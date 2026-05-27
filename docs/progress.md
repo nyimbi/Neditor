@@ -4748,6 +4748,13 @@ Homebrew readiness gap de-cycling:
 | `pnpm run check:homebrew` | Pass with release blockers | The refreshed Homebrew report now carries only the real pending blockers: final cask, signed/notarized macOS artifact, and macOS signing evidence. |
 | `pnpm run check:release-readiness` | Pass with external gaps | The readiness aggregator no longer re-imports the self-referential `homebrew-release-readiness` blocker from the Homebrew report; actual readiness failures still fail the aggregation directly. |
 
+Citation style fidelity:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked citation --lib` | Pass | 20 focused Rust citation tests passed after preserving common citation-style intent. APA, Chicago author-date, MLA, IEEE, and Vancouver now keep distinct generated bibliography formatting and citation labels instead of collapsing every CSL alias to generic author-year or numeric output. |
+| `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed after adding MLA to supported persisted bibliography defaults and exposing the style in the References and Settings citation-style selectors. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

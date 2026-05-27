@@ -1,5 +1,5 @@
 use crate::{
-    bibliography::BibliographyEntry,
+    bibliography::{bibliography_entry_markdown, BibliographyEntry},
     compiler_support::{citation_style, fenced_code_marker},
     document_ast::{extract_label, extract_quoted_attribute},
     indexing::{render_index_entries, IndexEntry},
@@ -157,22 +157,7 @@ fn render_bibliography_entries(bibliography: &[BibliographyEntry], style: &str) 
     bibliography
         .iter()
         .enumerate()
-        .map(|(index, entry)| match style {
-            "numeric" => format!("- [{}] **{}**. {}", index + 1, entry.key, entry.title),
-            "author-year" => {
-                let author_year = [entry.author.as_deref(), entry.issued.as_deref()]
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                if author_year.is_empty() {
-                    format!("- **{}**. {}", entry.key, entry.title)
-                } else {
-                    format!("- **{}**. {}. {}", entry.key, author_year, entry.title)
-                }
-            }
-            _ => format!("- **{}**. {}", entry.key, entry.title),
-        })
+        .map(|(index, entry)| bibliography_entry_markdown(index, entry, style))
         .collect::<Vec<_>>()
         .join("\n")
 }

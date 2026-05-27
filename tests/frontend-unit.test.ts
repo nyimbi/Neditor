@@ -3540,6 +3540,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
   deepEqual(migrated.bibliographyDefaults, { citationStyle: "apa" });
   equal(normalizeCitationStyle("numeric"), "numeric");
   equal(normalizeCitationStyle("ieee"), "ieee");
+  equal(normalizeCitationStyle("mla"), "mla");
   equal(normalizeCitationStyle("unknown-style"), "title");
   equal(migrated.brandProfileDefaults?.color, "#123456");
   equal(migrated.brandProfileDefaults?.watermark, "Draft");

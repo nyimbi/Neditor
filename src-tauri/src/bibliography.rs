@@ -963,7 +963,7 @@ fn render_citation_span(
         })
         .collect::<Vec<_>>()
         .join("; ");
-    let display_label = if style == "numeric" {
+    let display_label = if is_numeric_citation_style(style) {
         format!("[{label}]")
     } else {
         format!("({label})")
@@ -983,7 +983,7 @@ fn citation_label(
     context: &CitationRenderContext<'_>,
     style: &str,
 ) -> String {
-    if style == "numeric" {
+    if is_numeric_citation_style(style) {
         return context
             .numbers
             .get(reference.key.as_str())
@@ -996,6 +996,17 @@ fn citation_label(
     };
     match style {
         "key" => format!("@{}", reference.key),
+        "apa" | "chicago-author-date" => match (&entry.author, &entry.issued) {
+            (Some(author), Some(year)) => format!("{} {year}", citation_author_label(author)),
+            (Some(author), None) => citation_author_label(author),
+            (None, Some(year)) => year.clone(),
+            (None, None) => entry.title.clone(),
+        },
+        "mla" => entry
+            .author
+            .as_deref()
+            .map(citation_author_label)
+            .unwrap_or_else(|| entry.title.clone()),
         "author-year" => match (&entry.author, &entry.issued) {
             (Some(author), Some(year)) => format!("{author} {year}"),
             (Some(author), None) => author.clone(),
@@ -1003,5 +1014,168 @@ fn citation_label(
             (None, None) => entry.title.clone(),
         },
         _ => entry.title.clone(),
+    }
+}
+
+pub(crate) fn is_numeric_citation_style(style: &str) -> bool {
+    matches!(style, "numeric" | "ieee" | "vancouver")
+}
+
+pub(crate) fn citation_author_label(author: &str) -> String {
+    let authors = author
+        .split(" and ")
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(author_family_name)
+        .collect::<Vec<_>>();
+    match authors.as_slice() {
+        [] => author.trim().to_string(),
+        [single] => single.clone(),
+        [first, second] => format!("{first} and {second}"),
+        [first, ..] => format!("{first} et al."),
+    }
+}
+
+pub(crate) fn bibliography_entry_markdown(
+    index: usize,
+    entry: &BibliographyEntry,
+    style: &str,
+) -> String {
+    match style {
+        "numeric" => format!("- [{}] **{}**. {}", index + 1, entry.key, entry.title),
+        "ieee" => format!(
+            "- [{}] **{}**. {}",
+            index + 1,
+            entry.key,
+            ieee_reference(entry)
+        ),
+        "vancouver" => format!(
+            "- [{}] **{}**. {}",
+            index + 1,
+            entry.key,
+            vancouver_reference(entry)
+        ),
+        "apa" => format!("- **{}**. {}", entry.key, apa_reference(entry)),
+        "chicago-author-date" => format!(
+            "- **{}**. {}",
+            entry.key,
+            chicago_author_date_reference(entry)
+        ),
+        "mla" => format!("- **{}**. {}", entry.key, mla_reference(entry)),
+        "author-year" => {
+            let author_year = [entry.author.as_deref(), entry.issued.as_deref()]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(" ");
+            if author_year.is_empty() {
+                format!("- **{}**. {}", entry.key, entry.title)
+            } else {
+                format!("- **{}**. {}. {}", entry.key, author_year, entry.title)
+            }
+        }
+        _ => format!("- **{}**. {}", entry.key, entry.title),
+    }
+}
+
+fn author_family_name(author: &str) -> String {
+    let trimmed = author.trim();
+    if let Some((family, _rest)) = trimmed.split_once(',') {
+        let family = family.trim();
+        if !family.is_empty() {
+            return family.to_string();
+        }
+    }
+    let parts = trimmed.split_whitespace().collect::<Vec<_>>();
+    if parts.len() > 1 {
+        parts
+            .last()
+            .unwrap_or(&trimmed)
+            .trim_matches('.')
+            .to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn apa_reference(entry: &BibliographyEntry) -> String {
+    match (&entry.author, &entry.issued) {
+        (Some(author), Some(year)) => {
+            format!("{} ({year}). {}.", sentence_author(author), entry.title)
+        }
+        (Some(author), None) => format!("{} {}.", sentence_author(author), entry.title),
+        (None, Some(year)) => format!("({year}). {}.", entry.title),
+        (None, None) => format!("{}.", entry.title),
+    }
+}
+
+fn chicago_author_date_reference(entry: &BibliographyEntry) -> String {
+    match (&entry.author, &entry.issued) {
+        (Some(author), Some(year)) => {
+            format!("{} {year}. {}.", sentence_author(author), entry.title)
+        }
+        (Some(author), None) => format!("{} {}.", sentence_author(author), entry.title),
+        (None, Some(year)) => format!("{year}. {}.", entry.title),
+        (None, None) => format!("{}.", entry.title),
+    }
+}
+
+fn mla_reference(entry: &BibliographyEntry) -> String {
+    match (&entry.author, &entry.issued) {
+        (Some(author), Some(year)) => format!(
+            "{} <em>{}</em>. {year}.",
+            sentence_author(author),
+            entry.title
+        ),
+        (Some(author), None) => format!("{} <em>{}</em>.", sentence_author(author), entry.title),
+        (None, Some(year)) => format!("<em>{}</em>. {year}.", entry.title),
+        (None, None) => format!("<em>{}</em>.", entry.title),
+    }
+}
+
+fn ieee_reference(entry: &BibliographyEntry) -> String {
+    match (&entry.author, &entry.issued) {
+        (Some(author), Some(year)) => format!(
+            "{}, \"{},\" {year}.",
+            normalize_reference_author(author),
+            entry.title
+        ),
+        (Some(author), None) => format!(
+            "{}, \"{}.\"",
+            normalize_reference_author(author),
+            entry.title
+        ),
+        (None, Some(year)) => format!("\"{},\" {year}.", entry.title),
+        (None, None) => format!("\"{}.\"", entry.title),
+    }
+}
+
+fn vancouver_reference(entry: &BibliographyEntry) -> String {
+    match (&entry.author, &entry.issued) {
+        (Some(author), Some(year)) => {
+            format!("{} {}. {year}.", sentence_author(author), entry.title)
+        }
+        (Some(author), None) => format!("{} {}.", sentence_author(author), entry.title),
+        (None, Some(year)) => format!("{}. {year}.", entry.title),
+        (None, None) => format!("{}.", entry.title),
+    }
+}
+
+fn normalize_reference_author(author: &str) -> String {
+    author
+        .split(" and ")
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>()
+        .join(" and ")
+}
+
+fn sentence_author(author: &str) -> String {
+    let normalized = normalize_reference_author(author);
+    if normalized.ends_with(['.', '!', '?']) {
+        normalized
+    } else {
+        format!("{normalized}.")
     }
 }

@@ -15,6 +15,8 @@ export const SUPPORTED_CITATION_STYLES = [
   "american-psychological-association",
   "chicago-author-date",
   "chicago",
+  "mla",
+  "modern-language-association",
   "harvard",
   "council-of-science-editors-author-date",
   "key",

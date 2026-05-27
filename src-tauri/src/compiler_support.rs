@@ -72,22 +72,18 @@ pub(crate) fn canonical_citation_style(style: &str) -> Option<&'static str> {
     let normalized = style.trim().to_ascii_lowercase();
     match normalized.as_str() {
         "title" | "neditor-title" => Some("title"),
-        "author-year"
-        | "author_year"
-        | "apa"
-        | "american-psychological-association"
-        | "chicago-author-date"
-        | "chicago"
-        | "harvard"
-        | "council-of-science-editors-author-date" => Some("author-year"),
+        "author-year" | "author_year" | "harvard" | "council-of-science-editors-author-date" => {
+            Some("author-year")
+        }
+        "apa" | "american-psychological-association" => Some("apa"),
+        "chicago-author-date" | "chicago" => Some("chicago-author-date"),
+        "mla" | "modern-language-association" => Some("mla"),
         "key" | "citation-key" | "citation_key" => Some("key"),
-        "numeric"
-        | "ieee"
-        | "vancouver"
-        | "nature"
-        | "american-medical-association"
-        | "ama"
-        | "elsevier-vancouver" => Some("numeric"),
+        "numeric" => Some("numeric"),
+        "ieee" => Some("ieee"),
+        "vancouver" | "nature" | "american-medical-association" | "ama" | "elsevier-vancouver" => {
+            Some("vancouver")
+        }
         _ => None,
     }
 }

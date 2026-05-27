@@ -1271,6 +1271,7 @@
               <option value="numeric">Numeric</option>
               <option value="apa">APA</option>
               <option value="chicago-author-date">Chicago author-date</option>
+              <option value="mla">MLA</option>
               <option value="harvard">Harvard</option>
               <option value="ieee">IEEE</option>
               <option value="vancouver">Vancouver</option>
@@ -2322,6 +2323,7 @@
               <option value="numeric">Numeric</option>
               <option value="apa">APA</option>
               <option value="chicago-author-date">Chicago author-date</option>
+              <option value="mla">MLA</option>
               <option value="harvard">Harvard</option>
               <option value="ieee">IEEE</option>
               <option value="vancouver">Vancouver</option>

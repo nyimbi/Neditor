@@ -238,6 +238,73 @@ fn compiler_maps_common_csl_style_aliases_to_native_renderers() {
 }
 
 #[test]
+fn compiler_preserves_common_citation_style_intent_in_bibliographies() {
+    let source = |style: &str| {
+        format!(
+            "---\ntitle: Style Fidelity\nstatus: approved\napprovedBy: QA\ncitationStyle: {style}\n---\n# Style Fidelity\nClaim [@porter1985, p. 42].\n\n```bibtex\n@book{{porter1985,\n title={{Competitive Advantage}},\n author={{Porter, Michael E.}},\n year={{1985}}\n}}\n```\n[BIBLIOGRAPHY]\n"
+        )
+    };
+
+    let apa = compile(CompileRequest {
+        text: source("apa"),
+        file_path: None,
+    });
+    assert!(apa.html.contains("(Porter 1985, p. 42)"));
+    assert!(
+        apa.compiled_markdown
+            .contains("- **porter1985**. Porter, Michael E. (1985). Competitive Advantage."),
+        "{}",
+        apa.compiled_markdown
+    );
+
+    let chicago = compile(CompileRequest {
+        text: source("chicago-author-date"),
+        file_path: None,
+    });
+    assert!(chicago.html.contains("(Porter 1985, p. 42)"));
+    assert!(chicago
+        .compiled_markdown
+        .contains("- **porter1985**. Porter, Michael E. 1985. Competitive Advantage."));
+
+    let mla = compile(CompileRequest {
+        text: source("mla"),
+        file_path: None,
+    });
+    assert!(mla.html.contains("(Porter, p. 42)"));
+    assert!(mla
+        .compiled_markdown
+        .contains("- **porter1985**. Porter, Michael E. <em>Competitive Advantage</em>. 1985."));
+
+    let ieee = compile(CompileRequest {
+        text: source("ieee"),
+        file_path: None,
+    });
+    assert!(ieee.html.contains("[1, p. 42]"));
+    assert!(
+        ieee.compiled_markdown
+            .contains("- [1] **porter1985**. Porter, Michael E., \"Competitive Advantage,\" 1985."),
+        "{}",
+        ieee.compiled_markdown
+    );
+
+    let vancouver = compile(CompileRequest {
+        text: source("vancouver"),
+        file_path: None,
+    });
+    assert!(vancouver.html.contains("[1, p. 42]"));
+    assert!(vancouver
+        .compiled_markdown
+        .contains("- [1] **porter1985**. Porter, Michael E. Competitive Advantage. 1985."));
+
+    for response in [apa, chicago, mla, ieee, vancouver] {
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Unsupported citation style")));
+    }
+}
+
+#[test]
 fn compiler_loads_csl_json_bibliography() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
