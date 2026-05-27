@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `6fe1141 Reject
-  stale release evidence kits`
+- Latest inspected committed baseline before this update: `020eb43 Protect
+  two-way table source edits`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -39,6 +39,11 @@ Recent pushed checkpoints visible in current git history:
   from context switches. While a table edit is dirty, table selection, edit at
   cursor, and new-table actions are disabled or guarded until the user applies,
   updates, reloads, or cancels the current table edit.
+- Agent Workspace AI step assistance now has browser workflow proof. The
+  focused help/workflow test opens the Agent Workspace, plans a multi-lane
+  workflow, clicks **Add answer and replan**, verifies the editable context
+  answers receive the suggested answer, rationale, and context signals, and
+  then continues through packet generation and provider handoff.
 - The packaged `ned` CLI now has a headless RFP analysis and response workflow
   for procurement teams. `ned rfp-response` / `ned analyze-rfp` accepts
   Markdown/stdin, PDF, DOCX, or URL sources through native RFP intake, extracts
@@ -4383,6 +4388,16 @@ Two-way table source editing guard:
 | `pnpm run check:docs` | Pass | Markdown links resolved after documenting guarded two-way table source editing. |
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the guarded two-way table editing evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the guarded table source editing diff. |
+
+Agent Workspace AI step assistance browser proof:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "offers searchable contextual help with workflow actions" --project chromium` | Pass | Focused Chromium workflow now proves the visible Agent Workspace **Add answer and replan** action appends the AI suggested answer into editable context answers with rationale and context signals, immediately replans, and keeps the generated agent packet/provider workflow usable. |
+| `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after strengthening browser proof for Agent Workspace step assistance. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting the Agent Workspace step-assistance proof. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after marking 11.4 Agentic step assistance complete with direct unit/static and focused browser evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the Agent Workspace step-assistance proof diff. |
 
 ## Next Execution Order
 

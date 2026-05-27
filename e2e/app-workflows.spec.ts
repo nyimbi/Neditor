@@ -1868,6 +1868,16 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await agent.getByRole("button", { name: "Plan agent workflow" }).click();
   await expect(agent.getByLabel("Agent workflow plan")).toContainText("create -> revise -> review -> distribute");
   await expect(agent.getByLabel("Agent workflow steps")).toContainText("Prepare distribution");
+  const contextAnswers = agent.getByLabel("Context answers and constraints");
+  await expect(contextAnswers).not.toHaveValue(/Context signals:/);
+  const stepAssistance = agent.getByLabel("AI step-by-step assistance");
+  await expect(stepAssistance).toContainText("AI Step Assistance");
+  await stepAssistance.getByRole("button", { name: "Add answer and replan" }).first().click();
+  await expect(contextAnswers).toHaveValue(/Rationale:/);
+  await expect(contextAnswers).toHaveValue(/Context signals:/);
+  await expect(contextAnswers).toHaveValue(/Context completeness/);
+  await expect(agent.getByLabel("Agent workflow plan")).toContainText("create -> revise -> review -> distribute");
+  await expect(stepAssistance).toContainText("suggestions");
   await agent.getByRole("button", { name: "Generate agent packet" }).click();
   await expect(agent.getByLabel("Agent generated output")).toContainText("Agent run prepared");
   await expect(agent.getByLabel("Agent generated output")).toContainText("QA gates");
