@@ -51,6 +51,12 @@ Recent pushed checkpoints visible in current git history:
   edited source text, formula rows, escaped pipes, and alignment across HTML,
   PDF, DOCX, PPTX, and Markdown bundle targets, and the audit validator now
   requires that case.
+- Rendered export audit now includes a generated TOC/page-number review case.
+  The generated `review-cases/toc-page-numbers` artifacts cover numbered
+  generated TOC entries, PDF page-number leader text, native DOCX TOC-field
+  output, and manual review links across HTML, PDF, DOCX, PPTX, and Markdown
+  bundle targets, and the audit/release-readiness validators now require that
+  case.
 - Include watcher state now has focused browser proof for directive edits. The
   workflow edits a master document from `!include chapters/risk.md` to
   `!include chapters/ops.md`, proves the include graph and watched path set
@@ -1443,6 +1449,8 @@ Recent pushed checkpoints visible in current git history:
 
 | Command | Result | Notes |
 | --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new generated TOC/page-number review case. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit now verifies `review-cases/toc-page-numbers` across HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts, including numbered generated TOC links, PDF page-number leaders, native DOCX TOC-field guidance, browser visual proof, Office preview dashboards, Poppler proof where available, and manual-review/sign-off metadata. |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting remains clean after the OpenAPI server-rendering update. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused transform test proves OpenAPI server variables plus operation/path server overrides render in generated API docs. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export conformance remains intact. |

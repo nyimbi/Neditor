@@ -94,7 +94,7 @@ if (issues.length === 0) {
   }
   const reviewCases = Array.isArray(auditReport.reviewCases) ? auditReport.reviewCases : [];
   const reviewCaseSlugs = new Set(reviewCases.map((reviewCase) => reviewCase.slug));
-  for (const slug of ["rich-blocks", "option-heavy", "edited-tables"]) {
+  for (const slug of ["rich-blocks", "option-heavy", "toc-page-numbers", "edited-tables"]) {
     if (!reviewCaseSlugs.has(slug)) {
       issues.push(`audit report is missing rendered review case ${slug}`);
     }
@@ -836,7 +836,7 @@ function collectMacTextutilProof(issues, assertions, report) {
       assertions,
       `macos-textutil-review-${reviewCase.slug}`,
       join(auditDir, docxTarget.path),
-      [...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || [])].filter(Boolean))],
+      docxReviewCaseEvidence(reviewCase),
     );
   }
 }
@@ -866,7 +866,7 @@ async function collectBrowserVisualProof(issues, assertions, report) {
         scope: `browser-visual-review-${reviewCase.slug}`,
         artifact: htmlTarget.path,
         screenshot: `review-${reviewCase.slug}.png`,
-        selectors: ["body", "h1", "table"],
+        selectors: reviewCase.slug === "toc-page-numbers" ? ["body", "h1", "#table-of-contents", "ul"] : ["body", "h1", "table"],
         needles: [...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || []).slice(0, 4)].filter(Boolean))],
       };
     })
@@ -1013,7 +1013,7 @@ async function collectOfficePreviewProof(issues, assertions, report) {
 
   for (const reviewCase of report.reviewCases || []) {
     const targets = new Map((reviewCase.targets || []).map((target) => [target.target, target.path]));
-    const requiredEvidence = [...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || [])].filter(Boolean))];
+    const requiredEvidence = docxReviewCaseEvidence(reviewCase);
     const presentationEvidence = [
       ...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || []).filter((item) => item === "INTERNAL")].filter(Boolean)),
     ];
@@ -1217,6 +1217,17 @@ function extractPptxPreview(path) {
     searchText: slides.map((slide) => slide.text).join("\n"),
     slideCount: slides.length,
   };
+}
+
+function docxReviewCaseEvidence(reviewCase) {
+  if (reviewCase.slug === "toc-page-numbers") {
+    return [
+      reviewCase.title,
+      "Table of Contents",
+      "Update table of contents in Word to refresh page numbers.",
+    ].filter(Boolean);
+  }
+  return [...new Set([reviewCase.title, ...(reviewCase.requiredEvidence || [])].filter(Boolean))];
 }
 
 function officePreviewHtml(target, extracted) {
@@ -1819,6 +1830,7 @@ function verifyManualReviewDashboard(issues, assertions) {
     "rendered-export-audit.epub",
     "review-cases/rich-blocks/rich-blocks.html",
     "review-cases/option-heavy/option-heavy.html",
+    "review-cases/toc-page-numbers/toc-page-numbers.html",
     "review-cases/edited-tables/edited-tables.html",
     "Executable Viewer And Package Proof",
     "Visual Review Thumbnails",

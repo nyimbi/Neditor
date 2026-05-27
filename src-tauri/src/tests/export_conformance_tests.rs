@@ -430,7 +430,8 @@ fn write_rendered_export_audit_artifacts(artifacts: RenderedExportAuditArtifacts
             "Inspect ZIP packages and confirm manifests plus publishing and Google Docs handoff files are present.",
             "Open review-cases/rich-blocks.* and confirm block quote, callout, task list, code, table, figure, equation, and generated figure/table lists remain legible across targets.",
             "Open review-cases/option-heavy.* and confirm cover/page numbers/watermark/style/appendix options are visible without corrupting body content.",
-            "Open review-cases/edited-tables.* and confirm edited values, formula rows, escaped pipes, and alignment survive across targets."
+            "Open review-cases/edited-tables.* and confirm edited values, formula rows, escaped pipes, and alignment survive across targets.",
+            "Open review-cases/toc-page-numbers.* and confirm numbered generated TOC entries, PDF page-number leaders, and DOCX update-field guidance survive across targets."
         ]
     });
     fs::write(
@@ -485,6 +486,23 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
                 "Review Comments",
                 "AI Provenance",
                 "For option review only.",
+            ],
+        ),
+        (
+            "toc-page-numbers",
+            "TOC Page Number Export",
+            "---\ntitle: TOC Page Number Export\nstatus: approved\napprovedBy: Release QA\napprovedAt: 2026-05-21T11:05:00Z\ntoc: true\ntocDepth: 3\ntocNumbered: true\nlayout:\n  footer: \"Page {{page}} of {{pages}}\"\n---\n# TOC Page Number Export\nIntro text that starts after the generated table of contents.\n\n{{page-break}}\n\n## Alpha\nAlpha section content should appear on a later page so the PDF TOC can show page-number leaders.\n\n### Beta\nBeta subsection stays inside the configured TOC depth.\n\n{{page-break}}\n\n## Delta\nDelta section content verifies later TOC entries and page numbering remain readable.\n",
+            json!({
+                "includeStyles": true,
+                "pageNumbers": true,
+                "includeManifest": true
+            }),
+            vec![
+                "Table of Contents",
+                "1 TOC Page Number Export",
+                "1.1 Alpha",
+                "1.1.1 Beta",
+                "1.2 Delta",
             ],
         ),
         (
@@ -553,6 +571,28 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
             let bundle_text = zip_entry_text(&bundle, "document.md");
             for expected in &evidence {
                 assert!(html.contains(expected), "{slug} html missing {expected}");
+            }
+            if slug == "toc-page-numbers" {
+                assert!(
+                    pdf_text.contains("- 1 TOC Page Number Export .... 2"),
+                    "{slug} pdf missing page-numbered title TOC entry"
+                );
+                assert!(
+                    pdf_text.contains("- 1.1 Alpha .... 3"),
+                    "{slug} pdf missing page-numbered Alpha TOC entry"
+                );
+                assert!(
+                    docx_text.contains(r#"w:instr="TOC \o &quot;1-3&quot; \h \z \u""#),
+                    "{slug} docx missing depth-aware TOC field"
+                );
+                assert!(
+                    docx_text.contains("Update table of contents in Word to refresh page numbers."),
+                    "{slug} docx missing TOC refresh guidance"
+                );
+                assert!(
+                    !docx_text.contains("[1 Alpha](#alpha)"),
+                    "{slug} docx should replace Markdown TOC links with a native TOC field"
+                );
             }
             assert!(pdf_text.contains(title), "{slug} pdf missing title");
             assert!(docx_text.contains(title), "{slug} docx missing title");
