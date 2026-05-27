@@ -51,7 +51,10 @@ Recent pushed checkpoints visible in current git history:
   well as the Tables panel, Writing Tools menu, and command palette. Users can
   open the table editor, load the table at the cursor, select the Markdown table
   source for direct text editing, edit a specific source cell, apply grid
-  changes back to text, and sync edited Markdown source back into the grid.
+  changes back to text, and sync edited Markdown source back into the grid. The
+  Tables sidebar now also tracks the current Markdown editor cursor cell so
+  users can see the exact source cell they are about to edit before applying a
+  direct text change.
 - Button help now gives disabled table/export actions an explicit hover hitbox
   while still describing the real disabled button with `aria-describedby`.
   Chromium workflow proof now covers the delegated tooltip path and the two-way

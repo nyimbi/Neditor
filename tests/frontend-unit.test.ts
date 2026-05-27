@@ -4831,6 +4831,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Edit Table Cell at Cursor"));
   ok(app.includes("Edit cell at cursor"));
   ok(app.includes("Apply cell to text"));
+  ok(app.includes("tableCursorCellPreview"));
+  ok(app.includes("tableCursorCellSummary"));
+  ok(app.includes("refreshTableCursorCellPreview(update.view)"));
   ok(app.includes("tableTextCellEdit"));
   ok(app.includes("findMarkdownTableCellAtPosition"));
   ok(app.includes("replaceMarkdownTableCellInText"));

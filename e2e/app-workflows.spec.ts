@@ -4049,6 +4049,13 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await expect.poll(() => editorText(page)).toContain("| Services | 275000 |");
   await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Services");
   await expect(page.getByLabel("Value, row 1, column B")).toHaveValue("275000");
+  await expect(page.getByText(/Cursor is in row 2, column B/)).toBeVisible();
+  await page.getByRole("button", { name: "Edit cell at cursor" }).click();
+  await expect(page.getByLabel("Table cell text")).toHaveValue("45000");
+  await page.getByLabel("Table cell text").fill("47000");
+  await page.getByRole("button", { name: "Apply cell to text" }).click();
+  await expect.poll(() => editorText(page)).toContain("| Support | 47000 |");
+  await expect(page.getByLabel("Value, row 2, column B")).toHaveValue("47000");
 });
 
 test("opens, saves, duplicates, renames, reveals, and reverts mocked files", async ({ page }) => {

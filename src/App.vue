@@ -586,12 +586,18 @@
               >
                 Apply grid to text
               </button>
-              <button type="button" title="Load the Markdown table cell under the editor cursor for a precise text edit" @click="loadTableTextCellAtCursor">
+              <button
+                type="button"
+                :disabled="!tableCursorCellPreview"
+                :title="tableCursorCellPreview ? 'Load the Markdown table cell under the editor cursor for a precise text edit' : 'Place the editor cursor inside a Markdown table header or body cell'"
+                @click="loadTableTextCellAtCursor"
+              >
                 Cell at cursor
               </button>
             </div>
           </section>
           <section class="table-cell-text-editor" aria-label="Text table cell editor">
+            <p class="sidebar-hint table-cursor-cell">{{ tableCursorCellSummary }}</p>
             <label>
               Table cell text
               <input
@@ -602,7 +608,14 @@
               />
             </label>
             <div class="table-actions">
-              <button type="button" title="Read the table cell at the current source cursor" @click="loadTableTextCellAtCursor">Edit cell at cursor</button>
+              <button
+                type="button"
+                :disabled="!tableCursorCellPreview"
+                :title="tableCursorCellPreview ? 'Read the table cell at the current source cursor' : 'Place the editor cursor inside a Markdown table header or body cell'"
+                @click="loadTableTextCellAtCursor"
+              >
+                Edit cell at cursor
+              </button>
               <button type="button" :disabled="!tableTextCellEdit" title="Write this cell value directly into the Markdown table text" @click="applyTableTextCellEdit">
                 Apply cell to text
               </button>
@@ -5847,6 +5860,7 @@ const tableSourceEditText = ref("");
 const tableSourceEditError = ref("");
 const tableSourceEditDirty = ref(false);
 const tableSourceEditLiveSynced = ref(false);
+const tableCursorCellPreview = ref<MarkdownTableCellEdit | null>(null);
 const tableTextCellEdit = ref<MarkdownTableCellEdit | null>(null);
 const tableTextCellValue = ref("");
 const tableTextCellError = ref("");
@@ -7204,6 +7218,13 @@ const tableTextCellEditSummary = computed(() => {
   if (!edit) return "Place the cursor in a Markdown table cell, then load the cell for a precise text edit.";
   const rowLabel = edit.rowKind === "header" ? "header" : `row ${edit.rowIndex + 1}`;
   return `Editing ${rowLabel}, column ${edit.columnLabel}, line ${edit.lineNumber}. Applying writes directly to the Markdown text.`;
+});
+const tableCursorCellSummary = computed(() => {
+  const edit = tableCursorCellPreview.value;
+  if (!edit) return "Cursor is not inside an editable Markdown table cell.";
+  const rowLabel = edit.rowKind === "header" ? "header" : `row ${edit.rowIndex + 1}`;
+  const value = edit.value.trim() || "blank cell";
+  return `Cursor is in ${rowLabel}, column ${edit.columnLabel}, line ${edit.lineNumber}: ${value}`;
 });
 const tableTwoWayState = computed(() =>
   buildTableTwoWayState({
@@ -13458,6 +13479,7 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
     }),
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
+      if (update.docChanged || update.selectionSet) refreshTableCursorCellPreview(update.view);
       if (!update.docChanged) return;
       if (syncingEditorFromStore) return;
       const text = update.state.doc.toString();
@@ -13854,6 +13876,7 @@ function buildEditor() {
   secondaryEditorView = store.splitSourcePanes && secondaryEditorHost.value
     ? createEditorView(secondaryEditorHost.value, "Secondary Markdown editor", false)
     : null;
+  refreshTableCursorCellPreview();
   void nextTick(() => restoreActiveScrollPosition());
 }
 
@@ -13875,6 +13898,7 @@ function syncEditorViewsToText(text: string) {
   } finally {
     syncingEditorFromStore = false;
   }
+  refreshTableCursorCellPreview();
 }
 
 function syncPeerEditorViews(source: EditorView, text: string) {
@@ -13891,6 +13915,7 @@ function syncPeerEditorViews(source: EditorView, text: string) {
   } finally {
     syncingEditorFromStore = false;
   }
+  refreshTableCursorCellPreview(source);
 }
 
 function syncPreviewScrollFromEditor() {
@@ -17071,6 +17096,20 @@ function editorCursorLineColumn() {
   };
 }
 
+function refreshTableCursorCellPreview(view = editorView) {
+  if (!view) {
+    tableCursorCellPreview.value = null;
+    return;
+  }
+  const selection = view.state.selection.main;
+  const line = view.state.doc.lineAt(selection.from);
+  tableCursorCellPreview.value = findMarkdownTableCellAtPosition(
+    view.state.doc.toString(),
+    line.number,
+    selection.from - line.from + 1,
+  );
+}
+
 function loadTableTextCellAtCursor() {
   flushEditorTextToStore();
   if (tableContextSwitchBlocked("loading a table cell text edit")) return false;
@@ -17638,6 +17677,7 @@ async function goToSourceTarget(target: {
     selection: { anchor: from, head: Math.max(from + 1, to) },
     effects: EditorView.scrollIntoView(from, { y: "center" }),
   });
+  refreshTableCursorCellPreview(editorView);
   editorView.focus();
 }
 
@@ -22839,6 +22879,11 @@ select:hover {
   padding: 8px;
   border: 1px solid #d8e0e8;
   background: #f8fafc;
+}
+
+.table-cursor-cell {
+  margin: 0;
+  font-size: 12px;
 }
 
 .table-cell-text-editor input {
