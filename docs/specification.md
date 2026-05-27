@@ -937,6 +937,11 @@ y: revenue
 ```
 ```
 
+Business chart specs can also set `target`/`goal`/`benchmark` reference lines,
+`targetLabel`, and `valuePrefix`/`valueSuffix`/`unit` labels. Bar, line, and
+area charts must preserve negative values with a real zero baseline so variance,
+cash-flow, budget, and profit/loss charts remain honest in preview and export.
+
 #### 10.4.6 `geojson`
 
 Output:

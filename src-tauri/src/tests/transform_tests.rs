@@ -652,6 +652,38 @@ fn chart_transform_renders_pie_area_and_kpi_specs() {
 }
 
 #[test]
+fn chart_transform_handles_negative_values_targets_and_value_units() {
+    let artifact = run_transform(
+            "chart".to_string(),
+            "type: bar\ntitle: Profit Variance\ntarget: 25\ntargetLabel: Plan\nvaluePrefix: $\nvalueSuffix: k\ndata:\n  - quarter: Q1\n    profit: 42\n  - quarter: Q2\n    profit: -18\n  - quarter: Q3\n    profit: 30\nx: quarter\ny: profit\n".to_string(),
+        )
+        .expect("variance chart transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("Profit Variance"));
+    assert!(artifact.html.contains("chart-target-line"));
+    assert!(artifact.html.contains("Plan: $25k"));
+    assert!(artifact.html.contains(">$42k<"));
+    assert!(artifact.html.contains(">$-18k<"));
+    assert!(artifact.html.contains("fill=\"#be123c\""));
+    assert!(artifact.html.contains(">Q2<"));
+    assert!(artifact.diagnostics.is_empty());
+
+    let area = run_transform(
+            "chart".to_string(),
+            "type: area\ntitle: Cash Flow\ntarget: 6\ngoalLabel: Break-even\nunit: m\ndata:\n  - month: Jan\n    value: -4\n  - month: Feb\n    value: 8\nx: month\ny: value\n".to_string(),
+        )
+        .expect("cash-flow area chart transform");
+    assert_eq!(area.output_kind, "svg");
+    assert!(area.html.contains("Cash Flow"));
+    assert!(area.html.contains(">-4m<"));
+    assert!(area.html.contains(">8m<"));
+    assert!(area.html.contains("Break-even: 6m"));
+    assert!(area.html.contains("<polygon"));
+    assert!(area.diagnostics.is_empty());
+}
+
+#[test]
 fn timeline_transform_renders_static_svg_preview() {
     let artifact = run_transform(
         "timeline".to_string(),

@@ -106,6 +106,10 @@ Recent pushed checkpoints visible in current git history:
   control for multi-column sections, carrying the value through preview CSS,
   PDF reflow, DOCX section column spacing, PPTX/PDF summaries, manifests, and
   Markdown bundle evidence.
+- Native `chart` transforms now handle business variance charts with negative
+  values, true zero baselines, target/goal/benchmark lines, and value
+  prefix/suffix/unit labels so profit/loss, budget, and cash-flow charts remain
+  readable without requiring Vega-Lite.
 - Direct text-edited tables now accept common Markdown pipe-table syntax with
   or without outer pipes. The frontend table editor parses `A | B` / `--- |
   ---` source edits into the visual grid, and the backend compiler normalizes
