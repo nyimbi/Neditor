@@ -4503,7 +4503,10 @@ RFP URL and DOCX source cleanup hardening:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is clean after hardening native RFP source cleanup. |
-| `cargo test --manifest-path src-tauri/Cargo.toml --locked rfp_import --lib` | Pass | 4 focused RFP importer tests passed, proving DOCX entity decoding, URL script/style/noise stripping, table/list text preservation, numeric entity decoding, and page-title extraction for URL-sourced RFPs. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked rfp_import --lib` | Pass | 5 focused RFP importer tests passed, proving DOCX entity decoding, URL script/style/noise stripping, table/list text preservation, numeric entity decoding, page-title extraction, and non-ASCII-safe case-insensitive tag cleanup for URL-sourced RFPs. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after recording non-ASCII-safe RFP URL cleanup evidence. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after refreshing native RFP URL cleanup evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the RFP URL cleanup hardening diff. |
 
 ## Next Execution Order
 

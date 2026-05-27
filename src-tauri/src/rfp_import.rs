@@ -297,14 +297,11 @@ fn html_to_text(html: &str) -> String {
 
 fn html_title(html: &str) -> Option<String> {
     let cleaned = remove_html_element_blocks(html, &["script", "style", "noscript", "svg"]);
-    let lower = cleaned.to_lowercase();
-    let title_open = lower.find("<title")?;
-    let title_body = lower[title_open..]
+    let title_open = find_ascii_case_insensitive(&cleaned, "<title", 0)?;
+    let title_body = cleaned[title_open..]
         .find('>')
         .map(|offset| title_open + offset + 1)?;
-    let title_close = lower[title_body..]
-        .find("</title>")
-        .map(|offset| title_body + offset)?;
+    let title_close = find_ascii_case_insensitive(&cleaned, "</title>", title_body)?;
     let title = normalize_text(&decode_text_entities(&cleaned[title_body..title_close]));
     (!title.is_empty()).then_some(title)
 }
@@ -357,24 +354,43 @@ fn push_separator(output: &mut String, separator: char) {
 fn remove_html_element_blocks(html: &str, element_names: &[&str]) -> String {
     let mut output = html.to_string();
     for element_name in element_names {
+        let start_pattern = format!("<{element_name}");
+        let end_pattern = format!("</{element_name}>");
         loop {
-            let lower = output.to_lowercase();
-            let Some(start) = lower.find(&format!("<{element_name}")) else {
+            let Some(start) = find_ascii_case_insensitive(&output, &start_pattern, 0) else {
                 break;
             };
-            let body_start = lower[start..]
+            let body_start = output[start..]
                 .find('>')
                 .map(|offset| start + offset + 1)
                 .unwrap_or(start);
-            let end_pattern = format!("</{element_name}>");
-            let end = lower[body_start..]
-                .find(&end_pattern)
-                .map(|offset| body_start + offset + end_pattern.len())
+            let end = find_ascii_case_insensitive(&output, &end_pattern, body_start)
+                .map(|offset| offset + end_pattern.len())
                 .unwrap_or(body_start);
             output.replace_range(start..end, " ");
         }
     }
     output
+}
+
+fn find_ascii_case_insensitive(haystack: &str, needle: &str, start_at: usize) -> Option<usize> {
+    let haystack_bytes = haystack.as_bytes();
+    let needle_bytes = needle.as_bytes();
+    if needle_bytes.is_empty() {
+        return Some(start_at.min(haystack_bytes.len()));
+    }
+    if start_at >= haystack_bytes.len() || needle_bytes.len() > haystack_bytes.len() - start_at {
+        return None;
+    }
+    haystack_bytes[start_at..]
+        .windows(needle_bytes.len())
+        .position(|window| {
+            window
+                .iter()
+                .zip(needle_bytes.iter())
+                .all(|(left, right)| left.eq_ignore_ascii_case(right))
+        })
+        .map(|offset| start_at + offset)
 }
 
 fn remove_html_comments(html: &str) -> String {
@@ -505,5 +521,23 @@ mod tests {
             "<html><head><title>Customer Support RFP &amp; Addendum</title></head><body>Body</body></html>",
         );
         assert_eq!(title, Some("Customer Support RFP & Addendum".to_string()));
+    }
+
+    #[test]
+    fn url_html_cleanup_handles_non_ascii_before_case_insensitive_tags() {
+        let html = concat!(
+            "İstanbul intro ",
+            "<SCRIPT>drop()</SCRIPT>",
+            "<TiTlE>RFP São Paulo &amp; Nairobi</TiTlE>",
+            "<body><p>Vendor must support café users &#x2713;.</p></body>"
+        );
+
+        assert_eq!(
+            html_title(html),
+            Some("RFP São Paulo & Nairobi".to_string())
+        );
+        let text = html_to_text(html);
+        assert!(text.contains("Vendor must support café users ✓."));
+        assert!(!text.contains("drop()"));
     }
 }
