@@ -477,6 +477,12 @@ NEditor is built for drafts that need evidence before publication.
   `.neditor/agent-handoffs` in the active document folder. NEditor reports the
   exact launch command, whether the selected CLI is present on `PATH`, and the
   handoff file path so the local agent can work from the same project context.
+- For RFP responses, use the native RFP wizard in Templates to import or paste
+  the source RFP, inspect stated and implied buyer intent, and review a
+  requirement-by-requirement compliance matrix. Each compliance row includes a
+  suggested response answer, evidence owner, verification note, and target
+  response section so the first draft is immediately actionable but still
+  reviewable.
 - Use `ai-source` blocks and AI-assisted section metadata so generated content
   can be marked as needing review or human-reviewed.
 

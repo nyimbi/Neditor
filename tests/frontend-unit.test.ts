@@ -1392,18 +1392,23 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(analysis.budgetHints.some((item) => item.includes("pricing")));
   ok(analysis.mandatoryAttachments.some((item) => item.includes("insurance certificate")));
   ok(analysis.complianceRows.every((row) => row.verification.includes("Compliance Matrix")));
+  ok(analysis.complianceRows.every((row) => row.suggestedResponse.includes("Specific requirement:")));
+  ok(analysis.complianceRows.some((row) => row.category === "Compliance" && row.suggestedResponse.includes("mapping controls")));
   equal(analysis.verificationSummary.totalRequirements, analysis.requirements.length);
   equal(analysis.verificationSummary.complianceRows, analysis.complianceRows.length);
   ok(analysis.verificationSummary.allRequirementsMapped);
   ok(analysis.verificationSummary.rowsNeedingEvidence > 0);
   ok(analysis.verificationSummary.checklist.some((item) => item.includes("Every extracted requirement")));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes(`source line ${row.sourceLine}`))));
+  ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes("Suggested answer reviewed"))));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes(row.owner))));
 
   const matrix = rfpComplianceMatrixMarkdown(analysis);
-  ok(matrix.includes("| ID | Requirement | Category | Compliance status | Response section | Evidence / proof | Verification |"));
+  ok(matrix.includes("| ID | Requirement | Category | Compliance status | Response section | Suggested response | Evidence / proof | Verification |"));
   ok(matrix.includes("RFP-REQ-001"));
   ok(matrix.includes("SOC 2 security controls"));
+  ok(matrix.includes("Suggested response"));
+  ok(matrix.includes("Evidence to attach"));
 
   const response = rfpResponseMarkdown(analysis, profile);
   ok(response.includes("## Buyer Intent Analysis"));
@@ -1412,6 +1417,7 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(response.includes("## Compliance Matrix"));
   ok(response.includes("## Requirement Verification"));
   ok(response.includes("### Requirement-Level Checks"));
+  ok(response.includes("Suggested response:"));
   ok(response.includes("Every extracted requirement has a compliance matrix row."));
   ok(response.includes("- [ ] Every RFP requirement appears in the compliance matrix."));
   ok(response.includes("source=NEditor RFP Response Wizard"));
@@ -3459,6 +3465,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="RFP analysis results"'));
   ok(app.includes("analyzeRfpSource"));
   ok(app.includes("import_rfp_source"));
+  ok(app.includes("row.suggestedResponse"));
   ok(app.includes('aria-label="Equation editor"'));
   ok(app.includes('aria-label="Equation templates"'));
   ok(app.includes('aria-label="Equation template filters"'));

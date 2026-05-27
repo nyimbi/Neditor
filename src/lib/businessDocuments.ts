@@ -105,6 +105,7 @@ export interface RfpRequirement {
 export interface RfpComplianceRow extends RfpRequirement {
   complianceStatus: "Responsive draft prepared" | "Needs evidence review";
   responseSection: string;
+  suggestedResponse: string;
   verification: string;
   verificationChecklist: string[];
 }
@@ -878,10 +879,10 @@ export function rfpComplianceMatrixMarkdown(analysis: RfpAnalysis) {
   return [
     "## Compliance Matrix",
     "",
-    "| ID | Requirement | Category | Compliance status | Response section | Evidence / proof | Verification |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
-    ...rows.map((row) => `| ${escapeMarkdownTableCell(row.id)} | ${escapeMarkdownTableCell(row.text)} | ${escapeMarkdownTableCell(row.category)} | ${escapeMarkdownTableCell(row.complianceStatus)} | ${escapeMarkdownTableCell(row.responseSection)} | ${escapeMarkdownTableCell(row.evidenceNeeded)} | ${escapeMarkdownTableCell(row.verification)} |`),
-    rows.length ? "" : "| RFP-REQ-001 | Paste or import the RFP text to populate requirements. | Intake | Needs evidence review | Requirements Analysis | Source RFP text | Not verified. |",
+    "| ID | Requirement | Category | Compliance status | Response section | Suggested response | Evidence / proof | Verification |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${escapeMarkdownTableCell(row.id)} | ${escapeMarkdownTableCell(row.text)} | ${escapeMarkdownTableCell(row.category)} | ${escapeMarkdownTableCell(row.complianceStatus)} | ${escapeMarkdownTableCell(row.responseSection)} | ${escapeMarkdownTableCell(row.suggestedResponse)} | ${escapeMarkdownTableCell(row.evidenceNeeded)} | ${escapeMarkdownTableCell(row.verification)} |`),
+    rows.length ? "" : "| RFP-REQ-001 | Paste or import the RFP text to populate requirements. | Intake | Needs evidence review | Requirements Analysis | Analyze the full source RFP before drafting a response. | Source RFP text | Not verified. |",
   ].join("\n");
 }
 
@@ -955,6 +956,8 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "",
       ...analysis.complianceRows.flatMap((row) => [
         `#### ${row.id}: ${row.category}`,
+        "",
+        `Suggested response: ${row.suggestedResponse}`,
         "",
         ...row.verificationChecklist.map((item) => `- [ ] ${item}`),
         "",
@@ -1117,8 +1120,10 @@ function responseStrategyForCategory(category: string, profile: Record<keyof Bus
 function buildRfpComplianceRow(requirement: RfpRequirement): RfpComplianceRow {
   const responseSection = responseSectionForCategory(requirement.category);
   const needsEvidenceReview = requirementNeedsEvidenceReview(requirement);
+  const suggestedResponse = suggestedRfpRequirementResponse(requirement, responseSection, needsEvidenceReview);
   const verificationChecklist = [
     `${requirement.id} maps source line ${requirement.sourceLine} to ${responseSection}.`,
+    `Suggested answer reviewed: ${suggestedResponse}`,
     `Evidence required: ${requirement.evidenceNeeded}`,
     `Owner assigned: ${requirement.owner}.`,
     needsEvidenceReview
@@ -1129,9 +1134,34 @@ function buildRfpComplianceRow(requirement: RfpRequirement): RfpComplianceRow {
     ...requirement,
     complianceStatus: needsEvidenceReview ? "Needs evidence review" : "Responsive draft prepared",
     responseSection,
+    suggestedResponse,
     verification: `${requirement.id} mapped from source line ${requirement.sourceLine} to ${responseSection} and Compliance Matrix; evidence owner ${requirement.owner} must confirm proof before submission.`,
     verificationChecklist,
   };
+}
+
+function suggestedRfpRequirementResponse(requirement: RfpRequirement, responseSection: string, needsEvidenceReview: boolean) {
+  const cleanRequirement = requirement.text.replace(/\s+/g, " ").trim().replace(/\.$/, "");
+  const caveat = needsEvidenceReview
+    ? ` This answer is ready for ${requirement.owner} evidence attachment and reviewer sign-off before submission.`
+    : " This answer is draft-ready; final reviewer should confirm no exception is needed.";
+  const categoryLead: Record<string, string> = {
+    Pricing: "We will provide a transparent commercial response with pricing basis, assumptions, exclusions, validity, and required commercial forms aligned to the buyer's format.",
+    Timeline: "We will meet the required schedule through a phased implementation plan with named milestones, dependencies, approval points, and delivery ownership.",
+    Compliance: "We will comply with the requirement by mapping controls, exceptions, proof artifacts, and reviewer sign-off in the compliance response.",
+    "Team and Experience": "We will demonstrate delivery capacity through named roles, relevant experience, certifications, references, and comparable project proof.",
+    "Mandatory Attachment": "We will include the required attachment in the submission checklist and assign ownership for completion before final packaging.",
+    "Delivery Governance": "We will manage delivery through governance cadence, quality controls, risk management, reporting, escalation, and service-level commitments.",
+    "Technical Solution": "We will address the requirement through a practical technical approach covering architecture, integrations, controls, training, documentation, and support.",
+    Requirement: "We will answer the requirement directly, cite supporting evidence, and keep unresolved assumptions visible for review.",
+  };
+  return [
+    categoryLead[requirement.category] || categoryLead.Requirement,
+    `Specific requirement: ${cleanRequirement}.`,
+    `Response section: ${responseSection}.`,
+    `Evidence to attach: ${requirement.evidenceNeeded}`,
+    caveat,
+  ].join(" ");
 }
 
 function requirementNeedsEvidenceReview(requirement: RfpRequirement) {

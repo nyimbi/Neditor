@@ -238,6 +238,11 @@ Recent pushed checkpoints visible in current git history:
   endnotes, and comments in addition to the main document body, so requirement
   language and buyer clarifications outside `word/document.xml` are not silently
   omitted from the RFP response wizard intake.
+- The native RFP response wizard now gives each extracted requirement a
+  context-aware suggested response answer, including response section, evidence
+  owner, proof needed, and reviewer caveat. Suggested answers appear in the
+  Templates UI, compliance matrix export, full RFP response draft, verification
+  checklist, and local-agent handoff brief.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
@@ -2805,6 +2810,17 @@ Business wizard step-assistance verification:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with business wizard step-assistance evidence recorded. |
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the business wizard step-assistance update. |
 | `git diff --check` | Pass | No whitespace errors after the business wizard step-assistance update. |
+
+RFP suggested response verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding context-aware suggested responses to every RFP compliance row, including matrix columns, full response draft text, verification checklist entries, UI wiring, and local-agent handoff context. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding suggested RFP response answers to the RFP analysis UI. |
+| `pnpm run check:docs` | Pass | 15 Markdown files were checked after documenting RFP suggested response answers; local links resolve. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with RFP suggested response evidence recorded. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the RFP suggested response update. |
+| `git diff --check` | Pass | No whitespace errors after the RFP suggested response update. |
 
 AI paste code fence cleanup verification:
 

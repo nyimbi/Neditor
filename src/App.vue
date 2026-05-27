@@ -949,6 +949,7 @@
                   <li v-for="row in rfpAnalysis.complianceRows.slice(0, 12)" :key="row.id">
                     <strong>{{ row.id }}</strong> {{ row.text }}
                     <small>{{ row.category }} | {{ row.responseSection }} | {{ row.complianceStatus }} | {{ row.verification }}</small>
+                    <p>{{ row.suggestedResponse }}</p>
                   </li>
                 </ol>
               </details>
@@ -14038,7 +14039,7 @@ function rfpResponseAnalysisBrief(analysis: RfpAnalysis) {
     ...analysis.impliedIntent.map((item) => `- ${item}`),
     "",
     "Requirements:",
-    ...analysis.complianceRows.map((item) => `- ${item.id} [${item.category}]: ${item.text} | ${item.responseStrategy} | ${item.complianceStatus} | ${item.verification}`),
+    ...analysis.complianceRows.map((item) => `- ${item.id} [${item.category}]: ${item.text} | Suggested response: ${item.suggestedResponse} | ${item.responseStrategy} | ${item.complianceStatus} | ${item.verification}`),
     "",
     "Timeline hints:",
     ...analysis.timelines.map((item) => `- ${item}`),
