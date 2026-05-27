@@ -47,11 +47,10 @@ Recent pushed checkpoints visible in current git history:
   open the table editor, load the table at the cursor, select the Markdown table
   source for direct text editing, edit a specific source cell, apply grid
   changes back to text, and sync edited Markdown source back into the grid.
-- Button help now resolves disabled controls by pointer coordinates as well as
-  event targets, so disabled table/export actions reliably show hover help and
-  `aria-describedby` guidance. Full Chromium workflow proof now includes the
-  delegated tooltip path and the two-way table editing path in the same clean
-  72-test browser run.
+- Button help now gives disabled table/export actions an explicit hover hitbox
+  while still describing the real disabled button with `aria-describedby`.
+  Chromium workflow proof now covers the delegated tooltip path and the two-way
+  table editing path.
 - Multi-cursor editing now includes first-class select-all-occurrences and
   split-selection-into-line-cursors commands in the Edit menu, command palette,
   and writing toolbar, backed by pure helper tests for repeated-term selection

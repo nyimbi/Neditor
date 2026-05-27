@@ -4343,12 +4343,16 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('exportDocumentAs("html")'));
   ok(app.includes("Use Shift plus Cmd or Ctrl plus A for the AI agent workspace"));
   ok(app.includes("button-help-tooltip"));
+  ok(app.includes("button-help-hitbox"));
+  ok(app.includes("handleButtonHelpHitboxEnter"));
+  ok(app.includes("button-help-hitbox-overlay"));
   ok(app.includes('role="tooltip"'));
   ok(app.includes("handleButtonHelpEnter"));
   ok(app.includes('window.addEventListener("mouseover", handleButtonHelpEnter)'));
-  ok(app.includes('window.addEventListener("mousemove", handleButtonHelpPointerMove)'));
+  ok(app.includes('window.addEventListener("mousemove", handleButtonHelpPointerMove, true)'));
   ok(app.includes('window.addEventListener("focusin", handleButtonHelpEnter)'));
   ok(app.includes("buttonFromPointerEvent"));
+  ok(app.includes('document.querySelectorAll<HTMLButtonElement>("button")'));
   ok(app.includes('button.getAttribute("data-help")'));
   ok(app.includes('button.getAttribute("aria-label")'));
   ok(app.includes('button.innerText.replace'));

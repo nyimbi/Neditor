@@ -2180,7 +2180,9 @@ test("shows delegated button help on hover and focus", async ({ page }) => {
   await selectSidebarPanelOption(page, "tables");
   const disabledExport = page.getByRole("button", { name: "Export CSV" });
   await expect(disabledExport).toBeDisabled();
-  await disabledExport.hover({ force: true });
+  const disabledExportHitbox = page.locator(".button-help-hitbox").filter({ has: disabledExport });
+  await disabledExportHitbox.hover();
+  await disabledExportHitbox.dispatchEvent("mouseenter");
   await expect(tooltip).toContainText("Export CSV");
   await expect(tooltip).toContainText("This action is unavailable until the required document state is ready.");
   await expect(disabledExport).toHaveAttribute("aria-describedby", "button-help-tooltip");

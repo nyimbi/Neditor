@@ -663,8 +663,14 @@
             <button type="button" :disabled="tableDataBusy" @click="importTableFromSpreadsheet">
               {{ tableDataBusy ? "Working..." : "Import CSV/XLSX" }}
             </button>
-            <button type="button" :disabled="tableDataBusy || !tableDraft" @click="exportSelectedTable('csv')">Export CSV</button>
-            <button type="button" :disabled="tableDataBusy || !tableDraft" @click="exportSelectedTable('xlsx')">Export XLSX</button>
+            <span class="button-help-hitbox" @mouseenter="handleButtonHelpHitboxEnter" @mousemove="handleButtonHelpHitboxEnter" @mouseleave="hideButtonHelp">
+              <button type="button" :disabled="tableDataBusy || !tableDraft" @click="exportSelectedTable('csv')">Export CSV</button>
+              <span v-if="tableDataBusy || !tableDraft" class="button-help-hitbox-overlay" aria-hidden="true"></span>
+            </span>
+            <span class="button-help-hitbox" @mouseenter="handleButtonHelpHitboxEnter" @mousemove="handleButtonHelpHitboxEnter" @mouseleave="hideButtonHelp">
+              <button type="button" :disabled="tableDataBusy || !tableDraft" @click="exportSelectedTable('xlsx')">Export XLSX</button>
+              <span v-if="tableDataBusy || !tableDraft" class="button-help-hitbox-overlay" aria-hidden="true"></span>
+            </span>
             <button type="button" @click="insertSqlTransformTemplate">Insert SQL transform</button>
           </div>
           <template v-if="tableDraft">
@@ -10740,7 +10746,7 @@ onMounted(async () => {
   void installDesktopWorkflowTestHooks();
   window.addEventListener("keydown", handleShortcut);
   window.addEventListener("mouseover", handleButtonHelpEnter);
-  window.addEventListener("mousemove", handleButtonHelpPointerMove);
+  window.addEventListener("mousemove", handleButtonHelpPointerMove, true);
   window.addEventListener("focusin", handleButtonHelpEnter);
   window.addEventListener("mouseout", handleButtonHelpLeave);
   window.addEventListener("focusout", handleButtonHelpLeave);
@@ -10758,7 +10764,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(scrollPersistHandle);
   window.removeEventListener("keydown", handleShortcut);
   window.removeEventListener("mouseover", handleButtonHelpEnter);
-  window.removeEventListener("mousemove", handleButtonHelpPointerMove);
+  window.removeEventListener("mousemove", handleButtonHelpPointerMove, true);
   window.removeEventListener("focusin", handleButtonHelpEnter);
   window.removeEventListener("mouseout", handleButtonHelpLeave);
   window.removeEventListener("focusout", handleButtonHelpLeave);
@@ -14015,7 +14021,19 @@ function buttonFromEvent(event: Event) {
 
 function buttonFromPointerEvent(event: MouseEvent) {
   const target = document.elementFromPoint(event.clientX, event.clientY);
-  return target?.closest("button") as HTMLButtonElement | null;
+  const button = target?.closest("button") as HTMLButtonElement | null;
+  if (button) return button;
+  return Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((candidate) => {
+    const rect = candidate.getBoundingClientRect();
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom
+    );
+  }) || null;
 }
 
 function buttonHelpText(button: HTMLButtonElement) {
@@ -14043,6 +14061,10 @@ function clearButtonHelpDescription() {
 function handleButtonHelpEnter(event: Event) {
   const button = buttonFromEvent(event) || (event instanceof MouseEvent ? buttonFromPointerEvent(event) : null);
   if (!button || button.closest(".button-help-tooltip")) return;
+  showButtonHelp(button);
+}
+
+function showButtonHelp(button: HTMLButtonElement) {
   const text = buttonHelpText(button);
   if (!text) return;
   const rect = button.getBoundingClientRect();
@@ -14051,6 +14073,13 @@ function handleButtonHelpEnter(event: Event) {
   const y = placement === "bottom" ? rect.bottom + 8 : rect.top - 8;
   describeButtonWithHelp(button);
   buttonHelp.value = { visible: true, text, x, y, placement };
+}
+
+function handleButtonHelpHitboxEnter(event: MouseEvent) {
+  const target = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  const button = target?.querySelector<HTMLButtonElement>("button");
+  if (!button) return;
+  showButtonHelp(button);
 }
 
 function handleButtonHelpPointerMove(event: MouseEvent) {
@@ -14070,6 +14099,13 @@ function handleButtonHelpLeave(event: Event) {
   if (!button) return;
   const related = "relatedTarget" in event && event.relatedTarget instanceof Node ? event.relatedTarget : null;
   if (related && button.contains(related)) return;
+  if (event instanceof MouseEvent) {
+    const pointerButton = buttonFromPointerEvent(event);
+    if (pointerButton) {
+      handleButtonHelpEnter(event);
+      return;
+    }
+  }
   hideButtonHelp();
 }
 
@@ -20654,6 +20690,20 @@ select:hover {
   font-size: 12px;
   line-height: 1.35;
   pointer-events: none;
+}
+
+.button-help-hitbox {
+  position: relative;
+  display: inline-grid;
+}
+
+.button-help-hitbox > button {
+  width: 100%;
+}
+
+.button-help-hitbox-overlay {
+  position: absolute;
+  inset: 0;
 }
 
 .guided-demo-modal {
