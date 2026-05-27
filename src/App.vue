@@ -542,16 +542,35 @@
           <p class="sidebar-hint">{{ selectedTableEditSummary }}</p>
           <label>
             Table
-            <select v-model.number="selectedTableIndex" @change="loadSelectedTable">
+            <select
+              :value="selectedTableIndex"
+              :disabled="tableDraftDirty"
+              :title="tableDraftDirty ? 'Apply or cancel the current table edit before switching source tables' : 'Choose a Markdown source table to edit'"
+              @change="selectTableForEditing(inputValue($event))"
+            >
               <option v-for="(table, index) in markdownTables" :key="`${table.startLine}-${index}`" :value="index">
                 Line {{ table.startLine }} - {{ table.caption || table.headers.join(", ") }}
               </option>
             </select>
           </label>
           <div class="table-actions">
-            <button type="button" @click="loadTableAtCursor()">Edit table at cursor</button>
+            <button
+              type="button"
+              :disabled="tableDraftDirty"
+              :title="tableDraftDirty ? 'Apply or cancel the current table edit before loading another source table' : 'Load the Markdown table at the editor cursor or selection'"
+              @click="loadTableAtCursor()"
+            >
+              Edit table at cursor
+            </button>
             <button type="button" :disabled="!selectedTable" @click="goToSelectedTableSource">Go to source table</button>
-            <button type="button" @click="createTableDraft">New table</button>
+            <button
+              type="button"
+              :disabled="tableDraftDirty"
+              :title="tableDraftDirty ? 'Apply or cancel the current table edit before creating another table' : 'Create a new Markdown table draft'"
+              @click="createTableDraft"
+            >
+              New table
+            </button>
           </div>
           <div class="table-actions">
             <button type="button" :disabled="tableDataBusy" @click="importTableFromSpreadsheet">
@@ -5228,6 +5247,7 @@ import {
   spreadsheetColumnName,
   tableDraftMarkdown,
   tableSourceChanged,
+  tableSourceText,
   tableDraftFromRows,
   tableColumnRange,
   validateTableDraft,
@@ -6975,6 +6995,7 @@ const tableSourceEditSummary = computed(() => {
 });
 const tableDraftDirty = computed(() => {
   const snapshot = tableSourceSnapshot.value;
+  if (isNewTableDraft.value && tableDraft.value) return true;
   return Boolean(tableSourceEditDirty.value || (tableDraft.value && snapshot && tableDraftMarkdownPreview.value !== snapshot.draftMarkdown));
 });
 const tableDraftSourceChanged = computed(() => {
@@ -10653,7 +10674,7 @@ watch(
   async () => {
     await nextTick();
     selectedTableIndex.value = 0;
-    loadSelectedTable();
+    loadSelectedTable({ force: true });
     buildEditor();
   },
 );
@@ -10670,7 +10691,7 @@ watch(
   () => {
     if (store.sidebar !== "tables" || !tableDraft.value || isNewTableDraft.value || !tableDraftSourceChanged.value) return;
     if (tableDraftDirty.value) return;
-    loadSelectedTable();
+    loadSelectedTable({ force: true });
     store.statusMessage = "Synced table editor from Markdown source changes";
   },
 );
@@ -16803,6 +16824,7 @@ function editorSelectionLineRange() {
 
 function loadTableAtCursor(silent = false) {
   flushEditorTextToStore();
+  if (tableContextSwitchBlocked("loading another source table", silent)) return false;
   const range = editorSelectionLineRange();
   if (!range) {
     if (!silent) store.statusMessage = "Open the source editor and place the cursor inside a Markdown table";
@@ -16814,11 +16836,24 @@ function loadTableAtCursor(silent = false) {
     return false;
   }
   selectedTableIndex.value = index;
-  loadSelectedTable();
+  loadSelectedTable({ force: true });
   store.sidebar = "tables";
   const table = selectedTable.value;
   store.statusMessage = `Loaded source table from line ${table?.captionLine || table?.startLine || range.fromLine} for editing`;
   return true;
+}
+
+function tableContextSwitchBlocked(action: string, silent = false) {
+  if (!tableDraftDirty.value) return false;
+  if (!silent) store.statusMessage = `Apply or cancel the current table edit before ${action}.`;
+  return true;
+}
+
+function selectTableForEditing(value: string) {
+  if (tableContextSwitchBlocked("switching source tables")) return;
+  const nextIndex = clampInteger(Number(value), 0, Math.max(0, markdownTables.value.length - 1));
+  selectedTableIndex.value = nextIndex;
+  loadSelectedTable({ force: true });
 }
 
 function goToSelectedTableSource() {
@@ -16866,27 +16901,33 @@ function applyTableSourceEdit(forceSourceOverwrite = false) {
   applyTableDraft(forceSourceOverwrite);
 }
 
-function loadSelectedTable() {
+function loadSelectedTable(options: { force?: boolean } = {}) {
+  if (!options.force && tableContextSwitchBlocked("loading another source table")) return false;
+  if (markdownTables.value.length && selectedTableIndex.value >= markdownTables.value.length) {
+    selectedTableIndex.value = markdownTables.value.length - 1;
+  }
   const table = selectedTable.value;
   isNewTableDraft.value = false;
   if (!table) {
     tableDraft.value = null;
     tableSourceSnapshot.value = null;
     refreshTableSourceEditFromDraft();
-    return;
+    return true;
   }
   const draft = markdownTableToDraft(table);
   tableDraft.value = draft;
   rememberTableSource(table, draft);
   refreshTableSourceEditFromDraft();
+  return true;
 }
 
 function reloadTableDraftFromSource() {
-  loadSelectedTable();
+  loadSelectedTable({ force: true });
   store.statusMessage = "Reloaded table editor from the current Markdown source table";
 }
 
 function createTableDraft() {
+  if (tableContextSwitchBlocked("creating another table")) return;
   isNewTableDraft.value = true;
   tableSourceSnapshot.value = null;
   tableDraft.value = {
@@ -16904,6 +16945,10 @@ function createTableDraft() {
 }
 
 function applyTableDraft(forceSourceOverwrite = false) {
+  flushEditorTextToStore();
+  if (!isNewTableDraft.value && !selectedTable.value && markdownTables.value.length) {
+    selectedTableIndex.value = clampInteger(selectedTableIndex.value, 0, markdownTables.value.length - 1);
+  }
   const table = selectedTable.value;
   const draft = tableDraft.value;
   if (!draft) return;
@@ -16931,15 +16976,28 @@ function applyTableDraft(forceSourceOverwrite = false) {
       sourceText: serialized.join("\n"),
       draftMarkdown: serialized.join("\n"),
     };
-  } else if (!isNewTableDraft.value && tableSourceSnapshot.value) {
+  } else if (!isNewTableDraft.value) {
     store.statusMessage = "The source table is no longer available; reload from source or create a new table draft";
     return;
   } else {
     insertTableAtCursor(serialized);
-    const nextTableIndex = markdownTables.value.length;
+    const insertedSourceText = serialized.join("\n");
+    const updatedTables = parseMarkdownTables(active.value.text);
+    let insertedTableIndex = -1;
+    for (let index = updatedTables.length - 1; index >= 0; index -= 1) {
+      if (tableSourceText(active.value.text, updatedTables[index]) === insertedSourceText) {
+        insertedTableIndex = index;
+        break;
+      }
+    }
+    selectedTableIndex.value =
+      insertedTableIndex >= 0 ? insertedTableIndex : Math.max(0, updatedTables.length - 1);
+    const insertedTable = updatedTables[selectedTableIndex.value];
+    if (insertedTable) {
+      tableSourceSnapshot.value = createTableSourceSnapshot(active.value.text, active.value.id, selectedTableIndex.value, insertedTable, normalizedDraft);
+    }
     void nextTick().then(() => {
-      selectedTableIndex.value = Math.min(nextTableIndex, Math.max(0, markdownTables.value.length - 1));
-      loadSelectedTable();
+      loadSelectedTable({ force: true });
     });
   }
   isNewTableDraft.value = false;
@@ -16952,11 +17010,11 @@ function cancelTableDraft() {
     tableDraft.value = null;
     isNewTableDraft.value = false;
     refreshTableSourceEditFromDraft();
-    if (selectedTable.value) loadSelectedTable();
+    if (selectedTable.value) loadSelectedTable({ force: true });
     store.statusMessage = "Cancelled new table";
     return;
   }
-  loadSelectedTable();
+  loadSelectedTable({ force: true });
   store.statusMessage = "Discarded table draft changes";
 }
 

@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `aca8b8c Make table
-  source editing explicitly two-way`
+- Latest inspected committed baseline before this update: `6fe1141 Reject
+  stale release evidence kits`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -35,6 +35,10 @@ Recent pushed checkpoints visible in current git history:
   accepting a kit generated for an older commit. The aggregator recomputes the
   current Git HEAD and clean-tree state, then fails the evidence-kit check if
   the embedded kit commit does not match or the current checkout is dirty.
+- Two-way table editing now protects unsaved source-block and visual-grid edits
+  from context switches. While a table edit is dirty, table selection, edit at
+  cursor, and new-table actions are disabled or guarded until the user applies,
+  updates, reloads, or cancels the current table edit.
 - The packaged `ned` CLI now has a headless RFP analysis and response workflow
   for procurement teams. `ned rfp-response` / `ned analyze-rfp` accepts
   Markdown/stdin, PDF, DOCX, or URL sources through native RFP intake, extracts
@@ -4368,6 +4372,17 @@ Scriptable business profile field discovery:
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local setup automation without claiming external release proof completion. |
 | Browser e2e suite | Not rerun | Skipped to conserve battery because this slice changes terminal behavior, completion/help text, README/spec copy, and static Settings guidance rather than interactive workbench behavior. |
 | `git diff --check` | Pass | No whitespace errors are present in the profile field-discovery diff. |
+
+Two-way table source editing guard:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after guarding table context switches and adding static checks for the table source-switch guard and selector handler. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after flushing editor source before table apply, preventing existing-table source edits from falling through to new-table insertion, and snapshotting newly inserted tables immediately. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow now proves editable Markdown table source disables context-switch actions while dirty, parses typed source into the visual grid, applies that source back into the existing table, and avoids leaving the replaced captioned table behind. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting guarded two-way table source editing. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the guarded two-way table editing evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the guarded table source editing diff. |
 
 ## Next Execution Order
 

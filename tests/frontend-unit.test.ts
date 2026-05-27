@@ -4154,6 +4154,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Refresh source from grid"));
   ok(app.includes("Apply source text"));
   ok(app.includes("tableSourceEditDirty"));
+  ok(app.includes("tableContextSwitchBlocked"));
+  ok(app.includes("Apply or cancel the current table edit before switching source tables"));
+  ok(app.includes("selectTableForEditing"));
   ok(app.includes("updateTableDraftFromSourceText"));
   ok(app.includes("applyTableSourceEdit"));
   ok(app.includes("tableDraftSourceChanged"));

@@ -3706,6 +3706,24 @@ test("runs command palette insertion and table editor workflows", async ({ page 
 
   await expect.poll(() => editorText(page)).toContain("Pipeline");
   await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Pipeline");
+
+  await page.locator(".table-source-editor textarea").fill(
+    [
+      "Table: Workflow budget {#tbl:workflow-budget}",
+      "| Item | Value |",
+      "| --- | ---: |",
+      "| Services | 250000 |",
+      "| Support | 40000 |",
+    ].join("\n"),
+  );
+  await expect(page.getByRole("button", { name: "Edit table at cursor" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "New table" })).toBeDisabled();
+  await page.getByRole("button", { name: "Update grid from source" }).click();
+  await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Services");
+  await page.getByRole("button", { name: "Apply source text" }).click();
+  await expect.poll(() => editorText(page)).toContain("Services");
+  await expect.poll(() => editorText(page)).toContain("Support");
+  await expect.poll(() => editorText(page)).not.toContain("Table: Workflow budget\n| Item | Value |\n| --- | ---: |\n| Pipeline | 125000 |");
 });
 
 test("opens, saves, duplicates, renames, reveals, and reverts mocked files", async ({ page }) => {
