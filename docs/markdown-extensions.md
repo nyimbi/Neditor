@@ -375,7 +375,7 @@ Common transform names:
 | Transform | Purpose |
 | --- | --- |
 | `calc` | Document calculations. |
-| `chart` | Bar, line, pie, area, and KPI charts. |
+| `chart` | Bar, horizontal bar, line, pie, area, and KPI charts. |
 | `mermaid`, `pikchr`, `dot`, `graphviz`, `circo`, `neato`, `fdp`, `osage`, `twopi`, `d2`, `plantuml` | Diagrams with native fallback or trusted external engine support. |
 | `csv`, `tsv`, `json`, `yaml` | Structured data rendering. |
 | `sql` | Read-only SQLite query results rendered as Markdown tables. |
@@ -448,6 +448,11 @@ x: region
 y: revenue
 ```
 ````
+
+Use `type: horizontal-bar` or `type: barh` when category labels are long or
+the chart is a ranked comparison. Horizontal charts support the same `target`,
+`targetLabel`, `valuePrefix`, `valueSuffix`, `unit`, and multi-series fields as
+standard bar charts.
 
 External engines are disabled until trusted. See
 [External transform setup](external-transforms.md) for Graphviz, D2, PlantUML,

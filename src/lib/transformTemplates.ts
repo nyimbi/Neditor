@@ -792,6 +792,33 @@ y: revenue
     ["chart", "revenue"],
   ),
   template(
+    "chart-business-horizontal-risk",
+    "Charts",
+    "chart",
+    "Horizontal risk comparison",
+    "Creates a horizontal bar chart for ranked business comparisons with long labels.",
+    fenced(
+      "chart",
+      `
+type: horizontal-bar
+title: Renewal risk by account
+target: 40
+targetLabel: Escalation
+valueSuffix: "%"
+data:
+  - account: Very Long Enterprise Account
+    risk: 72
+  - account: Growth Segment
+    risk: 34
+  - account: Expansion Candidate
+    risk: 18
+x: account
+y: risk
+`,
+    ),
+    ["chart", "risk", "horizontal"],
+  ),
+  template(
     "vega-lite-grouped",
     "Charts",
     "vega-lite",

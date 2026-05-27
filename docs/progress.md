@@ -4789,6 +4789,14 @@ Two-way table text editing:
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after routing clean in-document table source edits through the explicit table text-sync helper instead of an implicit watcher reload. |
 | `pnpm run check:tables:manual` | Pass with pending human sign-off | Table editor manual review template and pending summary were regenerated so source-to-grid, grid-to-source, spreadsheet exchange, rendered export, keyboard/accessibility, and supported-host review remain visible release gates. |
 
+Horizontal business charts:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked chart_transform_renders_horizontal_business_comparisons --lib` | Pass | Focused transform proof shows native chart rendering now supports `horizontal-bar`/`barh` for long-label ranked comparisons, including negative values, target lines, units, and grouped multi-series bars. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked chart_transform --lib` | Pass | All five chart transform tests passed, covering YAML bars, pie, area, KPI, negative variance/target/unit charts, grouped bar/line charts, and horizontal business comparisons. |
+| `pnpm run test:unit` | Pass | Frontend template coverage now proves the built-in chart library includes a horizontal risk-comparison starter template with fill fields. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

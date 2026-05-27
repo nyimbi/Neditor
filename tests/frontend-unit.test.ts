@@ -3896,6 +3896,10 @@ test("transform template library covers reusable calculations and custom templat
   const chartTemplate = builtinTransformTemplates.find((template) => template.transform === "chart");
   if (!chartTemplate) throw new Error("missing chart template");
   ok(transformTemplateFillFields(chartTemplate).some((field) => field.name === "title"));
+  const horizontalChartTemplate = builtinTransformTemplates.find((template) => template.id === "chart-business-horizontal-risk");
+  if (!horizontalChartTemplate) throw new Error("missing horizontal chart template");
+  ok(horizontalChartTemplate.body.includes("type: horizontal-bar"));
+  ok(transformTemplateFillFields(horizontalChartTemplate).some((field) => field.name === "targetLabel"));
   deepEqual(
     transformTemplateFillFields({
       transform: "calc",

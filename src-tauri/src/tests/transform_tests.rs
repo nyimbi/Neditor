@@ -752,6 +752,41 @@ fn chart_transform_renders_multi_series_business_specs() {
 }
 
 #[test]
+fn chart_transform_renders_horizontal_business_comparisons() {
+    let ranked = run_transform(
+            "chart".to_string(),
+            "type: horizontal-bar\ntitle: Renewal Risk by Account\ntarget: 40\ntargetLabel: Escalation\nvalueSuffix: \"%\"\ndata:\n  - account: Very Long Enterprise Account Name\n    risk: 72\n  - account: Growth Segment\n    risk: -12\nx: account\ny: risk\n".to_string(),
+        )
+        .expect("horizontal chart transform");
+
+    assert_eq!(ranked.output_kind, "svg");
+    assert!(ranked.html.contains("Renewal Risk by Account"));
+    assert!(ranked.html.contains("chart-horizontal-bar"));
+    assert!(ranked.html.contains("chart-horizontal-label"));
+    assert!(ranked.html.contains("Very Long Enterprise Account Name"));
+    assert!(ranked.html.contains(">72%<"));
+    assert!(ranked.html.contains(">-12%<"));
+    assert!(ranked.html.contains("fill=\"#be123c\""));
+    assert!(ranked.html.contains("chart-target-vertical-line"));
+    assert!(ranked.html.contains("Escalation: 40%"));
+    assert!(ranked.diagnostics.is_empty());
+
+    let grouped = run_transform(
+            "chart".to_string(),
+            "type: barh\ntitle: Proposal Scorecard\nunit: pts\ndata:\n  - criterion: Technical fit\n    incumbent: 62\n    challenger: 84\n  - criterion: Implementation risk\n    incumbent: 38\n    challenger: 24\nx: criterion\nseries:\n  - key: incumbent\n    label: Incumbent\n  - key: challenger\n    label: Challenger\n".to_string(),
+        )
+        .expect("grouped horizontal chart transform");
+    assert_eq!(grouped.output_kind, "svg");
+    assert!(grouped.html.contains("Proposal Scorecard"));
+    assert!(grouped.html.contains("data-series=\"Incumbent\""));
+    assert!(grouped.html.contains("data-series=\"Challenger\""));
+    assert!(grouped.html.contains("chart-legend-item"));
+    assert!(grouped.html.contains(">84pts<"));
+    assert!(grouped.html.contains("Implementation risk"));
+    assert!(grouped.diagnostics.is_empty());
+}
+
+#[test]
 fn timeline_transform_renders_static_svg_preview() {
     let artifact = run_transform(
         "timeline".to_string(),

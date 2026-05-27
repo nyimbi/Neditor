@@ -566,7 +566,7 @@ NEditor includes a fenced-code transform registry for static, export-safe
 artifacts:
 
 - `calc` for document calculations.
-- `chart` for bar, line, pie, area, and KPI charts.
+- `chart` for bar, horizontal bar, line, pie, area, and KPI charts.
 - `mermaid`, `pikchr`, DOT/Graphviz, D2, and PlantUML for diagrams.
 - `vega-lite`, GeoJSON, TopoJSON, STL, `timeline`, `glossary`, `bibtex`,
   OpenAPI, JSON Schema, JSON, YAML, CSV, TSV, and read-only SQLite SQL.

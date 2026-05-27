@@ -13,6 +13,16 @@ pub(crate) fn render_chart_svg(body: &str) -> String {
         escape_html(&title)
     );
     match chart_type.to_ascii_lowercase().as_str() {
+        "horizontal-bar" | "bar-horizontal" | "barh" => {
+            svg.push_str(&render_horizontal_bar_chart_svg(
+                &chart.series,
+                &domain,
+                chart.target,
+                chart.target_label.as_deref(),
+                chart.value_prefix.as_deref().unwrap_or_default(),
+                chart.value_suffix.as_deref().unwrap_or_default(),
+            ))
+        }
         "line" => svg.push_str(&render_line_chart_svg(
             &chart.series,
             &domain,
@@ -275,6 +285,13 @@ fn chart_value_y(value: f64, min: f64, max: f64) -> f64 {
     plot_bottom - ((value - min) / span) * (plot_bottom - plot_top)
 }
 
+fn chart_value_x(value: f64, min: f64, max: f64) -> f64 {
+    let plot_left = 180.0;
+    let plot_right = 710.0;
+    let span = (max - min).max(1.0);
+    plot_left + ((value - min) / span) * (plot_right - plot_left)
+}
+
 fn render_bar_chart_svg(
     series: &[ChartSeries],
     domain: &ChartDomain,
@@ -347,6 +364,89 @@ fn render_bar_chart_svg(
             };
             svg.push_str(&format!(
                 "<rect x=\"{x}\" y=\"{y:.1}\" width=\"{bar_width}\" height=\"{bar_height:.1}\" fill=\"{color}\"{series_attr}/><text x=\"{x}\" y=\"{value_label_y:.1}\" font-size=\"12\">{}</text>",
+                escape_html(&value_label)
+            ));
+        }
+    }
+    render_chart_series_legend(&mut svg, series);
+    svg
+}
+
+fn render_horizontal_bar_chart_svg(
+    series: &[ChartSeries],
+    domain: &ChartDomain,
+    target: Option<f64>,
+    target_label: Option<&str>,
+    value_prefix: &str,
+    value_suffix: &str,
+) -> String {
+    let labels = chart_labels(series);
+    let series_count = series.len().max(1);
+    let plot_top = 70.0;
+    let plot_bottom = 240.0;
+    let plot_height = plot_bottom - plot_top;
+    let zero_x = chart_value_x(0.0, domain.min, domain.max);
+    let row_height = if labels.is_empty() {
+        plot_height
+    } else {
+        (plot_height / labels.len().max(1) as f64).max(18.0)
+    };
+    let bar_height = if series_count <= 1 {
+        (row_height - 10.0).max(6.0)
+    } else {
+        ((row_height - 12.0) / series_count as f64).max(5.0)
+    };
+    let mut svg = format!(
+        "<line class=\"chart-horizontal-zero\" x1=\"{zero_x:.1}\" y1=\"60\" x2=\"{zero_x:.1}\" y2=\"248\" stroke=\"#94a3b8\"/><text x=\"{:.1}\" y=\"258\" font-size=\"11\" fill=\"#64748b\">0</text>",
+        (zero_x + 4.0).clamp(184.0, 690.0)
+    );
+    if let Some(target) = target {
+        svg.push_str(&render_chart_target_vertical_line(
+            domain,
+            target,
+            target_label,
+            value_prefix,
+            value_suffix,
+        ));
+    }
+    for (label_index, label) in labels.iter().enumerate() {
+        let row_y = plot_top + label_index as f64 * row_height;
+        let label_y = row_y + row_height / 2.0 + 4.0;
+        svg.push_str(&format!(
+            "<text class=\"chart-horizontal-label\" x=\"30\" y=\"{label_y:.1}\" font-size=\"12\" fill=\"#334155\">{}</text>",
+            escape_html(label)
+        ));
+        for (series_index, chart_series) in series.iter().enumerate() {
+            let Some(value) = chart_value_for_label(&chart_series.values, label) else {
+                continue;
+            };
+            let value_x = chart_value_x(value, domain.min, domain.max);
+            let x = value_x.min(zero_x);
+            let width = (value_x - zero_x).abs().max(1.0);
+            let y = if series_count <= 1 {
+                row_y + (row_height - bar_height) / 2.0
+            } else {
+                row_y + 6.0 + series_index as f64 * bar_height
+            };
+            let value_label = format_chart_value(value, value_prefix, value_suffix);
+            let value_label_x = if value >= 0.0 {
+                (x + width + 6.0).clamp(184.0, 722.0)
+            } else {
+                (x - 48.0).clamp(184.0, 722.0)
+            };
+            let color = if value < 0.0 && series_count == 1 {
+                "#be123c"
+            } else {
+                chart_color(series_index)
+            };
+            let series_attr = if series_count <= 1 {
+                String::new()
+            } else {
+                format!(" data-series=\"{}\"", escape_html(&chart_series.label))
+            };
+            svg.push_str(&format!(
+                "<rect class=\"chart-horizontal-bar\" x=\"{x:.1}\" y=\"{y:.1}\" width=\"{width:.1}\" height=\"{bar_height:.1}\" fill=\"{color}\"{series_attr}/><text x=\"{value_label_x:.1}\" y=\"{:.1}\" font-size=\"12\" fill=\"#1f2937\">{}</text>",
+                y + bar_height - 2.0,
                 escape_html(&value_label)
             ));
         }
@@ -628,6 +728,24 @@ fn render_chart_target_line(
     format!(
         "<line class=\"chart-target-line\" x1=\"70\" y1=\"{y:.1}\" x2=\"710\" y2=\"{y:.1}\" stroke=\"#b45309\" stroke-dasharray=\"6 4\"/><text class=\"chart-target-label\" x=\"540\" y=\"{:.1}\" font-size=\"12\" fill=\"#92400e\">{}: {}</text>",
         (y - 8.0).clamp(66.0, 252.0),
+        escape_html(label),
+        escape_html(&value)
+    )
+}
+
+fn render_chart_target_vertical_line(
+    domain: &ChartDomain,
+    target: f64,
+    target_label: Option<&str>,
+    value_prefix: &str,
+    value_suffix: &str,
+) -> String {
+    let x = chart_value_x(target, domain.min, domain.max);
+    let label = target_label.unwrap_or("Target");
+    let value = format_chart_value(target, value_prefix, value_suffix);
+    format!(
+        "<line class=\"chart-target-line chart-target-vertical-line\" x1=\"{x:.1}\" y1=\"60\" x2=\"{x:.1}\" y2=\"248\" stroke=\"#b45309\" stroke-dasharray=\"6 4\"/><text class=\"chart-target-label\" x=\"{:.1}\" y=\"62\" font-size=\"12\" fill=\"#92400e\">{}: {}</text>",
+        (x + 6.0).clamp(184.0, 590.0),
         escape_html(label),
         escape_html(&value)
     )
