@@ -22,13 +22,16 @@ pub(crate) fn render_vega_lite_svg(
         }
     };
     let mark = vega_lite_mark(&spec);
-    if !matches!(mark.as_str(), "bar" | "line" | "point" | "area" | "tick") {
+    if !matches!(
+        mark.as_str(),
+        "bar" | "line" | "point" | "area" | "tick" | "text"
+    ) {
         let diagnostic = diag(
             "warning",
             format!("Unsupported Vega-Lite mark for native preview: {mark}"),
             None,
             None,
-            Some("Use bar, line, point, area, or tick marks for the native static preview."),
+            Some("Use bar, line, point, area, tick, or text marks for the native static preview."),
         );
         artifact_diags.push(diagnostic.clone());
         diagnostics.push(diagnostic);
@@ -41,12 +44,14 @@ pub(crate) fn render_vega_lite_svg(
         return vega_lite_missing_field("y", artifact_diags, diagnostics);
     };
     let color_field = vega_lite_encoding_field(&spec, "color");
+    let text_field = vega_lite_encoding_field(&spec, "text");
     let y_aggregate = vega_lite_encoding_aggregate(&spec, "y");
     let values = vega_lite_values(
         &spec,
         &x_field,
         &y_field,
         color_field.as_deref(),
+        text_field.as_deref(),
         y_aggregate.as_deref(),
     );
     if values.is_empty() {
@@ -271,6 +276,7 @@ struct VegaLiteDatum {
     label: String,
     value: f64,
     series: Option<String>,
+    text: Option<String>,
 }
 
 fn vega_lite_values(
@@ -278,6 +284,7 @@ fn vega_lite_values(
     x_field: &str,
     y_field: &str,
     color_field: Option<&str>,
+    text_field: Option<&str>,
     y_aggregate: Option<&str>,
 ) -> Vec<VegaLiteDatum> {
     let values = spec
@@ -294,10 +301,15 @@ fn vega_lite_values(
                 .and_then(|field| row.get(field))
                 .map(value_to_axis_label)
                 .filter(|value| !value.trim().is_empty());
+            let text = text_field
+                .and_then(|field| row.get(field))
+                .map(value_to_axis_label)
+                .filter(|value| !value.trim().is_empty());
             Some(VegaLiteDatum {
                 label: x,
                 value: y,
                 series,
+                text,
             })
         })
         .collect::<Vec<_>>();
@@ -338,6 +350,7 @@ fn aggregate_vega_lite_values(values: Vec<VegaLiteDatum>, aggregate: &str) -> Ve
                 label: bucket.label,
                 value,
                 series: bucket.series,
+                text: None,
             })
         })
         .collect()
@@ -453,7 +466,13 @@ fn render_vega_lite_chart_svg(
                     let label_index = labels.iter().position(|label| label == &datum.label)?;
                     let x = plot_left + label_index * step + step / 2;
                     let y = domain.y(datum.value);
-                    Some((x, y, datum.label.as_str(), datum.value))
+                    Some((
+                        x,
+                        y,
+                        datum.label.as_str(),
+                        datum.value,
+                        datum.text.as_deref(),
+                    ))
                 })
                 .collect::<Vec<_>>();
             let color = VEGA_SERIES_COLORS[series_index % VEGA_SERIES_COLORS.len()];
@@ -466,11 +485,11 @@ fn render_vega_lite_chart_svg(
                 let baseline = domain.zero_y;
                 let area_points = points
                     .iter()
-                    .map(|(x, y, _, _)| format!("{x},{y:.1}"))
+                    .map(|(x, y, _, _, _)| format!("{x},{y:.1}"))
                     .collect::<Vec<_>>()
                     .join(" ");
                 let area = match (points.first(), points.last()) {
-                    (Some((first_x, _, _, _)), Some((last_x, _, _, _))) => {
+                    (Some((first_x, _, _, _, _)), Some((last_x, _, _, _, _))) => {
                         format!("{first_x},{baseline:.1} {area_points} {last_x},{baseline:.1}")
                     }
                     _ => String::new(),
@@ -482,21 +501,31 @@ fn render_vega_lite_chart_svg(
             } else if mark == "line" {
                 let polyline = points
                     .iter()
-                    .map(|(x, y, _, _)| format!("{x},{y:.1}"))
+                    .map(|(x, y, _, _, _)| format!("{x},{y:.1}"))
                     .collect::<Vec<_>>()
                     .join(" ");
                 svg.push_str(&format!(
                     "<polyline points=\"{polyline}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"3\"{series_attr}/>"
                 ));
             }
-            for (x, y, label, value) in points {
+            for (x, y, label, value, text) in points {
                 let label = if series_name.is_empty() {
                     label.to_string()
                 } else {
                     format!("{label}: {series_name}")
                 };
                 let value_label = format_vega_value(value);
-                if mark == "tick" {
+                if mark == "text" {
+                    let text = text.unwrap_or(&value_label);
+                    svg.push_str(&format!(
+                        "<text class=\"vega-text-mark\" x=\"{x}\" y=\"{:.1}\" font-size=\"13\" text-anchor=\"middle\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}>{}</text>",
+                        y - 7.0,
+                        escape_html(&label),
+                        escape_html(&value_label),
+                        escape_html(&value_label),
+                        escape_html(text)
+                    ));
+                } else if mark == "tick" {
                     let x1 = x.saturating_sub(10);
                     let x2 = x + 10;
                     svg.push_str(&format!(

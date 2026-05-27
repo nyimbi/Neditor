@@ -49,6 +49,10 @@ Recent pushed checkpoints visible in current git history:
   export-safe SVG data values instead of forcing users to install a full Vega
   renderer for common score-strip previews, and the Templates panel now includes
   a ready-made risk-score tick plot starter.
+- Vega-Lite native static previews now also support `text` marks with
+  `encoding.text.field`, so milestone/readiness plots can place short labels at
+  x/y positions while retaining color-series metadata and export-safe values.
+  The Templates panel includes a matching readiness label plot starter.
 - Table editing now has a text-cell path in addition to the visual grid and
   editable source block. **Edit Table Cell at Cursor** locates the Markdown
   header/body cell under the source cursor, loads its value into the Tables

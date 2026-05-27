@@ -3945,6 +3945,10 @@ test("transform template library covers reusable calculations and custom templat
   if (!vegaTickTemplate) throw new Error("missing Vega-Lite tick template");
   ok(vegaTickTemplate.body.includes('"type": "tick"'));
   ok(vegaTickTemplate.tags.includes("qa"));
+  const vegaTextTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-readiness-labels");
+  if (!vegaTextTemplate) throw new Error("missing Vega-Lite text template");
+  ok(vegaTextTemplate.body.includes('"mark": "text"'));
+  ok(vegaTextTemplate.body.includes('"text": { "field": "label" }'));
   deepEqual(
     transformTemplateFillFields({
       transform: "calc",

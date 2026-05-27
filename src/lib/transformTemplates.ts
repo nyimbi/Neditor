@@ -873,6 +873,34 @@ y: risk
     ["vega-lite", "tick", "risk", "qa"],
   ),
   template(
+    "vega-lite-readiness-labels",
+    "Charts",
+    "vega-lite",
+    "Readiness label plot",
+    "Creates a labeled Vega-Lite score plot for milestone, QA, or release-readiness reviews.",
+    fenced(
+      "vega-lite",
+      `{
+  "mark": "text",
+  "title": "Milestone readiness labels",
+  "data": {
+    "values": [
+      { "stage": "Security", "score": 92, "label": "Ready", "lane": "Release" },
+      { "stage": "Accessibility", "score": 74, "label": "Review", "lane": "Release" },
+      { "stage": "Evidence", "score": 58, "label": "Blocked", "lane": "Proof" }
+    ]
+  },
+  "encoding": {
+    "x": { "field": "stage", "title": "Milestone" },
+    "y": { "field": "score", "title": "Readiness" },
+    "text": { "field": "label" },
+    "color": { "field": "lane" }
+  }
+}`,
+    ),
+    ["vega-lite", "text", "readiness", "qa"],
+  ),
+  template(
     "timeline-launch",
     "Business",
     "timeline",

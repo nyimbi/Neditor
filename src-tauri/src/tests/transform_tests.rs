@@ -1185,6 +1185,29 @@ fn vega_lite_tick_mark_renders_static_distribution_preview() {
 }
 
 #[test]
+fn vega_lite_text_mark_renders_static_labels_preview() {
+    let artifact = run_transform(
+            "vega-lite".to_string(),
+            r##"{"mark":"text","title":"Milestone Readiness Labels","data":{"values":[{"stage":"Security","score":92,"label":"Ready","lane":"Release"},{"stage":"Accessibility","score":74,"label":"Review","lane":"Release"},{"stage":"Evidence","score":58,"label":"Blocked","lane":"Proof"}]},"encoding":{"x":{"field":"stage","type":"nominal","title":"Milestone"},"y":{"field":"score","type":"quantitative","title":"Readiness"},"text":{"field":"label"},"color":{"field":"lane","type":"nominal"}}}"##.to_string(),
+        )
+        .expect("vega-lite text transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("Milestone Readiness Labels"));
+    assert!(artifact.html.contains("vega-text-mark"));
+    assert!(artifact.html.contains(">Ready<"));
+    assert!(artifact.html.contains(">Review<"));
+    assert!(artifact.html.contains(">Blocked<"));
+    assert!(artifact.html.contains("data-series=\"Release\""));
+    assert!(artifact.html.contains("data-series=\"Proof\""));
+    assert!(artifact
+        .html
+        .contains("aria-label=\"Security: Release 92\""));
+    assert!(!artifact.html.contains("Unsupported Vega-Lite mark"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn vega_lite_preview_preserves_negative_values_aggregation_and_axis_titles() {
     let artifact = run_transform(
             "vega-lite".to_string(),
@@ -1215,10 +1238,12 @@ fn vega_lite_unsupported_marks_report_supported_static_subset() {
 
     assert_eq!(artifact.output_kind, "html");
     assert!(artifact.html.contains("Unsupported Vega-Lite mark"));
-    assert!(artifact.diagnostics.iter().any(|diagnostic| diagnostic
-        .suggestion
-        .as_deref()
-        .is_some_and(|suggestion| suggestion.contains("bar, line, point, area, or tick"))));
+    assert!(artifact
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.suggestion.as_deref().is_some_and(
+            |suggestion| suggestion.contains("bar, line, point, area, tick, or text")
+        )));
 }
 
 #[test]
