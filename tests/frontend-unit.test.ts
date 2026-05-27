@@ -155,6 +155,7 @@ import {
   setTableCellSpan,
   sortTableDraftRows,
   tableColumnRange,
+  tableDraftFromRows,
   validateTableDraft,
   type TableDraft,
 } from "../src/lib/tables.js";
@@ -241,6 +242,29 @@ test("table paste handles quoted CSV and markdown table captions", () => {
   equal(markdown.id, "tbl:sales");
   equal(markdown.caption, "Sales");
   deepEqual(markdown.alignments, ["left", "right"]);
+
+  const draft = tableDraftFromRows(markdown.rows, {
+    id: markdown.id,
+    caption: markdown.caption,
+    alignments: markdown.alignments,
+  });
+  if (!draft) throw new Error("missing draft");
+  equal(draft.id, "tbl:sales");
+  equal(draft.caption, "Sales");
+  deepEqual(draft.headers, ["Region", "Revenue"]);
+  deepEqual(draft.alignments, ["left", "right"]);
+  equal(draft.formats[1], "number");
+  deepEqual(draft.rows, [["West", "900"]]);
+
+  const fallbackDraft = tableDraftFromRows([["", "Amount"]], {
+    fallbackId: "tbl:existing",
+    fallbackCaption: "Existing caption",
+  });
+  if (!fallbackDraft) throw new Error("missing fallback draft");
+  equal(fallbackDraft.id, "tbl:existing");
+  equal(fallbackDraft.caption, "Existing caption");
+  deepEqual(fallbackDraft.headers, ["Column 1", "Amount"]);
+  deepEqual(fallbackDraft.rows, [["", ""]]);
 });
 
 test("table validation and formatting cover editor formulas and totals", () => {

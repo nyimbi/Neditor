@@ -3625,6 +3625,7 @@ Two-way table source editing:
 | --- | --- | --- |
 | `pnpm run test:unit` | Pass | Frontend unit coverage now proves Markdown source tables can be converted into table-editor drafts, replaced over the original source range, and reparsed with edited values plus escaped pipe cells intact. |
 | `pnpm run check` | Pass | Vue typecheck passed after moving source table draft conversion and source-range replacement helpers into `src/lib/tables.ts`. |
+| `pnpm run test:unit` | Pass | Frontend unit coverage now proves pasted Markdown/CSV rows and spreadsheet-import rows share one draft construction helper for headers, fallback captions, alignments, inferred formats, and empty data rows. |
 
 Menus, quality recommendations, and expanded document wizards:
 

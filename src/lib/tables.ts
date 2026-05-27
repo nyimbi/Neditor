@@ -35,6 +35,14 @@ export interface ParsedTablePaste {
   caption?: string;
 }
 
+export interface TableDraftFromRowsOptions {
+  id?: string;
+  caption?: string;
+  fallbackId?: string;
+  fallbackCaption?: string;
+  alignments?: TableAlignment[];
+}
+
 export interface TableCellSpan {
   text: string;
   colspan: number;
@@ -192,6 +200,21 @@ export function normalizeTableDraft(draft: TableDraft): TableDraft {
     alignments: padAlignments(draft.alignments, headers.length),
     formats: Array.from({ length: headers.length }, (_, index) => draft.formats[index] || "text"),
     rows: draft.rows.map((row) => padTableRow(row, headers.length)),
+  };
+}
+
+export function tableDraftFromRows(rows: string[][], options: TableDraftFromRowsOptions = {}): TableDraft | null {
+  if (!rows.length) return null;
+  const headers = rows[0].map((cell, index) => cell.trim() || `Column ${index + 1}`);
+  const bodyRows = rows.slice(1).map((row) => padTableRow(row, headers.length));
+  const draftRows = bodyRows.length ? bodyRows : [headers.map(() => "")];
+  return {
+    id: options.id ?? options.fallbackId ?? "",
+    caption: options.caption ?? options.fallbackCaption ?? "",
+    headers,
+    alignments: options.alignments ? padAlignments(options.alignments, headers.length) : headers.map(() => "left"),
+    formats: headers.map((_, columnIndex) => inferTableFormat(draftRows.map((row) => row[columnIndex] || ""))),
+    rows: draftRows,
   };
 }
 

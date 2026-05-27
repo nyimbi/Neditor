@@ -5173,12 +5173,10 @@ import {
 import {
   findMarkdownTableIndexForLineRange,
   formatTableTotal,
-  inferTableFormat,
   isFormulaCell,
   isTableSummaryRow,
   markdownTableToDraft,
   normalizeTableDraft,
-  padAlignments,
   padTableRow,
   parseMarkdownTables,
   parseTablePaste,
@@ -5188,6 +5186,7 @@ import {
   setTableCellSpan,
   sortTableDraftRows,
   spreadsheetColumnName,
+  tableDraftFromRows,
   tableColumnRange,
   validateTableDraft,
   type TableDraft,
@@ -16875,21 +16874,16 @@ function clampInteger(value: number, min: number, max: number) {
 
 function replaceTableFromPaste() {
   const parsed = parseTablePaste(tablePasteText.value);
-  const rows = parsed.rows;
-  if (!rows.length) return;
   const current = tableDraft.value;
-  const headers = rows[0].map((cell, index) => cell.trim() || `Column ${index + 1}`);
-  const bodyRows = rows.slice(1).map((row) => padTableRow(row, headers.length));
-  tableDraft.value = {
-    id: parsed.id ?? current?.id ?? "",
-    caption: parsed.caption ?? current?.caption ?? "",
-    headers,
-    alignments: parsed.alignments
-      ? padAlignments(parsed.alignments, headers.length)
-      : headers.map(() => "left"),
-    formats: headers.map((_, columnIndex) => inferTableFormat(bodyRows.map((row) => row[columnIndex] || ""))),
-    rows: bodyRows.length ? bodyRows : [headers.map(() => "")],
-  };
+  const nextDraft = tableDraftFromRows(parsed.rows, {
+    id: parsed.id,
+    caption: parsed.caption,
+    fallbackId: current?.id,
+    fallbackCaption: current?.caption,
+    alignments: parsed.alignments,
+  });
+  if (!nextDraft) return;
+  tableDraft.value = nextDraft;
 }
 
 async function importTableFromSpreadsheet() {
@@ -16904,16 +16898,12 @@ async function importTableFromSpreadsheet() {
       request: { path: selected },
     });
     const parsed = parseTablePaste(response.markdown);
-    const headers = (parsed.rows[0] || []).map((cell, index) => cell.trim() || `Column ${index + 1}`);
-    const rows = parsed.rows.slice(1).map((row) => padTableRow(row, headers.length));
-    tableDraft.value = {
-      id: "",
+    const importedDraft = tableDraftFromRows(parsed.rows, {
       caption: response.sheet_name || response.source_format.toUpperCase(),
-      headers,
-      alignments: parsed.alignments ? padAlignments(parsed.alignments, headers.length) : headers.map(() => "left"),
-      formats: headers.map((_, columnIndex) => inferTableFormat(rows.map((row) => row[columnIndex] || ""))),
-      rows: rows.length ? rows : [headers.map(() => "")],
-    };
+      alignments: parsed.alignments,
+    });
+    if (!importedDraft) throw new Error("The selected spreadsheet did not contain a usable table.");
+    tableDraft.value = importedDraft;
     isNewTableDraft.value = true;
     tablePasteText.value = response.markdown;
     store.sidebar = "tables";
