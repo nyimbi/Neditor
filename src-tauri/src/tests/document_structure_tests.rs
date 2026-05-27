@@ -977,12 +977,23 @@ info:
   title: Ledger API
   version: 1.0.0
 servers:
-  - url: https://api.example.test
+  - url: https://api.example.test/{region}
     description: Production
+    variables:
+      region:
+        default: us-east
+        enum: [us-east, eu-west]
+        description: Deployment region
 security:
   - ApiKeyAuth: []
 paths:
   /accounts:
+    servers:
+      - url: https://tenant.example.test/{tenant}
+        description: Tenant endpoint
+        variables:
+          tenant:
+            default: demo
     parameters:
       - name: tenant
         in: header
@@ -998,6 +1009,9 @@ paths:
       externalDocs:
         description: Runbook
         url: https://docs.example.test/accounts
+      servers:
+        - url: https://read.example.test
+          description: Read replica
       parameters:
         - name: limit
           in: query
@@ -1243,7 +1257,16 @@ components:
     });
 
     assert!(response.html.contains("Ledger API"));
-    assert!(response.html.contains("https://api.example.test"));
+    assert!(response.html.contains("https://api.example.test/{region}"));
+    assert!(response
+        .html
+        .contains("variables: region default us-east enum us-east, eu-west - Deployment region"));
+    assert!(response
+        .html
+        .contains("servers: https://read.example.test - Read replica"));
+    assert!(response
+        .html
+        .contains("servers: https://tenant.example.test/{tenant} - Tenant endpoint - variables: tenant default demo"));
     assert!(response.html.contains("List accounts"));
     assert!(response.html.contains("listAccounts"));
     assert!(response.html.contains("deprecated"));

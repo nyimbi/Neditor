@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- OpenAPI transform rendering now shows more of the server contract reviewers
+  need to see. Top-level servers include server-variable defaults, enums, and
+  descriptions, while operation labels surface operation-level server overrides
+  and path-level server fallbacks so generated API references do not hide
+  tenant, region, or read-replica routing details.
 - Release readiness now rejects stale release-evidence-kit reports instead of
   accepting a kit generated for an older commit. The aggregator recomputes the
   current Git HEAD and clean-tree state, then fails the evidence-kit check if
@@ -108,6 +113,7 @@ Recent pushed checkpoints visible in current git history:
   handoff answers with rationale and context signals. Users can accept one or
   all suggestions into editable quality review notes and insert those notes into
   the document as a review handoff artifact.
+
 - Quality recommendations now have a dedicated typed implementation module
   instead of living only inside the workbench component. `src/lib/qualityRecommendations.ts`
   builds deterministic QA/QI findings for diagnostics, placeholders, citation
@@ -1377,6 +1383,18 @@ Recent pushed checkpoints visible in current git history:
   duplicate-key readiness diagnostics at the duplicate entry with the first
   occurrence in related context, and shows duplicate bibliography source
   locations in the References panel.
+
+## Latest Focused Verification
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting remains clean after the OpenAPI server-rendering update. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused transform test proves OpenAPI server variables plus operation/path server overrides render in generated API docs. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export conformance remains intact. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused browser workflow proves two-way table editing: visual creation, direct in-text Markdown table edits syncing into the grid, invalid in-text table protection, editable source text export, source-to-grid parsing, and applying source text back into the document. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording OpenAPI server evidence. |
+| `git diff --check` | Pass | No whitespace errors are present. |
 
 ## Current Capability Snapshot
 

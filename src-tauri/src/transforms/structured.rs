@@ -110,7 +110,8 @@ pub(crate) fn render_openapi_html(
                         .get("operationId")
                         .and_then(Value::as_str)
                         .unwrap_or("");
-                    let operation_label = operation_label(summary, operation_id, operation);
+                    let operation_label =
+                        operation_label(summary, operation_id, operation, path_item);
                     let mut parameters = path_parameters.iter().collect::<Vec<_>>();
                     if let Some(operation_parameters) =
                         operation.get("parameters").and_then(Value::as_array)
@@ -212,33 +213,129 @@ fn render_openapi_servers(value: &Value) -> String {
     let Some(servers) = value.get("servers").and_then(Value::as_array) else {
         return String::new();
     };
+    render_openapi_server_list(servers, "api-servers")
+}
+
+fn render_openapi_server_list(servers: &[Value], class_name: &str) -> String {
     if servers.is_empty() {
         return String::new();
     }
     let items = servers
         .iter()
-        .filter_map(|server| {
-            let url = server.get("url").and_then(Value::as_str)?;
-            let description = server
-                .get("description")
-                .and_then(Value::as_str)
-                .unwrap_or("");
-            Some(if description.is_empty() {
-                format!("<li><code>{}</code></li>", escape_html(url))
-            } else {
-                format!(
-                    "<li><code>{}</code> - {}</li>",
-                    escape_html(url),
-                    escape_html(description)
-                )
-            })
-        })
+        .filter_map(openapi_server_list_item)
         .collect::<Vec<_>>()
         .join("");
     if items.is_empty() {
         String::new()
     } else {
-        format!("<ul class=\"api-servers\">{items}</ul>")
+        format!("<ul class=\"{class_name}\">{items}</ul>")
+    }
+}
+
+fn openapi_server_list_item(server: &Value) -> Option<String> {
+    let summary = openapi_server_summary(server)?;
+    Some(format!("<li>{summary}</li>"))
+}
+
+fn openapi_server_summary(server: &Value) -> Option<String> {
+    let url = server.get("url").and_then(Value::as_str)?;
+    let description = server
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let variables = openapi_server_variables_summary(server);
+    let mut parts = vec![format!("<code>{}</code>", escape_html(url))];
+    if !description.is_empty() {
+        parts.push(escape_html(description));
+    }
+    if !variables.is_empty() {
+        parts.push(escape_html(&variables));
+    }
+    Some(parts.join(" - "))
+}
+
+fn openapi_server_summary_text(server: &Value) -> Option<String> {
+    let url = server.get("url").and_then(Value::as_str)?;
+    let description = server
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let variables = openapi_server_variables_summary(server);
+    let mut parts = vec![url.to_string()];
+    if !description.is_empty() {
+        parts.push(description.to_string());
+    }
+    if !variables.is_empty() {
+        parts.push(variables);
+    }
+    Some(parts.join(" - "))
+}
+
+fn openapi_server_variables_summary(server: &Value) -> String {
+    let Some(variables) = server.get("variables").and_then(Value::as_object) else {
+        return String::new();
+    };
+    let items = variables
+        .iter()
+        .map(|(name, variable)| {
+            let default = variable
+                .get("default")
+                .map(structured_value_summary)
+                .unwrap_or_default();
+            let enum_values = variable
+                .get("enum")
+                .and_then(Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .map(structured_value_summary)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
+                .unwrap_or_default();
+            let description = variable
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let mut parts = vec![name.to_string()];
+            if !default.is_empty() {
+                parts.push(format!("default {default}"));
+            }
+            if !enum_values.is_empty() {
+                parts.push(format!("enum {enum_values}"));
+            }
+            let summary = parts.join(" ");
+            if description.is_empty() {
+                summary
+            } else {
+                format!("{summary} - {description}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    if items.is_empty() {
+        String::new()
+    } else {
+        format!("variables: {items}")
+    }
+}
+
+fn render_openapi_operation_servers(operation: &Value, path_item: &Value) -> String {
+    let servers = operation
+        .get("servers")
+        .or_else(|| path_item.get("servers"))
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let summaries = servers
+        .iter()
+        .filter_map(openapi_server_summary_text)
+        .collect::<Vec<_>>()
+        .join("; ");
+    if summaries.is_empty() {
+        String::new()
+    } else {
+        format!("<small>servers: {}</small>", escape_html(&summaries))
     }
 }
 
@@ -249,7 +346,12 @@ fn is_openapi_method(method: &str) -> bool {
     )
 }
 
-fn operation_label(summary: &str, operation_id: &str, operation: &Value) -> String {
+fn operation_label(
+    summary: &str,
+    operation_id: &str,
+    operation: &Value,
+    path_item: &Value,
+) -> String {
     let tags = operation
         .get("tags")
         .and_then(Value::as_array)
@@ -299,6 +401,10 @@ fn operation_label(summary: &str, operation_id: &str, operation: &Value) -> Stri
     let callbacks = render_openapi_callbacks(operation.get("callbacks"));
     if !callbacks.is_empty() {
         parts.push(callbacks);
+    }
+    let servers = render_openapi_operation_servers(operation, path_item);
+    if !servers.is_empty() {
+        parts.push(servers);
     }
     if parts.is_empty() {
         "&nbsp;".to_string()
@@ -395,7 +501,8 @@ fn render_openapi_webhook_rows(value: &Value) -> String {
                             .get("operationId")
                             .and_then(Value::as_str)
                             .unwrap_or("");
-                        let operation_label = operation_label(summary, operation_id, operation);
+                        let operation_label =
+                            operation_label(summary, operation_id, operation, path_item);
                         let mut parameters = path_parameters.iter().collect::<Vec<_>>();
                         if let Some(operation_parameters) = operation
                             .get("parameters")
