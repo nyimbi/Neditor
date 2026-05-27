@@ -2809,6 +2809,16 @@ test("runs configurable Emacs and Vim-style editor keybinding modes", async ({ p
   await page.keyboard.press("Control+E");
   await page.keyboard.insertText(" End");
   await expect.poll(() => editorText(page)).toContain("Start Emacs target End");
+  await moveEditorCursorToEnd(page);
+  await page.keyboard.insertText("\nEmacs kill and yank target");
+  await page.keyboard.press("Control+A");
+  await page.keyboard.press("Control+K");
+  await expect.poll(() => editorText(page)).not.toContain("Emacs kill and yank target");
+  await editor.focus();
+  await page.keyboard.down("Control");
+  await page.keyboard.press("KeyY");
+  await page.keyboard.up("Control");
+  await expect.poll(() => editorText(page)).toContain("Emacs kill and yank target");
 
   await keybindings.selectOption("vim");
   await expect(status).toContainText("Vim insert mode");
@@ -2893,6 +2903,22 @@ test("runs configurable Emacs and Vim-style editor keybinding modes", async ({ p
   await page.keyboard.insertText("changed");
   await expect.poll(() => editorText(page)).toContain("changed word");
   await expect.poll(() => editorText(page)).not.toContain("changeable word");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("G");
+  await page.keyboard.press("o");
+  await page.keyboard.insertText("copy source line");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("y");
+  await page.keyboard.press("y");
+  await page.keyboard.press("p");
+  await expect.poll(() => editorText(page)).toContain("copy source line\ncopy source line");
+  await page.keyboard.press("P");
+  await expect.poll(() => editorText(page)).toContain("copy source line\ncopy source line\ncopy source line");
+  await page.keyboard.press("b");
+  await page.keyboard.press("e");
+  await page.keyboard.press("a");
+  await page.keyboard.insertText("!");
+  await expect.poll(() => editorText(page)).toContain("copy source line!");
 
   await page.getByRole("button", { name: "Save Workspace" }).click();
   await page.reload();

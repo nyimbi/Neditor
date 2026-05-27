@@ -4336,6 +4336,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("full `.exe` path instead of an ambiguous package-manager shim on Windows"));
   ok(app.includes("permission, timeout, empty-output, disabled-trust, stale-cache"));
   ok(app.includes("isEditableShortcutTarget"));
+  ok(app.includes("isReservedEmacsEditorShortcut"));
+  ok(app.includes('["k", "y", "w"].includes(key)'));
   ok(app.includes("setWorkbenchDestination"));
   ok(app.includes('openHelp("keyboard-shortcuts")'));
   ok(app.includes("Opened review readiness from keyboard"));

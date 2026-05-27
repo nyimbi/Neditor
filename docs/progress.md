@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Editor keybinding proof now covers more of the Emacs/Vim muscle-memory
+  surface. Emacs `Ctrl+K`/`Ctrl+Y`/`Ctrl+W` editor chords are reserved from the
+  global command-palette shortcut while focus is in CodeMirror, and the focused
+  Chromium workflow proves Emacs kill/yank plus Vim `yy`, `p`, `P`, `b`, and
+  `e` behavior through the real editor.
 - Multi-cursor browser proof now covers the full command family. The focused
   Chromium workflow discovers Add Cursor Above/Below, Select Next Occurrence,
   Select All Occurrences, and Split Selection Into Line Cursors through the

@@ -17749,6 +17749,20 @@ function isEditableShortcutTarget(target: EventTarget | null) {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
 }
 
+function isCodeMirrorShortcutTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && Boolean(target.closest(".cm-editor"));
+}
+
+function isReservedEmacsEditorShortcut(event: KeyboardEvent, key: string) {
+  return (
+    store.editorKeymapMode === "emacs" &&
+    event.ctrlKey &&
+    !event.metaKey &&
+    isCodeMirrorShortcutTarget(event.target) &&
+    ["k", "y", "w"].includes(key)
+  );
+}
+
 function setWorkbenchDestination(
   mode: typeof store.mode,
   sidebar: typeof store.sidebar | null,
@@ -17763,6 +17777,7 @@ function setWorkbenchDestination(
 function handleShortcut(event: KeyboardEvent) {
   if (!(event.metaKey || event.ctrlKey) || isEditableShortcutTarget(event.target)) return;
   const key = event.key.toLowerCase();
+  if (isReservedEmacsEditorShortcut(event, key)) return;
   if (key === "s") {
     event.preventDefault();
     if (event.shiftKey) {
