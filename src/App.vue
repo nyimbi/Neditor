@@ -555,6 +555,29 @@
             >
               Document text
             </button>
+            <button type="button" title="Load the Markdown table cell under the editor cursor for a precise text edit" @click="loadTableTextCellAtCursor">
+              Cell at cursor
+            </button>
+          </section>
+          <section class="table-cell-text-editor" aria-label="Text table cell editor">
+            <label>
+              Table cell text
+              <input
+                v-model="tableTextCellValue"
+                :disabled="!tableTextCellEdit"
+                :placeholder="tableTextCellEdit ? 'Cell value' : 'Place cursor in a table cell'"
+                @keydown.enter.prevent="applyTableTextCellEdit"
+              />
+            </label>
+            <div class="table-actions">
+              <button type="button" title="Read the table cell at the current source cursor" @click="loadTableTextCellAtCursor">Edit cell at cursor</button>
+              <button type="button" :disabled="!tableTextCellEdit" title="Write this cell value directly into the Markdown table text" @click="applyTableTextCellEdit">
+                Apply cell to text
+              </button>
+              <button type="button" :disabled="!tableTextCellEdit" title="Select the source row for this table cell" @click="goToTableTextCellSource">Go to cell text</button>
+            </div>
+            <p v-if="tableTextCellError" class="table-source-error" role="alert">{{ tableTextCellError }}</p>
+            <p v-else class="sidebar-hint">{{ tableTextCellEditSummary }}</p>
           </section>
           <label>
             Table
@@ -5288,6 +5311,7 @@ import {
   createTableSourceSnapshot,
   duplicateTableDraftColumn,
   duplicateTableDraftRow,
+  findMarkdownTableCellAtPosition,
   findMarkdownTableIndexForLineRange,
   findMarkdownTableForSourceSnapshot,
   formatTableTotal,
@@ -5298,6 +5322,7 @@ import {
   normalizeTableDraft,
   parseMarkdownTables,
   parseTableCellSpan,
+  replaceMarkdownTableCellInText,
   replaceMarkdownTableInText,
   replaceMarkdownTableSnapshotInText,
   removeTableDraftColumn,
@@ -5321,6 +5346,7 @@ import {
   tableSourceText,
   validateTableDraft,
   type MarkdownTable,
+  type MarkdownTableCellEdit,
   type TableDraft,
   type TableFormulaFunction,
   type TableSourceSnapshot,
@@ -5755,6 +5781,9 @@ const tableSourceEditText = ref("");
 const tableSourceEditError = ref("");
 const tableSourceEditDirty = ref(false);
 const tableSourceEditLiveSynced = ref(false);
+const tableTextCellEdit = ref<MarkdownTableCellEdit | null>(null);
+const tableTextCellValue = ref("");
+const tableTextCellError = ref("");
 const isNewTableDraft = ref(false);
 const tableDataBusy = ref(false);
 const tableFormulaFunction = ref<TableFormulaFunction>("SUM");
@@ -7102,6 +7131,12 @@ const tableSourceEditSummary = computed(() => {
   if (tableSourceEditDirty.value) return "Markdown source text has unsaved edits. Valid pipe-table text updates the grid as you type.";
   return "Edit the Markdown table text directly, update the visual grid from it, or regenerate source text from the grid.";
 });
+const tableTextCellEditSummary = computed(() => {
+  const edit = tableTextCellEdit.value;
+  if (!edit) return "Place the cursor in a Markdown table cell, then load the cell for a precise text edit.";
+  const rowLabel = edit.rowKind === "header" ? "header" : `row ${edit.rowIndex + 1}`;
+  return `Editing ${rowLabel}, column ${edit.columnLabel}, line ${edit.lineNumber}. Applying writes directly to the Markdown text.`;
+});
 const tableTwoWayStatus = computed(() => {
   if (tableSourceEditError.value) return "Source invalid";
   if (tableSourceEditDirty.value) return "Source draft";
@@ -8416,6 +8451,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "open-table-editor", label: "Open Table Editor", help: "Open the visual table grid for creating or editing Markdown tables.", run: () => openTableEditor() },
           { id: "edit-table-at-cursor", label: "Edit Table at Cursor", help: "Load the Markdown table under the cursor or selection into the visual table editor.", run: () => loadTableAtCursor() },
           { id: "edit-table-markdown-text", label: "Edit Table in Markdown Text", help: "Select the exact Markdown table source lines so direct text edits can sync back to the visual grid.", disabled: !selectedTableForDraft.value && !tableSourceSnapshot.value, run: () => editSelectedTableInMarkdownText() },
+          { id: "edit-table-cell-at-cursor", label: "Edit Table Cell at Cursor", help: "Load the exact Markdown table cell under the source cursor and write its value back into the text.", run: () => loadTableTextCellAtCursor() },
           { id: "go-to-source-table", label: "Go to Source Table", help: "Jump from the visual table grid back to the source Markdown table lines.", disabled: !selectedTable.value, run: () => goToSelectedTableSource() },
           { id: "import-table", label: "Import CSV/XLSX Table", help: "Import spreadsheet data into the editable table grid.", disabled: tableDataBusy.value, run: () => importTableFromSpreadsheet() },
           { id: "export-table-csv", label: "Export Table as CSV", help: "Export the current table draft or selected Markdown table to CSV.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("csv") },
@@ -10289,6 +10325,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   })),
   { name: "Insert code fence", group: "Snippet", run: () => insertBlock(codeFenceSnippet) },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
+  { name: "Edit table cell at cursor", group: "Writing Tools", keywords: ["table", "cell", "markdown", "text"], run: () => loadTableTextCellAtCursor() },
   { name: "Import CSV or XLSX table", group: "Writing Tools", keywords: ["table", "spreadsheet", "csv", "xlsx", "excel"], run: () => importTableFromSpreadsheet() },
   { name: "Export selected table to CSV", group: "Writing Tools", keywords: ["table", "spreadsheet", "csv", "export"], run: () => exportSelectedTable("csv") },
   { name: "Export selected table to XLSX", group: "Writing Tools", keywords: ["table", "spreadsheet", "xlsx", "excel", "export"], run: () => exportSelectedTable("xlsx") },
@@ -10592,6 +10629,9 @@ async function runNativeMenuCommand(command: string) {
       break;
     case "neditor-edit-table-at-cursor":
       loadTableAtCursor();
+      break;
+    case "neditor-edit-table-cell-at-cursor":
+      loadTableTextCellAtCursor();
       break;
     case "neditor-go-to-source-table":
       goToSelectedTableSource();
@@ -17026,6 +17066,84 @@ function editSelectedTableInMarkdownText() {
   goToSelectedTableSource("Selected the Markdown table text; direct source edits will refresh the visual grid when the pipe table is valid.");
 }
 
+function editorCursorLineColumn() {
+  if (!editorView) return null;
+  const selection = editorView.state.selection.main;
+  const line = editorView.state.doc.lineAt(selection.from);
+  return {
+    lineNumber: line.number,
+    columnNumber: selection.from - line.from + 1,
+  };
+}
+
+function loadTableTextCellAtCursor() {
+  flushEditorTextToStore();
+  if (tableContextSwitchBlocked("loading a table cell text edit")) return false;
+  const cursor = editorCursorLineColumn();
+  if (!cursor) {
+    tableTextCellError.value = "Open the source editor and place the cursor inside a Markdown table cell.";
+    store.statusMessage = "No Markdown table cell is available at the cursor";
+    return false;
+  }
+  const edit = findMarkdownTableCellAtPosition(active.value.text, cursor.lineNumber, cursor.columnNumber);
+  if (!edit) {
+    tableTextCellEdit.value = null;
+    tableTextCellValue.value = "";
+    tableTextCellError.value = "Place the cursor in a Markdown table header or body cell, not the caption or separator row.";
+    store.statusMessage = "No editable Markdown table cell found at the cursor";
+    return false;
+  }
+  tableTextCellEdit.value = edit;
+  tableTextCellValue.value = edit.value;
+  tableTextCellError.value = "";
+  selectedTableIndex.value = edit.tableIndex;
+  loadSelectedTable({ force: true });
+  store.sidebar = "tables";
+  store.statusMessage = `Loaded table cell ${edit.columnLabel}${edit.rowKind === "header" ? " header" : edit.rowIndex + 1} for text editing`;
+  return true;
+}
+
+function applyTableTextCellEdit() {
+  const edit = tableTextCellEdit.value;
+  if (!edit) return;
+  flushEditorTextToStore();
+  if (tableDraftDirty.value) {
+    tableTextCellError.value = "Apply or cancel the current table edit before writing a table cell directly into the Markdown text.";
+    store.statusMessage = "Table cell text edit is waiting for the current table draft";
+    return;
+  }
+  const currentLineCell = findMarkdownTableCellAtPosition(active.value.text, edit.lineNumber, 1);
+  if (!currentLineCell || edit.columnIndex >= currentLineCell.table.headers.length) {
+    tableTextCellError.value = "The original table row is no longer an editable Markdown table row.";
+    store.statusMessage = "Reload the table cell from the current source text";
+    return;
+  }
+  const nextText = replaceMarkdownTableCellInText(active.value.text, edit, tableTextCellValue.value);
+  store.updateText(nextText);
+  void nextTick(() => syncEditorViewFromActiveDocument());
+  const refreshed = findMarkdownTableCellAtPosition(nextText, edit.lineNumber, 1);
+  if (refreshed) {
+    selectedTableIndex.value = refreshed.tableIndex;
+    loadSelectedTable({ force: true });
+  }
+  tableTextCellEdit.value = { ...edit, value: tableTextCellValue.value };
+  tableTextCellError.value = "";
+  store.statusMessage = `Updated Markdown table cell ${edit.columnLabel}${edit.rowKind === "header" ? " header" : edit.rowIndex + 1}`;
+}
+
+function goToTableTextCellSource() {
+  const edit = tableTextCellEdit.value;
+  if (!edit) return;
+  void goToSourceTarget({
+    line: edit.lineNumber,
+    end_line: edit.lineNumber,
+    column: 1,
+    end_column: Number.MAX_SAFE_INTEGER,
+  }).then(() => {
+    store.statusMessage = `Selected Markdown row for table cell ${edit.columnLabel}`;
+  });
+}
+
 function focusTableGrid() {
   tableEditorGrid.value?.focus();
   store.statusMessage = "Focused the visual table grid";
@@ -22662,6 +22780,20 @@ select:hover {
   border-color: #fecaca;
   background: #fff7f7;
   color: #b91c1c;
+}
+
+.table-cell-text-editor {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+}
+
+.table-cell-text-editor input {
+  width: 100%;
+  min-width: 0;
 }
 
 .table-formula-builder,

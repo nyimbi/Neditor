@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Table editing now has a text-cell path in addition to the visual grid and
+  editable source block. **Edit Table Cell at Cursor** locates the Markdown
+  header/body cell under the source cursor, loads its value into the Tables
+  panel, and writes the edited value directly back into the Markdown row while
+  preserving escaped pipe cells and refreshing the visual table draft.
 - Release evidence validators now classify prior-commit external evidence as
   `stale` instead of hard-invalid while still rejecting malformed or bad
   current-commit evidence. Platform, AI provider/runtime, security review,

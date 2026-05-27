@@ -154,6 +154,7 @@ import {
   createTableSourceSnapshot,
   duplicateTableDraftColumn,
   duplicateTableDraftRow,
+  findMarkdownTableCellAtPosition,
   formatTableTotal,
   findMarkdownTableIndexForLineRange,
   findMarkdownTableForSourceSnapshot,
@@ -163,6 +164,7 @@ import {
   parseTableCellSpan,
   parseMarkdownTables,
   parseTablePaste,
+  replaceMarkdownTableCellInText,
   replaceMarkdownTableInText,
   replaceMarkdownTableSnapshotInText,
   removeTableDraftColumn,
@@ -485,6 +487,45 @@ test("table source draft helpers normalize editable markdown source", () => {
   equal(source.sourceText, tableDraftMarkdown(source.draft));
   ok(source.sourceText.includes("| West | 900 |"));
   equal(tableDraftFromMarkdownSource("not a table"), null);
+});
+
+test("markdown table cell text edits locate and replace the cursor cell", () => {
+  const text = [
+    "# Sales",
+    "",
+    "Table: Regional revenue {#tbl:revenue}",
+    "Region | Revenue | Note",
+    ":--- | ---: | ---",
+    "East | 1200 | margin\\|stable",
+    "West | 900 | review",
+  ].join("\n");
+
+  const valueColumn = text.split("\n")[5].indexOf("1200") + 2;
+  const edit = findMarkdownTableCellAtPosition(text, 6, valueColumn);
+  if (!edit) throw new Error("missing table cell edit");
+  equal(edit.tableIndex, 0);
+  equal(edit.rowKind, "body");
+  equal(edit.rowIndex, 0);
+  equal(edit.columnIndex, 1);
+  equal(edit.columnLabel, "B");
+  equal(edit.value, "1200");
+  equal(findMarkdownTableCellAtPosition(text, 6, valueColumn - 1)?.columnIndex, 1);
+
+  const updated = replaceMarkdownTableCellInText(text, edit, "$1,500");
+  ok(updated.includes("| East | $1,500 | margin\\|stable |"));
+  const [updatedTable] = parseMarkdownTables(updated);
+  deepEqual(updatedTable.rows[0], ["East", "$1,500", "margin|stable"]);
+
+  const headerColumn = text.split("\n")[3].indexOf("Revenue") + 2;
+  const headerEdit = findMarkdownTableCellAtPosition(text, 4, headerColumn);
+  if (!headerEdit) throw new Error("missing header cell edit");
+  equal(headerEdit.rowKind, "header");
+  equal(headerEdit.columnIndex, 1);
+  const headerUpdated = replaceMarkdownTableCellInText(text, headerEdit, "ARR");
+  deepEqual(parseMarkdownTables(headerUpdated)[0].headers, ["Region", "ARR", "Note"]);
+
+  equal(findMarkdownTableCellAtPosition(text, 5, 3), null);
+  equal(findMarkdownTableCellAtPosition(text, 3, 3), null);
 });
 
 test("table export markdown selection honors dirty source edits", () => {
@@ -4522,6 +4563,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Open Table Editor"));
   ok(app.includes("Go to Source Table"));
   ok(app.includes("Export Table as CSV"));
+  ok(app.includes("Edit Table Cell at Cursor"));
+  ok(app.includes("Edit cell at cursor"));
+  ok(app.includes("Apply cell to text"));
+  ok(app.includes("tableTextCellEdit"));
+  ok(app.includes("findMarkdownTableCellAtPosition"));
+  ok(app.includes("replaceMarkdownTableCellInText"));
   ok(app.includes("Create new table draft"));
   ok(app.includes("Source table changed"));
   ok(app.includes("Reload from source"));

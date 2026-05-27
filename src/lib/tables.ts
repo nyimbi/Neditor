@@ -83,6 +83,19 @@ export interface TableExportMarkdownSelection {
   sourceEditValid: boolean;
 }
 
+export type MarkdownTableCellKind = "header" | "body";
+
+export interface MarkdownTableCellEdit {
+  table: MarkdownTable;
+  tableIndex: number;
+  lineNumber: number;
+  rowKind: MarkdownTableCellKind;
+  rowIndex: number;
+  columnIndex: number;
+  columnLabel: string;
+  value: string;
+}
+
 export interface TableDraftFromRowsOptions {
   id?: string;
   caption?: string;
@@ -483,6 +496,86 @@ export function tableMarkdownForExport(options: TableExportMarkdownOptions): Tab
   const documentText = options.documentText?.trim() || "";
   if (documentText) return { markdown: documentText, source: "document", sourceEditValid: true };
   return { markdown: "", source: "none", sourceEditValid: true };
+}
+
+export function findMarkdownTableCellAtPosition(text: string, lineNumber: number, columnNumber: number): MarkdownTableCellEdit | null {
+  const lines = text.split("\n");
+  const tables = parseMarkdownTables(text);
+  const tableIndex = findMarkdownTableIndexForLineRange(tables, lineNumber);
+  const table = tables[tableIndex];
+  if (!table || lineNumber === table.captionLine || lineNumber === table.startLine + 1) return null;
+
+  const line = lines[lineNumber - 1] || "";
+  const cells = splitMarkdownTableRow(line);
+  if (!cells.length) return null;
+  const rowKind: MarkdownTableCellKind = lineNumber === table.startLine ? "header" : "body";
+  const rowIndex = rowKind === "header" ? -1 : lineNumber - table.startLine - 2;
+  const ranges = markdownTableCellRanges(line);
+  const position = Math.max(0, columnNumber - 1);
+  const fallbackColumn = Math.min(cells.length - 1, Math.max(0, table.headers.length - 1));
+  const rangeIndex = ranges.findIndex((range) => position >= range.start && position <= range.end);
+  const columnIndex = rangeIndex >= 0 ? rangeIndex : fallbackColumn;
+  return {
+    table,
+    tableIndex,
+    lineNumber,
+    rowKind,
+    rowIndex,
+    columnIndex,
+    columnLabel: spreadsheetColumnName(columnIndex + 1),
+    value: cells[columnIndex] || "",
+  };
+}
+
+export function replaceMarkdownTableCellInText(text: string, edit: MarkdownTableCellEdit, value: string) {
+  const lines = text.split("\n");
+  const line = lines[edit.lineNumber - 1];
+  if (line === undefined) return text;
+  const cells = padTableRow(splitMarkdownTableRow(line), edit.table.headers.length);
+  cells[edit.columnIndex] = value;
+  lines[edit.lineNumber - 1] = `| ${cells.map(escapeTableCell).join(" | ")} |`;
+  return lines.join("\n");
+}
+
+function markdownTableCellRanges(line: string) {
+  const pipeIndexes = unescapedPipeIndexes(line);
+  const firstPipe = pipeIndexes[0] ?? -1;
+  const lastPipe = pipeIndexes[pipeIndexes.length - 1] ?? -1;
+  const firstNonSpace = line.search(/\S/);
+  const lastNonSpace = line.search(/\S\s*$/);
+  const hasLeadingPipe = firstPipe >= 0 && firstPipe === firstNonSpace;
+  const hasTrailingPipe = lastPipe >= 0 && lastPipe === lastNonSpace;
+  const start = hasLeadingPipe ? firstPipe + 1 : 0;
+  const end = hasTrailingPipe ? lastPipe : line.length;
+  const innerPipes = pipeIndexes.filter((index) => index >= start && index < end);
+  const ranges: Array<{ start: number; end: number }> = [];
+  let cellStart = start;
+  for (const pipe of innerPipes) {
+    ranges.push(markdownTableCellRange(cellStart, pipe));
+    cellStart = pipe + 1;
+  }
+  ranges.push(markdownTableCellRange(cellStart, end));
+  return ranges;
+}
+
+function markdownTableCellRange(start: number, end: number) {
+  return { start, end: Math.max(start, end - 1) };
+}
+
+function unescapedPipeIndexes(line: string) {
+  const indexes: number[] = [];
+  let escaped = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (escaped) {
+      escaped = false;
+    } else if (char === "\\") {
+      escaped = true;
+    } else if (char === "|") {
+      indexes.push(index);
+    }
+  }
+  return indexes;
 }
 
 export function tableDraftFromRows(rows: string[][], options: TableDraftFromRowsOptions = {}): TableDraft | null {

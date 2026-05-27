@@ -370,6 +370,11 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         )?)
         .item(&menu_item(
             app,
+            "neditor-edit-table-cell-at-cursor",
+            "Edit Table Cell at Cursor",
+        )?)
+        .item(&menu_item(
+            app,
             "neditor-go-to-source-table",
             "Go to Source Table",
         )?)
