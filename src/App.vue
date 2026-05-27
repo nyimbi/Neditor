@@ -5297,6 +5297,7 @@ import {
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
 import { markdownListContinuation } from "./lib/markdownEditing";
 import { replaceOrAppendMarkdownSection } from "./lib/markdownSectionMerge";
+import { occurrenceRangesForSelection, splitSelectionIntoLineRanges } from "./lib/multiCursor";
 import {
   buildQualityRecommendations,
   buildQualityStepAssistance,
@@ -7898,6 +7899,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
     tips: [
       "The command palette is the fastest way to find actions while learning the app.",
       "AI drafting, outline planning, review readiness, and distribution preparation all have direct shortcuts so collapsed toolbars remain practical.",
+      "For repeated wording edits, use Select next occurrence, Select all occurrences, Add cursor above/below, or Split selection into line cursors from the Edit menu, command palette, or writing toolbar.",
       "Vim-style mode starts in insert mode; press Escape for normal mode, then use h/j/k/l, 0, ^, $, w, e, b, x, D, C, J, i, a, o, O, u, Ctrl+R, g, G, dd, dw, de, db, d0, d$, cw, cc, yy, yw, ye, yb, y0, y$, p, and P.",
       "Emacs-style mode adds familiar Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Ctrl+P, Ctrl+N, Ctrl+D, Ctrl+K, Ctrl+Y, Ctrl+W, Alt+D, Alt+Backspace, Alt+F, and Alt+B navigation/editing keys.",
       "Toolbar text can be resized or hidden if you prefer icons only.",
@@ -8157,6 +8159,8 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "bold", label: "Bold", title: "Bold selection", icon: "bold", run: () => wrapSelection("**") },
       { id: "italic", label: "Italic", title: "Italic selection", icon: "italic", run: () => wrapSelection("*") },
       { id: "code", label: "Code", title: "Inline code selection", icon: "code", run: () => wrapSelection("`") },
+      { id: "select-all-occurrences", label: "All Matches", title: "Select every exact match of the selected text or current word", icon: "find", run: () => selectAllEditorOccurrences() },
+      { id: "split-line-cursors", label: "Line Cursors", title: "Split the selection into one cursor or selection per line", icon: "commands", run: () => splitEditorSelectionIntoLineCursors() },
       { id: "link", label: "Link", title: "Insert link", icon: "link", run: () => wrapSelection("[", "](https://)") },
       { id: "heading", label: "Heading", title: "Insert second-level heading", icon: "heading", run: () => insertAtLineStart("## ") },
       { id: "fence", label: "Fence", title: "Insert code fence", icon: "fence", run: () => insertBlock(codeFenceSnippet) },
@@ -8200,6 +8204,18 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "equation", label: "Equation", title: "Open equation editor", icon: "equation", run: () => openEquationEditor() },
       { id: "toc", label: "TOC", title: "Insert table of contents", icon: "toc", run: () => insertBlock(tocSnippet) },
       { id: "ai-source", label: "AI Source", title: "Insert AI source block", icon: "ai", run: () => insertBlock(aiSnippet) },
+    ],
+  },
+  {
+    id: "tables",
+    label: "Tables",
+    actions: [
+      { id: "table-editor", label: "Open Editor", title: "Open the visual table grid and Markdown source tools", icon: "table", primary: true, run: () => openTableEditor() },
+      { id: "table-at-cursor", label: "At Cursor", title: "Load the Markdown table at the cursor or selection into the visual table editor", icon: "table", run: () => loadTableAtCursor() },
+      { id: "table-text", label: "Edit Text", title: "Select the exact Markdown table source so you can edit the table directly in text", icon: "code", disabled: !canEditMarkdownTableText.value, run: () => editSelectedTableInMarkdownText() },
+      { id: "table-cell", label: "Cell", title: "Load the Markdown table cell under the cursor and write its value back to the source text", icon: "table", run: () => loadTableTextCellAtCursor() },
+      { id: "table-grid-to-text", label: "Grid -> Text", title: "Apply the current visual table grid back to the Markdown source table", icon: "save", disabled: !tableDraft.value || tableDraftHasErrors.value || tableDraftSourceChanged.value, run: () => applyTableDraft() },
+      { id: "table-source-to-grid", label: "Text -> Grid", title: "Parse the editable Markdown table source and update the visual grid", icon: "commands", disabled: !tableDraft.value || !tableSourceEditDirty.value, run: () => updateTableDraftFromSourceText() },
     ],
   },
   {
@@ -8285,6 +8301,8 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "find-next", label: "Find Next", help: "Move to the next match.", run: () => runEditorCommand(findNext) },
           { id: "find-prev", label: "Find Previous", help: "Move to the previous match.", run: () => runEditorCommand(findPrevious) },
           { id: "multi-next", label: "Select Next Occurrence", help: "Add the next matching occurrence to the selection.", run: () => runEditorCommand(selectNextOccurrence) },
+          { id: "multi-all", label: "Select All Occurrences", help: "Select every exact match of the selected text or current word.", run: () => selectAllEditorOccurrences() },
+          { id: "split-line-cursors", label: "Split Selection Into Lines", help: "Create one cursor or selection on every selected line.", run: () => splitEditorSelectionIntoLineCursors() },
           { id: "cursor-above", label: "Add Cursor Above", help: "Create a multi-cursor above.", run: () => runEditorCommand(addCursorAbove) },
           { id: "cursor-below", label: "Add Cursor Below", help: "Create a multi-cursor below.", run: () => runEditorCommand(addCursorBelow) },
         ],
@@ -10133,6 +10151,20 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     run: () => runEditorCommand(selectNextOccurrence),
   },
   {
+    name: "Select all occurrences",
+    group: "Edit",
+    description: "Select every exact match of the selected text or current word for simultaneous editing.",
+    keywords: ["multi cursor", "multiple cursors", "select all matches", "same text", "all occurrences"],
+    run: () => selectAllEditorOccurrences(),
+  },
+  {
+    name: "Split selection into line cursors",
+    group: "Edit",
+    description: "Create one cursor or selected range on every line touched by the current selection.",
+    keywords: ["multi cursor", "multiple cursors", "split lines", "line cursors", "parallel edit"],
+    run: () => splitEditorSelectionIntoLineCursors(),
+  },
+  {
     name: "Add cursor above",
     group: "Edit",
     description: "Place another cursor on the line above for parallel edits.",
@@ -10218,6 +10250,27 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Insert code fence", group: "Snippet", run: () => insertBlock(codeFenceSnippet) },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
   { name: "Edit table cell at cursor", group: "Writing Tools", keywords: ["table", "cell", "markdown", "text"], run: () => loadTableTextCellAtCursor() },
+  {
+    name: "Apply table grid to Markdown text",
+    group: "Tables",
+    description: "Write the current visual table grid back to the loaded Markdown source table.",
+    keywords: ["table", "grid to text", "two way", "markdown table", "apply table"],
+    run: () => applyTableDraft(),
+  },
+  {
+    name: "Sync Markdown table text to grid",
+    group: "Tables",
+    description: "Parse the editable Markdown source block and update the visual table grid preview.",
+    keywords: ["table", "text to grid", "source to grid", "two way", "pipe table"],
+    run: () => updateTableDraftFromSourceText(),
+  },
+  {
+    name: "Apply Markdown table source text",
+    group: "Tables",
+    description: "Parse and write the edited Markdown source block into the document.",
+    keywords: ["table", "apply source text", "markdown text", "pipe table"],
+    run: () => applyTableSourceEdit(),
+  },
   { name: "Import CSV or XLSX table", group: "Writing Tools", keywords: ["table", "spreadsheet", "csv", "xlsx", "excel"], run: () => importTableFromSpreadsheet() },
   { name: "Export selected table to CSV", group: "Writing Tools", keywords: ["table", "spreadsheet", "csv", "export"], run: () => exportSelectedTable("csv") },
   { name: "Export selected table to XLSX", group: "Writing Tools", keywords: ["table", "spreadsheet", "xlsx", "excel", "export"], run: () => exportSelectedTable("xlsx") },
@@ -14109,6 +14162,36 @@ function runEditorCommand(command: (view: EditorView) => boolean) {
   if (!editorView) return;
   command(editorView);
   editorView.focus();
+}
+
+function selectAllEditorOccurrences() {
+  if (!editorView) return;
+  const selection = editorView.state.selection.main;
+  const result = occurrenceRangesForSelection(editorView.state.doc.toString(), selection.from, selection.to);
+  if (!result.ranges.length) {
+    store.statusMessage = "Select text or place the cursor on a word before selecting all occurrences";
+    return;
+  }
+  editorView.dispatch({
+    selection: EditorSelection.create(result.ranges.map((range) => EditorSelection.range(range.from, range.to))),
+    scrollIntoView: true,
+  });
+  editorView.focus();
+  store.statusMessage = `Selected ${result.ranges.length} occurrence${result.ranges.length === 1 ? "" : "s"} of ${result.term}`;
+}
+
+function splitEditorSelectionIntoLineCursors() {
+  if (!editorView) return;
+  const selection = editorView.state.selection.main;
+  const ranges = splitSelectionIntoLineRanges(editorView.state.doc.toString(), selection.from, selection.to);
+  editorView.dispatch({
+    selection: EditorSelection.create(
+      ranges.map((range) => (range.from === range.to ? EditorSelection.cursor(range.from) : EditorSelection.range(range.from, range.to))),
+    ),
+    scrollIntoView: true,
+  });
+  editorView.focus();
+  store.statusMessage = `Split selection into ${ranges.length} line cursor${ranges.length === 1 ? "" : "s"}`;
 }
 
 function showOutline() {

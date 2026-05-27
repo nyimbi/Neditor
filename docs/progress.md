@@ -31,6 +31,15 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Table editing is now exposed as a two-way workflow from the main toolbar as
+  well as the Tables panel, Writing Tools menu, and command palette. Users can
+  open the table editor, load the table at the cursor, select the Markdown table
+  source for direct text editing, edit a specific source cell, apply grid
+  changes back to text, and sync edited Markdown source back into the grid.
+- Multi-cursor editing now includes first-class select-all-occurrences and
+  split-selection-into-line-cursors commands in the Edit menu, command palette,
+  and writing toolbar, backed by pure helper tests for repeated-term selection
+  and per-line cursor ranges.
 - Vim-style editing now has first-class yank/paste register behavior. The
   editor supports pending `y` operators for `yy`, word motions, and line
   motions, plus `p`/`P` paste placement with linewise register semantics, and

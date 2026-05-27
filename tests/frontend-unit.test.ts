@@ -102,6 +102,7 @@ import {
 } from "../src/lib/frontMatter.js";
 import { markdownListContinuation } from "../src/lib/markdownEditing.js";
 import { extractMarkdownSection, findMarkdownSectionRange, replaceOrAppendMarkdownSection } from "../src/lib/markdownSectionMerge.js";
+import { occurrenceRangesForSelection, splitSelectionIntoLineRanges } from "../src/lib/multiCursor.js";
 import {
   buildQualityRecommendations,
   buildQualityStepAssistance,
@@ -1470,6 +1471,37 @@ test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   deepEqual(vimPasteEdit("one\ntwo\nthree\n", 10, { text: "alpha", linewise: true }, "after"), { position: 14, text: "alpha\n" });
   equal(vimPastePosition("one two", 3, { text: "X", linewise: false }, "after"), 4);
   equal(vimPastePosition("one two", 3, { text: "X", linewise: false }, "before"), 3);
+});
+
+test("multi-cursor helpers select repeated terms and split selected lines", () => {
+  const text = "alpha beta\nalpha gamma\nnested-alpha alpha\n";
+  deepEqual(occurrenceRangesForSelection(text, 0, 5), {
+    term: "alpha",
+    ranges: [
+      { from: 0, to: 5 },
+      { from: 11, to: 16 },
+      { from: 30, to: 35 },
+      { from: 36, to: 41 },
+    ],
+  });
+  deepEqual(occurrenceRangesForSelection(text, 2, 2), {
+    term: "alpha",
+    ranges: [
+      { from: 0, to: 5 },
+      { from: 11, to: 16 },
+      { from: 30, to: 35 },
+      { from: 36, to: 41 },
+    ],
+  });
+  deepEqual(splitSelectionIntoLineRanges("one two\nthree four\nfive", 4, 19), [
+    { from: 4, to: 7 },
+    { from: 8, to: 18 },
+    { from: 19, to: 19 },
+  ]);
+  deepEqual(splitSelectionIntoLineRanges("one\ntwo\n", 0, 8), [
+    { from: 0, to: 3 },
+    { from: 4, to: 7 },
+  ]);
 });
 
 test("Emacs keybinding helpers preserve kill and word navigation semantics", () => {
@@ -4252,6 +4284,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Place another cursor on the line above for parallel edits."));
   ok(app.includes('keywords: ["multi cursor", "multiple cursors", "cursor above", "parallel edit"]'));
   ok(app.includes("Select another matching word or phrase for simultaneous editing."));
+  ok(app.includes("Select every exact match of the selected text or current word"));
+  ok(app.includes("Split selection into line cursors"));
+  ok(app.includes("selectAllEditorOccurrences"));
+  ok(app.includes("splitEditorSelectionIntoLineCursors"));
   ok(app.includes('<small v-if="command.description">{{ command.description }}</small>'));
   ok(app.includes("Help Center"));
   ok(app.includes('aria-label="Business document creation"'));
@@ -4797,6 +4833,15 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Two-way table editing"));
   ok(app.includes("tableTwoWayStatus"));
   ok(app.includes("table-sync-chip"));
+  ok(app.includes('id: "tables"'));
+  ok(app.includes("Open the visual table grid and Markdown source tools"));
+  ok(app.includes("Select the exact Markdown table source so you can edit the table directly in text"));
+  ok(app.includes("Load the Markdown table cell under the cursor and write its value back to the source text"));
+  ok(app.includes("Apply table grid to Markdown text"));
+  ok(app.includes("Sync Markdown table text to grid"));
+  ok(app.includes("Apply Markdown table source text"));
+  ok(app.includes("Grid -> Text"));
+  ok(app.includes("Text -> Grid"));
   ok(app.includes("New table in text"));
   ok(app.includes("Insert draft in text"));
   ok(app.includes("insertTableDraftInMarkdownText"));
