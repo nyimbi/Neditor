@@ -4482,6 +4482,13 @@ Table dirty source export guard:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the dirty source export guard. |
 | `git diff --check` | Pass | No whitespace errors are present in the dirty source export guard diff. |
 
+RFP URL and DOCX source cleanup hardening:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is clean after hardening native RFP source cleanup. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked rfp_import --lib` | Pass | 4 focused RFP importer tests passed, proving DOCX entity decoding, URL script/style/noise stripping, table/list text preservation, numeric entity decoding, and page-title extraction for URL-sourced RFPs. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

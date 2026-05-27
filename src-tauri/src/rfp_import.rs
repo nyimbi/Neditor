@@ -222,7 +222,7 @@ fn import_url(
     warnings.push("URL import captures the public page response; verify linked attachments and addenda manually.".to_string());
     Ok((
         html_to_text(&raw),
-        url.to_string(),
+        html_title(&raw).unwrap_or_else(|| url.to_string()),
         "curl-url-text".to_string(),
     ))
 }
@@ -256,38 +256,180 @@ fn title_from_path(path: &Path) -> String {
 }
 
 fn docx_xml_to_text(xml: &str) -> String {
-    xml.replace("</w:p>", "\n")
-        .replace("</w:tr>", "\n")
-        .replace("</w:tc>", "\t")
-        .replace("<w:tab/>", "\t")
-        .replace("<w:br/>", "\n")
-        .split('<')
-        .map(|chunk| chunk.split_once('>').map(|(_, text)| text).unwrap_or(""))
-        .collect::<Vec<_>>()
-        .join("")
-        .replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
+    decode_text_entities(
+        &xml.replace("</w:p>", "\n")
+            .replace("</w:tr>", "\n")
+            .replace("</w:tc>", "\t")
+            .replace("<w:tab/>", "\t")
+            .replace("<w:br/>", "\n")
+            .split('<')
+            .map(|chunk| chunk.split_once('>').map(|(_, text)| text).unwrap_or(""))
+            .collect::<Vec<_>>()
+            .join(""),
+    )
 }
 
 fn html_to_text(html: &str) -> String {
-    html.replace("</p>", "\n")
-        .replace("</li>", "\n")
-        .replace("</tr>", "\n")
-        .replace("</h1>", "\n")
-        .replace("</h2>", "\n")
-        .replace("</h3>", "\n")
-        .split('<')
-        .map(|chunk| chunk.split_once('>').map(|(_, text)| text).unwrap_or(""))
-        .collect::<Vec<_>>()
-        .join(" ")
-        .replace("&nbsp;", " ")
-        .replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
+    let cleaned = remove_html_comments(&remove_html_element_blocks(
+        html,
+        &["script", "style", "noscript", "svg"],
+    ));
+    let mut output = String::new();
+    let mut tag = String::new();
+    let mut in_tag = false;
+    for ch in cleaned.chars() {
+        if in_tag {
+            if ch == '>' {
+                push_html_tag_separator(&tag, &mut output);
+                tag.clear();
+                in_tag = false;
+            } else {
+                tag.push(ch);
+            }
+        } else if ch == '<' {
+            in_tag = true;
+        } else {
+            output.push(ch);
+        }
+    }
+    normalize_text(&decode_text_entities(&output))
+}
+
+fn html_title(html: &str) -> Option<String> {
+    let cleaned = remove_html_element_blocks(html, &["script", "style", "noscript", "svg"]);
+    let lower = cleaned.to_lowercase();
+    let title_open = lower.find("<title")?;
+    let title_body = lower[title_open..]
+        .find('>')
+        .map(|offset| title_open + offset + 1)?;
+    let title_close = lower[title_body..]
+        .find("</title>")
+        .map(|offset| title_body + offset)?;
+    let title = normalize_text(&decode_text_entities(&cleaned[title_body..title_close]));
+    (!title.is_empty()).then_some(title)
+}
+
+fn push_html_tag_separator(raw_tag: &str, output: &mut String) {
+    let tag = raw_tag
+        .trim()
+        .trim_start_matches('/')
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .trim_matches('/')
+        .to_ascii_lowercase();
+    if tag.is_empty() || raw_tag.trim_start().starts_with('!') {
+        return;
+    }
+    if matches!(tag.as_str(), "td" | "th") {
+        push_separator(output, '\t');
+    } else if matches!(
+        tag.as_str(),
+        "br" | "p"
+            | "div"
+            | "section"
+            | "article"
+            | "header"
+            | "footer"
+            | "li"
+            | "ul"
+            | "ol"
+            | "tr"
+            | "table"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+    ) {
+        push_separator(output, '\n');
+    }
+}
+
+fn push_separator(output: &mut String, separator: char) {
+    if output.ends_with(separator) {
+        return;
+    }
+    output.push(separator);
+}
+
+fn remove_html_element_blocks(html: &str, element_names: &[&str]) -> String {
+    let mut output = html.to_string();
+    for element_name in element_names {
+        loop {
+            let lower = output.to_lowercase();
+            let Some(start) = lower.find(&format!("<{element_name}")) else {
+                break;
+            };
+            let body_start = lower[start..]
+                .find('>')
+                .map(|offset| start + offset + 1)
+                .unwrap_or(start);
+            let end_pattern = format!("</{element_name}>");
+            let end = lower[body_start..]
+                .find(&end_pattern)
+                .map(|offset| body_start + offset + end_pattern.len())
+                .unwrap_or(body_start);
+            output.replace_range(start..end, " ");
+        }
+    }
+    output
+}
+
+fn remove_html_comments(html: &str) -> String {
+    let mut output = html.to_string();
+    while let Some(start) = output.find("<!--") {
+        let end = output[start + 4..]
+            .find("-->")
+            .map(|offset| start + 4 + offset + 3)
+            .unwrap_or(output.len());
+        output.replace_range(start..end, " ");
+    }
+    output
+}
+
+fn decode_text_entities(text: &str) -> String {
+    let mut output = String::new();
+    let mut remaining = text;
+    while let Some(start) = remaining.find('&') {
+        output.push_str(&remaining[..start]);
+        let after_amp = &remaining[start + 1..];
+        let Some(end) = after_amp.find(';') else {
+            output.push('&');
+            remaining = after_amp;
+            continue;
+        };
+        let entity = &after_amp[..end];
+        if let Some(decoded) = decode_entity(entity) {
+            output.push(decoded);
+        } else {
+            output.push('&');
+            output.push_str(entity);
+            output.push(';');
+        }
+        remaining = &after_amp[end + 1..];
+    }
+    output.push_str(remaining);
+    output
+}
+
+fn decode_entity(entity: &str) -> Option<char> {
+    match entity {
+        "nbsp" => Some(' '),
+        "amp" => Some('&'),
+        "lt" => Some('<'),
+        "gt" => Some('>'),
+        "quot" => Some('"'),
+        "apos" => Some('\''),
+        _ if entity.starts_with("#x") || entity.starts_with("#X") => {
+            u32::from_str_radix(&entity[2..], 16)
+                .ok()
+                .and_then(char::from_u32)
+        }
+        _ if entity.starts_with('#') => entity[1..].parse::<u32>().ok().and_then(char::from_u32),
+        _ => None,
+    }
 }
 
 fn normalize_text(text: &str) -> String {
@@ -307,10 +449,10 @@ mod tests {
     #[test]
     fn docx_xml_text_preserves_paragraphs_and_table_cells() {
         let text = docx_xml_to_text(
-            r#"<w:p><w:r><w:t>Requirement A</w:t></w:r></w:p><w:tr><w:tc><w:p><w:r><w:t>Cell</w:t></w:r></w:p></w:tc></w:tr>"#,
+            r#"<w:p><w:r><w:t>Requirement &amp; A</w:t></w:r></w:p><w:tr><w:tc><w:p><w:r><w:t>Cell &#x32;</w:t></w:r></w:p></w:tc></w:tr>"#,
         );
-        assert!(text.contains("Requirement A"));
-        assert!(text.contains("Cell"));
+        assert!(text.contains("Requirement & A"));
+        assert!(text.contains("Cell 2"));
     }
 
     #[test]
@@ -346,9 +488,22 @@ mod tests {
 
     #[test]
     fn url_html_text_strips_markup() {
-        let text = html_to_text("<h1>RFP</h1><p>Vendor must provide support.</p>");
+        let text = html_to_text(
+            "<html><head><title>Support RFP</title><style>.x{}</style><script>alert('ignore')</script></head><body><h1>RFP</h1><p>Vendor must provide support &amp; training.</p><table><tr><th>ID</th><th>Requirement</th></tr><tr><td>1</td><td>Submit certificates &#x2713;</td></tr></table></body></html>",
+        );
         assert!(text.contains("RFP"));
-        assert!(text.contains("Vendor must provide support."));
+        assert!(text.contains("Vendor must provide support & training."));
+        assert!(text.contains("Submit certificates ✓"));
+        assert!(!text.contains("alert"));
+        assert!(!text.contains(".x"));
         assert!(!text.contains("<p>"));
+    }
+
+    #[test]
+    fn url_html_title_uses_page_title() {
+        let title = html_title(
+            "<html><head><title>Customer Support RFP &amp; Addendum</title></head><body>Body</body></html>",
+        );
+        assert_eq!(title, Some("Customer Support RFP & Addendum".to_string()));
     }
 }
