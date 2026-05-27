@@ -684,6 +684,39 @@ fn chart_transform_handles_negative_values_targets_and_value_units() {
 }
 
 #[test]
+fn chart_transform_renders_multi_series_business_specs() {
+    let grouped = run_transform(
+            "chart".to_string(),
+            "type: bar\ntitle: Budget vs Actual\nunit: k\ndata:\n  - month: Jan\n    budget: 100\n    actual: 92\n  - month: Feb\n    budget: 110\n    actual: 118\nx: month\nseries:\n  - key: budget\n    label: Budget\n  - key: actual\n    label: Actual\n".to_string(),
+        )
+        .expect("grouped business chart transform");
+
+    assert_eq!(grouped.output_kind, "svg");
+    assert!(grouped.html.contains("Budget vs Actual"));
+    assert!(grouped.html.contains("data-series=\"Budget\""));
+    assert!(grouped.html.contains("data-series=\"Actual\""));
+    assert!(grouped.html.contains("chart-legend-item"));
+    assert!(grouped.html.contains(">100k<"));
+    assert!(grouped.html.contains(">118k<"));
+    assert!(grouped.html.contains(">Feb<"));
+    assert!(grouped.diagnostics.is_empty());
+
+    let line = run_transform(
+            "chart".to_string(),
+            "type: line\ntitle: Segment Growth\nvalueSuffix: \"%\"\ndata:\n  - quarter: Q1\n    enterprise: 12\n    smb: 8\n  - quarter: Q2\n    enterprise: 18\n    smb: 11\nx: quarter\nseries:\n  - enterprise\n  - smb\n".to_string(),
+        )
+        .expect("multi-series line chart transform");
+    assert_eq!(line.output_kind, "svg");
+    assert!(line.html.contains("Segment Growth"));
+    assert!(line.html.contains("data-series=\"enterprise\""));
+    assert!(line.html.contains("data-series=\"smb\""));
+    assert!(line.html.contains(">18%<"));
+    assert!(line.html.contains(">11%<"));
+    assert!(line.html.contains("<polyline"));
+    assert!(line.diagnostics.is_empty());
+}
+
+#[test]
 fn timeline_transform_renders_static_svg_preview() {
     let artifact = run_transform(
         "timeline".to_string(),

@@ -109,7 +109,9 @@ Recent pushed checkpoints visible in current git history:
 - Native `chart` transforms now handle business variance charts with negative
   values, true zero baselines, target/goal/benchmark lines, and value
   prefix/suffix/unit labels so profit/loss, budget, and cash-flow charts remain
-  readable without requiring Vega-Lite.
+  readable without requiring Vega-Lite. The same native chart syntax now also
+  supports multi-series bar, line, and area charts for budget-vs-actual,
+  revenue-vs-cost, segment, and scenario comparisons.
 - Direct text-edited tables now accept common Markdown pipe-table syntax with
   or without outer pipes. The frontend table editor parses `A | B` / `--- |
   ---` source edits into the visual grid, and the backend compiler normalizes

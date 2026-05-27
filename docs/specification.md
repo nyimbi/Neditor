@@ -941,6 +941,9 @@ Business chart specs can also set `target`/`goal`/`benchmark` reference lines,
 `targetLabel`, and `valuePrefix`/`valueSuffix`/`unit` labels. Bar, line, and
 area charts must preserve negative values with a real zero baseline so variance,
 cash-flow, budget, and profit/loss charts remain honest in preview and export.
+Multi-series bar, line, and area charts can use `series` entries as field names
+or `{ key, label }` objects for budget-vs-actual, revenue-vs-cost, segment, and
+scenario comparisons while keeping the syntax business-readable.
 
 #### 10.4.6 `geojson`
 
