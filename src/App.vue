@@ -5240,6 +5240,7 @@ import {
   duplicateTableDraftColumn,
   duplicateTableDraftRow,
   findMarkdownTableIndexForLineRange,
+  findMarkdownTableForSourceSnapshot,
   formatTableTotal,
   isFormulaCell,
   markdownTableToDraft,
@@ -5264,7 +5265,6 @@ import {
   tableHeaderLabel as tableDraftHeaderLabel,
   tableCellLabel as tableDraftCellLabel,
   tableMarkdownForExport,
-  tableOverlapsSourceSnapshot,
   tableTotalLabel as tableDraftTotalLabel,
   tableSpanCellOptions as tableDraftSpanCellOptions,
   tableSourceChanged,
@@ -6837,11 +6837,16 @@ const citationStyle = computed(() =>
 );
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
 const selectedTable = computed(() => markdownTables.value[selectedTableIndex.value] || null);
-const selectedTableForDraft = computed(() => {
-  const table = selectedTable.value;
+const selectedTableDraftMatch = computed(() => {
   const snapshot = tableSourceSnapshot.value;
-  if (!snapshot || isNewTableDraft.value || snapshot.documentId !== active.value.id) return table;
-  return tableOverlapsSourceSnapshot(table, snapshot, active.value.id) ? table : null;
+  if (!snapshot || isNewTableDraft.value || snapshot.documentId !== active.value.id) {
+    const table = selectedTable.value;
+    return table ? { table, index: selectedTableIndex.value } : null;
+  }
+  return findMarkdownTableForSourceSnapshot(markdownTables.value, active.value.text, snapshot, active.value.id);
+});
+const selectedTableForDraft = computed(() => {
+  return selectedTableDraftMatch.value?.table || null;
 });
 const outlineHeadings = computed(() =>
   (active.value.compile?.document_ast.blocks || []).flatMap((block) => {
@@ -10713,6 +10718,7 @@ watch(
     if (store.sidebar !== "tables" || !tableDraft.value || isNewTableDraft.value || !tableDraftSourceChanged.value) return;
     if (!selectedTableForDraft.value) return;
     if (tableDraftDirty.value) return;
+    syncSelectedTableIndexToDraftMatch();
     loadSelectedTable({ force: true });
     store.statusMessage = "Synced table editor from Markdown source changes";
   },
@@ -16959,8 +16965,16 @@ function reloadTableDraftFromSource() {
     store.statusMessage = "The source table is not currently parseable; fix the Markdown text or apply the draft over source";
     return;
   }
+  syncSelectedTableIndexToDraftMatch();
   loadSelectedTable({ force: true });
   store.statusMessage = "Reloaded table editor from the current Markdown source table";
+}
+
+function syncSelectedTableIndexToDraftMatch() {
+  const match = selectedTableDraftMatch.value;
+  if (!match) return null;
+  if (selectedTableIndex.value !== match.index) selectedTableIndex.value = match.index;
+  return match;
 }
 
 function createTableDraft() {
@@ -16991,13 +17005,14 @@ function applyTableDraft(forceSourceOverwrite = false) {
       store.statusMessage = "Markdown source changed; reload the table or explicitly apply the draft over the current source table";
       return;
     }
+    const tableIndex = selectedTableDraftMatch.value?.index ?? selectedTableIndex.value;
     const replacement = replaceMarkdownTableInText(active.value.text, table, normalizedDraft);
     store.updateText(replacement.text);
     void nextTick(() => syncEditorViewFromActiveDocument());
     store.statusMessage = `Updated source table at lines ${replacement.startLine}-${replacement.endLine}`;
     tableSourceSnapshot.value = {
       documentId: active.value.id,
-      tableIndex: selectedTableIndex.value,
+      tableIndex,
       startLine: replacement.startLine,
       endLine: replacement.endLine,
       sourceText: serialized.join("\n"),
@@ -17033,8 +17048,7 @@ function applyTableDraft(forceSourceOverwrite = false) {
         break;
       }
     }
-    selectedTableIndex.value =
-      insertedTableIndex >= 0 ? insertedTableIndex : Math.max(0, updatedTables.length - 1);
+    selectedTableIndex.value = insertedTableIndex >= 0 ? insertedTableIndex : Math.max(0, updatedTables.length - 1);
     const insertedTable = updatedTables[selectedTableIndex.value];
     if (insertedTable) {
       tableSourceSnapshot.value = createTableSourceSnapshot(active.value.text, active.value.id, selectedTableIndex.value, insertedTable, normalizedDraft);

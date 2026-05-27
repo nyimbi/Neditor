@@ -156,6 +156,7 @@ import {
   duplicateTableDraftRow,
   formatTableTotal,
   findMarkdownTableIndexForLineRange,
+  findMarkdownTableForSourceSnapshot,
   markdownTableToDraft,
   moveTableDraftColumn,
   moveTableDraftRow,
@@ -304,6 +305,28 @@ test("table source snapshots detect source and draft divergence", () => {
   const [otherParsedTable] = parseMarkdownTables(invalidFirstTableText);
   equal(otherParsedTable.id, "tbl:other");
   equal(tableOverlapsSourceSnapshot(otherParsedTable, snapshot, "doc-1"), false);
+
+  const sourceShiftedByInsertedTable = [
+    "# Report",
+    "",
+    "Table: Inserted {#tbl:inserted}",
+    "| Name |",
+    "| --- |",
+    "| Earlier |",
+    "",
+    "Table: Regional revenue {#tbl:revenue}",
+    "| Region | Revenue |",
+    "| --- | ---: |",
+    "| North | 3100 |",
+    "",
+    "After table.",
+  ].join("\n");
+  const shiftedTables = parseMarkdownTables(sourceShiftedByInsertedTable);
+  const shiftedMatch = findMarkdownTableForSourceSnapshot(shiftedTables, sourceShiftedByInsertedTable, snapshot, "doc-1");
+  equal(shiftedMatch?.index, 1);
+  equal(shiftedMatch?.table.id, "tbl:revenue");
+  equal(shiftedMatch?.table.rows[0][0], "North");
+  equal(findMarkdownTableForSourceSnapshot(shiftedTables, sourceShiftedByInsertedTable, snapshot, "other-doc"), null);
 
   const replacement = replaceMarkdownTableSnapshotInText(invalidFirstTableText, snapshot, {
     ...draft,
@@ -4435,7 +4458,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("applyTableSourceEdit"));
   ok(app.includes("tableDraftSourceChanged"));
   ok(app.includes("selectedTableForDraft"));
-  ok(app.includes("tableOverlapsSourceSnapshot"));
+  ok(app.includes("findMarkdownTableForSourceSnapshot"));
   ok(app.includes("replaceMarkdownTableSnapshotInText"));
   ok(app.includes("The source table is not currently parseable"));
   ok(app.includes("Synced table editor from Markdown source changes"));

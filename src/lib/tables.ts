@@ -32,6 +32,11 @@ export interface TableSourceSnapshot {
   draftMarkdown: string;
 }
 
+export interface MarkdownTableSnapshotMatch {
+  table: MarkdownTable;
+  index: number;
+}
+
 export interface TableDraftIssue {
   severity: "warning" | "error";
   message: string;
@@ -238,6 +243,63 @@ export function tableOverlapsSourceSnapshot(
   if (!table || !snapshot || snapshot.documentId !== documentId) return false;
   const tableStart = table.captionLine || table.startLine;
   return tableStart <= snapshot.endLine && table.endLine >= snapshot.startLine;
+}
+
+export function findMarkdownTableForSourceSnapshot(
+  tables: MarkdownTable[],
+  text: string,
+  snapshot: TableSourceSnapshot | null | undefined,
+  documentId: string,
+): MarkdownTableSnapshotMatch | null {
+  if (!snapshot || snapshot.documentId !== documentId) return null;
+
+  const indexed = tables.map((table, index) => ({ table, index }));
+  const [snapshotTable] = parseMarkdownTables(snapshot.sourceText);
+  const indexedTable = indexed[snapshot.tableIndex];
+  if (
+    indexedTable &&
+    tableOverlapsSourceSnapshot(indexedTable.table, snapshot, documentId) &&
+    tableMatchesSnapshotIdentity(indexedTable.table, snapshotTable)
+  ) {
+    return indexedTable;
+  }
+
+  const overlapping = indexed.find(
+    ({ table }) => tableOverlapsSourceSnapshot(table, snapshot, documentId) && tableMatchesSnapshotIdentity(table, snapshotTable),
+  );
+  if (overlapping) return overlapping;
+
+  const snapshotId = snapshotTable?.id || "";
+  if (snapshotId) {
+    const byId = indexed.find(({ table }) => table.id === snapshotId);
+    if (byId) return byId;
+  }
+
+  const bySource = indexed.find(({ table }) => tableSourceText(text, table) === snapshot.sourceText);
+  if (bySource) return bySource;
+
+  if (snapshotTable?.caption) {
+    const byCaptionAndHeaders = indexed.find(
+      ({ table }) =>
+        table.caption === snapshotTable.caption &&
+        table.headers.length === snapshotTable.headers.length &&
+        table.headers.every((header, index) => header === snapshotTable.headers[index]),
+    );
+    if (byCaptionAndHeaders) return byCaptionAndHeaders;
+  }
+
+  return null;
+}
+
+function tableMatchesSnapshotIdentity(table: MarkdownTable, snapshotTable: MarkdownTable | undefined) {
+  if (!snapshotTable) return true;
+  if (snapshotTable.id) return table.id === snapshotTable.id;
+  if (!snapshotTable.caption) return true;
+  return (
+    table.caption === snapshotTable.caption &&
+    table.headers.length === snapshotTable.headers.length &&
+    table.headers.every((header, index) => header === snapshotTable.headers[index])
+  );
 }
 
 function parseTableCaption(line: string) {

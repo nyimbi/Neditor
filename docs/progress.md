@@ -4509,6 +4509,17 @@ Direct text table editing hardening:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording source-snapshot overlap and invalid in-text table recovery evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the direct text table editing hardening diff. |
 
+Moved-source table tracking:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed after adding source-snapshot identity recovery; direct coverage proves a loaded table can be recovered by label/caption identity after another Markdown table is inserted above the original source range. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after routing the visual table editor through identity-based source snapshot matching and synchronizing the selected table index before source reloads. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow now creates a table, inserts another Markdown table above it directly in the text source, keeps the original table loaded in the visual editor, applies source edits back to the intended table, and preserves the inserted table. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting identity-based moved-table tracking. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording moved-table tracking evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the moved-source table tracking diff. |
+
 RFP URL and DOCX source cleanup hardening:
 
 | Command | Result | Evidence |

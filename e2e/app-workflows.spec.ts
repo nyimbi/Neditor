@@ -3718,6 +3718,13 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await expect.poll(() => editorText(page)).toContain("Total");
   await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Revenue");
 
+  const editorContent = page.locator(".cm-content");
+  await editorContent.click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+Home" : "Control+Home");
+  await page.keyboard.type(["Table: Earlier context", "| Name |", "| --- |", "| Overview |", ""].join("\n"));
+  await expect.poll(() => editorText(page)).toContain("Table: Earlier context");
+  await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Revenue");
+
   await page.getByRole("button", { name: "Find" }).click();
   await page.getByRole("textbox", { name: "Find" }).fill("Revenue");
   await page.getByRole("textbox", { name: "Replace" }).fill("Pipeline");
@@ -3757,6 +3764,7 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await page.getByRole("button", { name: "Apply source text" }).click();
   await expect.poll(() => editorText(page)).toContain("Services");
   await expect.poll(() => editorText(page)).toContain("Support");
+  await expect.poll(() => editorText(page)).toContain("Table: Earlier context");
   await expect.poll(() => editorText(page)).not.toContain("Table: Workflow budget\n| Item | Value |\n| --- | ---: |\n| Pipeline | 125000 |");
 });
 
