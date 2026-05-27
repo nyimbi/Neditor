@@ -50,6 +50,11 @@ const LOCAL_AGENT_SPECS: &[LocalAgentSpec] = &[
         label: "OpenCode",
         command: "opencode",
     },
+    LocalAgentSpec {
+        profile_id: "google-antigravity-cli",
+        label: "Google Antigravity",
+        command: "antigravity",
+    },
 ];
 
 #[tauri::command]
@@ -57,7 +62,8 @@ pub(crate) fn prepare_local_agent_handoff(
     request: PrepareLocalAgentHandoffRequest,
 ) -> Result<LocalAgentHandoffResponse, String> {
     let spec = local_agent_spec(&request.profile_id).ok_or_else(|| {
-        "Unsupported local agent profile. Choose Claude Code, Codex, or OpenCode.".to_string()
+        "Unsupported local agent profile. Choose Claude Code, Codex, OpenCode, or Google Antigravity."
+            .to_string()
     })?;
     let prompt = request.prompt_markdown.trim();
     if prompt.is_empty() {
@@ -203,6 +209,26 @@ mod tests {
     }
 
     #[test]
+    fn allowlists_expected_local_agent_profiles() {
+        let expected = [
+            ("claude-code-cli", "Claude Code", "claude"),
+            ("codex-cli", "Codex", "codex"),
+            ("opencode-cli", "OpenCode", "opencode"),
+            (
+                "google-antigravity-cli",
+                "Google Antigravity",
+                "antigravity",
+            ),
+        ];
+
+        for (profile_id, label, command) in expected {
+            let spec = local_agent_spec(profile_id).unwrap();
+            assert_eq!(spec.label, label);
+            assert_eq!(spec.command, command);
+        }
+    }
+
+    #[test]
     fn prepares_handoff_file_inside_workspace() {
         let workspace = unique_temp_workspace("neditor-local-agent");
         fs::create_dir_all(&workspace).unwrap();
@@ -227,6 +253,35 @@ mod tests {
         assert!(fs::read_to_string(handoff_path)
             .unwrap()
             .contains("Return Markdown only."));
+
+        let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn prepares_google_antigravity_handoff_file_inside_workspace() {
+        let workspace = unique_temp_workspace("neditor-antigravity-agent");
+        fs::create_dir_all(&workspace).unwrap();
+
+        let response = prepare_local_agent_handoff(PrepareLocalAgentHandoffRequest {
+            profile_id: "google-antigravity-cli".to_string(),
+            prompt_markdown: "# Antigravity handoff\n\nReturn reviewed Markdown only.".to_string(),
+            workspace_path: Some(path_to_string(&workspace)),
+        })
+        .unwrap();
+
+        let handoff_path = PathBuf::from(&response.handoff_path);
+        assert_eq!(response.profile_id, "google-antigravity-cli");
+        assert_eq!(response.label, "Google Antigravity");
+        assert_eq!(response.command, "antigravity");
+        assert_eq!(response.launch_command, vec!["antigravity".to_string()]);
+        assert!(handoff_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with("neditor-google-antigravity-cli-"));
+        assert!(fs::read_to_string(handoff_path)
+            .unwrap()
+            .contains("Return reviewed Markdown only."));
 
         let _ = fs::remove_dir_all(workspace);
     }

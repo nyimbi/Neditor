@@ -142,6 +142,11 @@ Recent pushed checkpoints visible in current git history:
   wizard context package, README, user guide, and spec matrix now describe the
   same governed local-agent set already supported by the AI provider
   configuration surface.
+- Native local-agent handoff preparation now allowlists Google Antigravity as
+  well. The Tauri command writes Antigravity handoff Markdown under
+  `.neditor/agent-handoffs`, returns the `antigravity` launch command, and keeps
+  the same reviewed-Markdown-only instructions used by the other local-agent
+  profiles.
 - Table editing now exposes direct Markdown-text editing as a first-class
   two-way action. The Tables sidebar has an explicit **Edit Markdown in text**
   control that can load the table at the editor cursor, select the exact source
@@ -3905,6 +3910,14 @@ Local agent CLI workspace preparation:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `cargo test --locked local_agent --lib` in `src-tauri` | Pass | Native local-agent tests now prove Claude Code/Codex/OpenCode remain allowlisted and Google Antigravity writes a governed handoff file under `.neditor/agent-handoffs` with the `antigravity` launch command. |
+| `cargo fmt --check` in `src-tauri` | Pass | Rust formatting passed after adding the Google Antigravity native local-agent profile. |
+| `cargo check --locked` in `src-tauri` | Pass | The registered `prepare_local_agent_handoff` command compiles with the expanded local-agent allowlist. |
+| `pnpm run test:unit -- --runInBand` | Pass | 85 frontend unit/static tests passed, including the static business-document guard that keeps Google Antigravity visible with Claude Code, Codex, and OpenCode in the wizard handoff catalog. |
+| `pnpm run check` | Pass | Vue typecheck passed after the native/frontend local-agent catalog alignment. |
+| `pnpm run check:docs` | Pass | Markdown docs were checked after documenting the native Google Antigravity handoff alignment; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with native Google Antigravity handoff evidence recorded under AI workflow. |
+| `git diff --check` | Pass | No whitespace errors are present in the native Antigravity handoff diff. |
 | `cargo test --locked local_agent --lib` in `src-tauri` | Pass | Native local-agent tests prove unsupported profiles are rejected, Codex handoff Markdown is written under `.neditor/agent-handoffs`, and executable discovery is resolved through an allowlisted command path. |
 | `cargo check --locked` in `src-tauri` | Pass | The new `prepare_local_agent_handoff` Tauri command compiles with the registered app invoke handler. |
 | `pnpm run check` | Pass | Vue typecheck passed after wiring local-agent handoff state, result rendering, and command invocation. |

@@ -4284,6 +4284,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(businessDocs.includes("Claude Code"));
   ok(businessDocs.includes("Codex"));
   ok(businessDocs.includes("OpenCode"));
+  ok(businessDocs.includes("Google Antigravity"));
   ok(app.includes('aria-label="Help center"'));
   ok(app.includes("filteredHelpTopics"));
   ok(app.includes("External transform troubleshooting"));
