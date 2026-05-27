@@ -93,6 +93,7 @@ pub(crate) fn render_geojson_svg(
     let mut shapes = Vec::new();
     collect_geojson_shapes(&value, &mut shapes);
     let positions = geo_shapes_positions(&shapes);
+    warn_geojson_projection_assumptions(&value, &positions, artifact_diags, diagnostics);
     if positions.is_empty() {
         let diagnostic = diag(
             "warning",
@@ -105,7 +106,15 @@ pub(crate) fn render_geojson_svg(
         diagnostics.push(diagnostic);
         return "<section class=\"transform transform-geojson transform-error\">No GeoJSON coordinates found</section>".to_string();
     }
-    render_geo_shapes_svg("geojson", "#ecfeff", "#67e8f9", "#134e4a", &shapes)
+    render_geo_shapes_svg(
+        "geojson",
+        "#ecfeff",
+        "#67e8f9",
+        "#134e4a",
+        "linear-wgs84-fit",
+        "longitude-latitude",
+        &shapes,
+    )
 }
 
 pub(crate) fn render_topojson_svg(
@@ -141,7 +150,15 @@ pub(crate) fn render_topojson_svg(
         diagnostics.push(diagnostic);
         return "<section class=\"transform transform-topojson transform-error\">No TopoJSON arcs found</section>".to_string();
     }
-    render_geo_shapes_svg("topojson", "#f8fafc", "#94a3b8", "#334155", &shapes)
+    render_geo_shapes_svg(
+        "topojson",
+        "#f8fafc",
+        "#94a3b8",
+        "#334155",
+        "linear-topology-fit",
+        "topology-coordinates",
+        &shapes,
+    )
 }
 
 pub(crate) fn render_stl_svg(
@@ -595,6 +612,8 @@ fn render_geo_shapes_svg(
     fill: &str,
     stroke: &str,
     text_color: &str,
+    projection: &str,
+    coordinate_assumption: &str,
     shapes: &[GeoShape],
 ) -> String {
     let positions = geo_shapes_positions(shapes);
@@ -656,7 +675,9 @@ fn render_geo_shapes_svg(
     let summary = summary_parts.join(" / ");
 
     format!(
-        "<svg class=\"transform transform-{class_name}\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"{fill}\" stroke=\"{stroke}\"/>{body}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"{text_color}\">{summary}</text></svg>"
+        "<svg class=\"transform transform-{class_name}\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\" data-projection=\"{}\" data-coordinate-assumption=\"{}\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"{fill}\" stroke=\"{stroke}\"/>{body}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"{text_color}\">{summary}</text></svg>",
+        escape_html(projection),
+        escape_html(coordinate_assumption)
     )
 }
 
@@ -687,6 +708,45 @@ fn geo_shapes_positions(shapes: &[GeoShape]) -> Vec<(f64, f64)> {
         })
         .take(4000)
         .collect()
+}
+
+fn warn_geojson_projection_assumptions(
+    value: &Value,
+    positions: &[(f64, f64)],
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    if value.get("crs").is_some() {
+        push_visual_data_warning(
+            artifact_diags,
+            diagnostics,
+            "GeoJSON native preview ignores legacy crs metadata and assumes WGS84 longitude/latitude coordinates.",
+            "Reproject the source to WGS84 longitude/latitude before relying on the static map preview.",
+        );
+    }
+
+    if positions
+        .iter()
+        .any(|(longitude, latitude)| longitude.abs() > 180.0 || latitude.abs() > 90.0)
+    {
+        push_visual_data_warning(
+            artifact_diags,
+            diagnostics,
+            "GeoJSON native preview detected coordinates outside normal WGS84 longitude/latitude ranges.",
+            "Verify the coordinate reference system or reproject projected coordinates to WGS84 for the native preview.",
+        );
+    }
+}
+
+fn push_visual_data_warning(
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+    message: &str,
+    suggestion: &str,
+) {
+    let diagnostic = diag("warning", message, None, None, Some(suggestion));
+    artifact_diags.push(diagnostic.clone());
+    diagnostics.push(diagnostic);
 }
 
 fn collect_geojson_shapes(value: &Value, shapes: &mut Vec<GeoShape>) {

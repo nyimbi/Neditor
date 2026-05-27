@@ -4761,6 +4761,12 @@ Vega-Lite native preview fidelity:
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked vega_lite --lib` | Pass | Focused transform tests passed after the native Vega-Lite SVG renderer learned object-form marks, y-axis `sum`/`mean`/`average`/`min`/`max` aggregates, axis titles, negative values with a real zero baseline, grouped-series metadata, and export-safe `data-value` labels for variance charts. |
 
+GeoJSON projection honesty:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked geojson_transform_warns_for_projection_assumptions --lib` | Pass | Focused transform proof shows GeoJSON static SVG previews declare their native `linear-wgs84-fit` longitude-latitude projection assumption and warn on legacy CRS/projected-coordinate inputs. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

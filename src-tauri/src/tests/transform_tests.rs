@@ -810,6 +810,33 @@ fn geojson_transform_preserves_geometry_types_in_static_svg_preview() {
 }
 
 #[test]
+fn geojson_transform_warns_for_projection_assumptions() {
+    let artifact = run_transform(
+            "geojson".to_string(),
+            r#"{"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:3857"}},"features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[4088910,-144715]}}]}"#.to_string(),
+        )
+        .expect("geojson projected transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-geojson"));
+    assert!(artifact
+        .html
+        .contains("data-projection=\"linear-wgs84-fit\""));
+    assert!(artifact
+        .html
+        .contains("data-coordinate-assumption=\"longitude-latitude\""));
+    assert!(artifact.html.contains("<circle"));
+    assert!(artifact
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("ignores legacy crs metadata")));
+    assert!(artifact
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("outside normal WGS84")));
+}
+
+#[test]
 fn topojson_transform_renders_static_svg_preview() {
     let artifact = run_transform(
             "topojson".to_string(),
