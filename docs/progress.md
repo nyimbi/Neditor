@@ -132,6 +132,11 @@ Recent pushed checkpoints visible in current git history:
   direct unit coverage for engine labels, runtime summaries, Supertonic model
   download plans, copyable download details, acknowledgement prompts, and native
   read-aloud request values.
+- Docs Live review packet Markdown now lives in `src/lib/docsLive.ts` instead
+  of local Vue glue. Draft history, copy, and insertion paths share the same
+  helper, and direct frontend unit coverage proves the audit fence, generated
+  metadata, review queues, assumption register, humanization checklist, and
+  reviewer handoff sections are emitted consistently.
 - Table editing now exposes direct Markdown-text editing as a first-class
   two-way action. The Tables sidebar has an explicit **Edit Markdown in text**
   control that can load the table at the editor cursor, select the exact source
@@ -3916,6 +3921,11 @@ Frontend architecture modularization:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after moving Docs Live review-packet Markdown formatting and audit-inline sanitization from `src/App.vue` into direct helpers in `src/lib/docsLive.ts`. |
+| `pnpm run test:unit -- --runInBand` | Pass | 85 focused frontend unit/static tests passed, including direct Docs Live review-packet Markdown coverage and static wiring proof that the UI uses the extracted helper. |
+| `pnpm run check:docs` | Pass | Markdown docs were checked after documenting the Docs Live review-packet helper extraction; all local links resolved. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with the Docs Live helper extraction recorded under frontend architecture evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the Docs Live helper extraction diff. |
 | `pnpm run check` | Pass | Vue typecheck passed after moving Vim normal-mode command handling and word-motion helpers from `src/App.vue` into `src/lib/vimKeybindings.ts`. |
 | `pnpm run test:unit` | Pass | 50 frontend unit tests passed, including direct coverage for pure Vim word-start/word-end helper semantics and static wiring guards for the extracted module. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs configurable Emacs and Vim-style editor keybinding modes"` | Pass | Focused Chromium workflow re-proved the extracted keybinding module through the real editor UI. |

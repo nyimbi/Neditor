@@ -136,6 +136,11 @@ export interface DocsLiveReviewPacket {
   reviewerHandoff: string[];
 }
 
+export interface DocsLiveReviewPacketMarkdownOptions {
+  generatedAt: string;
+  source?: string;
+}
+
 interface DocsLiveBlueprint {
   label: string;
   defaultOutline: string[];
@@ -1292,6 +1297,51 @@ function reviewPacketMarkdown(packet: DocsLiveReviewPacket, blueprint: DocsLiveB
     "",
     ...packet.reviewerHandoff.map((item) => `- [ ] ${item}`),
   ].join("\n");
+}
+
+export function buildDocsLiveReviewPacketMarkdown(
+  draft: DocsLiveDraft,
+  options: DocsLiveReviewPacketMarkdownOptions,
+) {
+  const packet = draft.reviewPacket;
+  const source = options.source || "NEditor Docs Live";
+  const lines = [
+    "## Docs Live Review Packet",
+    "",
+    "```ai-audit",
+    "type: docs-live-review-packet",
+    `generatedAt: ${options.generatedAt}`,
+    `title: ${docsLiveAuditInline(draft.title)}`,
+    `documentType: ${docsLiveAuditInline(draft.documentType)}`,
+    `sections: ${draft.sections.length}`,
+    `source: ${docsLiveAuditInline(source)}`,
+    "```",
+    "",
+    "### Context Package",
+    "",
+    ...packet.contextSources.map((source) => `- ${docsLiveAuditInline(source)}`),
+    "",
+    "### Section Work Queue",
+    "",
+    ...packet.sectionRunbook.map((item) => `- ${docsLiveAuditInline(item)}`),
+    "",
+    "### Assumption Register",
+    "",
+    ...packet.qaRegister.map((item) => `- [ ] ${docsLiveAuditInline(item)}`),
+    "",
+    "### Humanization Checklist",
+    "",
+    ...packet.humanizationChecklist.map((item) => `- [ ] ${docsLiveAuditInline(item)}`),
+    "",
+    "### Reviewer Handoff",
+    "",
+    ...packet.reviewerHandoff.map((item) => `- [ ] ${docsLiveAuditInline(item)}`),
+  ];
+  return lines.join("\n");
+}
+
+export function docsLiveAuditInline(value: string) {
+  return (value || "").replace(/\r?\n/g, " ").trim();
 }
 
 function suggestedAnswerStepLabel(index: number, question: string, blueprint: DocsLiveBlueprint) {

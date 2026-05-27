@@ -68,6 +68,7 @@ import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debou
 import {
   buildDocsLiveDraft,
   buildDocsLiveQuestionnaire,
+  buildDocsLiveReviewPacketMarkdown,
   buildDocsLiveSuggestedAnswers,
   docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
@@ -1610,6 +1611,23 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(draft.markdown.includes("Commercial team should verify"));
   ok(draft.markdown.includes("The reader should approve renewal"));
   ok(draft.markdown.includes("Commercial team"));
+
+  const reviewPacketMarkdown = buildDocsLiveReviewPacketMarkdown(draft, { generatedAt: "2026-05-23T10:00:00.000Z" });
+  ok(reviewPacketMarkdown.startsWith("## Docs Live Review Packet"));
+  ok(reviewPacketMarkdown.includes("type: docs-live-review-packet"));
+  ok(reviewPacketMarkdown.includes("generatedAt: 2026-05-23T10:00:00.000Z"));
+  ok(reviewPacketMarkdown.includes("title: Acme Renewal Proposal"));
+  ok(reviewPacketMarkdown.includes("documentType: proposal"));
+  ok(reviewPacketMarkdown.includes("sections: 3"));
+  ok(reviewPacketMarkdown.includes("source: NEditor Docs Live"));
+  ok(reviewPacketMarkdown.includes("### Context Package"));
+  ok(reviewPacketMarkdown.includes("### Section Work Queue"));
+  ok(reviewPacketMarkdown.includes("### Assumption Register"));
+  ok(reviewPacketMarkdown.includes("- [ ] Executive Summary must tie"));
+  ok(reviewPacketMarkdown.includes("### Humanization Checklist"));
+  ok(reviewPacketMarkdown.includes("- [ ] Remove AI cruft"));
+  ok(reviewPacketMarkdown.includes("### Reviewer Handoff"));
+  ok(!reviewPacketMarkdown.includes("\nCreate a client proposal"));
 
   const technicalDraft = buildDocsLiveDraft({
     documentType: "technical-architecture",
@@ -4182,6 +4200,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const aiProviderPackages = readFileSync("src/lib/aiProviderPackages.ts", "utf8");
   const businessDocs = readFileSync("src/lib/businessDocuments.ts", "utf8");
   const configurationSetup = readFileSync("src/lib/configurationSetup.ts", "utf8");
+  const docsLive = readFileSync("src/lib/docsLive.ts", "utf8");
   const frontMatterManagers = readFileSync("src/lib/frontMatterManagers.ts", "utf8");
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
   const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
@@ -4624,8 +4643,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("docsLiveReviewPacketMarkdown"));
   ok(app.includes("insertDocsLiveReviewPacket"));
   ok(app.includes("copyDocsLiveReviewPacket"));
-  ok(app.includes("## Docs Live Review Packet"));
-  ok(app.includes("type: docs-live-review-packet"));
+  ok(docsLive.includes("## Docs Live Review Packet"));
+  ok(docsLive.includes("type: docs-live-review-packet"));
   ok(app.includes("store.recordDocsLiveDraftHistory"));
   ok(app.includes("docsLiveDraftHistoryItem"));
   ok(app.includes("docsLiveHistoryPreview"));

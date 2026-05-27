@@ -5246,22 +5246,24 @@ import {
   type RfpSourceKind,
 } from "./lib/businessDocuments";
 import {
-	  buildDocsLiveDraft,
-	  buildDocsLiveQuestionnaire,
-	  buildDocsLiveSuggestedAnswers,
-	  docsLivePlaceholderEntries,
-	  docsLiveDocumentTypes,
+  buildDocsLiveDraft,
+  buildDocsLiveQuestionnaire,
+  docsLiveAuditInline,
+  buildDocsLiveReviewPacketMarkdown,
+  buildDocsLiveSuggestedAnswers,
+  docsLivePlaceholderEntries,
+  docsLiveDocumentTypes,
   normalizeDocsLiveDocumentType,
   removeDocsLivePlaceholder,
   upsertDocsLivePlaceholder,
-	  type DocsLiveDocumentType,
-	  type DocsLiveDraft,
-	  type DocsLiveDraftDepth,
-	  type DocsLivePlaceholderEntry,
-	  type DocsLivePlaceholderKind,
-	  type DocsLivePlaceholderReviewStatus,
-	  type DocsLiveSuggestedAnswer,
-	} from "./lib/docsLive";
+  type DocsLiveDocumentType,
+  type DocsLiveDraft,
+  type DocsLiveDraftDepth,
+  type DocsLivePlaceholderEntry,
+  type DocsLivePlaceholderKind,
+  type DocsLivePlaceholderReviewStatus,
+  type DocsLiveSuggestedAnswer,
+} from "./lib/docsLive";
 import {
   buildExportMetadataChecklist,
   buildExportStepAssistance,
@@ -16262,7 +16264,7 @@ async function copyDocsLiveDraft() {
 function docsLiveDraftHistoryItem(draft: DocsLiveDraft): DocsLiveDraftHistoryItem {
   const generatedAt = new Date().toISOString();
   const outputFingerprint = stableFingerprint(draft.markdown);
-  const reviewPacketMarkdown = docsLiveReviewPacketMarkdownFor(draft, generatedAt);
+  const reviewPacketMarkdown = buildDocsLiveReviewPacketMarkdown(draft, { generatedAt });
   return {
     draftId: `docs-live-${outputFingerprint.slice(0, 16)}`,
     title: draft.title,
@@ -16295,48 +16297,7 @@ function docsLiveHistoryPreview(value: string) {
 
 function docsLiveReviewPacketMarkdown() {
   const draft = docsLiveDraft.value;
-  return draft ? docsLiveReviewPacketMarkdownFor(draft, new Date().toISOString()) : "";
-}
-
-function docsLiveReviewPacketMarkdownFor(draft: DocsLiveDraft, generatedAt: string) {
-  const packet = draft.reviewPacket;
-  const lines = [
-    "## Docs Live Review Packet",
-    "",
-    "```ai-audit",
-    "type: docs-live-review-packet",
-    `generatedAt: ${generatedAt}`,
-    `title: ${docsLiveAuditInline(draft.title)}`,
-    `documentType: ${docsLiveAuditInline(draft.documentType)}`,
-    `sections: ${draft.sections.length}`,
-    "source: NEditor Docs Live",
-    "```",
-    "",
-    "### Context Package",
-    "",
-    ...packet.contextSources.map((source) => `- ${docsLiveAuditInline(source)}`),
-    "",
-    "### Section Work Queue",
-    "",
-    ...packet.sectionRunbook.map((item) => `- ${docsLiveAuditInline(item)}`),
-    "",
-    "### Assumption Register",
-    "",
-    ...packet.qaRegister.map((item) => `- [ ] ${docsLiveAuditInline(item)}`),
-    "",
-    "### Humanization Checklist",
-    "",
-    ...packet.humanizationChecklist.map((item) => `- [ ] ${docsLiveAuditInline(item)}`),
-    "",
-    "### Reviewer Handoff",
-    "",
-    ...packet.reviewerHandoff.map((item) => `- [ ] ${docsLiveAuditInline(item)}`),
-  ];
-  return lines.join("\n");
-}
-
-function docsLiveAuditInline(value: string) {
-  return (value || "").replace(/\r?\n/g, " ").trim();
+  return draft ? buildDocsLiveReviewPacketMarkdown(draft, { generatedAt: new Date().toISOString() }) : "";
 }
 
 function captionKindLabel(kind: CaptionedReferenceItem["kind"]) {
