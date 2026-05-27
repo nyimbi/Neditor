@@ -5235,6 +5235,7 @@ import {
   applyTableCellSpanToDraft,
   buildTableFormulaRow,
   clearTableCellSpanFromDraft,
+  createDefaultTableDraft,
   createTableSourceSnapshot,
   duplicateTableDraftColumn,
   duplicateTableDraftRow,
@@ -5256,6 +5257,7 @@ import {
   sortTableDraftRows,
   spreadsheetColumnName,
   tableCellSpanPreview as tableDraftCellSpanPreview,
+  tableDraftFromMarkdownSource,
   tableDraftMarkdown,
   tableSourceChanged,
   tableSourceText,
@@ -16891,15 +16893,14 @@ function markTableSourceEditDirty() {
 }
 
 function updateTableDraftFromSourceText() {
-  const tables = parseMarkdownTables(tableSourceEditText.value);
-  if (!tables.length) {
+  const parsed = tableDraftFromMarkdownSource(tableSourceEditText.value);
+  if (!parsed) {
     tableSourceEditError.value = "Enter a valid Markdown pipe table with a header row and separator row.";
     store.statusMessage = "Markdown table source could not be parsed";
     return false;
   }
-  const draft = markdownTableToDraft(tables[0]);
-  tableDraft.value = draft;
-  tableSourceEditText.value = tableDraftMarkdown(draft);
+  tableDraft.value = parsed.draft;
+  tableSourceEditText.value = parsed.sourceText;
   tableSourceEditError.value = "";
   tableSourceEditDirty.value = false;
   store.statusMessage = "Updated visual table grid from Markdown source text";
@@ -16940,17 +16941,7 @@ function createTableDraft() {
   if (tableContextSwitchBlocked("creating another table")) return;
   isNewTableDraft.value = true;
   tableSourceSnapshot.value = null;
-  tableDraft.value = {
-    id: "",
-    caption: "",
-    headers: ["Item", "Value"],
-    alignments: ["left", "right"],
-    formats: ["text", "number"],
-    rows: [
-      ["Revenue", "125000"],
-      ["Cost", "74000"],
-    ],
-  };
+  tableDraft.value = createDefaultTableDraft();
   refreshTableSourceEditFromDraft();
 }
 

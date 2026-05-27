@@ -44,6 +44,11 @@ export interface ParsedTablePaste {
   caption?: string;
 }
 
+export interface ParsedTableSourceDraft {
+  draft: TableDraft;
+  sourceText: string;
+}
+
 export interface TableDraftFromRowsOptions {
   id?: string;
   caption?: string;
@@ -263,6 +268,30 @@ export function normalizeTableDraft(draft: TableDraft): TableDraft {
     alignments: padAlignments(draft.alignments, headers.length),
     formats: Array.from({ length: headers.length }, (_, index) => draft.formats[index] || "text"),
     rows: draft.rows.map((row) => padTableRow(row, headers.length)),
+  };
+}
+
+export function createDefaultTableDraft(): TableDraft {
+  return {
+    id: "",
+    caption: "",
+    headers: ["Item", "Value"],
+    alignments: ["left", "right"],
+    formats: ["text", "number"],
+    rows: [
+      ["Revenue", "125000"],
+      ["Cost", "74000"],
+    ],
+  };
+}
+
+export function tableDraftFromMarkdownSource(sourceText: string): ParsedTableSourceDraft | null {
+  const [table] = parseMarkdownTables(sourceText);
+  if (!table) return null;
+  const draft = markdownTableToDraft(table);
+  return {
+    draft,
+    sourceText: tableDraftMarkdown(draft),
   };
 }
 

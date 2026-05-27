@@ -150,6 +150,7 @@ import {
   applyTableCellSpanToDraft,
   buildTableFormulaRow,
   clearTableCellSpanFromDraft,
+  createDefaultTableDraft,
   createTableSourceSnapshot,
   duplicateTableDraftColumn,
   duplicateTableDraftRow,
@@ -169,6 +170,7 @@ import {
   sortTableDraftRows,
   tableCellSpanPreview,
   tableColumnRange,
+  tableDraftFromMarkdownSource,
   tableDraftMarkdown,
   tableDraftFromRows,
   tableSourceChanged,
@@ -309,6 +311,31 @@ test("table paste handles quoted CSV and markdown table captions", () => {
   equal(fallbackDraft.caption, "Existing caption");
   deepEqual(fallbackDraft.headers, ["Column 1", "Amount"]);
   deepEqual(fallbackDraft.rows, [["", ""]]);
+});
+
+test("table source draft helpers normalize editable markdown source", () => {
+  const defaultDraft = createDefaultTableDraft();
+  deepEqual(defaultDraft.headers, ["Item", "Value"]);
+  deepEqual(defaultDraft.alignments, ["left", "right"]);
+  equal(defaultDraft.formats[1], "number");
+  ok(tableDraftMarkdown(defaultDraft).includes("| Revenue | 125000 |"));
+
+  const source = tableDraftFromMarkdownSource(
+    [
+      "Table: Sales {#tbl:sales}",
+      "| Region | Revenue |",
+      "| --- | ---: |",
+      "| West | 900 |",
+      "| East | 1200 |",
+    ].join("\n"),
+  );
+  if (!source) throw new Error("missing source draft");
+  equal(source.draft.id, "tbl:sales");
+  equal(source.draft.caption, "Sales");
+  equal(source.draft.formats[1], "number");
+  equal(source.sourceText, tableDraftMarkdown(source.draft));
+  ok(source.sourceText.includes("| West | 900 |"));
+  equal(tableDraftFromMarkdownSource("not a table"), null);
 });
 
 test("table validation and formatting cover editor formulas and totals", () => {

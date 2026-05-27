@@ -4436,6 +4436,17 @@ Table merged-cell helper extraction:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the table span helper evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the merged-cell helper extraction diff. |
 
+Table source/default helper extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 78 frontend unit/static tests passed after moving default table draft creation and editable Markdown source parsing into `src/lib/tables.ts`; the new direct test proves the default scaffold, parsed source draft metadata, inferred numeric format, normalized source text, and invalid-source rejection. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after `App.vue` delegated new-table defaults and Markdown source parsing through table helpers. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow passed after the table editor routed new-table creation and source-text parsing through extracted helpers. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting the table source/default helper extraction. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording editable source/default draft helper evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the table source/default helper extraction diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
