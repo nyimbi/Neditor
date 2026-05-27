@@ -629,7 +629,7 @@ pub(super) fn provenance_export_lines(response: &CompileResponse, options: &Valu
         let reviewed_at = empty_as(source.reviewed_at.as_str(), "undated");
         let summary = empty_as(source.prompt_summary.as_str(), "no prompt summary");
         format!(
-            "{provider} / {model} on {date}; status: {}; reviewed by: {reviewer} on {reviewed_at}; prompt: {summary}",
+            "AI source: {provider} / {model} generated {date}; status: {}; reviewed by: {reviewer} on {reviewed_at}; prompt: {summary}",
             source.status
         )
     }));
@@ -639,7 +639,7 @@ pub(super) fn provenance_export_lines(response: &CompileResponse, options: &Valu
         let source = empty_as(section.source.as_str(), "unspecified source");
         let summary = empty_as(section.prompt_summary.as_str(), "no prompt summary");
         format!(
-            "Section '{}' at line {}: status {}; reviewed by {reviewer} on {reviewed_at}; source: {source}; prompt: {summary}",
+            "AI-assisted section '{}' at line {}: status {}; reviewed by {reviewer} on {reviewed_at}; source: {source}; prompt: {summary}",
             section.heading, section.line, section.status
         )
     }));

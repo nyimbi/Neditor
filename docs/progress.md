@@ -4971,6 +4971,13 @@ Table two-way state extraction:
 | `pnpm run test:unit -- --runInBand` | Pass | 85 frontend unit/static tests passed, including direct `buildTableTwoWayState` coverage for synced, invalid source, valid dirty-source preview, still-invalid dirty source, text-repair, document-changed, and new-draft states so table text/grid round-trip guidance is behavior-tested instead of only embedded in `App.vue`. |
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after the Tables panel delegated its two-way status, status class, and hint through the extracted table helper. |
 
+AI provenance appendix auditability:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked ai_provenance_appendix_is_audit_readable --manifest-path src-tauri/Cargo.toml` | Pass | Focused export proof now checks that enabled HTML provenance appendices distinguish `data-kind="source"` records from `data-kind="section"` records, carry `data-status` and section `data-line` audit hooks, render reviewer-readable source/section labels, escape prompt summaries, preserve reviewer timestamps with ISO colons, and disappear when `includeProvenance` is false. |
+| `cargo test --locked review_provenance_tests --manifest-path src-tauri/Cargo.toml` | Pass | All eight provenance parser tests remain clean after fixing inline AI-assisted metadata parsing so `key=value` fields with ISO timestamp colons keep the full `reviewedAt` value. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

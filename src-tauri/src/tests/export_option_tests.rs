@@ -340,6 +340,69 @@ fn export_appendix_options_control_target_outputs() {
 }
 
 #[test]
+fn ai_provenance_appendix_is_audit_readable() {
+    let response = compile(CompileRequest {
+        text: r#"---
+title: Audit Appendix QA
+version: 1.0.0
+status: approved
+approvedBy: QA
+approvedAt: 2026-05-27T10:00:00Z
+---
+# Audit Appendix QA
+
+```ai-source
+provider: OpenAI
+model: gpt-5.4
+date: 2026-05-27
+promptSummary: Drafted board memo & quantified risks
+reviewedBy: Ada Reviewer
+reviewedAt: 2026-05-27T11:00:00Z
+status: human-reviewed
+```
+
+<!-- ai-assisted: status=human-reviewed | reviewedBy=Ada Reviewer | reviewedAt=2026-05-27T11:30:00Z | source=OpenAI / gpt-5.4 | promptSummary=Expanded executive summary -->
+## Executive Summary
+Reviewed content.
+"#
+        .to_string(),
+        file_path: None,
+    });
+    assert_eq!(response.semantic.ai_sources.len(), 1);
+    assert_eq!(response.semantic.ai_assisted_sections.len(), 1);
+    let section_line = response.semantic.ai_assisted_sections[0].line;
+    let included = json!({ "includeProvenance": true });
+    let omitted = json!({ "includeProvenance": false });
+
+    let html = render_full_html(&response, &included);
+    assert!(html.contains("class=\"export-provenance\""));
+    assert!(html.contains("data-kind=\"source\" data-status=\"human-reviewed\""));
+    assert!(html.contains(&format!(
+        "data-kind=\"section\" data-status=\"human-reviewed\" data-line=\"{section_line}\""
+    )));
+    assert!(html.contains("AI source: OpenAI / gpt-5.4"));
+    assert!(html.contains("Drafted board memo &amp; quantified risks"));
+    assert!(html.contains("AI-assisted section: Executive Summary"));
+    assert!(html.contains("source: OpenAI / gpt-5.4"));
+    assert!(html.contains("reviewed by Ada Reviewer on 2026-05-27T11:30:00Z"));
+
+    let html_without_appendix = render_full_html(&response, &omitted);
+    assert!(!html_without_appendix.contains("class=\"export-provenance\""));
+    assert!(!html_without_appendix.contains("data-kind=\"source\""));
+    assert!(!html_without_appendix.contains("AI-assisted section: Executive Summary"));
+
+    let exported_text = export::export_text(&response, &included);
+    assert!(exported_text.contains("AI Provenance"));
+    assert!(exported_text.contains("AI source: OpenAI / gpt-5.4 generated 2026-05-27"));
+    assert!(exported_text.contains("AI-assisted section 'Executive Summary'"));
+    assert!(exported_text.contains("source: OpenAI / gpt-5.4"));
+
+    let exported_text_without_appendix = export::export_text(&response, &omitted);
+    assert!(!exported_text_without_appendix.contains("AI Provenance"));
+    assert!(!exported_text_without_appendix.contains("AI-assisted section 'Executive Summary'"));
+}
+
+#[test]
 fn export_option_matrix_is_preserved_across_targets_and_bundle_evidence() {
     let response = compile(CompileRequest {
         text: r##"---

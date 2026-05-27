@@ -184,9 +184,10 @@ fn parse_ai_assisted_section(
     {
         if matches!(part, "human-reviewed" | "needs-review" | "unreviewed") {
             status = part.to_string();
-        } else if let Some((key, value)) = part.split_once(':').or_else(|| part.split_once('=')) {
+        } else if let Some(delimiter) = metadata_delimiter(part) {
+            let (key, value) = part.split_at(delimiter);
             let key = key.trim();
-            let value = value.trim().to_string();
+            let value = value[1..].trim().to_string();
             match key {
                 "status" => status = value,
                 "reviewedBy" | "reviewed_by" | "reviewer" => reviewed_by = value,
@@ -206,6 +207,15 @@ fn parse_ai_assisted_section(
         reviewed_at,
         source,
         prompt_summary,
+    }
+}
+
+fn metadata_delimiter(part: &str) -> Option<usize> {
+    match (part.find('='), part.find(':')) {
+        (Some(equals), Some(colon)) => Some(equals.min(colon)),
+        (Some(equals), None) => Some(equals),
+        (None, Some(colon)) => Some(colon),
+        (None, None) => None,
     }
 }
 

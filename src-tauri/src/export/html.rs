@@ -489,14 +489,14 @@ fn html_provenance_section(response: &CompileResponse, options: &Value) -> Strin
         .ai_sources
         .iter()
         .map(|source| {
+            let status = escape_html(&source.status);
             format!(
-                "<li><strong>{}</strong> <span>{}</span><p>{}; reviewed by {} on {}; {}; prompt: {}</p></li>",
+                "<li data-kind=\"source\" data-status=\"{status}\"><strong>AI source: {} / {}</strong> <span>generated {}</span><p>status: {status}; reviewed by {} on {}; prompt: {}</p></li>",
                 escape_html(empty_as(source.provider.as_str(), "unknown provider")),
                 escape_html(empty_as(source.model.as_str(), "unknown model")),
                 escape_html(empty_as(source.date.as_str(), "undated")),
                 escape_html(empty_as(source.reviewed_by.as_str(), "unreviewed")),
                 escape_html(empty_as(source.reviewed_at.as_str(), "undated")),
-                escape_html(&source.status),
                 escape_html(empty_as(
                     source.prompt_summary.as_str(),
                     "no prompt summary"
@@ -509,11 +509,12 @@ fn html_provenance_section(response: &CompileResponse, options: &Value) -> Strin
         .ai_assisted_sections
         .iter()
         .map(|section| {
+            let status = escape_html(&section.status);
             format!(
-                "<li><strong>{}</strong> <span>line {}</span><p>{}; reviewed by {} on {}; source: {}; prompt: {}</p></li>",
+                "<li data-kind=\"section\" data-status=\"{status}\" data-line=\"{}\"><strong>AI-assisted section: {}</strong> <span>line {}</span><p>status: {status}; reviewed by {} on {}; source: {}; prompt: {}</p></li>",
+                section.line,
                 escape_html(&section.heading),
                 section.line,
-                escape_html(&section.status),
                 escape_html(empty_as(section.reviewed_by.as_str(), "unreviewed")),
                 escape_html(empty_as(section.reviewed_at.as_str(), "undated")),
                 escape_html(empty_as(section.source.as_str(), "unspecified source")),

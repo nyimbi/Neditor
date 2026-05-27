@@ -880,7 +880,10 @@ fn export_document_writes_optional_sidecar_manifest() {
     assert_eq!(response.manifest.approved_by.as_deref(), Some("QA"));
     assert_eq!(response.manifest.approved_at.as_deref(), Some("2026-05-19"));
     assert_eq!(response.manifest.owner.as_deref(), Some("Release QA"));
-    assert_eq!(response.manifest.release_target.as_deref(), Some("manifest smoke"));
+    assert_eq!(
+        response.manifest.release_target.as_deref(),
+        Some("manifest smoke")
+    );
     assert_eq!(response.manifest.layout_sections.len(), 1);
     let output_string = path_to_string(&output);
     assert_eq!(
