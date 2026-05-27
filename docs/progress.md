@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `790cebf Make creative
-  wizards guide structure first`
+- Latest inspected committed baseline before this update: `2aa176c Prove native
+  table menu editing`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`
 
@@ -31,6 +31,12 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Table editing now has source-sync protection beyond command discoverability.
+  The visual table editor records the Markdown source range it loaded, auto
+  reloads clean visual drafts when the user edits the table directly in source
+  text, and warns before a dirty visual draft can overwrite a concurrently
+  changed source table. Users get explicit **Reload from source** and **Apply
+  draft over source** choices when both sides diverge.
 - Table editing now works as a two-way source workflow. The Tables panel can
   load the Markdown table at the current source cursor or selection, show the
   exact source-line range being edited, jump back to that source table, and
@@ -1490,6 +1496,14 @@ Current verification recorded on 2026-05-21 through 2026-05-27:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding source-sync protection for the table editor, including static guards for the source-change warning, reload action, explicit overwrite action, and synchronization status. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows"` | Pass | Focused Chromium workflow proved a visual table can be inserted, then a direct Markdown source edit from `Revenue` to `Pipeline` syncs back into the visual table grid cell without requiring a new table. |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed 65 tests after the focused table run refreshed the full-suite browser evidence required by release readiness; the table workflow includes source-to-grid synchronization. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding table source snapshots, clean-draft auto-sync, dirty-draft overwrite protection, and the source synchronization UI. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting table source synchronization. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording source-synced two-way table editing. |
+| `pnpm run check:release-readiness` | Pass with external gaps | Wrote `.tmp/release-readiness/report.json` with status `current-host-ready-with-external-gaps` after refreshing full browser workflow evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the table source synchronization diff. |
 | `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding cursor-aware two-way Markdown table editing, including direct proof for table line-range matching and static wiring for source-table load/jump/apply controls. |
 | `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding AI transform template assistance, including direct proof that ROI/payback context generates four template-workflow suggestions and static wiring for the Templates sidebar notes workflow. |
 | `pnpm run check` | Pass | Vue typecheck passed after adding two-way source table editing and AI transform template assistance. |

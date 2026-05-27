@@ -4115,6 +4115,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Go to Source Table"));
   ok(app.includes("Export Table as CSV"));
   ok(app.includes("Create new table draft"));
+  ok(app.includes("Source table changed"));
+  ok(app.includes("Reload from source"));
+  ok(app.includes("Apply draft over source"));
+  ok(app.includes("tableDraftSourceChanged"));
+  ok(app.includes("Synced table editor from Markdown source changes"));
   ok(app.includes("loadTableAtCursor"));
   ok(app.includes("findMarkdownTableIndexForLineRange"));
   ok(app.includes("goToSelectedTableSource"));

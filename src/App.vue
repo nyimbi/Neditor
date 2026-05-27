@@ -563,16 +563,24 @@
           </div>
           <template v-if="tableDraft">
             <div class="table-actions">
-              <button type="button" :disabled="tableDraftHasErrors" @click="applyTableDraft">{{ isNewTableDraft ? "Insert table" : "Apply" }}</button>
-              <button type="button" @click="cancelTableDraft">Cancel table edit</button>
-              <button type="button" @click="addTableRow">Add row</button>
-              <button type="button" @click="addTableColumn">Add column</button>
-              <button type="button" @click="addTableTotalsRow">Add totals row</button>
-              <button type="button" @click="addTableFormulaRow('AVG')">AVG row</button>
-              <button type="button" @click="addTableFormulaRow('MIN')">MIN row</button>
-              <button type="button" @click="addTableFormulaRow('MAX')">MAX row</button>
-              <button type="button" @click="addTableFormulaRow('COUNT')">COUNT row</button>
+              <button type="button" :disabled="tableDraftHasErrors || tableDraftSourceChanged" title="Write this visual table draft back to the Markdown source" @click="applyTableDraft()">{{ isNewTableDraft ? "Insert table" : "Apply" }}</button>
+              <button type="button" title="Discard the visual table draft and return to the current source table" @click="cancelTableDraft">Cancel table edit</button>
+              <button type="button" title="Add a blank row to the visual table draft" @click="addTableRow">Add row</button>
+              <button type="button" title="Add a blank column to the visual table draft" @click="addTableColumn">Add column</button>
+              <button type="button" title="Append a SUM formula row across numeric columns" @click="addTableTotalsRow">Add totals row</button>
+              <button type="button" title="Append an AVG formula row across numeric columns" @click="addTableFormulaRow('AVG')">AVG row</button>
+              <button type="button" title="Append a MIN formula row across numeric columns" @click="addTableFormulaRow('MIN')">MIN row</button>
+              <button type="button" title="Append a MAX formula row across numeric columns" @click="addTableFormulaRow('MAX')">MAX row</button>
+              <button type="button" title="Append a COUNT formula row across numeric columns" @click="addTableFormulaRow('COUNT')">COUNT row</button>
             </div>
+            <section v-if="tableDraftSourceChanged" class="table-source-sync" aria-label="Table source synchronization">
+              <strong>Source table changed</strong>
+              <p>The Markdown table was edited after this visual draft was loaded. Reload to keep editing the source changes, or explicitly overwrite the current source table with this draft.</p>
+              <div class="table-actions">
+                <button type="button" title="Reload the visual grid from the current Markdown source table" @click="reloadTableDraftFromSource">Reload from source</button>
+                <button type="button" :disabled="tableDraftHasErrors" title="Replace the current Markdown table with this visual draft" @click="applyTableDraft(true)">Apply draft over source</button>
+              </div>
+            </section>
             <section class="table-formula-builder" aria-label="Table formula builder">
               <label>
                 Function
@@ -5189,6 +5197,7 @@ import {
   tableDraftFromRows,
   tableColumnRange,
   validateTableDraft,
+  type MarkdownTable,
   type TableDraft,
   type TableFormulaFunction,
   type TableSortDirection,
@@ -5216,6 +5225,14 @@ interface AppMenuGroup {
   id: string;
   label: string;
   items: AppMenuItem[];
+}
+interface TableSourceSnapshot {
+  documentId: string;
+  tableIndex: number;
+  startLine: number;
+  endLine: number;
+  sourceText: string;
+  draftMarkdown: string;
 }
 interface AppMenu {
   id: string;
@@ -5596,6 +5613,7 @@ const documentSetDraft = ref("");
 const documentSetRenameDraft = ref("");
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
+const tableSourceSnapshot = ref<TableSourceSnapshot | null>(null);
 const isNewTableDraft = ref(false);
 const tableDataBusy = ref(false);
 const tableFormulaFunction = ref<TableFormulaFunction>("SUM");
@@ -6917,6 +6935,21 @@ const tableDraftMarkdownPreview = computed(() => {
   const draft = tableDraft.value;
   if (!draft) return "";
   return serializeMarkdownTable(normalizeTableDraft(draft)).join("\n");
+});
+const selectedTableSourceText = computed(() => {
+  const table = selectedTable.value;
+  return table ? tableSourceText(table) : "";
+});
+const tableDraftDirty = computed(() => {
+  const snapshot = tableSourceSnapshot.value;
+  return Boolean(tableDraft.value && snapshot && tableDraftMarkdownPreview.value !== snapshot.draftMarkdown);
+});
+const tableDraftSourceChanged = computed(() => {
+  const snapshot = tableSourceSnapshot.value;
+  const table = selectedTable.value;
+  if (!snapshot || isNewTableDraft.value || snapshot.documentId !== active.value.id) return false;
+  if (!table) return true;
+  return selectedTableSourceText.value !== snapshot.sourceText;
 });
 const tableDataRowCount = computed(() => {
   const draft = tableDraft.value;
@@ -10600,6 +10633,16 @@ watch(
   () => active.value.text,
   (text) => {
     syncEditorViewsToText(text);
+  },
+);
+
+watch(
+  () => [active.value.id, active.value.text, store.sidebar, selectedTableIndex.value, tableDraftMarkdownPreview.value],
+  () => {
+    if (store.sidebar !== "tables" || !tableDraft.value || isNewTableDraft.value || !tableDraftSourceChanged.value) return;
+    if (tableDraftDirty.value) return;
+    loadSelectedTable();
+    store.statusMessage = "Synced table editor from Markdown source changes";
   },
 );
 
@@ -16735,18 +16778,46 @@ function goToSelectedTableSource() {
   });
 }
 
+function tableSourceText(table: MarkdownTable) {
+  const lines = active.value.text.split("\n");
+  const startLine = table.captionLine || table.startLine;
+  return lines.slice(startLine - 1, table.endLine).join("\n");
+}
+
+function rememberTableSource(table: MarkdownTable, draft: TableDraft) {
+  const startLine = table.captionLine || table.startLine;
+  const draftMarkdown = serializeMarkdownTable(normalizeTableDraft(draft)).join("\n");
+  tableSourceSnapshot.value = {
+    documentId: active.value.id,
+    tableIndex: selectedTableIndex.value,
+    startLine,
+    endLine: table.endLine,
+    sourceText: tableSourceText(table),
+    draftMarkdown,
+  };
+}
+
 function loadSelectedTable() {
   const table = selectedTable.value;
   isNewTableDraft.value = false;
   if (!table) {
     tableDraft.value = null;
+    tableSourceSnapshot.value = null;
     return;
   }
-  tableDraft.value = markdownTableToDraft(table);
+  const draft = markdownTableToDraft(table);
+  tableDraft.value = draft;
+  rememberTableSource(table, draft);
+}
+
+function reloadTableDraftFromSource() {
+  loadSelectedTable();
+  store.statusMessage = "Reloaded table editor from the current Markdown source table";
 }
 
 function createTableDraft() {
   isNewTableDraft.value = true;
+  tableSourceSnapshot.value = null;
   tableDraft.value = {
     id: "",
     caption: "",
@@ -16760,7 +16831,7 @@ function createTableDraft() {
   };
 }
 
-function applyTableDraft() {
+function applyTableDraft(forceSourceOverwrite = false) {
   const table = selectedTable.value;
   const draft = tableDraft.value;
   if (!draft) return;
@@ -16772,10 +16843,25 @@ function applyTableDraft() {
   const normalizedDraft = normalizeTableDraft(draft);
   const serialized = serializeMarkdownTable(normalizedDraft);
   if (table && !isNewTableDraft.value) {
+    if (tableDraftSourceChanged.value && !forceSourceOverwrite) {
+      store.statusMessage = "Markdown source changed; reload the table or explicitly apply the draft over the current source table";
+      return;
+    }
     const replacement = replaceMarkdownTableInText(active.value.text, table, normalizedDraft);
     store.updateText(replacement.text);
     void nextTick(() => syncEditorViewFromActiveDocument());
     store.statusMessage = `Updated source table at lines ${replacement.startLine}-${replacement.endLine}`;
+    tableSourceSnapshot.value = {
+      documentId: active.value.id,
+      tableIndex: selectedTableIndex.value,
+      startLine: replacement.startLine,
+      endLine: replacement.endLine,
+      sourceText: serialized.join("\n"),
+      draftMarkdown: serialized.join("\n"),
+    };
+  } else if (!isNewTableDraft.value && tableSourceSnapshot.value) {
+    store.statusMessage = "The source table is no longer available; reload from source or create a new table draft";
+    return;
   } else {
     insertTableAtCursor(serialized);
     const nextTableIndex = markdownTables.value.length;
@@ -17005,6 +17091,7 @@ async function importTableFromSpreadsheet() {
     });
     if (!importedDraft) throw new Error("The selected spreadsheet did not contain a usable table.");
     tableDraft.value = importedDraft;
+    tableSourceSnapshot.value = null;
     isNewTableDraft.value = true;
     tablePasteText.value = response.markdown;
     store.sidebar = "tables";
