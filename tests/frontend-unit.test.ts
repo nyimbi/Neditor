@@ -122,6 +122,19 @@ import {
   transformTemplateFillFields,
   transformTemplateMarkdown,
 } from "../src/lib/transformTemplates.js";
+import {
+  buildTtsModelDownloadPlan,
+  formatTtsRuntimeSummary,
+  formatTtsSetupSummary,
+  nativeTtsLanguageForPreferences,
+  nativeTtsRateForPreferences,
+  nativeTtsVoiceForPreferences,
+  selectedTtsEngineStatus,
+  ttsEngineOptions,
+  ttsModelAcknowledgementMessage,
+  ttsModelDownloadClipboardText,
+  ttsReadIsDisabled,
+} from "../src/lib/ttsSetup.js";
 import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../src/lib/watchPaths.js";
 import {
   migratePersistedWorkspace,
@@ -3186,6 +3199,50 @@ test("text-to-speech preferences normalize selected local engines", () => {
   });
 });
 
+test("text-to-speech setup helpers preserve consent-gated Supertonic model details", () => {
+  const preferences = normalizeTtsPreferences({
+    engine: "supertonic-cli",
+    voice: "Samantha",
+    language: "en-US",
+    rate: 1.25,
+    supertonicCommand: " /opt/homebrew/bin/supertonic ",
+    supertonicVoice: "F1",
+    supertonicLanguage: "en",
+    supertonicSpeed: 1.1,
+    supertonicModelDownloadAcknowledged: false,
+    supertonicModelStoragePath: "",
+  });
+  const plan = buildTtsModelDownloadPlan(preferences, "/Users/test/.cache/supertonic/models");
+  if (!plan) throw new Error("missing Supertonic model plan");
+
+  equal(formatTtsSetupSummary(preferences), "Supertonic CLI | en-US | 1.3x");
+  deepEqual(plan, {
+    engine: "supertonic-cli",
+    model: "supertonic-3",
+    approximateSize: "~305 MB",
+    storagePath: "/Users/test/.cache/supertonic/models",
+    source: "Hugging Face model download managed by the Supertonic CLI",
+    command: "/opt/homebrew/bin/supertonic download",
+    acknowledged: false,
+  });
+  equal(ttsReadIsDisabled(false, plan), true);
+  ok(ttsModelAcknowledgementMessage(plan).includes("supertonic-3 download (~305 MB)"));
+  ok(ttsModelDownloadClipboardText(plan).includes("Storage location: /Users/test/.cache/supertonic/models"));
+  equal(nativeTtsVoiceForPreferences(preferences), "F1");
+  equal(nativeTtsLanguageForPreferences(preferences), "en");
+  equal(nativeTtsRateForPreferences(preferences), 219);
+
+  const report = {
+    engines: [
+      { id: "browser-speech", label: "Browser", available: true, detail: "Browser available" },
+      { id: "supertonic-cli", label: "Supertonic", available: false, detail: "Supertonic not found on PATH" },
+    ],
+  };
+  equal(selectedTtsEngineStatus(preferences, report)?.detail, "Supertonic not found on PATH");
+  equal(formatTtsRuntimeSummary(preferences, report), "Supertonic not found on PATH");
+  equal(buildTtsModelDownloadPlan(normalizeTtsPreferences({ engine: "browser-speech" }), "/tmp/models"), null);
+});
+
 test("AI provider execution extracts Markdown without persisting secrets", async () => {
   const run = buildAgenticWorkflowRun({
     instruction: "Revise the summary for the board. audience: board owner: Strategy deadline: June 1 evidence: board pack",
@@ -4630,8 +4687,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('database="data/example.sqlite"'));
   ok(app.includes("read_text_aloud"));
   ok(app.includes("stop_text_aloud"));
-  ok(app.includes("supertonic-cli"));
-  ok(app.includes("macos-say"));
+  deepEqual(
+    ttsEngineOptions.map((option) => option.id),
+    ["browser-speech", "macos-say", "supertonic-cli"],
+  );
   ok(app.includes("inspectAiRuntimeReadiness"));
   ok(app.includes("Check AI runtime"));
   ok(app.includes('aria-label="AI runtime readiness"'));

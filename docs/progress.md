@@ -128,6 +128,10 @@ Recent pushed checkpoints visible in current git history:
   command, and the focused Chromium workflow proves download/playback stay
   disabled until acknowledgement before running mock download, read-aloud, and
   runtime inspection paths.
+- Text-to-speech setup logic is now extracted into `src/lib/ttsSetup.ts` with
+  direct unit coverage for engine labels, runtime summaries, Supertonic model
+  download plans, copyable download details, acknowledgement prompts, and native
+  read-aloud request values.
 - Table editing now exposes direct Markdown-text editing as a first-class
   two-way action. The Tables sidebar has an explicit **Edit Markdown in text**
   control that can load the table at the editor cursor, select the exact source

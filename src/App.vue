@@ -5281,6 +5281,21 @@ import {
   type TransformTemplate,
 } from "./lib/transformTemplates";
 import {
+  buildTtsModelDownloadPlan,
+  formatTtsRuntimeSummary,
+  formatTtsSetupSummary,
+  nativeTtsLanguageForPreferences,
+  nativeTtsRateForPreferences,
+  nativeTtsVoiceForPreferences,
+  selectedTtsEngineLabel,
+  selectedTtsEngineStatus as selectTtsEngineStatus,
+  ttsEngineOptions,
+  ttsModelAcknowledgementMessage,
+  ttsModelDownloadClipboardText,
+  ttsReadIsDisabled,
+  type TtsModelDownloadPlan,
+} from "./lib/ttsSetup";
+import {
   SUPPORTED_CITATION_STYLES,
   type AgentAutomationExecutionStatus,
   type AgentAutomationTaskState,
@@ -5435,15 +5450,6 @@ type NativeTtsEngineStatus = {
 type NativeTtsInspectionResponse = {
   engines: NativeTtsEngineStatus[];
   available_native_engines: number;
-};
-type TtsModelDownloadPlan = {
-  engine: "supertonic-cli";
-  model: string;
-  approximateSize: string;
-  storagePath: string;
-  source: string;
-  command: string;
-  acknowledged: boolean;
 };
 type ImportSpreadsheetTableResponse = {
   source_path: string;
@@ -7274,40 +7280,15 @@ const businessProfileCompletion = computed(() => {
   const completed = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
   return `${completed}/${businessProfileFields.length} fields`;
 });
-const ttsEngineOptions = [
-  { id: "browser-speech", label: "Browser or system speech" },
-  { id: "macos-say", label: "macOS Say" },
-  { id: "supertonic-cli", label: "Supertonic CLI" },
-] as const;
-const ttsSetupSummary = computed(() => {
-  const selected = ttsEngineOptions.find((option) => option.id === store.ttsPreferences.engine)?.label || "Browser or system speech";
-  return `${selected} | ${store.ttsPreferences.language} | ${store.ttsPreferences.rate.toFixed(1)}x`;
-});
+const ttsSetupSummary = computed(() => formatTtsSetupSummary(store.ttsPreferences));
 const selectedTtsEngineStatus = computed(() =>
-  ttsInspectionReport.value?.engines.find((engine) => engine.id === store.ttsPreferences.engine) || null,
+  selectTtsEngineStatus(store.ttsPreferences, ttsInspectionReport.value),
 );
-const ttsRuntimeSummary = computed(() => {
-  if (!ttsInspectionReport.value) return "TTS runtime has not been checked.";
-  if (store.ttsPreferences.engine === "browser-speech") return "Browser speech will be checked by the web runtime before playback.";
-  return selectedTtsEngineStatus.value?.detail || "Selected native TTS engine has no runtime status.";
-});
+const ttsRuntimeSummary = computed(() => formatTtsRuntimeSummary(store.ttsPreferences, ttsInspectionReport.value));
 const ttsModelDownloadPlan = computed<TtsModelDownloadPlan | null>(() => {
-  if (store.ttsPreferences.engine !== "supertonic-cli") return null;
-  const storagePath = store.ttsPreferences.supertonicModelStoragePath.trim() || ttsModelStorageDefault.value;
-  const command = `${store.ttsPreferences.supertonicCommand.trim() || "supertonic"} download`;
-  return {
-    engine: "supertonic-cli",
-    model: "supertonic-3",
-    approximateSize: "~305 MB",
-    storagePath,
-    source: "Hugging Face model download managed by the Supertonic CLI",
-    command,
-    acknowledged: store.ttsPreferences.supertonicModelDownloadAcknowledged,
-  };
+  return buildTtsModelDownloadPlan(store.ttsPreferences, ttsModelStorageDefault.value);
 });
-const ttsReadDisabled = computed(
-  () => ttsBusy.value || Boolean(ttsModelDownloadPlan.value && !ttsModelDownloadPlan.value.acknowledged),
-);
+const ttsReadDisabled = computed(() => ttsReadIsDisabled(ttsBusy.value, ttsModelDownloadPlan.value));
 const configurationSetupSteps = [
   {
     id: "identity",
@@ -8733,12 +8714,7 @@ async function downloadSelectedTtsModel() {
 async function copyTtsModelDownloadCommand() {
   const plan = ttsModelDownloadPlan.value;
   if (!plan) return;
-  const text = [
-    `Model: ${plan.model}`,
-    `Approximate size: ${plan.approximateSize}`,
-    `Storage location: ${plan.storagePath}`,
-    `Download command: ${plan.command}`,
-  ].join("\n");
+  const text = ttsModelDownloadClipboardText(plan);
   try {
     await navigator.clipboard?.writeText(text);
   } catch {
@@ -8758,7 +8734,7 @@ async function readTextAloud(scope: "selection" | "document") {
   store.saveTtsPreferences(store.ttsPreferences);
   const plan = ttsModelDownloadPlan.value;
   if (plan && !plan.acknowledged) {
-    ttsStatus.value = `Review and acknowledge the ${plan.model} download (${plan.approximateSize}) to ${plan.storagePath} before using Supertonic.`;
+    ttsStatus.value = ttsModelAcknowledgementMessage(plan);
     store.statusMessage = ttsStatus.value;
     return;
   }
@@ -8772,16 +8748,16 @@ async function readTextAloud(scope: "selection" | "document") {
         request: {
           engine: store.ttsPreferences.engine,
           text,
-          voice: nativeTtsVoice(),
-          language: nativeTtsLanguage(),
-          rate: Math.round(store.ttsPreferences.rate * 175),
+          voice: nativeTtsVoiceForPreferences(store.ttsPreferences),
+          language: nativeTtsLanguageForPreferences(store.ttsPreferences),
+          rate: nativeTtsRateForPreferences(store.ttsPreferences),
           command_path: store.ttsPreferences.engine === "supertonic-cli" ? store.ttsPreferences.supertonicCommand : undefined,
           speed: store.ttsPreferences.engine === "supertonic-cli" ? store.ttsPreferences.supertonicSpeed : undefined,
           model_download_acknowledged: plan?.acknowledged,
           model_storage_path: plan?.storagePath,
         },
       });
-      ttsStatus.value = `${response.message} with ${ttsEngineOptions.find((option) => option.id === store.ttsPreferences.engine)?.label || response.engine}`;
+      ttsStatus.value = `${response.message} with ${selectedTtsEngineLabel(store.ttsPreferences.engine) || response.engine}`;
       ttsBusy.value = false;
     }
     store.statusMessage = ttsStatus.value;
@@ -8791,16 +8767,6 @@ async function readTextAloud(scope: "selection" | "document") {
     store.statusMessage = "Read aloud failed";
     ttsBusy.value = false;
   }
-}
-
-function nativeTtsVoice() {
-  if (store.ttsPreferences.engine === "supertonic-cli") return store.ttsPreferences.supertonicVoice || store.ttsPreferences.voice;
-  return store.ttsPreferences.voice;
-}
-
-function nativeTtsLanguage() {
-  if (store.ttsPreferences.engine === "supertonic-cli") return store.ttsPreferences.supertonicLanguage || store.ttsPreferences.language;
-  return store.ttsPreferences.language;
 }
 
 function readableSpeechText(text: string) {
