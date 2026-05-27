@@ -541,6 +541,21 @@
         <template v-else-if="store.sidebar === 'tables'">
           <h2>Tables</h2>
           <p class="sidebar-hint">{{ selectedTableEditSummary }}</p>
+          <section v-if="tableDraft" class="table-two-way-strip" aria-label="Two-way table editing">
+            <span :class="['table-sync-chip', tableTwoWayStatusClass]" role="status">{{ tableTwoWayStatus }}</span>
+            <button type="button" :disabled="!tableDraft" title="Focus the visual table grid" @click="focusTableGrid">Grid</button>
+            <button type="button" :disabled="!tableDraft" title="Focus the editable Markdown source block in the Tables panel" @click="focusTableSourceEditor">
+              Source block
+            </button>
+            <button
+              type="button"
+              :disabled="!selectedTableForDraft && !tableSourceSnapshot"
+              title="Select the table's Markdown source in the document editor"
+              @click="editSelectedTableInMarkdownText"
+            >
+              Document text
+            </button>
+          </section>
           <label>
             Table
             <select
@@ -579,6 +594,14 @@
               @click="createTableDraft"
             >
               New table
+            </button>
+            <button
+              type="button"
+              :disabled="(!isNewTableDraft && tableDraftDirty) || tableDraftHasErrors"
+              :title="isNewTableDraft ? 'Insert this draft as Markdown and select it in the document editor' : 'Insert a starter Markdown table at the cursor and select it for direct text editing'"
+              @click="insertTableDraftInMarkdownText"
+            >
+              {{ isNewTableDraft ? "Insert draft in text" : "New table in text" }}
             </button>
           </div>
           <div class="table-actions">
@@ -683,9 +706,11 @@
               <p v-for="issue in tableDraftIssues" :key="issue.message" :class="issue.severity">{{ issue.message }}</p>
             </section>
             <div
+              ref="tableEditorGrid"
               class="table-editor-grid"
               role="group"
               aria-label="Table editor grid"
+              tabindex="-1"
               :style="{ gridTemplateColumns: `220px repeat(${tableDraft.headers.length}, minmax(132px, 1fr)) 44px` }"
             >
               <span></span>
@@ -797,6 +822,7 @@
             <label class="table-preview table-source-editor">
               Markdown source
               <textarea
+                ref="tableSourceEditor"
                 v-model="tableSourceEditText"
                 rows="7"
                 spellcheck="false"
@@ -5539,6 +5565,8 @@ const guidedDemoDialog = ref<HTMLElement | null>(null);
 const configurationSetupDialog = ref<HTMLElement | null>(null);
 const commandPaletteDialog = ref<HTMLElement | null>(null);
 const conflictDialog = ref<HTMLElement | null>(null);
+const tableEditorGrid = ref<HTMLElement | null>(null);
+const tableSourceEditor = ref<HTMLTextAreaElement | null>(null);
 let editorView: EditorView | null = null;
 let secondaryEditorView: EditorView | null = null;
 let syncingEditorFromStore = false;
@@ -7065,6 +7093,18 @@ const tableSourceEditSummary = computed(() => {
   if (!tableDraft.value) return "Select or create a table to edit Markdown source text.";
   if (tableSourceEditDirty.value) return "Markdown source text has unsaved edits. Update the grid or apply the source text before switching tables.";
   return "Edit the Markdown table text directly, update the visual grid from it, or regenerate source text from the grid.";
+});
+const tableTwoWayStatus = computed(() => {
+  if (tableSourceEditError.value) return "Source invalid";
+  if (tableSourceEditDirty.value) return "Source draft";
+  if (tableDraftSourceChanged.value) return selectedTableForDraft.value ? "Document changed" : "Text repair";
+  if (isNewTableDraft.value) return "New draft";
+  return "Synced";
+});
+const tableTwoWayStatusClass = computed(() => {
+  if (tableSourceEditError.value) return "error";
+  if (tableSourceEditDirty.value || tableDraftSourceChanged.value || isNewTableDraft.value) return "attention";
+  return "ready";
 });
 const tableDraftDirty = computed(() => {
   const snapshot = tableSourceSnapshot.value;
@@ -16968,6 +17008,52 @@ function editSelectedTableInMarkdownText() {
   goToSelectedTableSource("Selected the Markdown table text; direct source edits will refresh the visual grid when the pipe table is valid.");
 }
 
+function focusTableGrid() {
+  tableEditorGrid.value?.focus();
+  store.statusMessage = "Focused the visual table grid";
+}
+
+function focusTableSourceEditor() {
+  tableSourceEditor.value?.focus();
+  tableSourceEditor.value?.select();
+  store.statusMessage = "Focused the editable Markdown source block";
+}
+
+async function insertTableDraftInMarkdownText() {
+  if (!isNewTableDraft.value && tableContextSwitchBlocked("inserting a starter table in text")) return;
+  const draft = normalizeTableDraft(isNewTableDraft.value && tableDraft.value ? tableDraft.value : createDefaultTableDraft());
+  const issues = validateTableDraft(draft);
+  if (issues.some((issue) => issue.severity === "error")) {
+    store.statusMessage = "Fix table validation errors before inserting table text";
+    return;
+  }
+  const serialized = serializeMarkdownTable(draft);
+  const insertedSourceText = serialized.join("\n");
+  insertTableAtCursor(serialized);
+  await nextTick();
+  isNewTableDraft.value = false;
+  const updatedTables = parseMarkdownTables(active.value.text);
+  let insertedTableIndex = -1;
+  for (let index = updatedTables.length - 1; index >= 0; index -= 1) {
+    if (tableSourceText(active.value.text, updatedTables[index]) === insertedSourceText) {
+      insertedTableIndex = index;
+      break;
+    }
+  }
+  selectedTableIndex.value = insertedTableIndex >= 0 ? insertedTableIndex : Math.max(0, updatedTables.length - 1);
+  const insertedTable = updatedTables[selectedTableIndex.value];
+  tableDraft.value = draft;
+  if (insertedTable) {
+    tableSourceSnapshot.value = createTableSourceSnapshot(active.value.text, active.value.id, selectedTableIndex.value, insertedTable, draft);
+    refreshTableSourceEditFromDraft();
+    goToSelectedTableSource("Inserted a Markdown table and selected it for direct text editing");
+    return;
+  }
+  tableSourceSnapshot.value = null;
+  refreshTableSourceEditFromDraft();
+  store.statusMessage = "Inserted a Markdown table";
+}
+
 function rememberTableSource(table: MarkdownTable, draft: TableDraft) {
   tableSourceSnapshot.value = createTableSourceSnapshot(active.value.text, active.value.id, selectedTableIndex.value, table, draft);
 }
@@ -22498,6 +22584,49 @@ select:hover {
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.table-two-way-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 6px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+}
+
+.table-sync-chip {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid #d8e0e8;
+  background: #fff;
+  color: #1b2733;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.table-sync-chip.ready {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.table-sync-chip.attention {
+  border-color: #facc15;
+  background: #fefce8;
+  color: #854d0e;
+}
+
+.table-sync-chip.error {
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: #b91c1c;
 }
 
 .table-formula-builder,

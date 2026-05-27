@@ -206,7 +206,10 @@ source of truth. Existing Markdown tables can be loaded back into the visual
 grid from the Tables panel, Writing Tools menu, command palette, toolbar, or
 native desktop Writing Tools menu by choosing **Edit Table at Cursor** while
 the cursor or selection is inside the table; **Go to Source Table** returns the
-user to the exact Markdown range being edited.
+user to the exact Markdown range being edited. The Tables panel also exposes
+**New table in text** and **Insert draft in text** so a user can create a table
+visually, place the Markdown version in the document, and continue editing the
+pipe table directly.
 
 ## Figures, Captions, And Cross References
 

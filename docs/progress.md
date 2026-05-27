@@ -4693,6 +4693,14 @@ XLSX front matter data sources:
 | `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed after adding XLSX as a supported local data-source kind in the front matter manager. |
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after exposing XLSX in data-source UI type options. |
 
+Two-way table text editing:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed after adding the two-way table strip, **New table in text**/**Insert draft in text** actions, and same-start source snapshot recovery for in-place text edits that change headers and data. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after wiring the table grid/source/document-text focus controls and direct Markdown insertion path. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow now proves a user can create a visual draft, insert it as selected Markdown in the document editor, replace that selected table text with edited headers/rows, and see the visual grid sync back from the in-text Markdown table. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

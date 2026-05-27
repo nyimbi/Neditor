@@ -370,6 +370,9 @@ alignment, add totals, preserve merged-cell metadata, and write clean Markdown
 back to the document. It is also a two-way source editor: place the cursor
 inside an existing Markdown table, open Tables, choose **Edit table at cursor**,
 change the grid, then choose **Apply** to replace that exact table in the text.
+Choose **New table in text** or **Insert draft in text** when you want NEditor
+to place a starter or visual draft table directly in the Markdown editor and
+select it for immediate text editing.
 Use **Edit Markdown in text** when you want to select the exact table source
 lines and revise the pipe table directly in the editor; valid text edits sync
 back into the visual grid. Use **Go to source table** when you only need to jump

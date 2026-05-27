@@ -288,6 +288,12 @@ export function findMarkdownTableForSourceSnapshot(
     if (byCaptionAndHeaders) return byCaptionAndHeaders;
   }
 
+  const editedInPlace = indexed.find(({ table }) => {
+    const tableStart = table.captionLine || table.startLine;
+    return tableStart === snapshot.startLine && tableOverlapsSourceSnapshot(table, snapshot, documentId);
+  });
+  if (editedInPlace) return editedInPlace;
+
   return null;
 }
 

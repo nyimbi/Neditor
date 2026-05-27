@@ -2263,7 +2263,7 @@ test("supports keyboard-only operation for deep workbench controls", async ({ pa
   await expect(page.getByRole("document", { name: /Rendered preview for Keyboard Diagnostics, draft/ })).toBeFocused();
 
   await selectSidebarPanelOption(page, "tables");
-  const newTableButton = page.getByRole("button", { name: "New table" });
+  const newTableButton = page.getByRole("button", { name: "New table", exact: true });
   await newTableButton.focus();
   await page.keyboard.press("Enter");
   await page.getByLabel("Caption").fill("Keyboard budget");
@@ -3896,7 +3896,7 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await expect.poll(() => editorText(page)).toContain("[GLOSSARY]");
 
   await selectSidebarPanelOption(page, "tables");
-  await page.getByRole("button", { name: "New table" }).click();
+  await page.getByRole("button", { name: "New table", exact: true }).click();
   await page.getByLabel("Caption").fill("Workflow budget");
   await page.getByRole("button", { name: "Add totals row" }).click();
   await page.getByRole("button", { name: "Insert table" }).click();
@@ -3940,7 +3940,7 @@ test("runs command palette insertion and table editor workflows", async ({ page 
     ].join("\n"),
   );
   await expect(page.getByRole("button", { name: "Edit table at cursor" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "New table" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "New table", exact: true })).toBeDisabled();
   await queueDialogSelection(page, "/workspace/edited-source-table.csv");
   await page.getByRole("button", { name: "Export CSV" }).click();
   await expect.poll(() => mockFileText(page, "/workspace/edited-source-table.csv")).toContain("Services");
@@ -3953,6 +3953,23 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await expect.poll(() => editorText(page)).toContain("Support");
   await expect.poll(() => editorText(page)).toContain("Table: Earlier context");
   await expect.poll(() => editorText(page)).not.toContain("Table: Workflow budget\n| Item | Value |\n| --- | ---: |\n| Pipeline | 125000 |");
+
+  await page.getByRole("button", { name: "New table", exact: true }).click();
+  await page.getByLabel("Caption").fill("Typed text entry");
+  await page.getByRole("button", { name: "Insert draft in text" }).click();
+  await expect.poll(() => editorText(page)).toContain("Table: Typed text entry");
+  await page.keyboard.type(
+    [
+      "Table: Typed text entry",
+      "| Channel | Amount |",
+      "| --- | ---: |",
+      "| Direct | 12500 |",
+      "| Partner | 8750 |",
+    ].join("\n"),
+  );
+  await expect.poll(() => editorText(page)).toContain("| Direct | 12500 |");
+  await expect(page.getByLabel("Channel, row 1, column A")).toHaveValue("Direct");
+  await expect(page.getByLabel("Amount, row 2, column B")).toHaveValue("8750");
 
   await page.getByRole("button", { name: "Edit Markdown in text" }).click();
   await expect(page.locator(".status-bar")).toContainText("Selected the Markdown table text");
@@ -4872,7 +4889,7 @@ test("opens included-file conflicts without overwriting dirty master drafts", as
 
 test("edits pasted tables with sorting, formulas, and merged cells", async ({ page }) => {
   await selectSidebarPanelOption(page, "tables");
-  await page.getByRole("button", { name: "New table" }).click();
+  await page.getByRole("button", { name: "New table", exact: true }).click();
 
   await page.getByLabel("CSV/TSV paste").fill(
     [

@@ -320,6 +320,15 @@ test("table source snapshots detect source and draft divergence", () => {
   equal(otherParsedTable.id, "tbl:other");
   equal(tableOverlapsSourceSnapshot(otherParsedTable, snapshot, "doc-1"), false);
 
+  const headerEditedInPlaceText = sourceText
+    .replace("| Region | Revenue |", "| Channel | Amount |")
+    .replace("| East | 1200 |", "| Direct | 12500 |");
+  const [headerEditedTable] = parseMarkdownTables(headerEditedInPlaceText);
+  const headerEditedMatch = findMarkdownTableForSourceSnapshot([headerEditedTable], headerEditedInPlaceText, snapshot, "doc-1");
+  equal(headerEditedMatch?.index, 0);
+  deepEqual(headerEditedMatch?.table.headers, ["Channel", "Amount"]);
+  deepEqual(headerEditedMatch?.table.rows[0], ["Direct", "12500"]);
+
   const sourceShiftedByInsertedTable = [
     "# Report",
     "",
@@ -4464,6 +4473,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Source table changed"));
   ok(app.includes("Reload from source"));
   ok(app.includes("Apply draft over source"));
+  ok(app.includes("Two-way table editing"));
+  ok(app.includes("tableTwoWayStatus"));
+  ok(app.includes("table-sync-chip"));
+  ok(app.includes("New table in text"));
+  ok(app.includes("Insert draft in text"));
+  ok(app.includes("insertTableDraftInMarkdownText"));
   ok(app.includes("Markdown source"));
   ok(app.includes("Update grid from source"));
   ok(app.includes("Refresh source from grid"));
