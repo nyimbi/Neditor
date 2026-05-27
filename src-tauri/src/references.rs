@@ -2,7 +2,7 @@ use crate::{
     compiler_support::fenced_code_marker,
     compiler_types::Heading,
     diagnostics::{diag, with_range},
-    document_ast::is_valid_reference_key,
+    document_ast::{containing_byte_range, inline_code_spans, is_valid_reference_key},
     source_mapping::diagnostic_location_for_generated_line,
     DocumentDiagnostic, SourceMapEntry,
 };
@@ -90,9 +90,14 @@ fn scan_reference_labels(
     occurrences: &mut Vec<LabelOccurrence>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
+    let code_spans = inline_code_spans(line);
     let mut search_from = 0usize;
     while let Some(relative_start) = line[search_from..].find("{#") {
         let start = search_from + relative_start;
+        if let Some((_, end)) = containing_byte_range(start, &code_spans) {
+            search_from = end;
+            continue;
+        }
         let key_start = start + 2;
         let Some(relative_end) = line[key_start..].find('}') else {
             push_unclosed_reference_marker_diagnostic(
@@ -245,9 +250,14 @@ pub(crate) fn collect_cross_references(
             continue;
         }
         let generated_line = line_index + 1;
+        let code_spans = inline_code_spans(line);
         let mut search_from = 0usize;
         while let Some(relative_start) = line[search_from..].find("{@") {
             let start = search_from + relative_start;
+            if let Some((_, end)) = containing_byte_range(start, &code_spans) {
+                search_from = end;
+                continue;
+            }
             let key_start = start + 2;
             let Some(relative_end) = line[key_start..].find('}') else {
                 let (source_file, source_line) =

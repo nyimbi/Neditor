@@ -1709,10 +1709,22 @@ pub(crate) fn extract_label(text: &str) -> Option<String> {
 }
 
 pub(crate) fn extract_raw_label(text: &str) -> Option<&str> {
-    text.split("{#")
-        .nth(1)
-        .and_then(|rest| rest.split_once('}'))
-        .map(|(label, _)| label)
+    let code_spans = inline_code_spans(text);
+    let mut search_from = 0usize;
+    while let Some(relative_start) = text[search_from..].find("{#") {
+        let start = search_from + relative_start;
+        if let Some((_, end)) = containing_byte_range(start, &code_spans) {
+            search_from = end;
+            continue;
+        }
+        let key_start = start + 2;
+        let Some(relative_end) = text[key_start..].find('}') else {
+            return None;
+        };
+        let key_end = key_start + relative_end;
+        return Some(&text[key_start..key_end]);
+    }
+    None
 }
 
 fn parse_reference_label_key(raw_label: &str) -> Option<&str> {
@@ -1741,10 +1753,80 @@ pub(crate) fn extract_quoted_attribute(text: &str, key: &str) -> Option<String> 
 }
 
 fn strip_markdown_attributes(text: &str) -> &str {
-    if let Some(index) = text.rfind("{#") {
+    if let Some(index) = last_reference_label_start_outside_inline_code(text) {
         return text[..index].trim_end();
     }
     text
+}
+
+fn last_reference_label_start_outside_inline_code(text: &str) -> Option<usize> {
+    let code_spans = inline_code_spans(text);
+    let mut last = None;
+    let mut search_from = 0usize;
+    while let Some(relative_start) = text[search_from..].find("{#") {
+        let start = search_from + relative_start;
+        if let Some((_, end)) = containing_byte_range(start, &code_spans) {
+            search_from = end;
+            continue;
+        }
+        let key_start = start + 2;
+        let Some(relative_end) = text[key_start..].find('}') else {
+            break;
+        };
+        last = Some(start);
+        search_from = key_start + relative_end + 1;
+    }
+    last
+}
+
+pub(crate) fn inline_code_spans(text: &str) -> Vec<(usize, usize)> {
+    let bytes = text.as_bytes();
+    let mut spans = Vec::new();
+    let mut index = 0usize;
+    while index < bytes.len() {
+        if bytes[index] != b'`' {
+            index += 1;
+            continue;
+        }
+        let start = index;
+        while index < bytes.len() && bytes[index] == b'`' {
+            index += 1;
+        }
+        let tick_count = index - start;
+        let mut search = index;
+        let mut end = None;
+        while search < bytes.len() {
+            if bytes[search] != b'`' {
+                search += 1;
+                continue;
+            }
+            let closing_start = search;
+            while search < bytes.len() && bytes[search] == b'`' {
+                search += 1;
+            }
+            if search - closing_start == tick_count {
+                end = Some(search);
+                break;
+            }
+        }
+        if let Some(span_end) = end {
+            spans.push((start, span_end));
+            index = span_end;
+        } else {
+            index = start + tick_count;
+        }
+    }
+    spans
+}
+
+pub(crate) fn containing_byte_range(
+    index: usize,
+    ranges: &[(usize, usize)],
+) -> Option<(usize, usize)> {
+    ranges
+        .iter()
+        .copied()
+        .find(|(start, end)| index >= *start && index < *end)
 }
 
 fn clean_inline_text(text: &str) -> String {

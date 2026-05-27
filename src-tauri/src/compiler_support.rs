@@ -1,6 +1,6 @@
 use crate::{
     compiler_types::Heading,
-    document_ast::{extract_label, slugify},
+    document_ast::{containing_byte_range, extract_label, inline_code_spans, slugify},
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -100,7 +100,24 @@ pub(crate) fn collect_fence_bodies(text: &str, target: &str) -> Vec<String> {
 }
 
 fn strip_heading_attributes(text: &str) -> &str {
-    text.split("{#").next().unwrap_or(text).trim()
+    let code_spans = inline_code_spans(text);
+    let mut last = None;
+    let mut search_from = 0usize;
+    while let Some(relative_start) = text[search_from..].find("{#") {
+        let start = search_from + relative_start;
+        if let Some((_, end)) = containing_byte_range(start, &code_spans) {
+            search_from = end;
+            continue;
+        }
+        let key_start = start + 2;
+        let Some(relative_end) = text[key_start..].find('}') else {
+            break;
+        };
+        last = Some(start);
+        search_from = key_start + relative_end + 1;
+    }
+    last.map(|index| text[..index].trim())
+        .unwrap_or_else(|| text.trim())
 }
 
 pub(crate) fn fenced_code_marker(line: &str) -> Option<&'static str> {

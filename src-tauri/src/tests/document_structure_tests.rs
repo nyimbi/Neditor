@@ -393,6 +393,66 @@ fn malformed_reference_markers_are_reported_with_source_ranges() {
 }
 
 #[test]
+fn inline_code_reference_markers_are_treated_as_literal_examples() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Inline Reference Examples\nstatus: approved\napprovedBy: QA\n---\n# Strategy {#sec:strategy}\nUse `{@missing}` and `{#fig:literal}` as literal syntax examples.\n\n## Writing `{#heading-example}` syntax\n![Literal `{#fig:alt-example}`](data:image/svg+xml;base64,PHN2Zy8+){#fig:real caption=\"Real figure\"}\nSee {@sec:strategy} and {@fig:real}.\n"
+                .to_string(),
+            file_path: None,
+        });
+
+    assert!(response.semantic.headings.iter().any(|heading| {
+        heading.text == "Writing `{#heading-example}` syntax"
+            && heading.anchor == "writing-heading-example-syntax"
+    }));
+    assert!(response
+        .semantic
+        .labels
+        .iter()
+        .any(|label| label == "sec:strategy"));
+    assert!(response
+        .semantic
+        .labels
+        .iter()
+        .any(|label| label == "fig:real"));
+    for literal in [
+        "missing",
+        "fig:literal",
+        "heading-example",
+        "fig:alt-example",
+    ] {
+        assert!(
+            !response
+                .semantic
+                .labels
+                .iter()
+                .any(|label| label == literal),
+            "literal inline code marker should not become a label: {literal}"
+        );
+        assert!(
+            !response
+                .semantic
+                .cross_references
+                .iter()
+                .any(|reference| reference.key == literal),
+            "literal inline code marker should not become a cross reference: {literal}"
+        );
+    }
+    assert!(!response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("Broken cross reference: missing")));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("Duplicate reference label")));
+    assert!(response
+        .compiled_markdown
+        .contains("Use `{@missing}` and `{#fig:literal}` as literal syntax examples."));
+    assert!(response
+        .compiled_markdown
+        .contains("See [Section strategy](#sec:strategy) and [Figure real](#fig:real)."));
+}
+
+#[test]
 fn compiler_renders_layout_break_directives() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Layout\nstatus: approved\napprovedBy: QA\n---\n# Layout\n{{page-break}}\n{{section-break columns=1}}\n\n```layout\ncolumns: 2\n```\n".to_string(),

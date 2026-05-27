@@ -4520,6 +4520,19 @@ Moved-source table tracking:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording moved-table tracking evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the moved-source table tracking diff. |
 
+Inline-code reference readiness hardening:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is clean after aligning semantic heading extraction, AST label extraction, and cross-reference scanning around inline code spans. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked inline_code_reference_markers_are_treated_as_literal_examples --lib` | Pass | Focused regression proves inline-code examples such as `{@missing}` and `{#fig:literal}` stay literal, do not create labels or broken-reference diagnostics, headings containing code-form label examples keep a slug anchor instead of adopting the example label, and image alt text containing a literal label does not override the real figure label. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked reference --lib` | Pass | 13 reference-related Rust tests passed, covering inline-code literal markers, duplicate labels, malformed labels, prepare-for-export manifest blockers, resolved heading/appendix/decision references, citation fenced examples, named table formulas, topology references, and cross-target reference exports. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked prepare_for_export_blocks_malformed_reference_markers_in_manifest --lib` | Pass | Focused readiness regression still blocks malformed real reference markers and copies diagnostics into export manifests. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked prepare_for_export_blocks_duplicate_reference_labels_in_manifest --lib` | Pass | Focused readiness regression still blocks duplicate real reference labels and preserves manifest audit context. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting inline-code reference readiness hardening. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording inline-code reference edge coverage. |
+| `git diff --check` | Pass | No whitespace errors are present in the inline-code reference readiness diff. |
+
 RFP URL and DOCX source cleanup hardening:
 
 | Command | Result | Evidence |
