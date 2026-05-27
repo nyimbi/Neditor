@@ -4246,6 +4246,20 @@ Table command-surface completion:
 | `pnpm run check:release-readiness` | Pass | Release readiness is `current-host-ready-with-external-gaps` after refreshing the full browser workflow evidence for the changed UI/spec sources. |
 | `git diff --check` | Pass | No whitespace errors are present in the table command-surface diff. |
 
+Native table menu workflow proof:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run build` | Pass | Vue/TypeScript validation and production Vite build passed before rebuilding the Tauri binary for native smoke proof. |
+| `pnpm tauri build --no-bundle` | Pass | Rebuilt `src-tauri/target/release/neditor` with the updated frontend and native menu workflow hooks. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Bounded native launch smoke passed outside the sandbox and `.tmp/desktop-smoke/native-workflow-report.json` now records native Writing Tools menu evidence for opening the table editor, loading the source table at the cursor into a draft containing the Revenue row, and jumping back to the source Markdown table range. |
+| `pnpm run test:desktop-smoke` | Pass | Non-launch desktop smoke validates the refreshed native workflow report and command workflow after adding the table-menu assertions. |
+| `pnpm run test:tauri-webdriver` | Pass | macOS WebDriver harness correctly skipped with fresh native fallback proof for the rebuilt binary. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding native table menu smoke evidence and the review-mode sentinel update. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 75 tests, including static guards for the native table-menu smoke evidence and desktop smoke validator expectations. |
+| `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing native smoke and WebDriver fallback evidence for the rebuilt binary. |
+| `git diff --check` | Pass | No whitespace errors are present in the native table menu proof diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

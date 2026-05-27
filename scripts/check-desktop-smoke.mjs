@@ -588,7 +588,11 @@ function validateNativeWorkflowReport(launchReport) {
   if (
     !String(reviewModeEntry.sidebarText || "").includes("Review") ||
     !String(reviewModeEntry.sidebarText || "").includes("Summary") ||
-    !String(reviewModeEntry.sidebarText || "").includes("Approved by")
+    !(
+      String(reviewModeEntry.sidebarText || "").includes("Approved by") ||
+      (String(reviewModeEntry.sidebarText || "").includes("Quality recommendations") &&
+        String(reviewModeEntry.sidebarText || "").includes("AI reviewed"))
+    )
   ) {
     issues.push(`native workflow report did not include rendered review-mode governance content: ${JSON.stringify(reviewModeEntry)}`);
   }
@@ -844,6 +848,15 @@ function validateNativeWorkflowReport(launchReport) {
     nativeMenuCommandEvidence.equation?.inserted !== true ||
     nativeMenuCommandEvidence.codeFence?.inserted !== true ||
     nativeMenuCommandEvidence.table?.inserted !== true ||
+    nativeMenuCommandEvidence.tableEditor?.sidebar !== "tables" ||
+    nativeMenuCommandEvidence.tableEditor?.hasDraft !== true ||
+    nativeMenuCommandEvidence.tableSourceEdit?.sidebar !== "tables" ||
+    nativeMenuCommandEvidence.tableSourceEdit?.includesRevenueRow !== true ||
+    !Number.isInteger(nativeMenuCommandEvidence.tableSourceJump?.targetLine) ||
+    !Number.isInteger(nativeMenuCommandEvidence.tableSourceJump?.selection?.fromLine) ||
+    !Number.isInteger(nativeMenuCommandEvidence.tableSourceJump?.selection?.toLine) ||
+    nativeMenuCommandEvidence.tableSourceJump?.selection?.fromLine > nativeMenuCommandEvidence.tableSourceJump?.targetLine ||
+    nativeMenuCommandEvidence.tableSourceJump?.selection?.toLine < nativeMenuCommandEvidence.tableSourceJump?.targetLine ||
     nativeMenuCommandEvidence.templates?.sidebar !== "templates" ||
     nativeMenuCommandEvidence.docsLive?.open !== true ||
     nativeMenuCommandEvidence.docsLive?.generated?.workflow !== true ||

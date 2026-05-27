@@ -4336,6 +4336,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('"neditor-export-epub": "epub"'));
   ok(app.includes("collectNativeMenuCommandEvidence"));
   ok(app.includes("native workflow inserted table from native writing tools menu"));
+  ok(app.includes("native workflow opened table editor from native writing tools menu"));
+  ok(app.includes("native workflow loaded source table from native writing tools menu"));
+  ok(app.includes("native workflow jumped to source table from native writing tools menu"));
   ok(app.includes("collectNativeWorkspaceTabEvidence"));
   ok(app.includes("native workflow restored workspace tabs with active pinned and scroll state"));
   ok(app.includes("flushEditorTextToStore();"));
@@ -5190,6 +5193,9 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native workflow report did not include rendered export-mode content"));
   ok(smoke.includes("native workflow report did not include rendered review-mode governance content"));
   ok(smoke.includes("native workflow report did not include rendered presentation outline content"));
+  ok(smoke.includes("nativeMenuCommandEvidence.tableEditor?.sidebar !== \"tables\""));
+  ok(smoke.includes("nativeMenuCommandEvidence.tableSourceEdit?.includesRevenueRow !== true"));
+  ok(smoke.includes("nativeMenuCommandEvidence.tableSourceJump?.selection?.fromLine"));
   ok(smoke.includes("nativeMenuCommandEvidence.docsLive?.open !== true"));
   ok(smoke.includes("nativeMenuCommandEvidence.docsLive?.generated?.workflow !== true"));
   ok(smoke.includes("nativeMenuCommandEvidence.docsLive?.applied?.hasDraftingPlan !== true"));

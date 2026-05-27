@@ -11324,6 +11324,61 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
   await recordInsertion("neditor-insert-equation", "equation", "native workflow inserted equation from native writing tools menu", "E = mc^2");
   await recordInsertion("neditor-insert-code-fence", "codeFence", "native workflow inserted code fence from native writing tools menu", "```markdown");
   await recordInsertion("neditor-insert-table", "table", "native workflow inserted table from native writing tools menu", "| Revenue | 125000 |");
+  const insertedTableLine = active.value.text.split("\n").findIndex((line) => line.includes("| Revenue | 125000 |")) + 1;
+  await runMenuCommand("neditor-open-table-editor", "native-menu-command-table-editor");
+  await waitForNativeWorkflowCondition(() => store.sidebar === "tables" && Boolean(tableDraft.value), 1000);
+  evidence.tableEditor = {
+    sidebar: store.sidebar,
+    hasDraft: Boolean(tableDraft.value),
+    summary: selectedTableEditSummary.value,
+  };
+  record(
+    "native workflow opened table editor from native writing tools menu",
+    store.sidebar === "tables" && Boolean(tableDraft.value),
+    JSON.stringify(evidence.tableEditor),
+  );
+  await checkpoint?.("native-menu-command-table-editor-recorded");
+
+  if (insertedTableLine > 0) {
+    await goToSourceTarget({ line: insertedTableLine });
+    await nextTick();
+  }
+  await runMenuCommand("neditor-edit-table-at-cursor", "native-menu-command-edit-table-at-cursor");
+  await waitForNativeWorkflowCondition(
+    () => store.sidebar === "tables" && Boolean(tableDraft.value?.rows.some((row) => row.includes("Revenue") && row.includes("125000"))),
+    1000,
+  );
+  evidence.tableSourceEdit = {
+    sidebar: store.sidebar,
+    hasDraft: Boolean(tableDraft.value),
+    rowCount: tableDraft.value?.rows.length || 0,
+    summary: selectedTableEditSummary.value,
+    includesRevenueRow: Boolean(tableDraft.value?.rows.some((row) => row.includes("Revenue") && row.includes("125000"))),
+  };
+  record(
+    "native workflow loaded source table from native writing tools menu",
+    store.sidebar === "tables" && Boolean((evidence.tableSourceEdit as { includesRevenueRow?: boolean }).includesRevenueRow),
+    JSON.stringify(evidence.tableSourceEdit),
+  );
+  await checkpoint?.("native-menu-command-edit-table-at-cursor-recorded");
+
+  await runMenuCommand("neditor-go-to-source-table", "native-menu-command-go-to-source-table");
+  await waitForNativeWorkflowCondition(() => {
+    const range = editorSelectionLineRange();
+    return Boolean(range && insertedTableLine > 0 && range.fromLine <= insertedTableLine && range.toLine >= insertedTableLine);
+  }, 1000);
+  const sourceSelection = editorSelectionLineRange();
+  evidence.tableSourceJump = {
+    selection: sourceSelection,
+    targetLine: insertedTableLine,
+    lineText: insertedTableLine > 0 ? active.value.text.split("\n")[insertedTableLine - 1] || "" : "",
+  };
+  record(
+    "native workflow jumped to source table from native writing tools menu",
+    Boolean(sourceSelection && insertedTableLine > 0 && sourceSelection.fromLine <= insertedTableLine && sourceSelection.toLine >= insertedTableLine),
+    JSON.stringify(evidence.tableSourceJump),
+  );
+  await checkpoint?.("native-menu-command-go-to-source-table-recorded");
 
   await runMenuCommand("neditor-open-templates", "native-menu-command-templates");
   await waitForNativeWorkflowCondition(() => store.sidebar === "templates", 1000);
@@ -12015,7 +12070,8 @@ async function collectNativeModeEvidence(record: (name: string, passed: boolean,
           reviewMode.previewVisible &&
           reviewMode.sidebarText.includes("Review") &&
           reviewMode.sidebarText.includes("Summary") &&
-          reviewMode.sidebarText.includes("Approved by"),
+          (reviewMode.sidebarText.includes("Approved by") ||
+            (reviewMode.sidebarText.includes("Quality recommendations") && reviewMode.sidebarText.includes("AI reviewed"))),
       ),
       JSON.stringify(reviewMode),
     );
