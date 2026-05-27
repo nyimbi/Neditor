@@ -432,6 +432,7 @@ fn write_rendered_export_audit_artifacts(artifacts: RenderedExportAuditArtifacts
             "Open review-cases/option-heavy.* and confirm cover/page numbers/watermark/style/appendix options are visible without corrupting body content.",
             "Open review-cases/brand-layout.* and confirm brand logo, brand color, header/footer templates, page size/orientation, watermark, legal metadata, and page numbers survive across targets.",
             "Open review-cases/business-transforms.* and confirm roadmap, ADR, diff, and QR transform artifacts remain legible and hash-backed across targets.",
+            "Open review-cases/equations.* and confirm inline, matrix, extended-notation, and piecewise equations remain legible with captions and references across targets.",
             "Open review-cases/edited-tables.* and confirm edited values, formula rows, escaped pipes, and alignment survive across targets.",
             "Open review-cases/toc-page-numbers.* and confirm numbered generated TOC entries, PDF page-number leaders, and DOCX update-field guidance survive across targets."
         ]
@@ -539,6 +540,19 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
             vec![
                 "Launch beta",
                 "https://neditor.local/export-pack",
+            ],
+        ),
+        (
+            "equations",
+            "Equation Export",
+            "---\ntitle: Equation Export\nstatus: approved\napprovedBy: Release QA\napprovedAt: 2026-05-21T11:45:00Z\n---\n# Equation Export\n\nThis review case proves business and scientific equation authoring remains inspectable in exported artifacts.\n\nInline demand uses \\(\\sum_{i=1}^{n} x_i \\approx \\infty\\), transition notation uses \\(A \\to B\\), and risk notation uses \\(\\mathbb{R} \\to \\mathcal{F}\\).\n\n$$\n\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix} \\Rightarrow \\Omega\n$$ {#eq:matrix caption=\"Matrix model\"}\n\n$$\n\\left( \\frac{\\text{Revenue}}{\\sqrt[3]{Cost}} \\right) + \\overline{AB} + \\hat{\\theta} + \\vec{v} + \\underline{risk} + \\cdots\n$$ {#eq:extended caption=\"Extended notation\"}\n\n$$\nf(x)=\\begin{cases} x^2 & x \\ge 0 \\\\ -x & x < 0 \\end{cases} + \\lim_{n \\to \\infty} a_n\n$$ {#eq:piecewise caption=\"Piecewise risk model\"}\n\nSee {@eq:matrix}, {@eq:extended}, and {@eq:piecewise}.\n",
+            json!({
+                "includeStyles": true,
+                "includeSyntaxHighlighting": true,
+                "includeManifest": true
+            }),
+            vec![
+                "Matrix model",
             ],
         ),
         (
@@ -730,6 +744,50 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
                         && pptx_text.contains("Keep static transform artifacts")
                         && bundle_text.contains("Keep static transform artifacts"),
                     "{slug} missing ADR decision text across exported targets"
+                );
+            }
+            if slug == "equations" {
+                assert!(
+                    html.contains("class=\"math-matrix matrix-square\"")
+                        && html.contains("class=\"math-matrix matrix-cases\""),
+                    "{slug} html missing matrix or piecewise equation rendering"
+                );
+                assert!(
+                    html.contains("class=\"math-root-index\"")
+                        && html.contains("class=\"math-overline\"")
+                        && html.contains("class=\"math-hat\"")
+                        && html.contains("class=\"math-vec\"")
+                        && html.contains("class=\"math-underline\""),
+                    "{slug} html missing extended notation rendering"
+                );
+                assert!(
+                    html.contains("class=\"math-blackboard\"")
+                        && html.contains("class=\"math-calligraphic\"")
+                        && html.contains("Equation 1: Matrix model")
+                        && html.contains("Equation 2: Extended notation")
+                        && html.contains("Equation 3: Piecewise risk model"),
+                    "{slug} html missing styled inline math or numbered captions"
+                );
+                assert!(
+                    html.contains(r##"<a href="#eq:matrix">Equation matrix</a>"##)
+                        && html.contains(r##"<a href="#eq:extended">Equation extended</a>"##)
+                        && html.contains(r##"<a href="#eq:piecewise">Equation piecewise</a>"##)
+                        && bundle_text.contains("[Equation matrix](#eq:matrix)")
+                        && bundle_text.contains("[Equation extended](#eq:extended)")
+                        && bundle_text.contains("[Equation piecewise](#eq:piecewise)"),
+                    "{slug} missing equation cross-reference text in HTML or Markdown bundle"
+                );
+                assert!(
+                    pdf_text.contains("Matrix model")
+                        && pdf_text.contains("Extended notation")
+                        && pdf_text.contains("Piecewise risk model")
+                        && docx_text.contains("Matrix model")
+                        && docx_text.contains("Extended notation")
+                        && docx_text.contains("Piecewise risk model")
+                        && pptx_text.contains("Matrix model")
+                        && pptx_text.contains("Extended notation")
+                        && pptx_text.contains("Piecewise risk model"),
+                    "{slug} missing equation captions across exported targets"
                 );
             }
             assert!(pdf_text.contains(title), "{slug} pdf missing title");

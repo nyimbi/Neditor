@@ -94,7 +94,7 @@ if (issues.length === 0) {
   }
   const reviewCases = Array.isArray(auditReport.reviewCases) ? auditReport.reviewCases : [];
   const reviewCaseSlugs = new Set(reviewCases.map((reviewCase) => reviewCase.slug));
-  for (const slug of ["rich-blocks", "option-heavy", "brand-layout", "business-transforms", "toc-page-numbers", "edited-tables"]) {
+  for (const slug of ["rich-blocks", "option-heavy", "brand-layout", "business-transforms", "equations", "toc-page-numbers", "edited-tables"]) {
     if (!reviewCaseSlugs.has(slug)) {
       issues.push(`audit report is missing rendered review case ${slug}`);
     }
@@ -1832,6 +1832,7 @@ function verifyManualReviewDashboard(issues, assertions) {
     "review-cases/option-heavy/option-heavy.html",
     "review-cases/brand-layout/brand-layout.html",
     "review-cases/business-transforms/business-transforms.html",
+    "review-cases/equations/equations.html",
     "review-cases/toc-page-numbers/toc-page-numbers.html",
     "review-cases/edited-tables/edited-tables.html",
     "Executable Viewer And Package Proof",

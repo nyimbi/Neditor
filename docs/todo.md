@@ -1215,8 +1215,11 @@ Audit HTML, PDF, DOCX, PPTX, and Markdown bundle outputs for:
   ellipses, piecewise `cases` equations, `\mathbb{}`, `\mathcal{}`,
   `\mathrm{}`, probability and limit operators, preview/export CSS, AST
   capture, and DOCX/PPTX text evidence.
-  Remaining work is rendered visual QA and additional LaTeX permutations beyond
-  the native subset.
+  Rendered export audit now requires the `review-cases/equations` artifacts for
+  inline math, matrix equations, extended notation, piecewise equations,
+  captions, and equation cross references across HTML/PDF/DOCX/PPTX/
+  Markdown-bundle outputs. Remaining work is completed human/native visual
+  sign-off and additional LaTeX permutations beyond the native subset.
 - Citations, bibliography, locators, missing keys, duplicate keys, and CSL
   behavior.
 - Cross references to headings, figures, tables, equations, appendices, and

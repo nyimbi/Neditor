@@ -69,6 +69,11 @@ Recent pushed checkpoints visible in current git history:
   hashes, ADR decision text, diff additions, and QR target text across HTML,
   PDF, DOCX, PPTX, and Markdown bundle targets, and the
   audit/release-readiness validators now require that case.
+- Rendered export audit now includes an equation review case. The generated
+  `review-cases/equations` artifacts cover inline math, matrix equations,
+  extended notation, piecewise equations, equation captions, and equation
+  cross references across HTML, PDF, DOCX, PPTX, and Markdown bundle targets,
+  and the audit/release-readiness validators now require that case.
 - Include watcher state now has focused browser proof for directive edits. The
   workflow edits a master document from `!include chapters/risk.md` to
   `!include chapters/ops.md`, proves the include graph and watched path set
@@ -1466,6 +1471,8 @@ Recent pushed checkpoints visible in current git history:
 
 | Command | Result | Notes |
 | --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new equation review case and asserts inline/styled math, matrix rendering, extended notation, piecewise rendering, captions, and cross-target equation evidence. |
+| `pnpm run test:rendered-exports` | Pass | Rendered export audit now verifies `review-cases/equations` across HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts, browser visual proof, Office preview dashboards, Poppler proof where available, and manual-review dashboard links. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_accepts_text_edited_tables_without_outer_pipes --lib` | Pass | Focused Rust compiler proof accepts a directly typed Markdown table without outer pipes, evaluates formulas, resolves table references, preserves escaped literal pipes, and renders the table into HTML/AST output. |
 | `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed, including table editor parsing for directly typed Markdown tables without outer pipes and canonical source regeneration for the visual grid. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new business-transform review case and asserts roadmap, ADR, diff, QR, embedded artifact hashes, and cross-target ADR/diff text. |
