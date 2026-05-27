@@ -36,6 +36,12 @@ Recent pushed checkpoints visible in current git history:
   exact source-line range being edited, jump back to that source table, and
   apply visual-grid edits back over the original Markdown table range instead
   of only inserting new tables.
+- The same two-way table editing workflow is now first-class in the command
+  surface. Users can open the visual table editor, edit the table at the
+  current cursor or selection, jump back to the source Markdown table, import
+  CSV/XLSX data, export CSV/XLSX, and insert SQL table transforms from the
+  Tables panel, Writing Tools menu, command palette, toolbar, and native
+  desktop Writing Tools menu instead of hunting for a single sidebar path.
 - The Templates sidebar now provides **AI template assistance** for calculation
   and transform work. `buildTransformTemplateAssistance` uses the current
   template filters, document text, custom-template draft, and assistance notes
@@ -4226,6 +4232,19 @@ Creative content wizard staging:
 | --- | --- | --- |
 | `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 75 tests after making podcast and movie script wizards lock episode/screen-story architecture before prose, generate sequential segment/beat draft queues, add final audio-production/screenplay quality review gates, update business-template approval gates, expose matching Agent Workspace quality gates, and add context-aware suggested answers for every Docs Live questionnaire step. |
 | Browser e2e suite | Not rerun | Skipped to conserve battery because this slice changes shared Docs Live draft generation, business-template metadata, agentic workflow planning logic, and static Docs Live UI wiring covered by the focused frontend unit suite. |
+
+Table command-surface completion:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after exposing source-table editing through toolbar, visible Writing Tools menu, command palette, and native menu bridge. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 75 tests, including static guards for Edit Table at Cursor, Open Table Editor, Go to Source Table, CSV/XLSX table export, new table drafts, and matching native menu command handlers. |
+| `pnpm run test:e2e` | Pass | Full Chromium browser workflow suite passed with 65 tests after adding Writing Tools menu assertions for Edit Table at Cursor and Go to Source Table and tightening strict selectors for exact headings, readiness diagnostics, and template cards. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed after adding native Writing Tools table-edit menu items. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting table command-surface access in README, user guide, and Markdown extensions reference. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while recording that two-way table workflows are now discoverable from all main command surfaces. |
+| `pnpm run check:release-readiness` | Pass | Release readiness is `current-host-ready-with-external-gaps` after refreshing the full browser workflow evidence for the changed UI/spec sources. |
+| `git diff --check` | Pass | No whitespace errors are present in the table command-surface diff. |
 
 ## Next Execution Order
 

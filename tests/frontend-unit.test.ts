@@ -4111,6 +4111,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("import_spreadsheet_table"));
   ok(app.includes("Insert SQL transform"));
   ok(app.includes("Edit table at cursor"));
+  ok(app.includes("Open Table Editor"));
+  ok(app.includes("Go to Source Table"));
+  ok(app.includes("Export Table as CSV"));
+  ok(app.includes("Create new table draft"));
   ok(app.includes("loadTableAtCursor"));
   ok(app.includes("findMarkdownTableIndexForLineRange"));
   ok(app.includes("goToSelectedTableSource"));
@@ -4346,6 +4350,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
   ok(tauriLib.includes('"neditor-export-epub", "EPUB Export"'));
   ok(tauriLib.includes('"neditor-open-docs-live", "Docs Live"'));
+  ok(tauriLib.includes('"neditor-open-table-editor",'));
+  ok(tauriLib.includes('"neditor-edit-table-at-cursor",'));
+  ok(tauriLib.includes('"neditor-go-to-source-table",'));
   ok(tauriLib.includes('"neditor-read-selection-aloud",'));
   ok(tauriLib.includes('"neditor-read-document-aloud",'));
   ok(tauriLib.includes('"neditor-stop-reading",'));
@@ -4367,6 +4374,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-mode-outline", "Outline Mode"'));
   ok(app.includes('case "neditor-mode-export"'));
   ok(app.includes('case "neditor-mode-outline"'));
+  ok(app.includes('case "neditor-open-table-editor"'));
+  ok(app.includes('case "neditor-edit-table-at-cursor"'));
+  ok(app.includes('case "neditor-go-to-source-table"'));
   ok(app.includes('case "neditor-install-transform-handlers"'));
   ok(app.includes('case "neditor-open-help"'));
   ok(app.includes('case "neditor-open-agent-workspace"'));

@@ -7614,16 +7614,20 @@ const helpTopics = computed<HelpTopic[]>(() => [
     steps: [
       "Open Templates to browse built-in calculation and transform templates by category.",
       "Use Create custom template for reusable organization-specific blocks.",
-      "Open the table editor to normalize pasted spreadsheet data before inserting it.",
+      "Open the table editor to create a new table or edit the Markdown table at the current cursor/selection.",
+      "Use Go to source table when you need to inspect or hand-edit the exact Markdown lines behind the visual table grid.",
       "Run transforms after inserting calculation or external transform blocks.",
     ],
     tips: [
       "Template fill fields show which placeholder values you need to replace.",
+      "Source-table editing preserves captions, labels, alignment, escaped pipes, formulas, and the original document position.",
       "External transform engines require trust before NEditor executes them.",
     ],
     actions: [
       { label: "Open templates", run: () => openTransformTemplates() },
       { label: "Open table editor", run: () => openTableEditor() },
+      { label: "Edit table at cursor", run: () => loadTableAtCursor() },
+      { label: "Go to source table", run: () => goToSelectedTableSource() },
       { label: "Run transforms", run: () => store.compileActive() },
     ],
     keywords: ["calc", "tables", "templates", "transform", "formula", "spreadsheet"],
@@ -8048,6 +8052,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     label: "Insert",
     actions: [
       { id: "table", label: "Table", title: "Insert table", icon: "table", run: () => insertBlock(tableSnippet) },
+      { id: "edit-table", label: "Edit Table", title: "Load the Markdown table at the cursor or selection into the visual table editor", icon: "table", primary: true, run: () => loadTableAtCursor() },
       { id: "figure", label: "Figure", title: "Insert figure", icon: "figure", run: () => insertFigureSnippet() },
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
@@ -8211,11 +8216,18 @@ const appMenus = computed<AppMenu[]>(() => [
         label: "Insert",
         items: [
           { id: "table", label: "Table", help: "Insert a Markdown table scaffold.", run: () => insertBlock(tableSnippet) },
+          { id: "open-table-editor", label: "Open Table Editor", help: "Open the visual table grid for creating or editing Markdown tables.", run: () => openTableEditor() },
+          { id: "edit-table-at-cursor", label: "Edit Table at Cursor", help: "Load the Markdown table under the cursor or selection into the visual table editor.", run: () => loadTableAtCursor() },
+          { id: "go-to-source-table", label: "Go to Source Table", help: "Jump from the visual table grid back to the source Markdown table lines.", disabled: !selectedTable.value, run: () => goToSelectedTableSource() },
+          { id: "import-table", label: "Import CSV/XLSX Table", help: "Import spreadsheet data into the editable table grid.", disabled: tableDataBusy.value, run: () => importTableFromSpreadsheet() },
+          { id: "export-table-csv", label: "Export Table as CSV", help: "Export the current table draft or selected Markdown table to CSV.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("csv") },
+          { id: "export-table-xlsx", label: "Export Table as XLSX", help: "Export the current table draft or selected Markdown table to XLSX.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("xlsx") },
           { id: "figure", label: "Figure", help: "Insert a figure scaffold.", run: () => insertFigureSnippet() },
           { id: "calc", label: "Calculation", help: "Insert a calculation block.", run: () => insertBlock(calcSnippet) },
           { id: "equation", label: "Equation Editor", help: "Open equation templates and LaTeX insertion.", run: () => openEquationEditor() },
           { id: "toc", label: "Table of Contents", help: "Insert a generated TOC marker.", run: () => insertBlock(tocSnippet) },
           { id: "templates", label: "Transform Templates", help: "Open reusable calc, chart, diagram, data, and API templates.", run: () => openTransformTemplates() },
+          { id: "sql-transform", label: "SQL Transform", help: "Insert a trusted read-only SQL transform scaffold for database-backed Markdown tables.", run: () => insertSqlTransformTemplate() },
           { id: "install-transform-handlers", label: "Install Transform Handlers", help: "Open the configurator workflow that downloads and installs Graphviz, D2, PlantUML, Pikchr, and SQLite handlers.", run: () => openTransformInstaller() },
         ],
       },
@@ -10029,6 +10041,30 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Prepare release metadata", group: "Review", run: () => applyReleaseMetadataScaffold() },
   { name: "Insert release readiness audit", group: "Review", run: () => insertReleaseReadinessAudit() },
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
+  {
+    name: "Edit table at cursor",
+    group: "Tables",
+    description: "Load the Markdown table under the cursor or selection into the visual table editor.",
+    keywords: ["table", "edit table", "source table", "markdown table", "spreadsheet"],
+    run: () => loadTableAtCursor(),
+  },
+  {
+    name: "Go to source table",
+    group: "Tables",
+    description: "Jump from the selected visual table draft back to its source Markdown table lines.",
+    keywords: ["table", "source", "markdown table", "jump"],
+    run: () => goToSelectedTableSource(),
+  },
+  {
+    name: "Create new table draft",
+    group: "Tables",
+    description: "Start a structured table draft in the visual grid before inserting it into Markdown.",
+    keywords: ["table", "new table", "visual table", "grid"],
+    run: () => {
+      store.sidebar = "tables";
+      createTableDraft();
+    },
+  },
   { name: "Open transform templates", group: "Transforms", run: () => openTransformTemplates() },
   { name: "Set up business identity", group: "Templates", run: () => openBusinessProfile() },
   { name: "Insert company contact block", group: "Templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
@@ -10345,6 +10381,15 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-insert-table":
       insertBlock(tableSnippet);
       flushEditorTextToStore();
+      break;
+    case "neditor-open-table-editor":
+      openTableEditor();
+      break;
+    case "neditor-edit-table-at-cursor":
+      loadTableAtCursor();
+      break;
+    case "neditor-go-to-source-table":
+      goToSelectedTableSource();
       break;
     case "neditor-insert-code-fence":
       insertBlock(codeFenceSnippet);

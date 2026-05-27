@@ -360,6 +360,21 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .item(&menu_item(app, "neditor-insert-table", "Insert Table")?)
         .item(&menu_item(
             app,
+            "neditor-open-table-editor",
+            "Open Table Editor",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-edit-table-at-cursor",
+            "Edit Table at Cursor",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-go-to-source-table",
+            "Go to Source Table",
+        )?)
+        .item(&menu_item(
+            app,
             "neditor-insert-code-fence",
             "Insert Code Fence",
         )?)

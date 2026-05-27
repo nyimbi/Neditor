@@ -1764,6 +1764,8 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Writing Tools menu" }).click();
+  await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Edit Table at Cursor");
+  await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Go to Source Table");
   await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Lesson plan");
   await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Technical textbook");
   await page.keyboard.press("Escape");
@@ -1800,7 +1802,7 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeHidden();
   await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
-  await expect(page.locator(".sidebar").getByRole("heading", { name: "Export" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Export", exact: true })).toBeVisible();
   await expect(page.locator(".sidebar").getByRole("heading", { name: "Manifest" })).toBeVisible();
 
   await page.getByLabel("View mode").selectOption("review");
@@ -1850,7 +1852,7 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   await page.getByRole("button", { name: /Export and publishing/ }).click();
   await page.getByRole("button", { name: "Export panel" }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
-  await expect(page.locator(".sidebar").getByRole("heading", { name: "Export" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Export", exact: true })).toBeVisible();
 
   await page.locator(".command-bar").getByRole("button", { name: "Help" }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("help");
@@ -1916,7 +1918,7 @@ test("routes natural language command palette instructions to AI workflow surfac
   await expect(suggestions).toContainText("Review governance");
   await suggestions.getByRole("button", { name: "Export readiness" }).click();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("exports");
-  await expect(page.locator(".sidebar").getByRole("heading", { name: "Export" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("heading", { name: "Export", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page
@@ -3371,7 +3373,7 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await templateFilters.getByLabel("Transform").selectOption("calc");
   await templateFilters.getByLabel("Search").fill("dose");
 
-  const doseTemplate = sidebar.getByRole("listitem").filter({ hasText: "Dose by weight" });
+  const doseTemplate = sidebar.locator("article.template-card").filter({ hasText: "Dose by weight" });
   await expect(doseTemplate).toContainText("Science | calc | builtin");
   await expect(doseTemplate.getByLabel("Template fill values")).toContainText("weight_kg");
   await expect(doseTemplate.getByLabel("Template fill values")).toContainText("tablet_strength_mg");
@@ -3387,7 +3389,7 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await templateFilters.getByLabel("Category").selectOption("Charts");
   await templateFilters.getByLabel("Transform").selectOption("chart");
   await templateFilters.getByLabel("Search").fill("kpi");
-  const chartTemplate = sidebar.getByRole("listitem").filter({ hasText: "KPI bar chart" });
+  const chartTemplate = sidebar.locator("article.template-card").filter({ hasText: "KPI bar chart" });
   await expect(chartTemplate).toContainText("Charts | chart | builtin");
   await chartTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain("```chart");
@@ -3396,28 +3398,28 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await templateFilters.getByLabel("Category").selectOption("Business");
   await templateFilters.getByLabel("Transform").selectOption("timeline");
   await templateFilters.getByLabel("Search").fill("launch");
-  const timelineTemplate = sidebar.getByRole("listitem").filter({ hasText: "Launch timeline" });
+  const timelineTemplate = sidebar.locator("article.template-card").filter({ hasText: "Launch timeline" });
   await expect(timelineTemplate).toContainText("Business | timeline | builtin");
   await timelineTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain("2026-06-15: Pilot launch");
 
   await templateFilters.getByLabel("Transform").selectOption("roadmap");
   await templateFilters.getByLabel("Search").fill("quarterly");
-  const roadmapTemplate = sidebar.getByRole("listitem").filter({ hasText: "Quarterly roadmap" });
+  const roadmapTemplate = sidebar.locator("article.template-card").filter({ hasText: "Quarterly roadmap" });
   await expect(roadmapTemplate).toContainText("Business | roadmap | builtin");
   await roadmapTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain("Now: Harden editor ergonomics");
 
   await templateFilters.getByLabel("Transform").selectOption("adr");
   await templateFilters.getByLabel("Search").fill("architecture");
-  const adrTemplate = sidebar.getByRole("listitem").filter({ hasText: "Architecture decision" });
+  const adrTemplate = sidebar.locator("article.template-card").filter({ hasText: "Architecture decision" });
   await expect(adrTemplate).toContainText("Business | adr | builtin");
   await adrTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain("Consequences: List expected benefits");
 
   await templateFilters.getByLabel("Transform").selectOption("qr");
   await templateFilters.getByLabel("Search").fill("release");
-  const qrTemplate = sidebar.getByRole("listitem").filter({ hasText: "Release QR code" });
+  const qrTemplate = sidebar.locator("article.template-card").filter({ hasText: "Release QR code" });
   await expect(qrTemplate).toContainText("Business | qr | builtin");
   await qrTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain("https://example.com/releases/neditor-report");
@@ -3425,7 +3427,7 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await templateFilters.getByLabel("Category").selectOption("Data");
   await templateFilters.getByLabel("Transform").selectOption("openapi");
   await templateFilters.getByLabel("Search").fill("endpoint");
-  const openApiTemplate = sidebar.getByRole("listitem").filter({ hasText: "OpenAPI endpoint" });
+  const openApiTemplate = sidebar.locator("article.template-card").filter({ hasText: "OpenAPI endpoint" });
   await expect(openApiTemplate).toContainText("Data | openapi | builtin");
   await openApiTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain("openapi: 3.1.0");
@@ -3433,7 +3435,7 @@ test("manages transform templates and inserts reusable workflows", async ({ page
 
   await templateFilters.getByLabel("Transform").selectOption("json-schema");
   await templateFilters.getByLabel("Search").fill("schema");
-  const schemaTemplate = sidebar.getByRole("listitem").filter({ hasText: "JSON Schema object" });
+  const schemaTemplate = sidebar.locator("article.template-card").filter({ hasText: "JSON Schema object" });
   await expect(schemaTemplate).toContainText("Data | json-schema | builtin");
   await schemaTemplate.getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => editorText(page)).toContain('"title": "Customer"');
@@ -3472,7 +3474,7 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await templateFilters.getByLabel("Category").selectOption("all");
   await templateFilters.getByLabel("Transform").selectOption("all");
   await templateFilters.getByLabel("Search").fill("safety margin");
-  const customTemplate = sidebar.getByRole("listitem").filter({ hasText: "Custom Safety Margin" });
+  const customTemplate = sidebar.locator("article.template-card").filter({ hasText: "Custom Safety Margin" });
   await expect(customTemplate).toContainText("Business | calc | custom");
   await customTemplate.getByRole("button", { name: "Edit" }).click();
   await customEditor.getByLabel("Summary").fill("Reusable safety stock margin calculation with review note.");
@@ -3481,7 +3483,7 @@ test("manages transform templates and inserts reusable workflows", async ({ page
   await customTemplate.getByRole("button", { name: "Duplicate" }).click();
   await customEditor.getByLabel("Name").fill("Temporary Safety Margin Template");
   await customEditor.getByRole("button", { name: "Create custom" }).click();
-  const temporaryTemplate = sidebar.getByRole("listitem").filter({ hasText: "Temporary Safety Margin Template" });
+  const temporaryTemplate = sidebar.locator("article.template-card").filter({ hasText: "Temporary Safety Margin Template" });
   await expect(temporaryTemplate).toContainText("Business | calc | custom");
   await temporaryTemplate.getByRole("button", { name: "Delete" }).click();
   await expect(temporaryTemplate).toHaveCount(0);
@@ -4629,7 +4631,7 @@ test("toggles AI review state and clears provenance readiness warnings", async (
   await selectSidebarPanelOption(page, "exports");
   await page.getByRole("button", { name: "Prepare for export" }).click();
   await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
-  await expect(page.getByText("0 errors, 0 warnings, 0 info")).toBeVisible();
+  await expect(page.locator("article.readiness").getByText("0 errors, 0 warnings, 0 info", { exact: true })).toBeVisible();
   await expect(page.locator(".sidebar").getByText('"includeProvenance": true')).toBeVisible();
 });
 
@@ -4759,7 +4761,7 @@ test("runs export readiness, success, and failure workflows", async ({ page }) =
   await page.getByRole("button", { name: "Prepare for export" }).click();
 
   await expect(page.locator("article.readiness").getByText("Ready", { exact: true })).toBeVisible();
-  await expect(page.getByText("0 errors, 0 warnings, 1 info")).toBeVisible();
+  await expect(page.locator("article.readiness").getByText("0 errors, 0 warnings, 1 info", { exact: true })).toBeVisible();
   await expect(page.locator(".sidebar").getByText('"export_target": "pptx"')).toBeVisible();
   await expect(exportPreview).toContainText("ready");
 

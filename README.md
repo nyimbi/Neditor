@@ -507,7 +507,9 @@ web app.
   Markdown table, CSV/TSV/XLSX import, CSV/XLSX export, cancel/apply workflows,
   and readable Markdown output. Tables are two-way: create a new table visually
   or place the cursor inside a Markdown table and edit that exact source table
-  through the visual grid.
+  through the visual grid. The same source-table workflow is exposed from the
+  Tables panel, Writing Tools menu, command palette, toolbar, and native desktop
+  menu so users can find it without memorizing where the Tables sidebar lives.
 - Markdown tables, CSV fences, and TSV fences can carry formulas such as
   `=10+15`, `=SUM(2,3)`, and named table references.
 - Data transforms for CSV, TSV, JSON, YAML, SQLite SQL, OpenAPI, and JSON

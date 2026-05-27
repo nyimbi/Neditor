@@ -198,7 +198,11 @@ The table editor can write clean Markdown after paste import, CSV/TSV/XLSX
 import, sorting, row and column edits, alignment, totals, formula rows, and
 merged-cell metadata edits. Tables can also be exported as CSV or XLSX so a
 business user can round-trip spreadsheet data without leaving Markdown as the
-source of truth.
+source of truth. Existing Markdown tables can be loaded back into the visual
+grid from the Tables panel, Writing Tools menu, command palette, toolbar, or
+native desktop Writing Tools menu by choosing **Edit Table at Cursor** while
+the cursor or selection is inside the table; **Go to Source Table** returns the
+user to the exact Markdown range being edited.
 
 ## Figures, Captions, And Cross References
 
