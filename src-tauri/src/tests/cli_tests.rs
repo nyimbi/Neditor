@@ -189,6 +189,53 @@ fn ned_cli_manages_reusable_business_profile() {
     assert!(placeholders.message.contains("fullName: Jane Doe"));
     assert!(placeholders.message.contains("companyName: Acme Advisory"));
 
+    let fields = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "profile".to_string(),
+        "--fields".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("profile fields");
+    let fields_report: serde_json::Value =
+        serde_json::from_str(&fields.message).expect("fields json");
+    assert_eq!(fields_report["schema"], "neditor.ned-profile-fields.v1");
+    assert!(fields_report["fields"]
+        .as_array()
+        .expect("profile fields")
+        .iter()
+        .any(|field| field["field"] == "defaultClientName"
+            && field["aliases"]
+                .as_array()
+                .expect("aliases")
+                .contains(&serde_json::json!("client"))));
+
+    let single = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "profile".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--get".to_string(),
+        "company".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("single profile value");
+    let single_report: serde_json::Value =
+        serde_json::from_str(&single.message).expect("single value json");
+    assert_eq!(single_report["schema"], "neditor.ned-profile-value.v1");
+    assert_eq!(single_report["field"], "companyName");
+    assert_eq!(single_report["value"], "Acme Advisory");
+
+    let unset_single = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "business-profile".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--get".to_string(),
+        "website".to_string(),
+    ])
+    .expect("unset profile value");
+    assert_eq!(unset_single.message, "{{website}}");
+
     let dry = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "profile".to_string(),
@@ -1096,6 +1143,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("evidence"));
     assert!(bash.message.contains("snippets"));
     assert!(bash.message.contains("--markdown"));
+    assert!(bash.message.contains("--fields"));
+    assert!(bash.message.contains("--get"));
     assert!(bash.message.contains("support-bundle"));
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
@@ -1119,6 +1168,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--evidence-root"));
     assert!(zsh.message.contains("--ids-only"));
     assert!(zsh.message.contains("--markdown"));
+    assert!(zsh.message.contains("--fields"));
+    assert!(zsh.message.contains("--get"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1134,6 +1185,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("evidence"));
     assert!(fish.message.contains("snippets"));
     assert!(fish.message.contains("ids-only"));
+    assert!(fish.message.contains("fields"));
+    assert!(fish.message.contains("get"));
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("epub"));

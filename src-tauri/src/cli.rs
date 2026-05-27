@@ -1154,6 +1154,8 @@ fn run_profile_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut json_output = false;
     let mut markdown_output = false;
     let mut placeholders_output = false;
+    let mut fields_output = false;
+    let mut get_field: Option<String> = None;
     let mut init = false;
     let mut force = false;
     let mut dry_run = false;
@@ -1178,6 +1180,15 @@ fn run_profile_command(args: &[String]) -> Result<CliOutcome, String> {
             "--json" => json_output = true,
             "--markdown" => markdown_output = true,
             "--placeholders" | "--placeholder-text" => placeholders_output = true,
+            "--fields" => fields_output = true,
+            "--get" => {
+                index += 1;
+                get_field = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--get requires a profile field".to_string())?
+                        .to_string(),
+                );
+            }
             "--init" => init = true,
             "--force" => force = true,
             "--dry-run" => dry_run = true,
@@ -1187,6 +1198,23 @@ fn run_profile_command(args: &[String]) -> Result<CliOutcome, String> {
             value => updates.push(parse_profile_assignment(value)?),
         }
         index += 1;
+    }
+
+    if fields_output {
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-profile-fields.v1",
+                    "fields": business_profile_field_catalog(),
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: business_profile_fields_text_report(),
+            exit_code: 0,
+        });
     }
 
     let neditor_dir = workspace.join(".neditor");
@@ -1209,6 +1237,29 @@ fn run_profile_command(args: &[String]) -> Result<CliOutcome, String> {
             )
         })?;
         write_business_profile(&profile_path, &profile)?;
+    }
+
+    if let Some(field) = get_field.as_deref() {
+        let (canonical, value) = business_profile_field_value(&profile, field)?;
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-profile-value.v1",
+                    "workspace": path_to_display(&workspace),
+                    "profilePath": path_to_display(&profile_path),
+                    "exists": existed,
+                    "field": canonical,
+                    "value": value,
+                    "placeholder": profile_value(&value, canonical),
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: profile_value(&value, canonical),
+            exit_code: 0,
+        });
     }
 
     if markdown_output && !json_output {
@@ -2931,29 +2982,18 @@ fn set_business_profile_field(
     key: &str,
     value: &str,
 ) -> Result<(), String> {
-    match normalize_profile_key(key).as_str() {
-        "full name" | "name" | "owner" | "prepared by" => profile.full_name = value.to_string(),
-        "email" | "email address" => profile.email = value.to_string(),
-        "phone" | "phone number" | "telephone" => profile.phone = value.to_string(),
-        "role title" | "role" | "title" | "job title" => profile.role_title = value.to_string(),
-        "company name" | "company" | "organization" | "organisation" => {
-            profile.company_name = value.to_string()
-        }
-        "company address" | "address" | "mailing address" => {
-            profile.company_address = value.to_string()
-        }
-        "website" | "web site" | "url" => profile.website = value.to_string(),
-        "industry" | "sector" => profile.industry = value.to_string(),
-        "default client name" | "default client" | "client" | "client name" => {
-            profile.default_client_name = value.to_string()
-        }
-        "brand voice" | "voice" | "tone" => profile.brand_voice = value.to_string(),
-        other => {
-            return Err(format!(
-                "Unknown profile field '{other}'. Supported fields: {}",
-                business_profile_fields().join(", ")
-            ));
-        }
+    match canonical_profile_field(key)? {
+        "fullName" => profile.full_name = value.to_string(),
+        "email" => profile.email = value.to_string(),
+        "phone" => profile.phone = value.to_string(),
+        "roleTitle" => profile.role_title = value.to_string(),
+        "companyName" => profile.company_name = value.to_string(),
+        "companyAddress" => profile.company_address = value.to_string(),
+        "website" => profile.website = value.to_string(),
+        "industry" => profile.industry = value.to_string(),
+        "defaultClientName" => profile.default_client_name = value.to_string(),
+        "brandVoice" => profile.brand_voice = value.to_string(),
+        _ => unreachable!("canonical profile field list is exhaustive"),
     }
     Ok(())
 }
@@ -2971,6 +3011,88 @@ fn business_profile_fields() -> Vec<&'static str> {
         "defaultClientName",
         "brandVoice",
     ]
+}
+
+fn canonical_profile_field(key: &str) -> Result<&'static str, String> {
+    let normalized = normalize_profile_key(key);
+    match normalized.as_str() {
+        "full name" | "name" | "owner" | "prepared by" => Ok("fullName"),
+        "email" | "email address" => Ok("email"),
+        "phone" | "phone number" | "telephone" => Ok("phone"),
+        "role title" | "role" | "title" | "job title" => Ok("roleTitle"),
+        "company name" | "company" | "organization" | "organisation" => Ok("companyName"),
+        "company address" | "address" | "mailing address" => Ok("companyAddress"),
+        "website" | "web site" | "url" => Ok("website"),
+        "industry" | "sector" => Ok("industry"),
+        "default client name" | "default client" | "client" | "client name" => {
+            Ok("defaultClientName")
+        }
+        "brand voice" | "voice" | "tone" => Ok("brandVoice"),
+        other => Err(format!(
+            "Unknown profile field '{other}'. Supported fields: {}",
+            business_profile_fields().join(", ")
+        )),
+    }
+}
+
+fn business_profile_field_value(
+    profile: &BusinessProfile,
+    key: &str,
+) -> Result<(&'static str, String), String> {
+    let canonical = canonical_profile_field(key)?;
+    let value = match canonical {
+        "fullName" => &profile.full_name,
+        "email" => &profile.email,
+        "phone" => &profile.phone,
+        "roleTitle" => &profile.role_title,
+        "companyName" => &profile.company_name,
+        "companyAddress" => &profile.company_address,
+        "website" => &profile.website,
+        "industry" => &profile.industry,
+        "defaultClientName" => &profile.default_client_name,
+        "brandVoice" => &profile.brand_voice,
+        _ => unreachable!("canonical profile field list is exhaustive"),
+    };
+    Ok((canonical, value.clone()))
+}
+
+fn business_profile_field_catalog() -> Vec<Value> {
+    vec![
+        json!({"field": "fullName", "label": "Full name", "aliases": ["name", "owner", "preparedBy"], "usedFor": "sender, author, reviewer, and prepared-by placeholders"}),
+        json!({"field": "email", "label": "Email", "aliases": ["emailAddress"], "usedFor": "contact blocks, cover pages, and agent handoff metadata"}),
+        json!({"field": "phone", "label": "Phone", "aliases": ["phoneNumber", "telephone"], "usedFor": "contact blocks and submission forms"}),
+        json!({"field": "roleTitle", "label": "Role title", "aliases": ["role", "title", "jobTitle"], "usedFor": "prepared-by lines and reviewer handoffs"}),
+        json!({"field": "companyName", "label": "Company name", "aliases": ["company", "organization", "organisation"], "usedFor": "company boilerplate, proposals, and procurement responses"}),
+        json!({"field": "companyAddress", "label": "Company address", "aliases": ["address", "mailingAddress"], "usedFor": "cover pages, letters, tenders, and official submissions"}),
+        json!({"field": "website", "label": "Website", "aliases": ["webSite", "url"], "usedFor": "contact blocks, publishing metadata, and capability statements"}),
+        json!({"field": "industry", "label": "Industry", "aliases": ["sector"], "usedFor": "company overview snippets and proposal positioning"}),
+        json!({"field": "defaultClientName", "label": "Default client name", "aliases": ["defaultClient", "client", "clientName"], "usedFor": "starter documents, Docs Live placeholders, and reusable snippets"}),
+        json!({"field": "brandVoice", "label": "Brand voice", "aliases": ["voice", "tone"], "usedFor": "Docs Live drafting, snippets, humanization, and agent handoffs"}),
+    ]
+}
+
+fn business_profile_fields_text_report() -> String {
+    let mut lines = vec!["NEditor business profile fields:".to_string()];
+    for field in business_profile_field_catalog() {
+        let name = field["field"].as_str().unwrap_or_default();
+        let label = field["label"].as_str().unwrap_or_default();
+        let used_for = field["usedFor"].as_str().unwrap_or_default();
+        let aliases = field["aliases"]
+            .as_array()
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(|value| value.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_default();
+        lines.push(format!(
+            "  - {name}: {label}. Aliases: {aliases}. Used for {used_for}."
+        ));
+    }
+    lines.push("Use `ned profile --set field=value` to update values and `ned profile --get field` to print one value.".to_string());
+    lines.join("\n")
 }
 
 fn read_business_profile(path: &Path) -> Result<BusinessProfile, String> {
@@ -3353,7 +3475,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body" -- "$cur") )
         ;;
       profile|business-profile)
-        COMPREPLY=( $(compgen -W "--workspace --set --init --force --dry-run --json --markdown --placeholders --placeholder-text" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--workspace --set --get --fields --init --force --dry-run --json --markdown --placeholders --placeholder-text" -- "$cur") )
         ;;
       handlers|transform-handlers)
         COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
@@ -3436,7 +3558,7 @@ _ned() {{
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:'
       ;;
     profile|business-profile)
-      _arguments '--workspace[workspace containing .neditor]:directory:_files -/' '--set[set profile field key=value]:assignment:' '--init[create profile file]' '--force[replace existing profile when initializing]' '--dry-run[preview write]' '--json[print machine-readable JSON]' '--markdown[print reusable identity block]' '--placeholders[print Docs Live placeholder values]' '--placeholder-text[alias for --placeholders]'
+      _arguments '--workspace[workspace containing .neditor]:directory:_files -/' '--set[set profile field key=value]:assignment:' '--get[print one profile field]:field:' '--fields[list supported profile fields and aliases]' '--init[create profile file]' '--force[replace existing profile when initializing]' '--dry-run[preview write]' '--json[print machine-readable JSON]' '--markdown[print reusable identity block]' '--placeholders[print Docs Live placeholder values]' '--placeholder-text[alias for --placeholders]'
       ;;
     targets)
       _arguments '--json[print machine-readable JSON]'
@@ -3537,6 +3659,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l body -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l workspace -s w -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l set -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l get -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l fields".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l init".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l force".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l dry-run".to_string(),
@@ -3944,7 +4068,7 @@ fn help_text() -> String {
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id]".to_string(),
-        "  ned profile [--workspace path] [--init] [--set fullName=...] [--json|--markdown|--placeholders]".to_string(),
+        "  ned profile [--workspace path] [--init] [--set fullName=...] [--get field|--fields] [--json|--markdown|--placeholders]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json]"

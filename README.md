@@ -97,6 +97,8 @@ ned templates --category Procurement --json
 ned snippets --kind procurement --json
 ned snippets --markdown review-handoff
 ned profile --workspace . --set fullName="Jane Doe" --set companyName="Acme Advisory" --json
+ned profile --fields --json
+ned profile --workspace . --get companyName
 ned profile --workspace . --placeholders
 ned targets --json
 ned handlers --platform windows --commands-only
@@ -143,8 +145,9 @@ matrix, risk register, tender checklist, tutorial step, and review handoff; use
 creates, updates, and prints the reusable name, email, phone, role, company,
 address, website, industry, default client, and brand voice values that appear in
 templates, snippets, Docs Live, and agent handoffs; use `--json` for help desks,
-`--markdown` for a reusable identity block, and `--placeholders` for Docs Live
-answers. `ned targets` lists export
+`--fields` to list supported fields and aliases, `--get companyName` to print
+one value for scripts, `--markdown` for a reusable identity block, and
+`--placeholders` for Docs Live answers. `ned targets` lists export
 formats, with `--json` output for help desk scripts and deployment checks. `ned
 handlers` lists copyable setup plans for optional transform handlers such as
 Graphviz, D2, PlantUML, Pikchr, and SQLite; use `--commands-only` when a support

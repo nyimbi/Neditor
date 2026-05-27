@@ -4204,6 +4204,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned templates --category Procurement --json"));
   ok(app.includes("ned snippets --markdown review-handoff"));
   ok(app.includes("ned profile --workspace . --set companyName=Acme --json"));
+  ok(app.includes("ned profile --fields --json"));
+  ok(app.includes("ned profile --workspace . --get companyName"));
   ok(app.includes("ned new tender.md --template tender --json"));
   ok(app.includes("ned new podcast.md --template podcast-script --json"));
   ok(app.includes("ned evidence --json"));

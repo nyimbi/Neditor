@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `eb2af1b Prove delegated
-  button help at runtime`
+- Latest inspected committed baseline before this update: `a7f7c3b Associate button
+  help with active controls`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`
 
@@ -138,6 +138,11 @@ Recent pushed checkpoints visible in current git history:
   accepts documented camelCase keys plus spaced, dashed, underscored, and common
   business aliases so non-technical setup scripts can reuse the same profile in
   templates, snippets, Docs Live, and local-agent handoffs.
+- The same packaged profile setup surface now supports script-friendly field
+  discovery and single-value retrieval. `ned profile --fields --json` lists the
+  reusable identity fields with aliases and intended uses, while
+  `ned profile --workspace . --get companyName` returns just one value for help
+  desk scripts, setup wizards, document generators, and local-agent handoffs.
 - Agent Workspace plans now include AI assistance at every planned workflow
   step. Each creation, composition, edit/revision, review, and distribution
   step receives a context-aware suggested optimal answer, rationale, and context
@@ -4313,6 +4318,26 @@ Button-help tooltip semantics:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while recording the stronger button-help accessibility proof. |
 | `pnpm run test:e2e` | Pass | Full Chromium browser workflow suite passed with 66 tests after adding the tooltip relationship assertions to the runtime accessibility workflow. |
 | `git diff --check` | Pass | No whitespace errors are present in the button-help semantics diff. |
+
+Scriptable business profile field discovery:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting passed after adding `ned profile --fields` and `--get`. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked cli_tests --lib` | Pass | Focused Rust CLI test module passed with 21 tests, including reusable business profile field discovery, alias metadata, single-value retrieval, placeholder fallback for unset values, completions, and existing profile update/dry-run behavior. |
+| `pnpm run check:cli` | Pass | CLI gate passed and rebuilt the `ned` binary after adding `neditor.ned-profile-fields.v1` and `neditor.ned-profile-value.v1` outputs. |
+| `src-tauri/target/debug/ned profile --fields --json` | Pass | Direct smoke returned all reusable profile fields, aliases, labels, intended uses, and schema `neditor.ned-profile-fields.v1`. |
+| `src-tauri/target/debug/ned profile --workspace /private/tmp/neditor-profile-smoke --init --set fullName='Jane Doe' --set companyName='Acme Advisory' --json` | Pass | Direct smoke initialized `.neditor/business-profile.json` and returned schema `neditor.ned-profile.v1` with reusable identity JSON, Markdown, and placeholder text. |
+| `src-tauri/target/debug/ned profile --workspace /private/tmp/neditor-profile-smoke --get companyName --json` | Pass | Direct smoke returned schema `neditor.ned-profile-value.v1`, canonical field `companyName`, value `Acme Advisory`, and matching placeholder output for scriptable setup checks. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after updating Settings command-line guidance. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 76 tests, including Settings guidance guards for `ned profile --fields --json` and `ned profile --workspace . --get companyName`. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting profile field discovery and single-value retrieval in README. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while recording stronger CLI setup evidence in the Settings row. |
+| `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration remains valid after extending the packaged `ned` profile command. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract remains valid after extending the packaged `ned` profile command. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps`; this slice improves local setup automation without claiming external release proof completion. |
+| Browser e2e suite | Not rerun | Skipped to conserve battery because this slice changes terminal behavior, completion/help text, README/spec copy, and static Settings guidance rather than interactive workbench behavior. |
+| `git diff --check` | Pass | No whitespace errors are present in the profile field-discovery diff. |
 
 ## Next Execution Order
 
