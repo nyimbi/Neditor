@@ -885,14 +885,15 @@ y: risk
   "title": "Opportunity score scatter",
   "data": {
     "values": [
-      { "account": "Acme", "score": 82, "segment": "Enterprise" },
-      { "account": "Beta", "score": 55, "segment": "Growth" },
-      { "account": "Cobalt", "score": 68, "segment": "Midmarket" }
+      { "account": "Acme", "score": 82, "dealSize": 40, "segment": "Enterprise" },
+      { "account": "Beta", "score": 55, "dealSize": 10, "segment": "Growth" },
+      { "account": "Cobalt", "score": 68, "dealSize": 24, "segment": "Midmarket" }
     ]
   },
   "encoding": {
     "x": { "field": "account", "title": "Account" },
     "y": { "field": "score", "title": "Opportunity score" },
+    "size": { "field": "dealSize" },
     "color": { "field": "segment" }
   }
 }`,

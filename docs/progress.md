@@ -57,6 +57,9 @@ Recent pushed checkpoints visible in current git history:
   and `square`. The renderer preserves color-series metadata and axis titles,
   and the Templates panel includes an opportunity scatter starter for account
   and portfolio scoring workflows.
+- Vega-Lite static scatter previews now honor `encoding.size.field` for
+  bubble/symbol sizing, preserving the authored size as export-safe SVG
+  metadata while scaling circle and square marks for portfolio comparison.
 - Table editing now has a text-cell path in addition to the visual grid and
   editable source block. **Edit Table Cell at Cursor** locates the Markdown
   header/body cell under the source cursor, loads its value into the Tables

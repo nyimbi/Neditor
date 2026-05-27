@@ -3948,6 +3948,7 @@ test("transform template library covers reusable calculations and custom templat
   const vegaScatterTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-opportunity-scatter");
   if (!vegaScatterTemplate) throw new Error("missing Vega-Lite scatter template");
   ok(vegaScatterTemplate.body.includes('"type": "circle"'));
+  ok(vegaScatterTemplate.body.includes('"size": { "field": "dealSize" }'));
   ok(vegaScatterTemplate.tags.includes("scatter"));
   const vegaTextTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-readiness-labels");
   if (!vegaTextTemplate) throw new Error("missing Vega-Lite text template");

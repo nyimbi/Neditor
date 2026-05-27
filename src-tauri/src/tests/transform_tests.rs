@@ -1211,7 +1211,7 @@ fn vega_lite_text_mark_renders_static_labels_preview() {
 fn vega_lite_circle_and_square_marks_render_static_scatter_previews() {
     let circle = run_transform(
             "vega-lite".to_string(),
-            r##"{"mark":{"type":"circle"},"title":"Opportunity Scatter","data":{"values":[{"account":"Acme","value":82,"segment":"Enterprise"},{"account":"Beta","value":55,"segment":"Growth"}]},"encoding":{"x":{"field":"account","title":"Account"},"y":{"field":"value","title":"Opportunity score"},"color":{"field":"segment"}}}"##.to_string(),
+            r##"{"mark":{"type":"circle"},"title":"Opportunity Scatter","data":{"values":[{"account":"Acme","value":82,"segment":"Enterprise","dealSize":40},{"account":"Beta","value":55,"segment":"Growth","dealSize":10}]},"encoding":{"x":{"field":"account","title":"Account"},"y":{"field":"value","title":"Opportunity score"},"color":{"field":"segment"},"size":{"field":"dealSize"}}}"##.to_string(),
         )
         .expect("vega-lite circle transform");
 
@@ -1219,6 +1219,9 @@ fn vega_lite_circle_and_square_marks_render_static_scatter_previews() {
     assert!(circle.html.contains("Opportunity Scatter"));
     assert!(circle.html.contains("vega-circle-mark"));
     assert!(circle.html.contains("data-series=\"Enterprise\""));
+    assert!(circle.html.contains("data-size=\"40\""));
+    assert!(circle.html.contains("r=\"12.0\""));
+    assert!(circle.html.contains("r=\"4.0\""));
     assert!(circle.html.contains("aria-label=\"Acme: Enterprise 82\""));
     assert!(!circle.html.contains("Unsupported Vega-Lite mark"));
     assert!(circle.diagnostics.is_empty());
