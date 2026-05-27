@@ -37,6 +37,22 @@ export interface MarkdownTableSnapshotMatch {
   index: number;
 }
 
+export interface TableDocumentTextSyncOptions {
+  text: string;
+  documentId: string;
+  tables?: MarkdownTable[];
+  snapshot?: TableSourceSnapshot | null;
+  fallbackIndex?: number;
+}
+
+export interface TableDocumentTextSyncResult {
+  table: MarkdownTable;
+  index: number;
+  draft: TableDraft;
+  sourceText: string;
+  snapshot: TableSourceSnapshot;
+}
+
 export interface TableDraftIssue {
   severity: "warning" | "error";
   message: string;
@@ -295,6 +311,25 @@ export function findMarkdownTableForSourceSnapshot(
   if (editedInPlace) return editedInPlace;
 
   return null;
+}
+
+export function syncTableDraftFromDocumentText(options: TableDocumentTextSyncOptions): TableDocumentTextSyncResult | null {
+  const tables = options.tables ?? parseMarkdownTables(options.text);
+  const fallbackIndex = clampInteger(options.fallbackIndex ?? 0, 0, Math.max(0, tables.length - 1));
+  const match = options.snapshot
+    ? findMarkdownTableForSourceSnapshot(tables, options.text, options.snapshot, options.documentId)
+    : tables[fallbackIndex]
+      ? { table: tables[fallbackIndex], index: fallbackIndex }
+      : null;
+  if (!match) return null;
+  const draft = markdownTableToDraft(match.table);
+  return {
+    table: match.table,
+    index: match.index,
+    draft,
+    sourceText: tableSourceText(options.text, match.table),
+    snapshot: createTableSourceSnapshot(options.text, options.documentId, match.index, match.table, draft),
+  };
 }
 
 function tableMatchesSnapshotIdentity(table: MarkdownTable, snapshotTable: MarkdownTable | undefined) {

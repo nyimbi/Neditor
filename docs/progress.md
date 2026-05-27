@@ -4781,6 +4781,14 @@ External transform executable validation:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked external_transform_rejects_directory_engine_path_before_spawn --lib` | Pass | Focused external-transform safety proof shows configured engine paths must be regular executable files and directories are rejected before process spawn. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked external_transform --lib` | Pass | 16 external-transform tests passed, including trust gating, disabled fallback, missing path diagnostics, non-executable rejection, directory-as-engine rejection, timeout, stderr, adapter shapes, installed-engine conformance, and cache invalidation. |
 
+Two-way table text editing:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | Frontend unit coverage now includes `syncTableDraftFromDocumentText`, proving a visually created table can be inserted as Markdown, edited directly in the document text, resynced into the visual grid, written back from the grid, and protected while the text edit is temporarily not parseable. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after routing clean in-document table source edits through the explicit table text-sync helper instead of an implicit watcher reload. |
+| `pnpm run check:tables:manual` | Pass with pending human sign-off | Table editor manual review template and pending summary were regenerated so source-to-grid, grid-to-source, spreadsheet exchange, rendered export, keyboard/accessibility, and supported-host review remain visible release gates. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

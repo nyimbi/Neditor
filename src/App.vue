@@ -5305,6 +5305,7 @@ import {
   serializeMarkdownTable,
   sortTableDraftRows,
   spreadsheetColumnName,
+  syncTableDraftFromDocumentText,
   tableCellSpanPreview as tableDraftCellSpanPreview,
   tableDraftFromMarkdownSource,
   tableDraftFromPasteText,
@@ -10818,8 +10819,18 @@ watch(
     if (store.sidebar !== "tables" || !tableDraft.value || isNewTableDraft.value || !tableDraftSourceChanged.value) return;
     if (!selectedTableForDraft.value) return;
     if (tableDraftDirty.value) return;
-    syncSelectedTableIndexToDraftMatch();
-    loadSelectedTable({ force: true });
+    const sync = syncTableDraftFromDocumentText({
+      text: active.value.text,
+      documentId: active.value.id,
+      tables: markdownTables.value,
+      snapshot: tableSourceSnapshot.value,
+      fallbackIndex: selectedTableIndex.value,
+    });
+    if (!sync) return;
+    selectedTableIndex.value = sync.index;
+    tableDraft.value = sync.draft;
+    tableSourceSnapshot.value = sync.snapshot;
+    refreshTableSourceEditFromDraft();
     store.statusMessage = "Synced table editor from Markdown source changes";
   },
 );

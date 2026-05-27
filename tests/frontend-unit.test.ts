@@ -170,6 +170,7 @@ import {
   serializeMarkdownTable,
   setTableCellSpan,
   sortTableDraftRows,
+  syncTableDraftFromDocumentText,
   tableCellSpanPreview,
   tableColumnRange,
   tableCellLabel,
@@ -359,6 +360,53 @@ test("table source snapshots detect source and draft divergence", () => {
   ok(replacement.text.includes("Table: Other {#tbl:other}"));
   equal(replacement.startLine, 3);
   equal(replacement.endLine, 6);
+});
+
+test("table drafts resync from direct document text edits and write back through the grid", () => {
+  const insertedDraft = createDefaultTableDraft();
+  const insertedText = ["# Report", "", ...serializeMarkdownTable(insertedDraft), "", "After table."].join("\n");
+  const [insertedTable] = parseMarkdownTables(insertedText);
+  const snapshot = createTableSourceSnapshot(insertedText, "doc-1", 0, insertedTable, insertedDraft);
+  const textEditedTable = insertedText
+    .replace("| Item | Value |", "| Metric | Amount |")
+    .replace("| Revenue | 125000 |", "| Pipeline | 180000 |")
+    .replace("| Cost | 74000 |", "| Renewal | 92000 |");
+
+  const sync = syncTableDraftFromDocumentText({
+    text: textEditedTable,
+    documentId: "doc-1",
+    tables: parseMarkdownTables(textEditedTable),
+    snapshot,
+    fallbackIndex: 0,
+  });
+  if (!sync) throw new Error("missing direct text sync");
+  equal(sync.index, 0);
+  deepEqual(sync.draft.headers, ["Metric", "Amount"]);
+  deepEqual(sync.draft.rows, [
+    ["Pipeline", "180000"],
+    ["Renewal", "92000"],
+  ]);
+  ok(sync.sourceText.includes("| Pipeline | 180000 |"));
+
+  sync.draft.rows[0][1] = "210000";
+  const writeBack = replaceMarkdownTableInText(textEditedTable, sync.table, sync.draft);
+  ok(writeBack.text.includes("| Pipeline | 210000 |"));
+  ok(writeBack.text.includes("After table."));
+  const [roundTrippedTable] = parseMarkdownTables(writeBack.text);
+  deepEqual(roundTrippedTable.headers, ["Metric", "Amount"]);
+  deepEqual(roundTrippedTable.rows[0], ["Pipeline", "210000"]);
+
+  const invalidWhileTyping = textEditedTable.replace("| --- | ---: |", "| separator is still being typed |");
+  equal(
+    syncTableDraftFromDocumentText({
+      text: invalidWhileTyping,
+      documentId: "doc-1",
+      tables: parseMarkdownTables(invalidWhileTyping),
+      snapshot,
+      fallbackIndex: 0,
+    }),
+    null,
+  );
 });
 
 test("table paste handles quoted CSV and markdown table captions", () => {
@@ -4497,6 +4545,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("tableDraftSourceChanged"));
   ok(app.includes("selectedTableForDraft"));
   ok(app.includes("findMarkdownTableForSourceSnapshot"));
+  ok(app.includes("syncTableDraftFromDocumentText"));
   ok(app.includes("replaceMarkdownTableSnapshotInText"));
   ok(app.includes("The source table is not currently parseable"));
   ok(app.includes("Synced table editor from Markdown source changes"));
