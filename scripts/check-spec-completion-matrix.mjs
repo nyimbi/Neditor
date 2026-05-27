@@ -13,7 +13,18 @@ const markdown = readFileSync(matrixPath, "utf8");
 const rows = parseMatrixRows(markdown);
 const issues = validateMatrix(markdown, rows);
 const summary = summarizeRows(rows);
+const openRows = rows.filter((row) => ["Partial", "Unverified", "Missing"].includes(row.status));
+const openRowPlans = openRows.map((row) => ({
+  specSection: row.specSection,
+  requirementArea: row.requirementArea,
+  status: row.status,
+  classification: classifyOpenRow(row),
+  nextAction: nextActionForOpenRow(row),
+  remainingGap: row.remainingGap,
+}));
+const gapTriage = summarizeGapTriage(openRowPlans);
 const status = issues.length ? "failed" : summary.openRows > 0 ? "partial-with-release-risks" : "complete";
+const gapPlanPath = join(outputDir, "gap-plan.md");
 
 mkdirSync(outputDir, { recursive: true });
 writeFileSync(
@@ -24,21 +35,17 @@ writeFileSync(
       generatedAt: new Date().toISOString(),
       status,
       matrixPath: relative(matrixPath),
+      gapPlanPath: relative(gapPlanPath),
       summary,
+      gapTriage,
       issues,
-      openRows: rows
-        .filter((row) => ["Partial", "Unverified", "Missing"].includes(row.status))
-        .map((row) => ({
-          specSection: row.specSection,
-          requirementArea: row.requirementArea,
-          status: row.status,
-          remainingGap: row.remainingGap,
-        })),
+      openRows: openRowPlans,
     },
     null,
     2,
   )}\n`,
 );
+writeFileSync(gapPlanPath, renderGapPlanMarkdown(openRowPlans, gapTriage, summary, status));
 
 if (issues.length) {
   console.error("Spec completion matrix validation failed:");
@@ -47,7 +54,7 @@ if (issues.length) {
   process.exit(1);
 }
 
-console.log(`Spec completion matrix is ${status}; wrote ${relative(reportPath)}.`);
+console.log(`Spec completion matrix is ${status}; wrote ${relative(reportPath)} and ${relative(gapPlanPath)}.`);
 
 function parseMatrixRows(text) {
   const parsed = [];
@@ -137,6 +144,136 @@ function summarizeRows(rows) {
     openRows,
     sections: Array.from(new Set(rows.map((row) => row.section))).filter(Boolean),
   };
+}
+
+function classifyOpenRow(row) {
+  const text = `${row.evidence} ${row.remainingGap}`.toLowerCase();
+  if (/\b(signing|notarization|notarized|credential|certificate|attestation)\b/.test(text)) return "release-credentials";
+  if (/\b(homebrew|cask|sha256|artifact proof)\b/.test(text)) return "distribution-artifacts";
+  if (/\b(windows|linux|cross-platform|supported host|supported-host|other os|platform evidence|package artifact)\b/.test(text)) {
+    return "cross-platform-evidence";
+  }
+  if (/\b(human|manual|screen-reader|assistive|native viewer|visual qa|review sign-off|sign-off|signoff)\b/.test(text)) {
+    return "manual-review";
+  }
+  if (/\b(live provider|real device|google docs live|authorized drive|external evidence|independent security|release-device|credentialed)\b/.test(text)) {
+    return "external-evidence";
+  }
+  if (/\b(document|sync|matrix|todo|progress|docs|runbook|guide)\b/.test(text)) return "documentation-proof";
+  if (/\b(test|workflow|coverage|proof|verify|native proof|browser proof|evidence)\b/.test(text)) return "local-proof";
+  if (/\b(modular|split|refactor|implementation|implement|deeper|broader|edge case)\b/.test(text)) return "local-implementation";
+  return "needs-triage";
+}
+
+function nextActionForOpenRow(row) {
+  switch (classifyOpenRow(row)) {
+    case "release-credentials":
+      return "Collect credentialed signing/notarization evidence on a clean release host and ingest it into the release evidence kit.";
+    case "distribution-artifacts":
+      return "Build the final distributable artifact, pin its SHA-256 in the release/Homebrew evidence, and rerun readiness gates.";
+    case "cross-platform-evidence":
+      return "Run the packaged workflow or WebDriver proof on the named supported host and copy the validator-shaped report into the evidence directory.";
+    case "manual-review":
+      return "Complete the generated reviewer checklist with named reviewer, platform, evidence references, passing checklist items, and zero unresolved blockers.";
+    case "external-evidence":
+      return "Collect validator-shaped external proof with current app version, current Git commit, clean source tree, artifact hashes, and no stored secrets.";
+    case "documentation-proof":
+      return "Replace broad prose with exact command, artifact, and source references, then rerun the docs and spec completion checks.";
+    case "local-proof":
+      return "Add or refresh direct local tests, browser workflows, native smoke assertions, or artifact inspection that proves this row end to end.";
+    case "local-implementation":
+      return "Implement the missing behavior in the smallest owned module, then add direct tests and update the matrix evidence.";
+    default:
+      return "Classify the gap, identify the authoritative proof required, and add an exact command or artifact reference before claiming closure.";
+  }
+}
+
+function summarizeGapTriage(openRowPlans) {
+  const categories = [
+    "local-implementation",
+    "local-proof",
+    "documentation-proof",
+    "manual-review",
+    "external-evidence",
+    "cross-platform-evidence",
+    "release-credentials",
+    "distribution-artifacts",
+    "needs-triage",
+  ];
+  const byClassification = Object.fromEntries(categories.map((category) => [category, 0]));
+  for (const row of openRowPlans) {
+    byClassification[row.classification] = (byClassification[row.classification] || 0) + 1;
+  }
+  const locallyClosableRows =
+    Number(byClassification["local-implementation"] || 0) +
+    Number(byClassification["local-proof"] || 0) +
+    Number(byClassification["documentation-proof"] || 0) +
+    Number(byClassification["needs-triage"] || 0);
+  const evidenceBlockedRows = openRowPlans.length - locallyClosableRows;
+  return {
+    byClassification,
+    locallyClosableRows,
+    evidenceBlockedRows,
+    firstLocalActions: openRowPlans
+      .filter((row) => ["local-implementation", "local-proof", "documentation-proof", "needs-triage"].includes(row.classification))
+      .slice(0, 12)
+      .map((row) => ({
+        specSection: row.specSection,
+        requirementArea: row.requirementArea,
+        classification: row.classification,
+        nextAction: row.nextAction,
+      })),
+  };
+}
+
+function renderGapPlanMarkdown(openRowPlans, gapTriage, summary, status) {
+  const lines = [
+    "# NEditor Spec Gap Plan",
+    "",
+    `Generated: ${new Date().toISOString()}`,
+    `Status: ${status}`,
+    "",
+    "## Summary",
+    "",
+    `- Total matrix rows: ${summary.totalRows}`,
+    `- Open rows: ${summary.openRows}`,
+    `- Locally closable rows: ${gapTriage.locallyClosableRows}`,
+    `- External/manual/distribution evidence rows: ${gapTriage.evidenceBlockedRows}`,
+    "",
+    "## Triage",
+    "",
+    "| Classification | Rows |",
+    "| --- | ---: |",
+    ...Object.entries(gapTriage.byClassification).map(([classification, count]) => `| ${classification} | ${count} |`),
+    "",
+    "## First Local Actions",
+    "",
+    "| Spec section | Requirement area | Classification | Next action |",
+    "| --- | --- | --- | --- |",
+    ...gapTriage.firstLocalActions.map(
+      (row) =>
+        `| ${escapeMarkdownTableCell(row.specSection)} | ${escapeMarkdownTableCell(row.requirementArea)} | ${row.classification} | ${escapeMarkdownTableCell(row.nextAction)} |`,
+    ),
+    "",
+    "## All Open Rows",
+    "",
+    "| Spec section | Requirement area | Status | Classification | Remaining gap | Next action |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...openRowPlans.map(
+      (row) =>
+        `| ${escapeMarkdownTableCell(row.specSection)} | ${escapeMarkdownTableCell(row.requirementArea)} | ${row.status} | ${row.classification} | ${escapeMarkdownTableCell(row.remainingGap)} | ${escapeMarkdownTableCell(row.nextAction)} |`,
+    ),
+    "",
+  ];
+  return lines.join("\n");
+}
+
+function escapeMarkdownTableCell(value) {
+  return String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
+    .trim();
 }
 
 function splitTableRow(line) {

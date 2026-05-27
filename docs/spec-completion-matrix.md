@@ -352,11 +352,15 @@ Current major verification gaps:
   native performance profiling, optional engines without accepted host proof,
   and human reviewer sign-offs remain explicit external evidence gaps.
 - The spec-completion matrix contract now writes
-  `.tmp/spec-completion/report.json`, validates every matrix row for a
+  `.tmp/spec-completion/report.json` and
+  `.tmp/spec-completion/gap-plan.md`, validates every matrix row for a
   recognized status, evidence, and substantive remaining gap when still Partial,
-  Unverified, or Missing, and feeds open matrix rows into release readiness as
-  explicit production risks plus a release evidence kit closure runbook instead
-  of letting the matrix drift as prose.
+  Unverified, or Missing, classifies open rows into local implementation/proof,
+  documentation-proof, manual review, external evidence, cross-platform
+  evidence, release credentials, and distribution-artifact buckets, and feeds
+  open matrix rows into release readiness as explicit production risks plus a
+  release evidence kit closure runbook instead of letting the matrix drift as
+  prose.
 - The AI provider evidence contract now writes
   `.tmp/ai-provider-evidence/report.json`, validates live endpoint evidence for
   current source, response hashes, required markers, and secret-free reports,

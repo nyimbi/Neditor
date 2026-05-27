@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `d4ec284 Prove
-  agentic step assistance in-browser`
+- Latest inspected committed baseline before this update: `f848d26 Enable
+  native Antigravity handoffs`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -31,6 +31,13 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Spec-completion evidence now produces a machine-readable closure plan instead
+  of only a flat partial-row count. `pnpm run check:spec-completion` writes
+  `.tmp/spec-completion/report.json` plus `.tmp/spec-completion/gap-plan.md`,
+  classifies each open matrix row as local implementation/proof,
+  documentation-proof, manual review, external evidence, cross-platform
+  evidence, release credentials, or distribution artifacts, and lists the first
+  local actions so release gap closure can proceed row by row.
 - BibTeX transform previews now preserve and show richer reference metadata.
   The bibliography parser records entry type plus common scalar fields, and the
   embedded BibTeX transform renders author/year alongside publisher, journal or

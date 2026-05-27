@@ -5318,6 +5318,17 @@ test("local verification scripts expose local baseline checks", () => {
   ok(specCompletion.includes("partial-with-release-risks"));
   ok(specCompletion.includes("Current major verification gaps"));
   ok(specCompletion.includes("Next Matrix Work"));
+  ok(specCompletion.includes("neditor.spec-completion-report.v1"));
+  ok(specCompletion.includes("gapPlanPath"));
+  ok(specCompletion.includes("renderGapPlanMarkdown"));
+  ok(specCompletion.includes("locallyClosableRows"));
+  ok(specCompletion.includes("evidenceBlockedRows"));
+  ok(specCompletion.includes("firstLocalActions"));
+  ok(specCompletion.includes("local-implementation"));
+  ok(specCompletion.includes("cross-platform-evidence"));
+  ok(specCompletion.includes("release-credentials"));
+  ok(specCompletion.includes("manual-review"));
+  ok(specCompletion.includes("validator-shaped external proof"));
   ok(specCompletion.includes("openRows"));
   ok(specCompletion.includes("Partial"));
   ok(specCompletion.includes("Unverified"));
