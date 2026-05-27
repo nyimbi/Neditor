@@ -4056,6 +4056,30 @@ test("moves clean watcher roots after save-as path changes", async ({ page }) =>
   await expect(page.locator(".status-bar")).toContainText("Reloaded external changes");
 });
 
+test("moves watcher roots after closing the active watched tab", async ({ page }) => {
+  await setMockFileText(page, "/workspace/close-active.md", "# Close Active\n\nTemporary watched document.");
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await queueDialogSelection(page, "/workspace/close-active.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect.poll(() => editorText(page)).toContain("Temporary watched document.");
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/close-active.md"))).toBe(true);
+
+  await page.locator(".document-tabs .tab.active").getByLabel("Close document").click();
+  await expect.poll(() => editorText(page)).toContain("Original saved content.");
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/market.md"))).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/close-active.md"))).toBe(false);
+
+  await setMockFileText(page, "/workspace/close-active.md", "# Close Active\n\nStale closed tab update.");
+  await emitMockFileWatch(page, "/workspace/close-active.md");
+  await expect.poll(() => editorText(page)).not.toContain("Stale closed tab update.");
+
+  await setMockFileText(page, "/workspace/market.md", "# Market Entry Report\n\nActive tab external update.");
+  await emitMockFileWatch(page, "/workspace/market.md");
+  await expect.poll(() => editorText(page)).toContain("Active tab external update.");
+  await expect(page.locator(".status-bar")).toContainText("Reloaded external changes");
+});
+
 test("runs snapshot restore and release tagging workflows", async ({ page }) => {
   await queueDialogSelection(page, "/workspace/market.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();

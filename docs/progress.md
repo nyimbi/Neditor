@@ -41,6 +41,10 @@ Recent pushed checkpoints visible in current git history:
   changes so the watch root moves to the current file, and the focused Chromium
   workflow proves Save As drops the old root, watches the new root, ignores
   stale old-path events, and reloads clean changes from the new path.
+- Close-tab watcher cleanup now has focused browser proof. Closing the active
+  watched tab switches to the previous tab, recompiles the new active document,
+  moves the watcher root to that file, ignores stale events from the closed tab,
+  and still reloads clean external changes from the active tab.
 - Supertonic read-aloud setup now has browser workflow proof for the
   consent-gated model download path. Settings exposes an editable model storage
   path, the model notice shows name, size, storage location, source, and
@@ -1424,6 +1428,7 @@ Recent pushed checkpoints visible in current git history:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export conformance remains intact. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "recomputes watched include paths" --project chromium` | Pass | Focused browser workflow proves editing include directives recomputes the include graph and watched paths, removes the old include, watches the new include, ignores stale old-include watch events, and recompiles after the new include changes. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "moves clean watcher roots" --project chromium` | Pass | Focused browser workflow proves Save As path changes resync the clean root watcher from the old path to the new path, ignore stale old-root events, and reload clean external changes from the moved path. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "moves watcher roots after closing" --project chromium` | Pass | Focused browser workflow proves closing the active watched tab moves the watcher root to the newly active tab, ignores stale closed-tab events, and reloads clean external changes from the active file. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "gates Supertonic TTS model downloads" --project chromium` | Pass | Focused browser workflow proves Settings exposes Supertonic model size, editable storage path, download source, and command; model download and read-aloud are disabled until acknowledgement; acknowledged setup can copy details, queue the model download, read the document with Supertonic, and inspect runtime status. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused browser workflow proves two-way table editing: visual creation, direct in-text Markdown table edits syncing into the grid, invalid in-text table protection, editable source text export, source-to-grid parsing, applying source text back into the document, and the explicit **Edit Markdown in text** action selecting a source table that can be replaced in the editor and synced back into visual cells. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "keeps production Docs Live wizards structure-first" --project chromium` | Pass | Focused browser workflow proves podcast and movie-script Docs Live modes block prose while production structure is only suggested, then unlock sequential segment or beat drafting after the approved architecture is supplied. |
