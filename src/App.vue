@@ -549,7 +549,7 @@
             </button>
             <button
               type="button"
-              :disabled="!selectedTableForDraft && !tableSourceSnapshot"
+              :disabled="!canGoToTableSource"
               title="Select the table's Markdown source in the document editor"
               @click="editSelectedTableInMarkdownText"
             >
@@ -609,7 +609,7 @@
             >
               Edit Markdown in text
             </button>
-            <button type="button" :disabled="!selectedTableForDraft && !tableSourceSnapshot" @click="() => goToSelectedTableSource()">Go to source table</button>
+            <button type="button" :disabled="!canGoToTableSource" @click="() => goToSelectedTableSource()">Go to source table</button>
             <button
               type="button"
               :disabled="tableDraftDirty"
@@ -6949,6 +6949,7 @@ const selectedTableDraftMatch = computed(() => {
 const selectedTableForDraft = computed(() => {
   return selectedTableDraftMatch.value?.table || null;
 });
+const canGoToTableSource = computed(() => Boolean(selectedTableForDraft.value || tableSourceSnapshot.value));
 const outlineHeadings = computed(() =>
   (active.value.compile?.document_ast.blocks || []).flatMap((block) => {
     if (block.kind !== "heading") return [];
@@ -8450,9 +8451,9 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "table", label: "Table", help: "Insert a Markdown table scaffold.", run: () => insertBlock(tableSnippet) },
           { id: "open-table-editor", label: "Open Table Editor", help: "Open the visual table grid for creating or editing Markdown tables.", run: () => openTableEditor() },
           { id: "edit-table-at-cursor", label: "Edit Table at Cursor", help: "Load the Markdown table under the cursor or selection into the visual table editor.", run: () => loadTableAtCursor() },
-          { id: "edit-table-markdown-text", label: "Edit Table in Markdown Text", help: "Select the exact Markdown table source lines so direct text edits can sync back to the visual grid.", disabled: !selectedTableForDraft.value && !tableSourceSnapshot.value, run: () => editSelectedTableInMarkdownText() },
+          { id: "edit-table-markdown-text", label: "Edit Table in Markdown Text", help: "Select the exact Markdown table source lines so direct text edits can sync back to the visual grid.", disabled: !canGoToTableSource.value, run: () => editSelectedTableInMarkdownText() },
           { id: "edit-table-cell-at-cursor", label: "Edit Table Cell at Cursor", help: "Load the exact Markdown table cell under the source cursor and write its value back into the text.", run: () => loadTableTextCellAtCursor() },
-          { id: "go-to-source-table", label: "Go to Source Table", help: "Jump from the visual table grid back to the source Markdown table lines.", disabled: !selectedTable.value, run: () => goToSelectedTableSource() },
+          { id: "go-to-source-table", label: "Go to Source Table", help: "Jump from the visual table grid back to the source Markdown table lines.", disabled: !canGoToTableSource.value, run: () => goToSelectedTableSource() },
           { id: "import-table", label: "Import CSV/XLSX Table", help: "Import spreadsheet data into the editable table grid.", disabled: tableDataBusy.value, run: () => importTableFromSpreadsheet() },
           { id: "export-table-csv", label: "Export Table as CSV", help: "Export the current table draft or selected Markdown table to CSV.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("csv") },
           { id: "export-table-xlsx", label: "Export Table as XLSX", help: "Export the current table draft or selected Markdown table to XLSX.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("xlsx") },

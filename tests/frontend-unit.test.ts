@@ -4617,6 +4617,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("findMarkdownTableIndexForLineRange"));
   ok(app.includes("goToSelectedTableSource"));
   ok(app.includes("selectedTableEditSummary"));
+  ok(app.includes("canGoToTableSource"));
   ok(app.includes('aria-label="AI transform template assistance"'));
   ok(app.includes('aria-label="Transform assistance notes"'));
   ok(app.includes("transformTemplateAssistance"));
