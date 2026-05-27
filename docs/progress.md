@@ -31,6 +31,12 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- External file watching now treats every open saved document as a watched root,
+  not only the active editor tab. The native watch request accepts `open_roots`,
+  inactive clean root edits are reloaded into their matching open document
+  without disrupting the active editor, and focused Chromium proof covers
+  inactive-root reload, Save As watcher-root moves, and closing the active
+  watched tab.
 - Table editing is now exposed as a two-way workflow from the main toolbar as
   well as the Tables panel, Writing Tools menu, and command palette. Users can
   open the table editor, load the table at the cursor, select the Markdown table

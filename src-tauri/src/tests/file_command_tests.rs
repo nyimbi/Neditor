@@ -133,13 +133,18 @@ fn stable_file_ipc_aliases_open_save_as_and_watch_paths() {
 
     let watched = watch_file(WatchFileRequest {
         root: path_to_string(&doc),
+        open_roots: vec![path_to_string(&copy)],
         included: vec![path_to_string(&included), path_to_string(&included)],
     })
     .expect("watch file command");
-    assert_eq!(watched.paths.len(), 3);
+    assert_eq!(watched.paths.len(), 4);
     assert!(watched.paths.iter().all(|metadata| metadata.exists));
     assert_eq!(watched.paths[0].role, "root");
     assert_eq!(watched.paths[1].role, "include");
+    assert!(watched
+        .paths
+        .iter()
+        .any(|metadata| metadata.role == "root" && metadata.path.ends_with("copy.md")));
     assert!(watched
         .paths
         .iter()

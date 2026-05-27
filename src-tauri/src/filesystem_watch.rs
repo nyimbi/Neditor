@@ -29,6 +29,8 @@ struct ActiveFileWatcher {
 #[derive(Debug, Deserialize)]
 pub(crate) struct WatchFileRequest {
     pub(crate) root: String,
+    #[serde(default)]
+    pub(crate) open_roots: Vec<String>,
     pub(crate) included: Vec<String>,
 }
 
@@ -84,6 +86,9 @@ fn expanded_watch_paths(request: WatchFileRequest) -> Vec<(String, &'static str)
     let root = PathBuf::from(&request.root);
     output.push((request.root.clone(), "root"));
     collect_nested_watch_includes(&root, 0, &mut discovered, &mut output);
+    for open_root in request.open_roots {
+        output.push((open_root, "root"));
+    }
     for included in request.included {
         let include_path = PathBuf::from(&included);
         output.push((included, "include"));

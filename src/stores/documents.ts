@@ -93,6 +93,7 @@ interface DocumentWatchEvent {
 interface WatchContext {
   documentId: string;
   rootPath: string;
+  openRootPaths: string[];
   includedPaths: string[];
   signature: string;
 }
@@ -1010,9 +1011,13 @@ export const useDocumentsStore = defineStore("documents", {
         this.watchedPathRoles = {};
         return;
       }
+      const openRootPaths = this.documents
+        .map((document) => document.path)
+        .filter((path): path is string => Boolean(path))
+        .filter((path) => !sameWatchPath(path, doc.path));
       const includedPaths = (doc.compile?.export_manifest.included_files || []).map((file) => file.path);
       const watchSnapshot = await invoke<WatchFileResponse>("start_file_watcher", {
-        request: { root: doc.path, included: includedPaths },
+        request: { root: doc.path, open_roots: openRootPaths, included: includedPaths },
       });
       const watchedFiles = watchSnapshot.paths.filter((file) => file.exists);
       const watchPaths = watchedFiles.map((file) => file.path);
@@ -1023,6 +1028,7 @@ export const useDocumentsStore = defineStore("documents", {
       const context: WatchContext = {
         documentId: doc.id,
         rootPath: doc.path,
+        openRootPaths,
         includedPaths,
         signature,
       };
@@ -1137,9 +1143,14 @@ export const useDocumentsStore = defineStore("documents", {
       if (!doc?.path || !sameWatchPath(doc.path, context.rootPath)) return null;
       return doc;
     },
+    documentForWatchedRoot(path: string, context: WatchContext) {
+      const activeContextDocument = this.documentForWatchContext(context);
+      if (activeContextDocument?.path && sameWatchPath(activeContextDocument.path, path)) return activeContextDocument;
+      return this.documents.find((document) => Boolean(document.path) && sameWatchPath(document.path as string, path)) || null;
+    },
     async handleWatchedFileChange(event: DocumentWatchEvent, context: WatchContext) {
       if (!this.watchContextIsCurrent(context)) return;
-      const doc = this.documentForWatchContext(context);
+      const doc = event.reason === "root" ? this.documentForWatchedRoot(event.path, context) : this.documentForWatchContext(context);
       if (!doc) return;
       const watched = this.watchedPaths.length
         ? this.watchedPaths
@@ -1195,8 +1206,12 @@ export const useDocumentsStore = defineStore("documents", {
         targetDoc.modified = response.modified;
         targetDoc.dirty = false;
         this.externalConflict = null;
-        await this.compileActive();
-        this.statusMessage = "Reloaded external changes";
+        if (targetDoc.id === this.activeDocument.id) {
+          await this.compileActive();
+          this.statusMessage = "Reloaded external changes";
+        } else {
+          this.statusMessage = `Reloaded external changes for ${titleFromPath(targetDoc.path)}`;
+        }
       } else if (includeChanged) {
         this.externalConflict = null;
         await this.compileActive();

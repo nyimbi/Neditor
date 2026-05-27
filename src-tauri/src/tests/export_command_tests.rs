@@ -51,6 +51,7 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
 
     let watched = watch_file(WatchFileRequest {
         root: path_to_string(&root_doc),
+        open_roots: vec![],
         included: vec![],
     })
     .expect("watch desktop smoke source");

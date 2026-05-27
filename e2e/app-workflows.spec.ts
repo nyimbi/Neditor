@@ -1320,9 +1320,20 @@ async function installTauriMock(page: Page, stateKey: string) {
         return readMockFile(request.path);
       }
       if (cmd === "start_file_watcher") {
-        const request = args.request as { root: string; included?: string[] };
+        const request = args.request as { root: string; open_roots?: string[]; included?: string[] };
         const rootPath = normalizePath(request.root);
         const rootFile = files.get(rootPath);
+        const openRootFiles = (request.open_roots || []).map((path) => {
+          const normalizedPath = normalizePath(path);
+          const file = files.get(normalizedPath);
+          return {
+            path: normalizedPath,
+            exists: Boolean(file),
+            hash: file?.hash || null,
+            modified: file?.modified || null,
+            role: "root",
+          };
+        });
         const includedFiles = (request.included || []).map((path) => {
           const normalizedPath = normalizePath(path);
           const file = files.get(normalizedPath);
@@ -1343,6 +1354,7 @@ async function installTauriMock(page: Page, stateKey: string) {
               modified: rootFile?.modified || null,
               role: "root",
             },
+            ...openRootFiles,
             ...includedFiles,
           ],
           native_watcher: true,
@@ -4677,17 +4689,19 @@ test("detects external changes when switching back to an inactive clean tab", as
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.locator(".document-tabs .tab.active")).toContainText(/Watch B|watch-b\.md/);
   await expect.poll(() => editorText(page)).toContain("Original B body.");
-  await expect(page.locator(".status-bar")).toContainText("Native watch: 1 path");
+  await expect(page.locator(".status-bar")).toContainText("Native watch: 2 paths");
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/watch-a.md"))).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/watch-b.md"))).toBe(true);
 
   await setMockFileText(page, "/workspace/watch-a.md", "# Watch A\n\nExternal A update while inactive.");
   await emitMockFileWatch(page, "/workspace/watch-a.md");
   await expect.poll(() => editorText(page)).toContain("Original B body.");
   await expect.poll(() => editorText(page)).not.toContain("External A update while inactive.");
+  await expect(page.locator(".status-bar")).toContainText("Reloaded external changes for watch-a.md");
 
   await page.locator(".document-tabs .tab").filter({ hasText: /Watch A|watch-a\.md/ }).getByRole("button", { name: /Watch A|watch-a\.md/ }).click();
   await expect(page.locator(".document-tabs .tab.active")).toContainText(/Watch A|watch-a\.md/);
   await expect.poll(() => editorText(page)).toContain("External A update while inactive.");
-  await expect(page.locator(".status-bar")).toContainText("Reloaded external changes");
   await expect(page.locator(".document-tabs .tab.active")).not.toContainText("*");
 });
 
