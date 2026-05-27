@@ -3951,8 +3951,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="NEditor configuration setup"'));
   ok(app.includes('aria-label="NEditor configuration center"'));
   ok(app.includes('aria-label="Configuration sections"'));
+  ok(app.includes('aria-label="AI configuration setup assistance"'));
+  ok(app.includes('aria-label="Configuration setup notes"'));
   ok(app.includes("configurationSetupSteps"));
   ok(app.includes("configurationSetupStatus"));
+  ok(app.includes("configurationSetupStepAssistance"));
+  ok(app.includes("appendConfigurationSetupAssistance"));
   ok(app.includes("configurationCenterSections"));
   ok(app.includes("selectedConfigurationSection"));
   ok(app.includes("Appearance and editor"));

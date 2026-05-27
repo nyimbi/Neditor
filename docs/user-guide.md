@@ -475,6 +475,12 @@ NEditor is built for drafts that need evidence before publication.
   facts where required, and import the response as a review draft. If direct
   execution is allowed, use a session-only key and apply the response only after
   checking the provider output.
+- Use **Settings -> Setup wizard** when configuring NEditor for a new user or
+  workstation. Each setup area now includes AI setup assistance with a suggested
+  next answer, rationale, and context signals for identity, LLM access, local
+  agents, voice runtime, read-aloud, exports, transforms, and release gates.
+  Add the suggestion to editable setup notes when a non-technical user needs a
+  clear setup record before changing configuration.
 - For Claude Code, Codex, and OpenCode profiles, use **Prepare local agent
   workspace** to write the governed prompt package under
   `.neditor/agent-handoffs` in the active document folder. NEditor reports the

@@ -256,6 +256,11 @@ Recent pushed checkpoints visible in current git history:
   QA, and handoff. Users can accept guidance into editable response-context
   notes, and those notes flow into generated full responses, Docs Live context,
   and local-agent handoff context without altering the source RFP.
+- The Configuration Center setup wizard now provides AI setup assistance for
+  identity, LLM access, local agents, voice runtime, read-aloud, exports,
+  transforms, and release gates. Each setup area shows a context-aware suggested
+  answer, rationale, and context signals, and accepted guidance is appended to
+  editable setup notes for non-technical setup handoff.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
@@ -3806,6 +3811,17 @@ Configuration Center consolidation:
 | `pnpm run check:docs` | Pass | Markdown links resolved after refreshing the Preferences completion evidence for the consolidated setup surface. |
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator returned `partial-with-release-risks` after adding Configuration Center evidence to Preferences. |
 | `git diff --check` | Pass | No whitespace errors are present in the Configuration Center diff. |
+
+Configuration setup assistance:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding AI setup assistance, editable setup notes, and static UI wiring to the configuration setup wizard. |
+| `pnpm run check` | Pass | Vue typecheck passed after rendering setup assistance and setup-note acceptance controls across configuration areas. |
+| `pnpm run check:docs` | Pass | Markdown docs were checked after documenting configuration setup assistance; local links resolve. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with configuration setup assistance evidence recorded. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the configuration setup assistance update. |
+| `git diff --check` | Pass | No whitespace errors after the configuration setup assistance update. |
 
 Consent-gated TTS model downloads:
 

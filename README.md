@@ -454,6 +454,11 @@ web app.
   can use macOS Say; and teams that install Supertonic can point NEditor at the
   `supertonic` CLI for local on-device TTS. These settings store provider
   choices and command names, not audio recordings or document copies.
+- The Configuration Center setup wizard now provides AI setup assistance for
+  identity, LLM access, local agents, voice runtime, read-aloud, exports,
+  transforms, and release gates. Each setup area shows a suggested next answer,
+  rationale, and context signals, and users can add the guidance to editable
+  setup notes before changing configuration.
 - The Templates panel now includes a business identity setup dialog for your
   name, email, phone, role, company, address, website, industry, default client,
   and brand voice; common business-development document builders for tutorials,

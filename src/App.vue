@@ -2831,6 +2831,27 @@
                 <small>{{ item.detail }}</small>
               </article>
             </section>
+            <section class="configuration-setup-assistance" aria-label="AI configuration setup assistance">
+              <header>
+                <div>
+                  <strong>AI Setup Assistance</strong>
+                  <span>Suggested next answer for this setup area, based on current readiness.</span>
+                </div>
+                <button type="button" @click="appendConfigurationSetupAssistance(configurationSetupStepAssistance)">Add to notes</button>
+              </header>
+              <article>
+                <small>{{ configurationSetupStepAssistance.stepLabel }}</small>
+                <p>{{ configurationSetupStepAssistance.suggestedAnswer }}</p>
+                <p class="sidebar-hint">{{ configurationSetupStepAssistance.rationale }}</p>
+                <ul>
+                  <li v-for="signal in configurationSetupStepAssistance.contextSignals" :key="signal">{{ signal }}</li>
+                </ul>
+              </article>
+              <label>
+                Setup notes
+                <textarea v-model="configurationSetupNotes" rows="4" aria-label="Configuration setup notes"></textarea>
+              </label>
+            </section>
             <section v-if="currentConfigurationSetupStep.id === 'llm-access'" class="agent-provider-grid">
               <label>
                 Provider profile
@@ -5381,6 +5402,7 @@ const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const configurationSetupOpen = ref(false);
 const configurationSetupStepId = ref<ConfigurationSetupStepId>("llm-access");
+const configurationSetupNotes = ref("");
 const selectedConfigurationSection = ref("overview");
 const transformInstallerPlans = ref<TransformHandlerInstallerPlan[]>([]);
 const selectedTransformInstallerId = ref("");
@@ -6965,6 +6987,14 @@ const configurationSetupSteps = [
   },
 ] as const;
 type ConfigurationSetupStepId = (typeof configurationSetupSteps)[number]["id"];
+interface ConfigurationSetupStepAssistance {
+  stepId: ConfigurationSetupStepId;
+  stepLabel: string;
+  suggestedAnswer: string;
+  rationale: string;
+  contextSignals: string[];
+  actionLabel: string;
+}
 const currentConfigurationSetupStep = computed(
   () => configurationSetupSteps.find((step) => step.id === configurationSetupStepId.value) || configurationSetupSteps[0],
 );
@@ -6999,6 +7029,77 @@ const configurationSetupStatus = computed(() => {
   };
 });
 const configurationSetupSummary = computed(() => `${configurationSetupStatus.value.complete}/${configurationSetupStatus.value.total} setup areas ready`);
+const configurationSetupStepAssistance = computed(() => {
+  const step = currentConfigurationSetupStep.value;
+  const status = configurationSetupStatus.value.items.find((item) => item.id === step.id);
+  const businessDone = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
+  const missingBusiness = businessProfileFields.filter((field) => !store.businessProfile[field.key]?.trim()).map((field) => field.label);
+  const readyEngines = store.externalTransformEngines.filter((engine) => externalEngineSetupStatus(engine).status === "ready").length;
+  const disabledEngines = Object.values(store.disabledTransformEngines).filter(Boolean).length;
+  const contextSignals = [
+    `Setup area: ${step.title}`,
+    `Status: ${status?.done ? "ready" : "needs work"}`,
+    `Status detail: ${status?.detail || step.summary}`,
+    `Overall readiness: ${configurationSetupSummary.value}`,
+    `Setup notes words: ${configurationSetupNotes.value.trim().split(/\s+/).filter(Boolean).length}`,
+  ];
+  let suggestedAnswer = "";
+  let rationale = "";
+  switch (step.id) {
+    case "identity":
+      suggestedAnswer = missingBusiness.length
+        ? `Complete the reusable business profile before creating production documents. Add ${missingBusiness.slice(0, 5).join(", ")} first, then verify sender, company, default client, website, address, and brand voice.`
+        : "Business identity is ready. Use the saved profile as the default sender, company, client, and brand voice for templates, snippets, Docs Live, and local-agent handoffs.";
+      rationale = "Identity values appear repeatedly in proposals, RFPs, exports, snippets, and AI prompts; setting them once prevents inconsistent document metadata.";
+      contextSignals.push(`Business profile fields: ${businessDone}/${businessProfileFields.length}`);
+      break;
+    case "llm-access":
+      suggestedAnswer = `Use ${agentProviderId.value} with model ${agentProviderModel.value || "[model required]"} and keep the API key in ${agentProviderKeyEnv.value || "[environment variable required]"}. Save only non-secret defaults; enter session keys only when running a provider request.`;
+      rationale = "LLM access should be easy for business users while preserving local-first security and avoiding stored secrets.";
+      contextSignals.push(`Provider endpoint: ${agentProviderEndpoint.value || "not set"}`, `Key env: ${agentProviderKeyEnv.value || "not set"}`);
+      break;
+    case "local-agents":
+      suggestedAnswer = `Keep Claude Code, Codex, OpenCode, and Google Antigravity as governed handoff targets. Verify each CLI on PATH before relying on it, and include document context, evidence gates, and rollback instructions in every handoff.`;
+      rationale = "Local-agent tools are powerful only when they receive bounded, auditable work packages instead of loose prompts.";
+      contextSignals.push(`Agent profiles: ${localAgentCliProfiles.length}`);
+      break;
+    case "voice-runtime":
+      suggestedAnswer = docsLiveRuntimeReport.value
+        ? `Voice setup has ${docsLiveRuntimeReport.value.issues.length} issue(s). Resolve microphone, SpeechRecognition, and clipboard blockers before promising voice-first drafting to users.`
+        : "Run the Docs Live runtime check on the target device, then record whether speech recognition, microphone permission, and clipboard read/write are available without storing audio or clipboard content.";
+      rationale = "Voice drafting depends on real browser/runtime permissions, so setup guidance must be based on current-device evidence.";
+      contextSignals.push(docsLiveRuntimeReport.value ? "Runtime report present" : "Runtime report missing");
+      break;
+    case "tts":
+      suggestedAnswer = `Use ${store.ttsPreferences.engine} for read-aloud by default. If Supertonic is selected, show the model name, size, storage location, source, and command, and require explicit acknowledgement before any model download.`;
+      rationale = "Read-aloud setup must be transparent about local engines and model downloads so users control storage, bandwidth, and privacy.";
+      contextSignals.push(`TTS engine: ${store.ttsPreferences.engine}`, `TTS status: ${ttsRuntimeSummary.value}`);
+      break;
+    case "exports":
+      suggestedAnswer = `Review export defaults for ${store.exportTarget.toUpperCase()}, layout preset ${store.exportDefaults.layoutPreset}, citation style ${store.bibliographyDefaults.citationStyle}, manifests, approval metadata, brand settings, and target-specific publishing requirements before client delivery.`;
+      rationale = "Production export setup needs consistent metadata and evidence packages across PDF, DOCX, HTML, Google Docs, LaTeX, EPUB, blog, and Substack targets.";
+      contextSignals.push(`Export target: ${store.exportTarget}`, `Layout preset: ${store.exportDefaults.layoutPreset}`);
+      break;
+    case "transforms":
+      suggestedAnswer = `Configure only the transform engines users actually need. Ready engines: ${readyEngines}; disabled engines: ${disabledEngines}; total known engines: ${store.externalTransformEngines.length}. Keep untrusted handlers disabled until paths, permissions, timeouts, and input modes are verified.`;
+      rationale = "Transform setup can execute external tools, so handler readiness must be explicit, trust-gated, and easy to audit.";
+      contextSignals.push(`Ready engines: ${readyEngines}`, `Disabled engines: ${disabledEngines}`);
+      break;
+    case "release":
+      suggestedAnswer = "Treat release readiness as incomplete until external evidence is supplied for signing/notarization, Windows and Linux package proof, Google Docs live import/readback, live provider evidence, real-device AI runtime evidence, rendered export sign-off, accessibility sign-off, and sustained performance profiling.";
+      rationale = "Some production gates cannot be proven on the current host; they must remain visible release blockers rather than being hidden behind local green checks.";
+      contextSignals.push("External evidence required");
+      break;
+  }
+  return {
+    stepId: step.id,
+    stepLabel: step.title,
+    suggestedAnswer,
+    rationale,
+    contextSignals: Array.from(new Set(contextSignals)),
+    actionLabel: "Add to setup notes",
+  };
+});
 const selectedTransformInstallerPlan = computed(() =>
   transformInstallerPlans.value.find((plan) => plan.id === selectedTransformInstallerId.value) || transformInstallerPlans.value[0] || null,
 );
@@ -13772,6 +13873,16 @@ function closeConfigurationSetup() {
   configurationSetupOpen.value = false;
 }
 
+function appendConfigurationSetupAssistance(assistance: ConfigurationSetupStepAssistance) {
+  const block = [
+    `${assistance.stepLabel}: ${assistance.suggestedAnswer}`,
+    `Rationale: ${assistance.rationale}`,
+    `Context signals: ${assistance.contextSignals.join("; ")}`,
+  ].join("\n");
+  configurationSetupNotes.value = appendTextBlock(configurationSetupNotes.value, block);
+  store.statusMessage = `Added ${assistance.stepLabel} setup guidance to notes`;
+}
+
 async function openPendingCliPaths() {
   const response = await invoke<unknown>("pending_cli_open_paths").catch(() => []);
   const paths = Array.isArray(response) ? response.filter((path): path is string => typeof path === "string" && path.trim().length > 0) : [];
@@ -16996,6 +17107,7 @@ select:hover {
 .app-shell[data-theme="dark"] .docs-live-intent-brief,
 .app-shell[data-theme="dark"] .docs-live-placeholder-manager,
 .app-shell[data-theme="dark"] .docs-live-workflow,
+.app-shell[data-theme="dark"] .configuration-setup-assistance,
 .app-shell[data-theme="dark"] .status-message,
 .app-shell[data-theme="dark"] .word-stats,
 .app-shell[data-theme="dark"] .preview-timing,
@@ -17202,6 +17314,7 @@ select:hover {
 	  .app-shell[data-theme="system"] .docs-live-suggestions,
 	  .app-shell[data-theme="system"] .docs-live-suggestions article,
 	  .app-shell[data-theme="system"] .docs-live-workflow,
+  .app-shell[data-theme="system"] .configuration-setup-assistance,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
   .app-shell[data-theme="system"] .preview-timing,
@@ -17369,6 +17482,7 @@ select:hover {
 .app-shell[data-high-contrast="true"] .agent-provider-output,
 .app-shell[data-high-contrast="true"] .docs-live-runtime,
 .app-shell[data-high-contrast="true"] .docs-live-workflow,
+.app-shell[data-high-contrast="true"] .configuration-setup-assistance,
 .app-shell[data-high-contrast="true"] .status-message,
 .app-shell[data-high-contrast="true"] .word-stats,
 .app-shell[data-high-contrast="true"] .preview-timing,
@@ -18926,6 +19040,41 @@ select:hover {
 .configuration-status-chip small {
   color: #526171;
   font-size: 11px;
+}
+
+.configuration-setup-assistance {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d7dee7;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.configuration-setup-assistance header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.configuration-setup-assistance article,
+.configuration-setup-assistance label {
+  display: grid;
+  gap: 4px;
+}
+
+.configuration-setup-assistance p,
+.configuration-setup-assistance ul {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.configuration-setup-assistance small,
+.configuration-setup-assistance header span {
+  color: #526171;
+  font-size: 12px;
 }
 
 .business-template-hub header,
