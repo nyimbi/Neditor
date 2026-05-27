@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Multi-cursor browser proof now covers the full command family. The focused
+  Chromium workflow discovers Add Cursor Above/Below, Select Next Occurrence,
+  Select All Occurrences, and Split Selection Into Line Cursors through the
+  command palette, then proves simultaneous term replacement and selection
+  splitting across every selected line in the editor.
 - External file watching now treats every open saved document as a watched root,
   not only the active editor tab. The native watch request accepts `open_roots`,
   inactive clean root edits are reloaded into their matching open document

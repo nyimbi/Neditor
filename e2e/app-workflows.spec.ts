@@ -3287,6 +3287,9 @@ test("edits with explicit multi-cursor commands", async ({ page }) => {
       "",
       "# Multi Cursor",
       "",
+      "TODO first item",
+      "TODO second item",
+      "TODO third item",
       "Row A",
       "Row B",
     ].join("\n"),
@@ -3307,6 +3310,26 @@ test("edits with explicit multi-cursor commands", async ({ page }) => {
 
   await expect.poll(() => editorText(page)).toContain("Row A!");
   await expect.poll(() => editorText(page)).toContain("Row B!");
+
+  await page.locator(".cm-line").filter({ hasText: "TODO first item" }).dblclick({ position: { x: 16, y: 8 } });
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("select all occurrences");
+  await expect(page.getByRole("button", { name: /Select all occurrences.*simultaneous editing.*Edit/ })).toBeVisible();
+  await page.getByRole("button", { name: /Select all occurrences.*Edit/ }).click();
+  await page.keyboard.type("DONE");
+  await expect.poll(() => editorText(page)).toContain("DONE first item");
+  await expect.poll(() => editorText(page)).toContain("DONE second item");
+  await expect.poll(() => editorText(page)).toContain("DONE third item");
+  await expect.poll(() => editorText(page)).not.toContain("TODO");
+
+  await editorContent.click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("split selection into line cursors");
+  await expect(page.getByRole("button", { name: /Split selection into line cursors.*selected range on every line.*Edit/ })).toBeVisible();
+  await page.getByRole("button", { name: /Split selection into line cursors.*Edit/ }).click();
+  await page.keyboard.type("X");
+  await expect.poll(() => editorText(page)).toBe(["X", "X", "X", "X", "X", "X", "X", "X", "X", "X", "X", "X"].join("\n"));
 });
 
 test("runs command palette citation glossary and index navigation", async ({ page }) => {
