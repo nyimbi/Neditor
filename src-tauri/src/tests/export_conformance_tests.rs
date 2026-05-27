@@ -1889,10 +1889,10 @@ fn front_matter_data_sources_survive_cross_target_exports() {
     assert!(html.contains("<dt>owner</dt>"));
     assert!(html.contains("Data Source: revenue"));
     assert!(html.contains("<td>Revenue</td>"));
-    assert!(html.contains("<td>450</td>"));
+    assert!(html.contains("data-value=\"450\""));
     assert!(html.contains("Data Source: targets"));
     assert!(html.contains("<td>Pipeline</td>"));
-    assert!(html.contains("<td>375</td>"));
+    assert!(html.contains("data-value=\"375\""));
 
     let pdf = render_pdf_bytes(&response, &options);
     let pdf_text = String::from_utf8_lossy(&pdf);

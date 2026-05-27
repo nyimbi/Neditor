@@ -601,6 +601,41 @@ fn structured_data_transforms_render_tables_and_trees() {
 }
 
 #[test]
+fn structured_data_tables_flatten_nested_business_rows() {
+    let json_artifact = run_transform(
+        "json".to_string(),
+        r#"{"records":[{"account":{"name":"Acme","owner":"Mina"},"metrics":{"revenue":120,"margin":0.42},"tags":["strategic","renewal"],"risks":[]},{"account":{"name":"Beta","owner":"Sam"},"metrics":{"revenue":98,"margin":0.31},"tags":["watch"],"risks":[]}]}"#.to_string(),
+    )
+    .expect("nested business json transform");
+
+    assert_eq!(json_artifact.output_kind, "html");
+    assert!(json_artifact.html.contains("transform-json"));
+    assert!(json_artifact.html.contains("<caption>records</caption>"));
+    assert!(json_artifact.html.contains("<th>account.name</th>"));
+    assert!(json_artifact.html.contains("<th>metrics.revenue</th>"));
+    assert!(json_artifact.html.contains("<td>Acme</td>"));
+    assert!(json_artifact.html.contains("<td>120</td>"));
+    assert!(json_artifact.html.contains("<td>strategic, renewal</td>"));
+    assert!(json_artifact.html.contains("<td>[]</td>"));
+    assert!(json_artifact.diagnostics.is_empty());
+
+    let yaml_artifact = run_transform(
+        "yaml".to_string(),
+        "items:\n  - customer:\n      name: Contoso\n      tier: enterprise\n    contract:\n      renewal: 2026-07-01\n      value: 250000\n  - customer:\n      name: Fabrikam\n      tier: growth\n    contract:\n      renewal: 2026-09-15\n      value: 175000\n".to_string(),
+    )
+    .expect("nested business yaml transform");
+
+    assert_eq!(yaml_artifact.output_kind, "html");
+    assert!(yaml_artifact.html.contains("transform-yaml"));
+    assert!(yaml_artifact.html.contains("<caption>items</caption>"));
+    assert!(yaml_artifact.html.contains("<th>contract.renewal</th>"));
+    assert!(yaml_artifact.html.contains("<th>customer.tier</th>"));
+    assert!(yaml_artifact.html.contains("<td>enterprise</td>"));
+    assert!(yaml_artifact.html.contains("<td>175000</td>"));
+    assert!(yaml_artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn chart_transform_renders_yaml_business_chart_specs() {
     let artifact = run_transform(
             "chart".to_string(),

@@ -190,7 +190,11 @@ xlsxFiles:
 ```
 
 CSV/TSV/XLSX sources render as tables, JSON arrays can render as structured
-tables, and nested JSON/YAML values render as structured trees. XLSX data
+tables, common JSON/YAML row containers such as `records`, `data`, `items`, and
+`values` render as captioned tables, nested object fields in those rows flatten
+to dot-path columns such as `account.owner`, scalar arrays render as readable
+comma-separated cells, and other nested JSON/YAML values render as structured
+trees. XLSX data
 sources import the first worksheet and use cached formula values when the
 workbook provides them. Data source paths must stay inside the document folder
 by using relative child paths; absolute paths and `..` parent-directory escapes

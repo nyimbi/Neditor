@@ -4767,6 +4767,13 @@ GeoJSON projection honesty:
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked geojson_transform_warns_for_projection_assumptions --lib` | Pass | Focused transform proof shows GeoJSON static SVG previews declare their native `linear-wgs84-fit` longitude-latitude projection assumption and warn on legacy CRS/projected-coordinate inputs. |
 
+Nested structured data tables:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked structured_data_tables_flatten_nested_business_rows --lib` | Pass | Focused transform proof shows nested JSON/YAML business row objects flatten into dot-path table columns instead of opaque object summaries, including scalar-array cells. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked front_matter_data_sources_survive_cross_target_exports --lib` | Pass | Cross-target data-source proof remains clean after nested structured-row flattening and now asserts export-safe numeric `data-value` cells for CSV/TSV data-source tables. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

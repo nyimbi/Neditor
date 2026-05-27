@@ -1,6 +1,6 @@
 use crate::{diag, escape_html, DocumentDiagnostic};
 use serde_json::Value;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 pub(crate) fn render_structured_data_html(
     format: &str,
@@ -1304,9 +1304,12 @@ fn render_structured_table(format: &str, value: &Value) -> Option<String> {
     if rows.is_empty() || !rows.iter().all(|row| row.is_object()) {
         return None;
     }
-    let headers = rows
+    let flattened_rows = rows
         .iter()
-        .filter_map(|row| row.as_object())
+        .map(flatten_structured_table_row)
+        .collect::<Vec<_>>();
+    let headers = flattened_rows
+        .iter()
         .flat_map(|object| object.keys().cloned())
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -1323,20 +1326,55 @@ fn render_structured_table(format: &str, value: &Value) -> Option<String> {
         html.push_str(&format!("<th>{}</th>", escape_html(header)));
     }
     html.push_str("</tr></thead><tbody>");
-    for row in rows {
-        let object = row.as_object()?;
+    for object in &flattened_rows {
         html.push_str("<tr>");
         for header in &headers {
-            let cell = object
-                .get(header)
-                .map(structured_value_summary)
-                .unwrap_or_default();
+            let cell = object.get(header).cloned().unwrap_or_default();
             html.push_str(&format!("<td>{}</td>", escape_html(&cell)));
         }
         html.push_str("</tr>");
     }
     html.push_str("</tbody></table>");
     Some(html)
+}
+
+fn flatten_structured_table_row(row: &Value) -> BTreeMap<String, String> {
+    let mut cells = BTreeMap::new();
+    if let Some(object) = row.as_object() {
+        for (key, value) in object {
+            flatten_structured_table_value(key, value, &mut cells);
+        }
+    }
+    cells
+}
+
+fn flatten_structured_table_value(path: &str, value: &Value, cells: &mut BTreeMap<String, String>) {
+    match value {
+        Value::Object(object) if !object.is_empty() => {
+            for (key, child) in object {
+                flatten_structured_table_value(&format!("{path}.{key}"), child, cells);
+            }
+        }
+        Value::Array(values) if values.is_empty() => {
+            cells.insert(path.to_string(), "[]".to_string());
+        }
+        Value::Array(values) if values.iter().all(is_structured_scalar) => {
+            cells.insert(path.to_string(), value_list_summary(values));
+        }
+        Value::Object(object) if object.is_empty() => {
+            cells.insert(path.to_string(), "{}".to_string());
+        }
+        _ => {
+            cells.insert(path.to_string(), structured_value_summary(value));
+        }
+    }
+}
+
+fn is_structured_scalar(value: &Value) -> bool {
+    matches!(
+        value,
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_)
+    )
 }
 
 fn structured_table_rows(value: &Value) -> Option<(Option<&str>, &[Value])> {
