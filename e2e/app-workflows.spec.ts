@@ -2989,6 +2989,59 @@ test("keeps long-form Docs Live wizards outline-first before sequential prose", 
   await expect(dialog).toBeHidden();
 });
 
+test("keeps production Docs Live wizards structure-first before script drafting", async ({ page }) => {
+  await page.getByRole("button", { name: "Docs Live", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Docs Live voice drafting" });
+  await expect(dialog).toBeVisible();
+  const outlineInput = dialog.getByRole("textbox", { name: "Outline", exact: true });
+
+  await dialog.getByLabel("Document type").selectOption("podcast-script");
+  await dialog.getByLabel("Document title").fill("Future of Support");
+  await outlineInput.fill("");
+  await dialog.getByLabel("Context and answers").fill("Audience: support leaders. Owner: Producer. Evidence: interview notes.");
+  await dialog.getByLabel("Placeholder values").fill("audience: support leaders\nowner: Producer\nevidence: interview notes");
+  await dialog.getByRole("button", { name: "Build questionnaire" }).click();
+  await expect(dialog.getByLabel("AI-created questionnaire")).toHaveValue(/segment rundown/);
+
+  await dialog.getByRole("button", { name: "Generate draft" }).click();
+  const workflow = dialog.getByRole("region", { name: "Docs Live section drafting workflow" });
+  const markdown = dialog.getByLabel("Docs Live generated Markdown");
+  await expect(workflow).toContainText("Suggested outline ready");
+  await expect(workflow).toContainText("needs-input");
+  await expect(markdown).toHaveValue(/Episode Architecture Approval Gate/);
+  await expect(markdown).toHaveValue(/Sequential Segment Draft Queue/);
+  await expect(markdown).toHaveValue(/Final Audio Production Quality Review/);
+  await expect(markdown).toHaveValue(/Prose intentionally blocked until the episode architecture is approved/);
+
+  await outlineInput.fill("- Episode Architecture\n- Segment Rundown\n- Cold Open\n- Segment 1\n- Segment 2\n- Audio Production Review");
+  await dialog.getByRole("button", { name: "Generate draft" }).click();
+  await expect(workflow).toContainText("Episode architecture locked");
+  await expect(markdown).toHaveValue(/draft this segment in sequence/);
+  await expect(markdown).not.toHaveValue(/Prose intentionally blocked until the episode architecture is approved/);
+
+  await dialog.getByLabel("Document type").selectOption("movie-script");
+  await dialog.getByLabel("Document title").fill("The Signal Room");
+  await outlineInput.fill("");
+  await dialog.getByLabel("Context and answers").fill("Audience: streaming thriller viewers. Owner: Screenwriter. Evidence: treatment notes.");
+  await dialog.getByLabel("Placeholder values").fill("audience: streaming thriller viewers\nowner: Screenwriter\nevidence: treatment notes");
+  await dialog.getByRole("button", { name: "Generate draft" }).click();
+  await expect(workflow).toContainText("Suggested outline ready");
+  await expect(markdown).toHaveValue(/Screen Story Architecture Approval Gate/);
+  await expect(markdown).toHaveValue(/Sequential Beat Draft Queue/);
+  await expect(markdown).toHaveValue(/Final Screenplay Quality Review/);
+  await expect(markdown).toHaveValue(/Prose intentionally blocked until the screen story architecture is approved/);
+
+  await outlineInput.fill("- Screen Story Architecture\n- Beat Sheet\n- Act I\n- Act II\n- Act III\n- Screenplay Quality Review");
+  await dialog.getByRole("button", { name: "Generate draft" }).click();
+  await expect(workflow).toContainText("Screen story architecture locked");
+  await expect(markdown).toHaveValue(/The beat has a visual objective, conflict, turn, consequence, and handoff into the next beat/);
+  await expect(markdown).toHaveValue(/draft this beat in sequence/);
+  await expect(markdown).not.toHaveValue(/Prose intentionally blocked until the screen story architecture is approved/);
+
+  await dialog.getByRole("button", { name: "Close Docs Live" }).click();
+  await expect(dialog).toBeHidden();
+});
+
 test("edits document structure from outline mode", async ({ page }) => {
   await setMockFileText(
     page,
@@ -3822,6 +3875,21 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await expect.poll(() => editorText(page)).toContain("Support");
   await expect.poll(() => editorText(page)).toContain("Table: Earlier context");
   await expect.poll(() => editorText(page)).not.toContain("Table: Workflow budget\n| Item | Value |\n| --- | ---: |\n| Pipeline | 125000 |");
+
+  await page.getByRole("button", { name: "Edit Markdown in text" }).click();
+  await expect(page.locator(".status-bar")).toContainText("Selected the Markdown table text");
+  await page.keyboard.type(
+    [
+      "Table: Workflow budget {#tbl:workflow-budget}",
+      "| Item | Value |",
+      "| --- | ---: |",
+      "| Services | 275000 |",
+      "| Support | 45000 |",
+    ].join("\n"),
+  );
+  await expect.poll(() => editorText(page)).toContain("| Services | 275000 |");
+  await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Services");
+  await expect(page.getByLabel("Value, row 1, column B")).toHaveValue("275000");
 });
 
 test("opens, saves, duplicates, renames, reveals, and reverts mocked files", async ({ page }) => {

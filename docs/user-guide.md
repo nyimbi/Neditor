@@ -363,11 +363,13 @@ alignment, add totals, preserve merged-cell metadata, and write clean Markdown
 back to the document. It is also a two-way source editor: place the cursor
 inside an existing Markdown table, open Tables, choose **Edit table at cursor**,
 change the grid, then choose **Apply** to replace that exact table in the text.
-Use **Go to source table** when you need to jump from the visual editor back to
-the Markdown range being edited. The same table workflow is available from the
-Writing Tools menu, command palette, toolbar, and native desktop Writing Tools
-menu, so business users can reach it from whichever command surface they are
-already using.
+Use **Edit Markdown in text** when you want to select the exact table source
+lines and revise the pipe table directly in the editor; valid text edits sync
+back into the visual grid. Use **Go to source table** when you only need to jump
+from the visual editor back to the Markdown range being edited. The same table
+workflow is available from the Writing Tools menu, command palette, toolbar,
+and native desktop Writing Tools menu, so business users can reach it from
+whichever command surface they are already using.
 
 Use `calc` blocks for document-level calculations:
 

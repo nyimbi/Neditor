@@ -523,10 +523,11 @@ web app.
   Markdown table, CSV/TSV/XLSX import, CSV/XLSX export, cancel/apply workflows,
   and readable Markdown output. Tables are two-way: create a new table visually
   or place the cursor inside a Markdown table and edit that exact source table
-  through the visual grid or the editable Markdown source block beside it.
-  Source text edits can be parsed back into the grid, and grid edits can
-  regenerate readable Markdown before applying to the document. If the Markdown
-  source table changes while the grid is open, NEditor syncs a clean visual
+  through the visual grid, the editable Markdown source block beside it, or the
+  explicit **Edit Markdown in text** action that selects the exact table lines
+  in the editor. Source text edits can be parsed back into the grid, and grid
+  edits can regenerate readable Markdown before applying to the document. If
+  the Markdown source table changes while the grid is open, NEditor syncs a clean visual
   draft from the source and protects dirty visual drafts from silently
   overwriting text edits until the user reloads or explicitly applies the draft
   over the current source. If a user temporarily breaks the pipe-table syntax

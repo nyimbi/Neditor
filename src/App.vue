@@ -562,7 +562,15 @@
             >
               Edit table at cursor
             </button>
-            <button type="button" :disabled="!selectedTableForDraft && !tableSourceSnapshot" @click="goToSelectedTableSource">Go to source table</button>
+            <button
+              type="button"
+              :disabled="!selectedTableForDraft && !tableSourceSnapshot"
+              title="Select the exact Markdown table lines in the editor so you can edit the table directly in text"
+              @click="editSelectedTableInMarkdownText"
+            >
+              Edit Markdown in text
+            </button>
+            <button type="button" :disabled="!selectedTableForDraft && !tableSourceSnapshot" @click="() => goToSelectedTableSource()">Go to source table</button>
             <button
               type="button"
               :disabled="tableDraftDirty"
@@ -7724,7 +7732,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
       "Open Templates to browse built-in calculation and transform templates by category.",
       "Use Create custom template for reusable organization-specific blocks.",
       "Open the table editor to create a new table or edit the Markdown table at the current cursor/selection.",
-      "Use Go to source table when you need to inspect or hand-edit the exact Markdown lines behind the visual table grid.",
+      "Use Edit Markdown in text or Go to source table when you need to inspect or hand-edit the exact Markdown lines behind the visual table grid.",
       "Run transforms after inserting calculation or external transform blocks.",
     ],
     tips: [
@@ -7736,6 +7744,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
       { label: "Open templates", run: () => openTransformTemplates() },
       { label: "Open table editor", run: () => openTableEditor() },
       { label: "Edit table at cursor", run: () => loadTableAtCursor() },
+      { label: "Edit Markdown in text", run: () => editSelectedTableInMarkdownText() },
       { label: "Go to source table", run: () => goToSelectedTableSource() },
       { label: "Run transforms", run: () => store.compileActive() },
     ],
@@ -8327,6 +8336,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "table", label: "Table", help: "Insert a Markdown table scaffold.", run: () => insertBlock(tableSnippet) },
           { id: "open-table-editor", label: "Open Table Editor", help: "Open the visual table grid for creating or editing Markdown tables.", run: () => openTableEditor() },
           { id: "edit-table-at-cursor", label: "Edit Table at Cursor", help: "Load the Markdown table under the cursor or selection into the visual table editor.", run: () => loadTableAtCursor() },
+          { id: "edit-table-markdown-text", label: "Edit Table in Markdown Text", help: "Select the exact Markdown table source lines so direct text edits can sync back to the visual grid.", disabled: !selectedTableForDraft.value && !tableSourceSnapshot.value, run: () => editSelectedTableInMarkdownText() },
           { id: "go-to-source-table", label: "Go to Source Table", help: "Jump from the visual table grid back to the source Markdown table lines.", disabled: !selectedTable.value, run: () => goToSelectedTableSource() },
           { id: "import-table", label: "Import CSV/XLSX Table", help: "Import spreadsheet data into the editable table grid.", disabled: tableDataBusy.value, run: () => importTableFromSpreadsheet() },
           { id: "export-table-csv", label: "Export Table as CSV", help: "Export the current table draft or selected Markdown table to CSV.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("csv") },
@@ -10156,6 +10166,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     description: "Load the Markdown table under the cursor or selection into the visual table editor.",
     keywords: ["table", "edit table", "source table", "markdown table", "spreadsheet"],
     run: () => loadTableAtCursor(),
+  },
+  {
+    name: "Edit table in Markdown text",
+    group: "Tables",
+    description: "Select the exact Markdown source lines for the active table so direct text edits sync back into the visual grid.",
+    keywords: ["table", "edit table", "source table", "markdown text", "pipe table"],
+    run: () => editSelectedTableInMarkdownText(),
   },
   {
     name: "Go to source table",
@@ -16888,12 +16905,15 @@ function selectTableForEditing(value: string) {
   loadSelectedTable({ force: true });
 }
 
-function goToSelectedTableSource() {
+function goToSelectedTableSource(statusMessage = "") {
   const table = selectedTableForDraft.value;
   if (table) {
     void goToSourceTarget({
       line: table.captionLine || table.startLine,
       end_line: table.endLine,
+      end_column: Number.MAX_SAFE_INTEGER,
+    }).then(() => {
+      if (statusMessage) store.statusMessage = statusMessage;
     });
     return;
   }
@@ -16902,7 +16922,14 @@ function goToSelectedTableSource() {
   void goToSourceTarget({
     line: snapshot.startLine,
     end_line: snapshot.endLine,
+    end_column: Number.MAX_SAFE_INTEGER,
+  }).then(() => {
+    if (statusMessage) store.statusMessage = statusMessage;
   });
+}
+
+function editSelectedTableInMarkdownText() {
+  goToSelectedTableSource("Selected the Markdown table text; direct source edits will refresh the visual grid when the pipe table is valid.");
 }
 
 function rememberTableSource(table: MarkdownTable, draft: TableDraft) {
