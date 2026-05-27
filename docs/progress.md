@@ -4990,6 +4990,13 @@ Brand profile cross-target artifact proof:
 | --- | --- | --- |
 | `cargo test --locked compile_options_supply_brand_profile_defaults --manifest-path src-tauri/Cargo.toml` | Pass | Default brand profiles now have direct artifact-family proof across HTML, PDF/text metadata, DOCX headers/footers/custom properties, PPTX company/header/footer/legal slides, and Markdown bundle `document.txt` plus `metadata.json`, including brand name/color/logo/font, header/footer templates, watermark, and legal disclaimer. |
 
+CSV/TSV ragged-row validation:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked csv_and_tsv_transforms_warn_and_normalize_ragged_rows --manifest-path src-tauri/Cargo.toml` | Pass | Focused table-transform proof now covers ragged CSV and TSV inputs: missing header/data cells produce artifact and document diagnostics, placeholder headers such as `Column 3` are generated, short rows are padded, extra cells remain exportable, and numeric metadata still survives normalized rows. |
+| `cargo test --locked table_tests --manifest-path src-tauri/Cargo.toml` | Pass | All 17 table tests passed after adding CSV/TSV row-width normalization, preserving existing Markdown table formulas, CSV/TSV formula diagnostics, spreadsheet exchange, named tables, SQL transform, merged cells, and cross-target table export behavior. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

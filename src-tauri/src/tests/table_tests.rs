@@ -159,6 +159,64 @@ fn csv_and_tsv_transforms_mark_numeric_cells_for_export_safe_formatting() {
 }
 
 #[test]
+fn csv_and_tsv_transforms_warn_and_normalize_ragged_rows() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Ragged Data\nstatus: approved\napprovedBy: QA\n---\n# Ragged Data\n```csv\nRegion,Revenue\nEast,120,extra note\nWest\nTotal,=SUM(B1:B2),formula\n```\n\n```tsv\nMetric\tValue\nPipeline\t1250\towner\nCoverage\n```\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response.html.contains("<th scope=\"col\">Column 3</th>"));
+    assert!(response.html.contains("<td>extra note</td>"));
+    assert!(response.html.contains("<td>formula</td>"));
+    assert!(response
+        .html
+        .contains("class=\"numeric\" data-format=\"number\" data-value=\"1250\">1250</td>"));
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.severity == "warning"
+            && diagnostic
+                .message
+                .contains("CSV row 1 has 2 cells; normalized to 3 columns")
+            && diagnostic
+                .suggestion
+                .as_deref()
+                .is_some_and(|suggestion| suggestion.contains("Review CSV/TSV delimiters"))
+    }));
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.severity == "warning"
+            && diagnostic
+                .message
+                .contains("TSV row 1 has 2 cells; normalized to 3 columns")
+    }));
+    assert!(response.diagnostics.iter().any(|diagnostic| {
+        diagnostic.severity == "info"
+            && diagnostic
+                .message
+                .contains("CSV transform normalized ragged rows to 3 columns")
+    }));
+
+    let csv_artifact = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "csv")
+        .expect("csv artifact");
+    assert!(csv_artifact.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .message
+            .contains("CSV row 1 has 2 cells; normalized to 3 columns")
+    }));
+    let tsv_artifact = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "tsv")
+        .expect("tsv artifact");
+    assert!(tsv_artifact.diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .message
+            .contains("TSV row 1 has 2 cells; normalized to 3 columns")
+    }));
+}
+
+#[test]
 fn csv_formula_diagnostics_report_absolute_fence_source_lines() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Bad CSV Formula\nstatus: draft\n---\n# Bad CSV Formula\n```csv\nMetric,Value\nBad,=UNKNOWN(1)\n```\n"

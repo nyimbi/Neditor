@@ -30,6 +30,7 @@ pub(crate) fn render_delimited_table(
     if rows.is_empty() {
         return "<table></table>".to_string();
     }
+    normalize_delimited_row_widths(&mut rows, delimiter, artifact_diags, diagnostics);
     evaluate_delimited_table_formula_rows(&mut rows, artifact_diags, diagnostics);
     let numeric_columns = delimited_numeric_columns(&rows);
     let mut html = String::from("<table class=\"transform-table\"><thead><tr>");
@@ -59,8 +60,66 @@ pub(crate) fn delimited_rows_for_export(body: &str, delimiter: char) -> Vec<Vec<
     let mut rows = parse_delimited_rows(body, delimiter);
     let mut artifact_diags = Vec::new();
     let mut diagnostics = Vec::new();
+    normalize_delimited_row_widths(&mut rows, delimiter, &mut artifact_diags, &mut diagnostics);
     evaluate_delimited_table_formula_rows(&mut rows, &mut artifact_diags, &mut diagnostics);
     rows
+}
+
+fn normalize_delimited_row_widths(
+    rows: &mut [Vec<String>],
+    delimiter: char,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) {
+    let Some(expected_width) = rows.iter().map(Vec::len).max() else {
+        return;
+    };
+    if expected_width == 0 {
+        return;
+    }
+    let transform = if delimiter == '\t' { "tsv" } else { "csv" };
+    let mut warned = false;
+    for (row_index, row) in rows.iter_mut().enumerate() {
+        let original_width = row.len();
+        if row_index == 0 && original_width < expected_width {
+            row.extend(
+                (original_width..expected_width).map(|index| format!("Column {}", index + 1)),
+            );
+        } else if original_width < expected_width {
+            row.resize(expected_width, String::new());
+        }
+        if original_width != expected_width {
+            warned = true;
+            let line = row_index + 1;
+            let diagnostic = diag(
+                "warning",
+                format!(
+                    "{} row {line} has {original_width} cell{}; normalized to {expected_width} columns for export.",
+                    transform.to_ascii_uppercase(),
+                    if original_width == 1 { "" } else { "s" }
+                ),
+                None,
+                Some(line),
+                Some("Review CSV/TSV delimiters, quotes, and missing cells before relying on the table."),
+            );
+            artifact_diags.push(diagnostic.clone());
+            diagnostics.push(diagnostic);
+        }
+    }
+    if warned && rows.first().is_some_and(|row| row.len() == expected_width) {
+        let diagnostic = diag(
+            "info",
+            format!(
+                "{} transform normalized ragged rows to {expected_width} columns.",
+                transform.to_ascii_uppercase()
+            ),
+            None,
+            Some(1),
+            Some("Generated placeholder headers such as Column 3 are safe to rename in the source data."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+    }
 }
 
 #[derive(Debug)]
