@@ -4687,6 +4687,65 @@ test("recompiles clean master documents after included files change", async ({ p
   await expect.poll(() => editorText(page)).not.toContain("Updated included risk note.");
 });
 
+test("recomputes watched include paths after editing include directives", async ({ page }) => {
+  await setMockFileText(page, "/workspace/chapters/ops.md", "## Operations Notes\n\nOriginal included ops note.");
+  await setMockFileText(
+    page,
+    "/workspace/market.md",
+    [
+      "---",
+      "title: Market Entry Report",
+      "status: draft",
+      "---",
+      "",
+      "# Market Entry Report",
+      "",
+      "!include chapters/risk.md",
+    ].join("\n"),
+  );
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+
+  const preview = page.getByRole("region", { name: "Live preview" });
+  await expect(preview).toContainText("Original included risk note.");
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/chapters/risk.md"))).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/chapters/ops.md"))).toBe(false);
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().includeGraph.map((edge) => edge.child))).toContain(
+    "/workspace/chapters/risk.md",
+  );
+  await expect(page.locator(".status-bar")).toContainText("Native watch: 2 paths");
+
+  await page.getByRole("button", { name: "Find" }).click();
+  await page.getByRole("textbox", { name: "Find" }).fill("chapters/risk.md");
+  await page.getByRole("textbox", { name: "Replace" }).fill("chapters/ops.md");
+  await page.locator(".cm-search").getByRole("button", { name: "replace all" }).click();
+
+  await expect.poll(() => editorText(page)).toContain("!include chapters/ops.md");
+  await expect(preview).toContainText("Original included ops note.");
+  await expect(preview).not.toContainText("Original included risk note.");
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/chapters/risk.md"))).toBe(false);
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/chapters/ops.md"))).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().includeGraph.map((edge) => edge.child))).toContain(
+    "/workspace/chapters/ops.md",
+  );
+  await expect(page.locator(".status-bar")).toContainText("Native watch: 2 paths");
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => mockFileText(page, "/workspace/market.md")).toContain("!include chapters/ops.md");
+
+  await setMockFileText(page, "/workspace/chapters/risk.md", "## Risk Notes\n\nStale risk update should not recompile.");
+  await emitMockFileWatch(page, "/workspace/chapters/risk.md");
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/chapters/risk.md"))).toBe(false);
+  await expect(preview).not.toContainText("Stale risk update should not recompile.");
+  await expect(page.locator(".status-bar")).not.toContainText("risk.md");
+
+  await setMockFileText(page, "/workspace/chapters/ops.md", "## Operations Notes\n\nUpdated included ops note.");
+  await emitMockFileWatch(page, "/workspace/chapters/ops.md");
+
+  await expect(preview).toContainText("Updated included ops note.");
+  await expect(page.locator(".status-bar")).toContainText("Recompiled after included file changed: ops.md");
+});
+
 test("navigates include graph entries from references and commands", async ({ page }) => {
   await setMockFileText(
     page,

@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Include watcher state now has focused browser proof for directive edits. The
+  workflow edits a master document from `!include chapters/risk.md` to
+  `!include chapters/ops.md`, proves the include graph and watched path set
+  drop the old child and add the new child, ignores a stale watch event from
+  the old include, and recompiles when the new include changes.
 - Supertonic read-aloud setup now has browser workflow proof for the
   consent-gated model download path. Settings exposes an editable model storage
   path, the model notice shows name, size, storage location, source, and
@@ -1412,6 +1417,7 @@ Recent pushed checkpoints visible in current git history:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting remains clean after the OpenAPI server-rendering update. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused transform test proves OpenAPI server variables plus operation/path server overrides render in generated API docs. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export conformance remains intact. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "recomputes watched include paths" --project chromium` | Pass | Focused browser workflow proves editing include directives recomputes the include graph and watched paths, removes the old include, watches the new include, ignores stale old-include watch events, and recompiles after the new include changes. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "gates Supertonic TTS model downloads" --project chromium` | Pass | Focused browser workflow proves Settings exposes Supertonic model size, editable storage path, download source, and command; model download and read-aloud are disabled until acknowledgement; acknowledged setup can copy details, queue the model download, read the document with Supertonic, and inspect runtime status. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused browser workflow proves two-way table editing: visual creation, direct in-text Markdown table edits syncing into the grid, invalid in-text table protection, editable source text export, source-to-grid parsing, applying source text back into the document, and the explicit **Edit Markdown in text** action selecting a source table that can be replaced in the editor and synced back into visual cells. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "keeps production Docs Live wizards structure-first" --project chromium` | Pass | Focused browser workflow proves podcast and movie-script Docs Live modes block prose while production structure is only suggested, then unlock sequential segment or beat drafting after the approved architecture is supplied. |

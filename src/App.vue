@@ -5481,7 +5481,16 @@ declare global {
     __NEDITOR_APP_E2E__?: {
       setSidebar(panelId: string): Promise<void>;
       selectConfigurationSection(sectionId: string): Promise<void>;
-      state(): { mode: string; sidebar: string; configurationSection: string };
+      state(): {
+        mode: string;
+        sidebar: string;
+        configurationSection: string;
+        watchedPaths: string[];
+        watchedPathRoles: Record<string, string>;
+        includeGraph: Array<{ parent: string; child: string; depth: number }>;
+        statusMessage: string;
+        lastPreviewCompiledAt: string;
+      };
     };
     __NEDITOR_DESKTOP_WORKFLOW__?: DesktopWorkflowTestHooks;
   }
@@ -10658,6 +10667,11 @@ function installE2eAppHooks() {
       mode: store.mode,
       sidebar: store.sidebar,
       configurationSection: selectedConfigurationSection.value,
+      watchedPaths: [...store.watchedPaths],
+      watchedPathRoles: { ...store.watchedPathRoles },
+      includeGraph: [...(active.value.compile?.include_graph || [])],
+      statusMessage: store.statusMessage,
+      lastPreviewCompiledAt: store.lastPreviewCompiledAt,
     }),
   };
 }

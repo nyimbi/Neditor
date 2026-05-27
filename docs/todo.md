@@ -1462,7 +1462,12 @@ Finish:
 - Multi-tab watcher switching beyond the current tab-activation proof.
 - Stale watcher cleanup when tabs close or paths move beyond current
   recent-path cleanup coverage.
-- Include graph changes after editing include directives.
+- Include graph changes after editing include directives are now browser-proven:
+  the focused workflow swaps a master document from `chapters/risk.md` to
+  `chapters/ops.md`, proves the watched path set and include graph move to the
+  new child, ignores stale old-include watch events, and recompiles when the
+  new include changes. Remaining work is richer multi-include native proof
+  across supported OS hosts.
 
 ### 9. Workspace, Tabs, And Document Sets
 
