@@ -199,6 +199,7 @@ function collectEvidenceGaps(checks) {
   const homebrewPackaging = reports["homebrew-packaging"];
   if (homebrewPackaging?.status === "passed-with-release-blockers") {
     for (const blocker of homebrewPackaging.blockers || []) {
+      if (blocker.id === "homebrew-release-readiness") continue;
       gaps.push({
         id: blocker.id,
         status: blocker.status || "pending",

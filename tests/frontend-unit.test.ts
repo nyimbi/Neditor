@@ -5308,6 +5308,7 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("aiRuntimeEvidenceAccepted"));
   ok(script.includes("google-docs-import-evidence"));
   ok(script.includes("google-docs-live-import-readback"));
+  ok(script.includes('blocker.id === "homebrew-release-readiness"'));
   ok(script.includes("release-signing-and-notarization"));
   ok(script.includes("accessibility-assistive-technology-human-signoff"));
   ok(script.includes("rendered-export-native-viewer-human-signoff"));

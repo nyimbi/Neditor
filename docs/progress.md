@@ -4724,6 +4724,13 @@ Optional engine evidence collection:
 | `pnpm run check:external-transform-docs` | Pass | External transform documentation checks now require the evidence collector instructions. |
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after the package-script and test updates. |
 
+Homebrew readiness gap de-cycling:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:homebrew` | Pass with release blockers | The refreshed Homebrew report now carries only the real pending blockers: final cask, signed/notarized macOS artifact, and macOS signing evidence. |
+| `pnpm run check:release-readiness` | Pass with external gaps | The readiness aggregator no longer re-imports the self-referential `homebrew-release-readiness` blocker from the Homebrew report; actual readiness failures still fail the aggregation directly. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
