@@ -146,9 +146,11 @@ import {
 import {
   formatTableTotal,
   findMarkdownTableIndexForLineRange,
+  markdownTableToDraft,
   parseTableCellSpan,
   parseMarkdownTables,
   parseTablePaste,
+  replaceMarkdownTableInText,
   serializeMarkdownTable,
   setTableCellSpan,
   sortTableDraftRows,
@@ -203,6 +205,30 @@ test("table parsing preserves captions, alignment, and escaped pipes", () => {
   equal(findMarkdownTableIndexForLineRange([table], 3), 0);
   equal(findMarkdownTableIndexForLineRange([table], 5), -1);
   equal(findMarkdownTableIndexForLineRange([table], 0, 2), 0);
+
+  const draft = markdownTableToDraft(table);
+  equal(draft.id, "tbl:revenue");
+  equal(draft.formats[1], "currency");
+  draft.rows[0][1] = "$2,400";
+  const sourceText = [
+    "# Report",
+    "",
+    'Table: Regional revenue {#tbl:revenue}',
+    "| Region | Revenue | Note |",
+    "| :--- | ---: | --- |",
+    "| East | $1,200 | margin\\|stable |",
+    "",
+    "After table.",
+  ].join("\n");
+  const [sourceTable] = parseMarkdownTables(sourceText);
+  const replacement = replaceMarkdownTableInText(sourceText, sourceTable, draft);
+  ok(replacement.text.includes("| East | $2400 | margin\\|stable |"));
+  ok(replacement.text.includes("After table."));
+  equal(replacement.startLine, 3);
+  equal(replacement.endLine, 6);
+  const [updatedTable] = parseMarkdownTables(replacement.text);
+  equal(updatedTable.rows[0][1], "$2400");
+  equal(updatedTable.rows[0][2], "margin|stable");
 });
 
 test("table paste handles quoted CSV and markdown table captions", () => {

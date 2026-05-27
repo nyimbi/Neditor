@@ -5176,12 +5176,14 @@ import {
   inferTableFormat,
   isFormulaCell,
   isTableSummaryRow,
+  markdownTableToDraft,
   normalizeTableDraft,
   padAlignments,
   padTableRow,
   parseMarkdownTables,
   parseTablePaste,
   parseTableCellSpan,
+  replaceMarkdownTableInText,
   serializeMarkdownTable,
   setTableCellSpan,
   sortTableDraftRows,
@@ -16640,14 +16642,7 @@ function loadSelectedTable() {
     tableDraft.value = null;
     return;
   }
-  tableDraft.value = {
-    id: table.id,
-    caption: table.caption,
-    headers: [...table.headers],
-    alignments: [...table.alignments],
-    formats: table.headers.map((_, columnIndex) => inferTableFormat(table.rows.map((row) => row[columnIndex] || ""))),
-    rows: table.rows.map((row) => padTableRow(row, table.headers.length)),
-  };
+  tableDraft.value = markdownTableToDraft(table);
 }
 
 function createTableDraft() {
@@ -16677,12 +16672,10 @@ function applyTableDraft() {
   const normalizedDraft = normalizeTableDraft(draft);
   const serialized = serializeMarkdownTable(normalizedDraft);
   if (table && !isNewTableDraft.value) {
-    const lines = active.value.text.split("\n");
-    const replaceStart = table.captionLine || table.startLine;
-    lines.splice(replaceStart - 1, table.endLine - replaceStart + 1, ...serialized);
-    store.updateText(lines.join("\n"));
+    const replacement = replaceMarkdownTableInText(active.value.text, table, normalizedDraft);
+    store.updateText(replacement.text);
     void nextTick(() => syncEditorViewFromActiveDocument());
-    store.statusMessage = `Updated source table at lines ${replaceStart}-${table.endLine}`;
+    store.statusMessage = `Updated source table at lines ${replacement.startLine}-${replacement.endLine}`;
   } else {
     insertTableAtCursor(serialized);
     const nextTableIndex = markdownTables.value.length;

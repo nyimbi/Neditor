@@ -85,6 +85,31 @@ export function findMarkdownTableIndexForLineRange(tables: MarkdownTable[], from
   });
 }
 
+export function markdownTableToDraft(table: MarkdownTable): TableDraft {
+  return {
+    id: table.id,
+    caption: table.caption,
+    headers: [...table.headers],
+    alignments: [...table.alignments],
+    formats: table.headers.map((_, columnIndex) => inferTableFormat(table.rows.map((row) => row[columnIndex] || ""))),
+    rows: table.rows.map((row) => padTableRow(row, table.headers.length)),
+  };
+}
+
+export function replaceMarkdownTableInText(text: string, table: MarkdownTable, draft: TableDraft) {
+  const lines = text.split("\n");
+  const replaceStart = table.captionLine || table.startLine;
+  const normalizedDraft = normalizeTableDraft(draft);
+  const serialized = serializeMarkdownTable(normalizedDraft);
+  lines.splice(replaceStart - 1, table.endLine - replaceStart + 1, ...serialized);
+  return {
+    text: lines.join("\n"),
+    draft: normalizedDraft,
+    startLine: replaceStart,
+    endLine: replaceStart + serialized.length - 1,
+  };
+}
+
 function parseTableCaption(line: string) {
   if (!line.toLowerCase().startsWith("table:")) return null;
   const id = line.match(/\{#([^}\s]+)(?:\s+[^}]*)?\}/)?.[1] || "";

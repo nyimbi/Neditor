@@ -3619,6 +3619,13 @@ Frontend architecture modularization:
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "runs configurable Emacs and Vim-style editor keybinding modes"` | Pass | Focused Chromium workflow re-proved the extracted keybinding module through the real editor UI. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed with 64 tests after extracting the Vim keybinding module. |
 
+Two-way table source editing:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | Frontend unit coverage now proves Markdown source tables can be converted into table-editor drafts, replaced over the original source range, and reparsed with edited values plus escaped pipe cells intact. |
+| `pnpm run check` | Pass | Vue typecheck passed after moving source table draft conversion and source-range replacement helpers into `src/lib/tables.ts`. |
+
 Menus, quality recommendations, and expanded document wizards:
 
 | Command | Result | Evidence |
