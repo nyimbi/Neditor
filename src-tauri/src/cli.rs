@@ -1098,11 +1098,21 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut markdown_id: Option<String> = None;
     let mut kind: Option<String> = None;
     let mut query: Option<String> = None;
+    let mut workspace = PathBuf::from(".");
+    let mut fill_profile = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
             "--json" => json_output = true,
             "--ids-only" => ids_only = true,
+            "--workspace" | "-w" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
+            "--fill-profile" | "--profile" => fill_profile = true,
             "--markdown" | "--body" => {
                 index += 1;
                 markdown_id = Some(
@@ -1149,19 +1159,32 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
                         .join(", ")
                 )
             })?;
+        let profile_path = workspace.join(".neditor").join("business-profile.json");
+        let profile = if fill_profile && profile_path.exists() {
+            Some(read_business_profile(&profile_path)?)
+        } else {
+            None
+        };
+        let markdown = profile
+            .as_ref()
+            .map(|profile| fill_business_profile_placeholders(snippet.body, profile))
+            .unwrap_or_else(|| snippet.body.to_string());
         if json_output {
             return Ok(CliOutcome {
                 message: serde_json::to_string_pretty(&json!({
                     "schema": "neditor.ned-snippet.v1",
                     "snippet": snippet,
-                    "markdown": snippet.body,
+                    "markdown": markdown,
+                    "rawMarkdown": snippet.body,
+                    "profileApplied": profile.is_some(),
+                    "profilePath": path_to_display(&profile_path),
                 }))
                 .map_err(|err| err.to_string())?,
                 exit_code: 0,
             });
         }
         return Ok(CliOutcome {
-            message: snippet.body.to_string(),
+            message: markdown,
             exit_code: 0,
         });
     }
@@ -3186,7 +3209,7 @@ fn snippets_text_report(snippets: &[DocumentSnippetInfo]) -> String {
             snippet.id, snippet.kind, snippet.label, snippet.summary
         ));
     }
-    lines.push("Use `ned snippets --markdown <id>` to print a reusable document part.".to_string());
+    lines.push("Use `ned snippets --markdown <id>` to print a reusable document part, or add `--workspace . --fill-profile` to merge saved business identity values.".to_string());
     lines.join("\n")
 }
 
@@ -3361,6 +3384,66 @@ fn profile_value(value: &str, placeholder: &str) -> String {
         format!("{{{{{placeholder}}}}}")
     } else {
         trimmed.to_string()
+    }
+}
+
+fn fill_business_profile_placeholders(markdown: &str, profile: &BusinessProfile) -> String {
+    let mut output = String::new();
+    let mut remaining = markdown;
+    while let Some(start) = remaining.find("{{") {
+        output.push_str(&remaining[..start]);
+        let after_start = &remaining[start + 2..];
+        if let Some(end) = after_start.find("}}") {
+            let placeholder = after_start[..end].trim();
+            if let Some(value) = business_profile_placeholder_value(profile, placeholder) {
+                output.push_str(&value);
+            } else {
+                output.push_str("{{");
+                output.push_str(&after_start[..end]);
+                output.push_str("}}");
+            }
+            remaining = &after_start[end + 2..];
+        } else {
+            output.push_str(&remaining[start..]);
+            remaining = "";
+        }
+    }
+    output.push_str(remaining);
+    output
+}
+
+fn business_profile_placeholder_value(
+    profile: &BusinessProfile,
+    placeholder: &str,
+) -> Option<String> {
+    let normalized = normalize_profile_key(
+        placeholder
+            .trim()
+            .strip_prefix("profile.")
+            .unwrap_or_else(|| placeholder.trim()),
+    );
+    let value = match normalized.as_str() {
+        "full name" | "name" | "owner" | "prepared by" | "author" | "reviewer" | "approver" => {
+            &profile.full_name
+        }
+        "email" | "email address" => &profile.email,
+        "phone" | "phone number" | "telephone" => &profile.phone,
+        "role title" | "role" | "title" | "job title" => &profile.role_title,
+        "company name" | "company" | "organization" | "organisation" => &profile.company_name,
+        "company address" | "address" | "mailing address" => &profile.company_address,
+        "website" | "web site" | "url" => &profile.website,
+        "industry" | "sector" => &profile.industry,
+        "default client name" | "default client" | "client" | "client name" => {
+            &profile.default_client_name
+        }
+        "brand voice" | "voice" | "tone" => &profile.brand_voice,
+        _ => return None,
+    };
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
     }
 }
 
@@ -4607,7 +4690,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search" -- "$cur") )
         ;;
       snippets|parts)
-        COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body --workspace --fill-profile --profile" -- "$cur") )
         ;;
       profile|business-profile)
         COMPREPLY=( $(compgen -W "--workspace --set --get --fields --init --force --dry-run --json --markdown --placeholders --placeholder-text" -- "$cur") )
@@ -4693,7 +4776,7 @@ _ned() {{
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:'
       ;;
     snippets|parts)
-      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:'
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--fill-profile[merge saved business profile values into printed snippet Markdown]' '--profile[alias for --fill-profile]'
       ;;
     profile|business-profile)
       _arguments '--workspace[workspace containing .neditor]:directory:_files -/' '--set[set profile field key=value]:assignment:' '--get[print one profile field]:field:' '--fields[list supported profile fields and aliases]' '--init[create profile file]' '--force[replace existing profile when initializing]' '--dry-run[preview write]' '--json[print machine-readable JSON]' '--markdown[print reusable identity block]' '--placeholders[print Docs Live placeholder values]' '--placeholder-text[alias for --placeholders]'
@@ -4798,6 +4881,9 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l search -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l markdown -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l body -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l workspace -s w -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l fill-profile".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l profile".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l workspace -s w -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l set -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l get -r".to_string(),
@@ -5219,7 +5305,7 @@ fn help_text() -> String {
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
-        "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id]".to_string(),
+        "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id] [--workspace . --fill-profile]".to_string(),
         "  ned profile [--workspace path] [--init] [--set fullName=...] [--get field|--fields] [--json|--markdown|--placeholders]".to_string(),
         "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--json|--markdown|--matrix]".to_string(),
         "  ned targets [--json]".to_string(),

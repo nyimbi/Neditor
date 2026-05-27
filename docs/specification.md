@@ -212,7 +212,10 @@ uses, JSON metadata, category filters, and search filters before a user creates 
 document.
 Reusable document parts must also be available outside the GUI: the packaged CLI
 should list, filter, search, and print standard snippet Markdown for identity,
-proposal, delivery, procurement, governance, and review sections.
+proposal, delivery, procurement, governance, and review sections. When a
+workspace business profile is available, the CLI should also be able to merge
+known identity values into printed snippets while leaving unknown document-
+specific placeholders visible for completion.
 Reusable business identity values must be scriptable as well: the CLI should
 initialize, update, inspect, and print the repeated name, email, phone, role,
 company, address, website, industry, default-client, and brand-voice values used

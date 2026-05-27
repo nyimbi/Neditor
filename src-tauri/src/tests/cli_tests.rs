@@ -145,7 +145,13 @@ fn ned_cli_manages_reusable_business_profile() {
         "--set".to_string(),
         "email=jane@example.com".to_string(),
         "--set".to_string(),
+        "roleTitle=Managing Partner".to_string(),
+        "--set".to_string(),
         "companyName=Acme Advisory".to_string(),
+        "--set".to_string(),
+        "phone=+1 555 0100".to_string(),
+        "--set".to_string(),
+        "website=https://acme.example".to_string(),
         "--set".to_string(),
         "brandVoice=clear and practical".to_string(),
         "--json".to_string(),
@@ -189,6 +195,48 @@ fn ned_cli_manages_reusable_business_profile() {
     assert!(placeholders.message.contains("fullName: Jane Doe"));
     assert!(placeholders.message.contains("companyName: Acme Advisory"));
 
+    let filled_snippet = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "snippets".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--markdown".to_string(),
+        "company-contact-block".to_string(),
+        "--fill-profile".to_string(),
+    ])
+    .expect("filled profile snippet");
+    assert!(filled_snippet
+        .message
+        .contains("Jane Doe, Managing Partner"));
+    assert!(filled_snippet.message.contains("Acme Advisory"));
+    assert!(filled_snippet.message.contains("jane@example.com"));
+    assert!(filled_snippet.message.contains("https://acme.example"));
+    assert!(!filled_snippet.message.contains("{{fullName}}"));
+
+    let filled_snippet_json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "parts".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--markdown".to_string(),
+        "review-handoff".to_string(),
+        "--fill-profile".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("filled profile snippet json");
+    let filled_snippet_report: serde_json::Value =
+        serde_json::from_str(&filled_snippet_json.message).expect("filled snippet json");
+    assert_eq!(filled_snippet_report["schema"], "neditor.ned-snippet.v1");
+    assert_eq!(filled_snippet_report["profileApplied"], true);
+    assert!(filled_snippet_report["markdown"]
+        .as_str()
+        .expect("filled markdown")
+        .contains("Final reviewer: Jane Doe."));
+    assert!(filled_snippet_report["rawMarkdown"]
+        .as_str()
+        .expect("raw markdown")
+        .contains("{{reviewer}}"));
+
     let fields = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "profile".to_string(),
@@ -231,10 +279,10 @@ fn ned_cli_manages_reusable_business_profile() {
         "--workspace".to_string(),
         root.to_string_lossy().to_string(),
         "--get".to_string(),
-        "website".to_string(),
+        "companyAddress".to_string(),
     ])
     .expect("unset profile value");
-    assert_eq!(unset_single.message, "{{website}}");
+    assert_eq!(unset_single.message, "{{companyAddress}}");
 
     let dry = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1264,6 +1312,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("evidence"));
     assert!(bash.message.contains("snippets"));
     assert!(bash.message.contains("--markdown"));
+    assert!(bash.message.contains("--fill-profile"));
     assert!(bash.message.contains("--fields"));
     assert!(bash.message.contains("--get"));
     assert!(bash.message.contains("support-bundle"));
@@ -1290,6 +1339,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--evidence-root"));
     assert!(zsh.message.contains("--ids-only"));
     assert!(zsh.message.contains("--markdown"));
+    assert!(zsh.message.contains("--fill-profile"));
     assert!(zsh.message.contains("--fields"));
     assert!(zsh.message.contains("--get"));
     assert!(zsh.message.contains("--matrix-output"));
@@ -1308,6 +1358,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("evidence"));
     assert!(fish.message.contains("snippets"));
     assert!(fish.message.contains("ids-only"));
+    assert!(fish.message.contains("fill-profile"));
     assert!(fish.message.contains("fields"));
     assert!(fish.message.contains("get"));
     assert!(fish.message.contains("matrix-output"));

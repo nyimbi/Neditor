@@ -4857,6 +4857,14 @@ OpenAPI metadata completeness:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused OpenAPI proof shows native API references now preserve terms of service, contact, license, root external docs, tag descriptions, and tag external docs alongside existing operation, callback, webhook, schema, security, and parameter tables. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export proof remains clean after adding API metadata to the OpenAPI native HTML artifact fixture. |
 
+Profile-filled CLI snippets:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli --lib` | Pass | Rust CLI coverage now proves `ned snippets --workspace <dir> --fill-profile --markdown company-contact-block` merges saved `.neditor/business-profile.json` identity values into reusable document parts, preserves raw snippet Markdown in JSON, and leaves unresolved non-profile placeholders visible. |
+| `src-tauri/target/debug/ned snippets --workspace /private/tmp/neditor-profile-snippet-smoke --fill-profile --markdown company-contact-block` | Pass | Direct binary smoke printed a reusable contact snippet with saved full name, role, company, email, and website merged from `.neditor/business-profile.json` while leaving unset address and phone placeholders visible. |
+| `pnpm run check:docs` | Pass | Markdown documentation links remain valid after documenting profile-filled snippet rendering for non-technical CLI use. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
