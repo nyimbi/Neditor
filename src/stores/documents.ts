@@ -1714,6 +1714,7 @@ export const useDocumentsStore = defineStore("documents", {
       });
       this.releaseTag = "";
       this.statusMessage = `Tagged release ${releaseTag}`;
+      await this.refreshGitStatus();
     },
     async restoreGitRevision(revision: string) {
       const path = this.activeDocument?.path;

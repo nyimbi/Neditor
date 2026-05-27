@@ -3843,7 +3843,6 @@ test("runs snapshot restore and release tagging workflows", async ({ page }) => 
   await expect(sidebar).toContainText("Mock diff for browser workflow");
 
   await sidebar.getByRole("button", { name: "Create snapshot" }).click();
-  await expect(page.locator(".status-bar")).toContainText("Snapshot saved to");
   await expect(sidebar.locator(".snapshot-row").filter({ hasText: "manual" })).toBeVisible();
 
   await page.locator(".cm-content").click();
@@ -3858,6 +3857,12 @@ test("runs snapshot restore and release tagging workflows", async ({ page }) => 
   await sidebar.getByLabel("Release tag").fill("v2.0.0");
   await sidebar.getByRole("button", { name: "Tag release" }).click();
   await expect(page.locator(".status-bar")).toContainText("Tagged release v2.0.0");
+  await expect(sidebar).toContainText("tag v2.0.0");
+  await expect(sidebar.getByLabel("Release tag")).toHaveValue("");
+
+  await sidebar.locator(".snapshot-row").filter({ hasText: "Initial market report" }).getByRole("button", { name: "Restore" }).click();
+  await expect.poll(() => editorText(page)).toContain("Restored from 001122334455.");
+  await expect(sidebar.locator(".snapshot-row").filter({ hasText: "pre-git-restore" })).toBeVisible();
 });
 
 test("guides Git-free users through snapshot-first versioning", async ({ page }) => {

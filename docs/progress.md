@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `020eb43 Protect
-  two-way table source edits`
+- Latest inspected committed baseline before this update: `d4ec284 Prove
+  agentic step assistance in-browser`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -44,6 +44,10 @@ Recent pushed checkpoints visible in current git history:
   workflow, clicks **Add answer and replan**, verifies the editable context
   answers receive the suggested answer, rationale, and context signals, and
   then continues through packet generation and provider handoff.
+- Versioning release tags now refresh the Git status panel immediately after
+  tagging. The focused browser workflow also proves snapshot restore, refreshed
+  release-tag summary, cleared tag input, Git-history restore, and the
+  pre-restore safety snapshot row.
 - The packaged `ned` CLI now has a headless RFP analysis and response workflow
   for procurement teams. `ned rfp-response` / `ned analyze-rfp` accepts
   Markdown/stdin, PDF, DOCX, or URL sources through native RFP intake, extracts
@@ -4398,6 +4402,17 @@ Agent Workspace AI step assistance browser proof:
 | `pnpm run check:docs` | Pass | Markdown links resolved after documenting the Agent Workspace step-assistance proof. |
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after marking 11.4 Agentic step assistance complete with direct unit/static and focused browser evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the Agent Workspace step-assistance proof diff. |
+
+Versioning release-tag and Git-history browser proof:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs snapshot restore and release tagging workflows" --project chromium` | Pass | Focused Chromium workflow now proves approved release metadata, manual snapshot creation, snapshot restore, release tag submission, immediate Git status refresh with `tag v2.0.0`, cleared release-tag input, Git-history restore from `001122334455`, and the safety `pre-git-restore` snapshot row before revision restore. |
+| `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after refreshing Git status from the release-tag action and extending versioning browser proof. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after making release tagging refresh the Versioning panel Git state immediately. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting stronger versioning workflow evidence. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording snapshot, release tag, and Git-history restore evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the versioning workflow diff. |
 
 ## Next Execution Order
 
