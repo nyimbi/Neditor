@@ -944,8 +944,12 @@ Required next coverage:
   app-authored macOS Tauri webview evidence for dark theme, high contrast,
   reduced motion, editor font size, and preview typography; broader platform
   and manual theme review remain open.
-- Remaining table editor flows: non-sandboxed browser execution and export
-  fixture proof for edited tables.
+- Remaining table editor flows: edited-table export fixture proof now runs
+  through `pnpm run test:rendered-exports`, which generates the
+  `review-cases/edited-tables` HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts
+  and validates edited source text, formula totals, escaped pipes, and
+  alignment evidence. Remaining work is manual table QA and supported-host
+  coverage.
 - External conflict modal: native desktop proof now covers rendered modal
   controls plus local/external merge-base seeding; remaining work is deeper
   manual UX QA for dialog-driven save-copy and full line-composition gestures.

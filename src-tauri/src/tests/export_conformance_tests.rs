@@ -429,7 +429,8 @@ fn write_rendered_export_audit_artifacts(artifacts: RenderedExportAuditArtifacts
             "Open rendered-export-audit.epub in an EPUB reader and confirm the table of contents, equations, metadata, and document body are readable.",
             "Inspect ZIP packages and confirm manifests plus publishing and Google Docs handoff files are present.",
             "Open review-cases/rich-blocks.* and confirm block quote, callout, task list, code, table, figure, equation, and generated figure/table lists remain legible across targets.",
-            "Open review-cases/option-heavy.* and confirm cover/page numbers/watermark/style/appendix options are visible without corrupting body content."
+            "Open review-cases/option-heavy.* and confirm cover/page numbers/watermark/style/appendix options are visible without corrupting body content.",
+            "Open review-cases/edited-tables.* and confirm edited values, formula rows, escaped pipes, and alignment survive across targets."
         ]
     });
     fs::write(
@@ -484,6 +485,23 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
                 "Review Comments",
                 "AI Provenance",
                 "For option review only.",
+            ],
+        ),
+        (
+            "edited-tables",
+            "Edited Table Export",
+            "---\ntitle: Edited Table Export\nstatus: approved\napprovedBy: Release QA\napprovedAt: 2026-05-21T10:50:00Z\n---\n# Edited Table Export\n\nThis review case represents a table that was created visually, corrected directly in Markdown source, and then exported after formulas, alignment, and escaped pipe values were normalized. Reviewers should confirm the calculated total row, right-aligned numeric columns, center-aligned owner column, and literal pipe in the Base Case label remain legible in every rendered target.\n\nTable: Edited revenue {#tbl:edited}\n| Region | Revenue | Margin | Notes |\n| :--- | ---: | ---: | --- |\n| East | $125,000 | 42% | source edited |\n| West | $98,000 | 38% | visual grid |\n| Total | =SUM(B1:B2) | =AVG(C1:C2) | formula row |\n\nTable: Scenario grid {#tbl:scenario}\n| Scenario | Owner | Score | Status |\n| :--- | :---: | ---: | --- |\n| Base \\| Case | Finance | $1,200.50 | Ready |\n| Stretch | Ops | 75% | Watch |\n| Floor | Risk | 20 | Hold |\n| Max | Summary | =MAX(C1:C3) | Formula |\n",
+            json!({
+                "includeStyles": true,
+                "includeSyntaxHighlighting": true,
+                "includeManifest": true
+            }),
+            vec![
+                "Edited revenue",
+                "223000",
+                "40",
+                "Base | Case",
+                "Scenario grid",
             ],
         ),
     ];

@@ -94,7 +94,7 @@ if (issues.length === 0) {
   }
   const reviewCases = Array.isArray(auditReport.reviewCases) ? auditReport.reviewCases : [];
   const reviewCaseSlugs = new Set(reviewCases.map((reviewCase) => reviewCase.slug));
-  for (const slug of ["rich-blocks", "option-heavy"]) {
+  for (const slug of ["rich-blocks", "option-heavy", "edited-tables"]) {
     if (!reviewCaseSlugs.has(slug)) {
       issues.push(`audit report is missing rendered review case ${slug}`);
     }
@@ -1819,6 +1819,7 @@ function verifyManualReviewDashboard(issues, assertions) {
     "rendered-export-audit.epub",
     "review-cases/rich-blocks/rich-blocks.html",
     "review-cases/option-heavy/option-heavy.html",
+    "review-cases/edited-tables/edited-tables.html",
     "Executable Viewer And Package Proof",
     "Visual Review Thumbnails",
     "visual-review-signoff.template.json",
