@@ -145,7 +145,11 @@ concrete next actions and lifecycle tasks, so evidence cleanup can be assigned,
 run, noted, and completed from the same agent board. After a packet is generated,
 the latest AI Control Center also appears in the Review sidebar so readiness,
 next actions, grounding, governance, and distribution state remain visible while
-the user edits the document. When the agent detects numbers, dates,
+the user edits the document. The Review sidebar also includes **AI quality
+assistance** that turns current QA findings into suggested triage, evidence,
+humanization, and reviewer-handoff answers with visible rationale and context
+signals; accept the guidance into editable review notes, revise it, then insert
+the notes as a quality handoff artifact. When the agent detects numbers, dates,
 commitments, quotes, or unsupported claims, the **Claim Inventory** panel gives
 each finding a source jump, an insertable/copyable audit table, and a one-click
 citation TODO action. The same packet includes named

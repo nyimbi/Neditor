@@ -103,6 +103,7 @@ import { markdownListContinuation } from "../src/lib/markdownEditing.js";
 import { extractMarkdownSection, findMarkdownSectionRange, replaceOrAppendMarkdownSection } from "../src/lib/markdownSectionMerge.js";
 import {
   buildQualityRecommendations,
+  buildQualityStepAssistance,
   formatQualityRecommendationSummary,
   qualityRecommendationMarkdown,
 } from "../src/lib/qualityRecommendations.js";
@@ -1583,6 +1584,20 @@ test("quality recommendations classify deterministic review risks", () => {
   ok(markdown.includes("## Quality Assurance and Improvement Report"));
   ok(markdown.includes("Summary: 1 blockers, 4 risks, 2 improvements"));
   ok(markdown.includes("| Compiler diagnostics | blocker |"));
+
+  const assistance = buildQualityStepAssistance({
+    recommendations,
+    documentTitle: "Launch Plan",
+    documentText: "# Launch Plan\n\nThis robust plan needs review.",
+    exportTarget: "PDF",
+    reviewNotes: "Owner will verify launch sources.",
+  });
+  equal(assistance.length, 4);
+  ok(assistance[0].suggestedAnswer.includes("blocked"));
+  ok(assistance[0].contextSignals.some((signal) => signal.includes("1 blockers")));
+  ok(assistance.some((item) => item.suggestedAnswer.includes("Resolve placeholders")));
+  ok(assistance.some((item) => item.contextSignals.includes("Generic phrasing detected")));
+  ok(assistance.some((item) => item.contextSignals.includes("Target: PDF")));
 });
 
 test("quality recommendations pass when a reviewed document has baseline structure", () => {
@@ -3805,9 +3820,16 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("releaseTarget"));
   ok(app.includes('aria-label="Release readiness checklist"'));
   ok(app.includes('aria-label="Quality improvement recommendations"'));
+  ok(app.includes('aria-label="AI quality review assistance"'));
+  ok(app.includes('aria-label="Quality review notes"'));
   ok(app.includes("qualityImprovementRecommendations"));
+  ok(app.includes("qualityStepAssistance"));
+  ok(app.includes("buildQualityStepAssistance"));
   ok(app.includes("runQualityReview"));
   ok(app.includes("insertQualityImprovementReport"));
+  ok(app.includes("appendQualityStepAssistance"));
+  ok(app.includes("appendAllQualityStepAssistance"));
+  ok(app.includes("insertQualityReviewNotes"));
   ok(app.includes("openQualityAgent"));
   ok(app.includes("releaseReadinessChecklist"));
   ok(app.includes("applyReleaseMetadataScaffold"));

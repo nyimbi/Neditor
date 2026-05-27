@@ -1861,6 +1861,32 @@
               <p>{{ item.recommendation }}</p>
               <small>{{ item.action }}</small>
             </article>
+            <section class="quality-step-assistance" aria-label="AI quality review assistance">
+              <header>
+                <h4>AI quality assistance</h4>
+                <button type="button" @click="appendAllQualityStepAssistance">Use all</button>
+              </header>
+              <p>Context-aware suggestions turn the QA findings into triage, evidence, humanization, and handoff answers you can edit before inserting.</p>
+              <article
+                v-for="item in qualityStepAssistance"
+                :key="item.id"
+                class="snapshot-row"
+                data-status="improve"
+              >
+                <strong>{{ item.label }}</strong>
+                <p>{{ item.suggestedAnswer }}</p>
+                <small>{{ item.rationale }}</small>
+                <ul class="signal-list">
+                  <li v-for="signal in item.contextSignals" :key="`${item.id}-${signal}`">{{ signal }}</li>
+                </ul>
+                <button type="button" @click="appendQualityStepAssistance(item)">{{ item.actionLabel }}</button>
+              </article>
+              <label class="field">
+                <span>Quality review notes</span>
+                <textarea v-model="qualityReviewNotes" aria-label="Quality review notes" rows="6" placeholder="Accept guidance, add owner decisions, and record reviewer questions here."></textarea>
+              </label>
+              <button type="button" @click="insertQualityReviewNotes">Insert review notes</button>
+            </section>
           </section>
           <section class="release-readiness-checklist" aria-label="Release readiness checklist">
             <header>
@@ -5063,9 +5089,11 @@ import { markdownListContinuation } from "./lib/markdownEditing";
 import { replaceOrAppendMarkdownSection } from "./lib/markdownSectionMerge";
 import {
   buildQualityRecommendations,
+  buildQualityStepAssistance,
   formatQualityRecommendationSummary,
   qualityRecommendationMarkdown as qualityRecommendationsToMarkdown,
   type QualityRecommendation,
+  type QualityStepAssistance,
 } from "./lib/qualityRecommendations";
 import { isAiSourceFenceOpener, markdownFenceOpener, stripMarkdownFencedBlocks } from "./lib/provenanceReview";
 import {
@@ -5389,6 +5417,7 @@ const aiConvertNumberedLists = ref(true);
 const aiConvertTables = ref(true);
 const aiPreviewBusy = ref(false);
 const aiPreviewSignature = ref("");
+const qualityReviewNotes = ref("");
 const agentWorkspaceOpen = ref(false);
 const agentInstruction = ref("");
 const agentContextAnswers = ref("");
@@ -6658,6 +6687,15 @@ const qualityImprovementRecommendations = computed<QualityRecommendation[]>(() =
   });
 });
 const qualityRecommendationSummary = computed(() => formatQualityRecommendationSummary(qualityImprovementRecommendations.value));
+const qualityStepAssistance = computed<QualityStepAssistance[]>(() =>
+  buildQualityStepAssistance({
+    recommendations: qualityImprovementRecommendations.value,
+    documentTitle: active.value.compile?.semantic?.title || frontMatterScalarValue(active.value.text, "title") || active.value.title,
+    documentText: active.value.text,
+    exportTarget: store.exportTarget,
+    reviewNotes: qualityReviewNotes.value,
+  }),
+);
 const releaseReadinessChecklist = computed<ReleaseChecklistItem[]>(() => {
   return buildReleaseReadinessChecklist({
     text: active.value.text,
@@ -14820,6 +14858,45 @@ function insertQualityImprovementReport() {
   store.statusMessage = "Inserted QA improvement report";
 }
 
+function qualityStepAssistanceBlock(item: QualityStepAssistance) {
+  return [
+    `### ${item.label}`,
+    "",
+    `Suggested answer: ${item.suggestedAnswer}`,
+    "",
+    `Rationale: ${item.rationale}`,
+    "",
+    "Context signals:",
+    ...item.contextSignals.map((signal) => `- ${signal}`),
+  ].join("\n");
+}
+
+function appendQualityStepAssistance(item: QualityStepAssistance) {
+  const nextBlock = qualityStepAssistanceBlock(item);
+  qualityReviewNotes.value = qualityReviewNotes.value.trim()
+    ? `${qualityReviewNotes.value.trim()}\n\n${nextBlock}`
+    : nextBlock;
+  store.statusMessage = `Added ${item.label.toLowerCase()} guidance to quality notes`;
+}
+
+function appendAllQualityStepAssistance() {
+  qualityReviewNotes.value = qualityStepAssistance.value.map((item) => qualityStepAssistanceBlock(item)).join("\n\n");
+  store.statusMessage = "Added all AI quality assistance to review notes";
+}
+
+function insertQualityReviewNotes() {
+  const notes = qualityReviewNotes.value.trim();
+  if (!notes) {
+    store.statusMessage = "Add quality review notes before inserting";
+    return;
+  }
+  flushEditorTextToStore();
+  insertBlock(["## Quality Review Notes", "", notes, ""].join("\n"));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted quality review notes";
+}
+
 function openQualityAgent() {
   const findings = qualityImprovementRecommendations.value
     .map((item) => `- ${item.label} (${item.severity}): ${item.action}`)
@@ -18960,6 +19037,53 @@ select:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.quality-step-assistance {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #d7dee8;
+  background: #ffffff;
+}
+
+.quality-step-assistance header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quality-step-assistance h4,
+.quality-step-assistance ul {
+  margin: 0;
+}
+
+.quality-step-assistance .field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #526171;
+}
+
+.quality-step-assistance textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid #bac4d1;
+  border-radius: 6px;
+  padding: 8px;
+  color: #18212f;
+  background: #ffffff;
+}
+
+.signal-list {
+  display: grid;
+  gap: 3px;
+  padding-left: 18px;
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .release-readiness-checklist .snapshot-row[data-status="complete"] {

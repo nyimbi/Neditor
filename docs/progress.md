@@ -31,6 +31,13 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- The Review sidebar now provides **AI quality assistance** on top of the
+  deterministic QA/QI recommendations. `buildQualityStepAssistance` turns the
+  current findings, document title, export target, document length, and review
+  notes into suggested triage, evidence-review, humanization, and reviewer
+  handoff answers with rationale and context signals. Users can accept one or
+  all suggestions into editable quality review notes and insert those notes into
+  the document as a review handoff artifact.
 - Quality recommendations now have a dedicated typed implementation module
   instead of living only inside the workbench component. `src/lib/qualityRecommendations.ts`
   builds deterministic QA/QI findings for diagnostics, placeholders, citation
@@ -1465,6 +1472,12 @@ Current verification recorded on 2026-05-21 through 2026-05-27:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding AI quality review assistance, including direct proof that quality findings produce four context-aware suggestions and static wiring for the Review sidebar notes workflow. |
+| `pnpm run check` | Pass | Vue typecheck passed after wiring quality step assistance into the Review sidebar and editable quality review notes. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting AI quality assistance in the README, user guide, progress log, and spec completion matrix. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the AI quality assistance coverage. |
+| `pnpm run check:release-readiness` | Pass with external gaps | Wrote `.tmp/release-readiness/report.json` with status `current-host-ready-with-external-gaps`; external release evidence gaps remain unchanged. |
+| `git diff --check` | Pass | No whitespace errors are present in the AI quality assistance diff. |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting stayed clean after adding the `ned profile` command surface and profile-field normalizer. |
 | `pnpm run check:cli` | Pass | 21 focused CLI tests passed and the `ned` binary rebuilt. Coverage includes `.neditor/business-profile.json` scaffold creation, repeated `--set` updates, camelCase business profile fields, schema `neditor.ned-profile.v1`, Markdown identity output, Docs Live placeholder output, dry-run protection, alias command support, shell-completion generation, and unknown-field validation. |
 | `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding Settings CLI copy and guards that the CLI source exposes the profile command, profile schema, and scaffold file. |

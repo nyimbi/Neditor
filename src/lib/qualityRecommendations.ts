@@ -18,6 +18,23 @@ export interface QualityRecommendationInput {
   diagnostics?: DocumentDiagnostic[] | null;
 }
 
+export interface QualityStepAssistance {
+  id: string;
+  label: string;
+  suggestedAnswer: string;
+  rationale: string;
+  contextSignals: string[];
+  actionLabel: string;
+}
+
+export interface QualityStepAssistanceInput {
+  recommendations: QualityRecommendation[];
+  documentTitle?: string | null;
+  documentText?: string | null;
+  exportTarget?: string | null;
+  reviewNotes?: string | null;
+}
+
 const PLACEHOLDER_RE = /\{\{[^}]+\}\}|\b(?:TODO|TBD|FIXME)\b/gi;
 const CITATION_RE = /\[@[A-Za-z0-9_:.#$%&+?~/-]+\]/g;
 const BIBLIOGRAPHY_LANGUAGES = new Set(["bibtex", "hayagriva", "bibliography"]);
@@ -136,6 +153,78 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
   return recommendations;
 }
 
+export function buildQualityStepAssistance(input: QualityStepAssistanceInput): QualityStepAssistance[] {
+  const recommendations = input.recommendations.length
+    ? input.recommendations
+    : [{ id: "qa-ready", label: "QA baseline", severity: "pass", recommendation: "No obvious deterministic QA blockers were found.", action: "Run export readiness and human review." } satisfies QualityRecommendation];
+  const counts = qualityRecommendationCounts(recommendations);
+  const activeFindings = recommendations.filter((item) => item.severity !== "pass");
+  const title = (input.documentTitle || "").trim() || "current document";
+  const exportTarget = (input.exportTarget || "").trim() || "review package";
+  const wordTotal = wordCount(input.documentText || "");
+  const reviewNoteWords = wordCount(input.reviewNotes || "");
+  const topFindings = activeFindings.slice(0, 3).map((item) => item.label).join(", ") || "QA baseline";
+  const hasFinding = (id: string) => recommendations.some((item) => item.id === id);
+  const riskSignal = `${counts.blocker} blockers, ${counts.risk} risks, ${counts.improve} improvements`;
+  const documentSignal = `${wordTotal} document words`;
+  const notesSignal = reviewNoteWords ? `${reviewNoteWords} review-note words captured` : "No quality review notes captured yet";
+
+  return [
+    {
+      id: "qa-triage",
+      label: "Triage the review",
+      suggestedAnswer: counts.blocker
+        ? `Treat "${title}" as blocked until the compiler or structural blockers are resolved, then re-run QA before preparing the ${exportTarget}.`
+        : counts.risk
+          ? `Prioritize the ${counts.risk} risk item(s) in "${title}", document every decision, and keep the ${exportTarget} in review until evidence and owner handoffs are complete.`
+          : `Use the QA baseline for "${title}" as a readiness signal, then run export readiness and a human review before sending the ${exportTarget}.`,
+      rationale: counts.blocker
+        ? "Blockers can invalidate exported artifacts, so the first AI-guided answer should stop distribution and focus the reviewer on repairs."
+        : "Triage turns a flat QA list into a reviewer-safe sequence: risks first, improvements second, export last.",
+      contextSignals: [riskSignal, `Top findings: ${topFindings}`, documentSignal],
+      actionLabel: "Add triage guidance",
+    },
+    {
+      id: "evidence-review",
+      label: "Verify evidence",
+      suggestedAnswer: hasFinding("citation-evidence") || hasFinding("placeholders") || hasFinding("review-comments")
+        ? "Resolve placeholders, citation gaps, and open review comments by assigning an owner, evidence source, and accept/defer decision for each item before sign-off."
+        : "Confirm that claims, citations, assumptions, and reviewer comments are still aligned with the latest document context before approving the draft.",
+      rationale: "Business review depends on traceable evidence and explicit decisions, especially when a document is moving toward a public or client-facing export.",
+      contextSignals: [
+        hasFinding("citation-evidence") ? "Citation evidence gap detected" : "No citation-evidence gap detected",
+        hasFinding("placeholders") ? "Placeholder cleanup required" : "No unresolved placeholder finding",
+        hasFinding("review-comments") ? "Open review comments detected" : "No open review-comment finding",
+      ],
+      actionLabel: "Add evidence guidance",
+    },
+    {
+      id: "humanization",
+      label: "Improve voice and clarity",
+      suggestedAnswer: hasFinding("humanization") || hasFinding("readability") || hasFinding("ai-provenance")
+        ? "Replace generic AI wording with named facts, split dense passages for scanning, and require human sign-off for every AI-assisted section before reviewer handoff."
+        : "Do a final voice pass for specificity, reader relevance, and plain-language clarity even when deterministic AI-wording checks are clean.",
+      rationale: "The QA pass should not only catch defects; it should make the document sound accountable, specific, and review-ready.",
+      contextSignals: [
+        hasFinding("humanization") ? "Generic phrasing detected" : "No generic phrasing finding",
+        hasFinding("readability") ? "Long-paragraph finding detected" : "No long-paragraph finding",
+        hasFinding("ai-provenance") ? "AI provenance needs review" : "AI provenance appears reviewed or absent",
+      ],
+      actionLabel: "Add humanization guidance",
+    },
+    {
+      id: "review-handoff",
+      label: "Prepare reviewer handoff",
+      suggestedAnswer: activeFindings.length
+        ? `Create a reviewer handoff for "${title}" that lists unresolved QA decisions, owners, due dates, and the exact ${exportTarget} readiness gate that must be passed next.`
+        : `Package "${title}" for review with the QA baseline, export-readiness evidence, and the final ${exportTarget} checklist. Add any reviewer-specific questions before distribution.`,
+      rationale: "A strong handoff preserves accountability across QA, approval, export, and distribution instead of leaving reviewers to infer next steps.",
+      contextSignals: [riskSignal, notesSignal, `Target: ${exportTarget}`],
+      actionLabel: "Add handoff guidance",
+    },
+  ];
+}
+
 export function formatQualityRecommendationSummary(recommendations: QualityRecommendation[]) {
   const counts = qualityRecommendationCounts(recommendations);
   return `${counts.blocker} blockers, ${counts.risk} risks, ${counts.improve} improvements`;
@@ -176,6 +265,10 @@ function longParagraphCount(text: string) {
 
 function firstHeading(text: string) {
   return text.match(/^#\s+(.+)$/m)?.[1] || "";
+}
+
+function wordCount(value: string) {
+  return value.trim() ? value.trim().split(/\s+/).length : 0;
 }
 
 function hasBibliographyEvidence(text: string) {

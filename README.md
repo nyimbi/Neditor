@@ -194,6 +194,7 @@ settings.
 | Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, run **Check AI runtime** when you want proof that voice and clipboard capabilities are available, dictate the intent, add placeholder values, review the AI-created questionnaire, use or edit the context-aware suggested answers for each wizard step, inspect the rationale and context signals behind those answers, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
 | Listen to a draft or selected passage | Use **Read Sel.** or **Read Doc** in the Writing toolbar, or configure **Read aloud** in Settings for browser speech, macOS Say, or Supertonic CLI. |
 | Reuse a company format | Save your name, email, company, address, website, industry, client, and brand voice in **Business info**, then insert reusable document parts such as contact blocks, company overview, scope, pricing assumptions, compliance matrix, risk register, and review handoff. |
+| Prepare a document for review | Open **Review**, run **QA review**, then use **AI quality assistance** to accept or edit suggested triage, evidence, humanization, and reviewer-handoff answers before inserting the quality review notes. |
 | Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
 | Send a client-facing document | Export to PDF or DOCX, depending on what the recipient expects. |
 | Prepare slides or an executive handoff | Export to PPTX or use presentation mode to review the section flow. |
@@ -377,7 +378,9 @@ web app.
   extracted claim inventory, cross-reference integrity hints, humanization findings, unreviewed AI markers, approval metadata gaps,
   placeholder links, persistent review-sidebar visibility, runnable next
   actions in Agent Workspace and the Review sidebar that route document
-  evidence into concrete remediation work, an
+  evidence into concrete remediation work, AI quality assistance that turns QA
+  findings into editable triage, evidence, humanization, and reviewer-handoff
+  notes, an
   agentic lifecycle task board that turns creation,
   composition, editing, revision, review, and distribution into runnable
   owned tasks with dedicated evidence-fix tasks, persistent
