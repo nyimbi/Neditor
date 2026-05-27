@@ -4480,6 +4480,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Insert draft in text"));
   ok(app.includes("insertTableDraftInMarkdownText"));
   ok(app.includes("Markdown source"));
+  ok(app.includes("valid source updates the visual grid as you type"));
+  ok(app.includes("Valid pipe-table text updates the grid as you type"));
+  ok(app.includes("tableSourceEditLiveSynced"));
+  ok(app.includes("syncTableDraftFromSourceText"));
   ok(app.includes("Update grid from source"));
   ok(app.includes("Refresh source from grid"));
   ok(app.includes("Apply source text"));

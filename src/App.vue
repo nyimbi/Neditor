@@ -826,12 +826,13 @@
                 v-model="tableSourceEditText"
                 rows="7"
                 spellcheck="false"
+                title="Edit the Markdown pipe table directly; valid source updates the visual grid as you type"
                 :aria-invalid="Boolean(tableSourceEditError)"
                 @input="markTableSourceEditDirty"
               ></textarea>
             </label>
             <div class="table-actions">
-              <button type="button" :disabled="!tableDraft || !tableSourceEditDirty" title="Parse the Markdown source text into the visual grid" @click="updateTableDraftFromSourceText">
+              <button type="button" :disabled="!tableDraft || !tableSourceEditDirty" title="Canonicalize the Markdown source text and confirm the live visual grid preview" @click="updateTableDraftFromSourceText">
                 Update grid from source
               </button>
               <button type="button" :disabled="!tableDraft" title="Regenerate Markdown source text from the current visual grid" @click="refreshTableSourceEditFromDraft">
@@ -5750,6 +5751,7 @@ const tableSourceSnapshot = ref<TableSourceSnapshot | null>(null);
 const tableSourceEditText = ref("");
 const tableSourceEditError = ref("");
 const tableSourceEditDirty = ref(false);
+const tableSourceEditLiveSynced = ref(false);
 const isNewTableDraft = ref(false);
 const tableDataBusy = ref(false);
 const tableFormulaFunction = ref<TableFormulaFunction>("SUM");
@@ -7091,7 +7093,10 @@ const tableDraftMarkdownPreview = computed(() => {
 });
 const tableSourceEditSummary = computed(() => {
   if (!tableDraft.value) return "Select or create a table to edit Markdown source text.";
-  if (tableSourceEditDirty.value) return "Markdown source text has unsaved edits. Update the grid or apply the source text before switching tables.";
+  if (tableSourceEditDirty.value && tableSourceEditLiveSynced.value) {
+    return "Markdown source text has unsaved edits, and the visual grid is previewing those valid text changes. Apply or cancel before switching tables.";
+  }
+  if (tableSourceEditDirty.value) return "Markdown source text has unsaved edits. Valid pipe-table text updates the grid as you type.";
   return "Edit the Markdown table text directly, update the visual grid from it, or regenerate source text from the grid.";
 });
 const tableTwoWayStatus = computed(() => {
@@ -17062,26 +17067,43 @@ function refreshTableSourceEditFromDraft() {
   tableSourceEditText.value = tableDraft.value ? tableDraftMarkdownPreview.value : "";
   tableSourceEditError.value = "";
   tableSourceEditDirty.value = false;
+  tableSourceEditLiveSynced.value = false;
 }
 
 function markTableSourceEditDirty() {
   tableSourceEditDirty.value = true;
   tableSourceEditError.value = "";
+  tableSourceEditLiveSynced.value = false;
+  void nextTick(() => {
+    if (!tableSourceEditDirty.value) return;
+    syncTableDraftFromSourceText({ canonicalize: false, clearDirty: false, reportInvalid: false, statusMessage: "" });
+  });
 }
 
-function updateTableDraftFromSourceText() {
+function syncTableDraftFromSourceText(options: { canonicalize?: boolean; clearDirty?: boolean; reportInvalid?: boolean; statusMessage?: string } = {}) {
+  const canonicalize = options.canonicalize ?? true;
+  const clearDirty = options.clearDirty ?? true;
+  const reportInvalid = options.reportInvalid ?? true;
   const parsed = tableDraftFromMarkdownSource(tableSourceEditText.value);
   if (!parsed) {
-    tableSourceEditError.value = "Enter a valid Markdown pipe table with a header row and separator row.";
-    store.statusMessage = "Markdown table source could not be parsed";
+    tableSourceEditLiveSynced.value = false;
+    if (reportInvalid) {
+      tableSourceEditError.value = "Enter a valid Markdown pipe table with a header row and separator row.";
+      store.statusMessage = "Markdown table source could not be parsed";
+    }
     return false;
   }
   tableDraft.value = parsed.draft;
-  tableSourceEditText.value = parsed.sourceText;
+  if (canonicalize) tableSourceEditText.value = parsed.sourceText;
   tableSourceEditError.value = "";
-  tableSourceEditDirty.value = false;
-  store.statusMessage = "Updated visual table grid from Markdown source text";
+  tableSourceEditLiveSynced.value = true;
+  if (clearDirty) tableSourceEditDirty.value = false;
+  if (options.statusMessage !== "") store.statusMessage = options.statusMessage || "Updated visual table grid from Markdown source text";
   return true;
+}
+
+function updateTableDraftFromSourceText() {
+  return syncTableDraftFromSourceText();
 }
 
 function applyTableSourceEdit(forceSourceOverwrite = false) {

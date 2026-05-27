@@ -99,6 +99,9 @@ Recent pushed checkpoints visible in current git history:
   control that selects the exact source table range, and the focused Chromium
   workflow proves replacing that text with a valid pipe table refreshes the
   visual grid cells.
+- Table editing source-block edits now preview into the visual grid
+  immediately when the typed Markdown is a valid pipe table, while invalid or
+  partial source remains editable until the user fixes, applies, or cancels it.
 - Direct text-edited tables now accept common Markdown pipe-table syntax with
   or without outer pipes. The frontend table editor parses `A | B` / `--- |
   ---` source edits into the visual grid, and the backend compiler normalizes

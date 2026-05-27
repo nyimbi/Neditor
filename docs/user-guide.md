@@ -373,13 +373,16 @@ change the grid, then choose **Apply** to replace that exact table in the text.
 Choose **New table in text** or **Insert draft in text** when you want NEditor
 to place a starter or visual draft table directly in the Markdown editor and
 select it for immediate text editing.
-Use **Edit Markdown in text** when you want to select the exact table source
-lines and revise the pipe table directly in the editor; valid text edits sync
-back into the visual grid. Use **Go to source table** when you only need to jump
-from the visual editor back to the Markdown range being edited. The same table
-workflow is available from the Writing Tools menu, command palette, toolbar,
-and native desktop Writing Tools menu, so business users can reach it from
-whichever command surface they are already using.
+Use the **Markdown source** box when you want a two-way source-and-grid view;
+valid pipe-table text updates the visual grid as you type, and **Apply source
+text** writes that edited source into the document. Use **Edit Markdown in
+text** when you want to select the exact table source lines and revise the pipe
+table directly in the editor; valid text edits sync back into the visual grid.
+Use **Go to source table** when you only need to jump from the visual editor
+back to the Markdown range being edited. The same table workflow is available
+from the Writing Tools menu, command palette, toolbar, and native desktop
+Writing Tools menu, so business users can reach it from whichever command
+surface they are already using.
 
 Use `calc` blocks for document-level calculations:
 

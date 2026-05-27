@@ -3939,6 +3939,7 @@ test("runs command palette insertion and table editor workflows", async ({ page 
       "| Support | 40000 |",
     ].join("\n"),
   );
+  await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Services");
   await expect(page.getByRole("button", { name: "Edit table at cursor" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "New table", exact: true })).toBeDisabled();
   await queueDialogSelection(page, "/workspace/edited-source-table.csv");
