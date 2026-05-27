@@ -200,7 +200,7 @@ settings.
 | Publish to a blog or Substack | Export the Blog or Substack package, then copy the prepared content into the publishing tool. |
 | Continue editing in Google Docs | Export the Google Docs package, then import the included DOCX into Google Docs. |
 | Share a long-form reader copy | Export the EPUB ebook, then open it in an EPUB reader before sending it. |
-| Keep formal evidence for approvals | Use export manifests, review status, approval metadata, snapshots, and release tags when your team needs an audit trail. |
+| Keep formal evidence for approvals | Use export manifests, review status, approval metadata, snapshots, release tags, and the AI Export Assistance notes for metadata, readiness diagnostics, and artifact evidence when your team needs an audit trail. |
 | Add calculations, charts, or diagrams | Insert a built-in transform template, replace the sample values, and preview the result. |
 
 ### What NEditor Helps With

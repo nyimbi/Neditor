@@ -15,8 +15,42 @@ export interface ExportMetadataChecklistInput {
   target: ExportTarget;
   text?: string;
   metadata?: Record<string, unknown> | null;
-  exportDefaults?: Partial<Pick<ExportDefaults, "htmlDescription" | "canonicalUrl" | "htmlLanguage">>;
+  exportDefaults?: Partial<
+    Pick<
+      ExportDefaults,
+      | "htmlDescription"
+      | "canonicalUrl"
+      | "htmlLanguage"
+      | "includeManifest"
+      | "includeComments"
+      | "includeProvenance"
+      | "includeGlossary"
+      | "layoutPreset"
+    >
+  >;
   outlineCount?: number;
+}
+
+export interface ExportReadinessSummaryInput {
+  ready?: boolean;
+  error_count?: number;
+  warning_count?: number;
+  info_count?: number;
+}
+
+export interface ExportStepAssistanceInput extends ExportMetadataChecklistInput {
+  checklist?: ExportMetadataChecklistItem[];
+  readiness?: ExportReadinessSummaryInput | null;
+  notes?: string;
+}
+
+export interface ExportStepAssistance {
+  stepId: string;
+  stepLabel: string;
+  suggestedAnswer: string;
+  rationale: string;
+  contextSignals: string[];
+  actionLabel: string;
 }
 
 export const PUBLIC_METADATA_TARGETS = new Set<ExportTarget>(["html", "blog", "substack", "epub"]);
@@ -146,6 +180,70 @@ export function formatExportMetadataChecklistSummary(items: ExportMetadataCheckl
 export function exportMetadataChecklistHelp(target: ExportTarget) {
   const label = EXPORT_TARGET_LABELS[target] || target;
   return `Preflight metadata for ${label} before writing files. Prepare for export still runs the authoritative backend validation.`;
+}
+
+export function buildExportStepAssistance(input: ExportStepAssistanceInput): ExportStepAssistance[] {
+  const targetLabel = EXPORT_TARGET_LABELS[input.target] || input.target;
+  const checklist = input.checklist || buildExportMetadataChecklist(input);
+  const missing = checklist.filter((item) => item.status === "missing" || item.status === "invalid");
+  const optional = checklist.filter((item) => item.status === "optional");
+  const readiness = input.readiness || null;
+  const notesWords = (input.notes || "").split(/\s+/).filter(Boolean).length;
+  const options = input.exportDefaults || {};
+  const baseSignals = [
+    `Target: ${targetLabel}`,
+    `Metadata checklist: ${formatExportMetadataChecklistSummary(checklist)}`,
+    readiness ? `Backend readiness: ${readiness.ready ? "ready" : "needs attention"}` : "Backend readiness not run",
+    readiness ? `Diagnostics: ${readiness.error_count || 0} errors, ${readiness.warning_count || 0} warnings, ${readiness.info_count || 0} info` : "Diagnostics not available yet",
+    `Export notes words: ${notesWords}`,
+    `Outline entries: ${input.outlineCount || 0}`,
+  ];
+  const missingLabels = missing.map((item) => item.label).join(", ") || "none";
+  const auditOptions = [
+    options.includeManifest ? "manifest" : "",
+    options.includeComments ? "comments" : "",
+    options.includeProvenance ? "AI provenance" : "",
+    options.includeGlossary ? "glossary" : "",
+  ].filter(Boolean);
+  const metadataGuidance = missing.length
+    ? `Fix the blocking ${targetLabel} metadata first: ${missingLabels}. Use Add suggested metadata where appropriate, then replace TODO values before delivery.`
+    : `The ${targetLabel} metadata checklist has no blocking missing or invalid items. Review optional items (${optional.map((item) => item.label).join(", ") || "none"}) before final delivery.`;
+  const readinessGuidance = readiness
+    ? readiness.ready
+      ? `Backend export readiness is currently ready for ${targetLabel}. Keep the manifest and readiness diagnostics with the review record before writing the final artifact.`
+      : `Backend export readiness needs attention: resolve ${readiness.error_count || 0} error(s), ${readiness.warning_count || 0} warning(s), and review ${readiness.info_count || 0} info item(s), then rerun Prepare for export.`
+    : `Run Prepare for export for ${targetLabel} after metadata review so backend diagnostics, manifests, references, transforms, and layout evidence are checked before files are written.`;
+
+  return [
+    {
+      stepId: "target-metadata",
+      stepLabel: "Target metadata",
+      actionLabel: "Use metadata guidance",
+      suggestedAnswer: metadataGuidance,
+      rationale: "Target-specific metadata controls whether the package is acceptable for publishing, client delivery, Google Docs handoff, EPUB readers, or review archives.",
+      contextSignals: [...baseSignals, `Missing/invalid metadata: ${missingLabels}`],
+    },
+    {
+      stepId: "readiness-diagnostics",
+      stepLabel: "Readiness diagnostics",
+      actionLabel: "Use readiness guidance",
+      suggestedAnswer: readinessGuidance,
+      rationale: "The frontend checklist is helpful, but backend export readiness is the authoritative gate before artifacts are written.",
+      contextSignals: baseSignals,
+    },
+    {
+      stepId: "artifact-evidence",
+      stepLabel: "Artifact evidence",
+      actionLabel: "Use evidence guidance",
+      suggestedAnswer: [
+        `Package ${targetLabel} with ${auditOptions.length ? auditOptions.join(", ") : "the minimal selected options"}.`,
+        options.layoutPreset ? `Use the ${options.layoutPreset} layout preset.` : "Choose a layout preset before final export.",
+        "Keep output path, manifest path, source hash, readiness diagnostics, and any manual review notes with the delivery record.",
+      ].join(" "),
+      rationale: "Production exports need artifact-level evidence, not only a successful button click.",
+      contextSignals: [...baseSignals, `Audit options: ${auditOptions.join(", ") || "none"}`],
+    },
+  ];
 }
 
 function exportOptionOrMetadata(

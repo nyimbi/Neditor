@@ -261,6 +261,11 @@ Recent pushed checkpoints visible in current git history:
   transforms, and release gates. Each setup area shows a context-aware suggested
   answer, rationale, and context signals, and accepted guidance is appended to
   editable setup notes for non-technical setup handoff.
+- The Export panel now includes AI Export Assistance for target metadata,
+  backend readiness diagnostics, and artifact evidence. Users can accept the
+  suggested answer, rationale, and context signals into editable export
+  readiness notes, insert those notes into the document as an audit handoff, and
+  rerun readiness from the same panel.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
@@ -3822,6 +3827,17 @@ Configuration setup assistance:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with configuration setup assistance evidence recorded. |
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the configuration setup assistance update. |
 | `git diff --check` | Pass | No whitespace errors after the configuration setup assistance update. |
+
+Export readiness assistance:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding export step assistance, editable export readiness notes, note insertion, and static UI wiring. |
+| `pnpm run check` | Pass | Vue typecheck passed after rendering export assistance and note acceptance controls in the Export panel. |
+| `pnpm run check:docs` | Pass | Markdown docs were checked after documenting export readiness assistance; local links resolve. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with export readiness assistance evidence recorded. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the export readiness assistance update. |
+| `git diff --check` | Pass | No whitespace errors after the export readiness assistance update. |
 
 Consent-gated TTS model downloads:
 

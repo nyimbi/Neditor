@@ -80,6 +80,7 @@ import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from
 import { emacsKillLineRange, emacsWordRange } from "../src/lib/emacsKeybindings.js";
 import {
   buildExportMetadataChecklist,
+  buildExportStepAssistance,
   exportMetadataChecklistHelp,
   formatExportMetadataChecklistSummary,
 } from "../src/lib/exportMetadataChecklist.js";
@@ -1812,6 +1813,26 @@ test("export metadata checklist validates publishing and ebook handoff readiness
   equal(blogStatusById.get("language"), "complete");
   equal(formatExportMetadataChecklistSummary(blogChecklist), "3 complete, 1 missing, 1 invalid, 0 optional");
   ok(exportMetadataChecklistHelp("blog").includes("blog package"));
+  const blogAssistance = buildExportStepAssistance({
+    target: "blog",
+    text: "# Launch Post",
+    checklist: blogChecklist,
+    exportDefaults: {
+      includeManifest: true,
+      includeComments: true,
+      includeProvenance: true,
+      includeGlossary: false,
+      layoutPreset: "business",
+    },
+    readiness: { ready: false, error_count: 1, warning_count: 2, info_count: 3 },
+    notes: "Needs editorial owner before publication.",
+  });
+  equal(blogAssistance.length, 3);
+  ok(blogAssistance.every((item) => item.suggestedAnswer.length > 80));
+  ok(blogAssistance.every((item) => item.rationale.length > 60));
+  ok(blogAssistance.some((item) => item.stepId === "target-metadata" && item.suggestedAnswer.includes("Release approval")));
+  ok(blogAssistance.some((item) => item.stepId === "readiness-diagnostics" && item.suggestedAnswer.includes("resolve 1 error")));
+  ok(blogAssistance.some((item) => item.stepId === "artifact-evidence" && item.suggestedAnswer.includes("manifest, comments, AI provenance")));
 
   const epubChecklist = buildExportMetadataChecklist({
     target: "epub",
@@ -4175,6 +4196,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package"'));
   ok(app.includes('aria-label="Public export metadata options"'));
   ok(app.includes('aria-label="Distribution metadata checklist"'));
+  ok(app.includes('aria-label="AI export readiness assistance"'));
+  ok(app.includes('aria-label="Export readiness notes"'));
+  ok(app.includes("exportStepAssistance"));
+  ok(app.includes("appendExportStepAssistance"));
+  ok(app.includes("appendAllExportStepAssistance"));
+  ok(app.includes("insertExportReadinessNotes"));
   ok(app.includes("publicMetadataOptionsTitle"));
   ok(app.includes("exportDistributionChecklist"));
   ok(app.includes("store.exportDefaults.htmlLanguage"));

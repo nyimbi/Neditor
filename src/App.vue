@@ -1569,6 +1569,34 @@
               <small>{{ item.suggestion }}</small>
             </article>
           </section>
+          <section class="export-assistance-panel" aria-label="AI export readiness assistance">
+            <header>
+              <div>
+                <h3>AI Export Assistance</h3>
+                <span>Suggested next answers for metadata, readiness diagnostics, and artifact evidence.</span>
+              </div>
+              <button type="button" @click="appendAllExportStepAssistance">Use all</button>
+            </header>
+            <article v-for="item in exportStepAssistance" :key="item.stepId">
+              <div>
+                <small>{{ item.stepLabel }}</small>
+                <p>{{ item.suggestedAnswer }}</p>
+                <p class="sidebar-hint">{{ item.rationale }}</p>
+                <ul>
+                  <li v-for="signal in item.contextSignals" :key="signal">{{ signal }}</li>
+                </ul>
+              </div>
+              <button type="button" @click="appendExportStepAssistance(item)">{{ item.actionLabel }}</button>
+            </article>
+            <label>
+              Export readiness notes
+              <textarea v-model="exportReadinessNotes" rows="4" aria-label="Export readiness notes"></textarea>
+            </label>
+            <div class="reference-actions">
+              <button type="button" :disabled="!exportReadinessNotes.trim()" @click="insertExportReadinessNotes">Insert notes</button>
+              <button type="button" @click="prepareForExport">Run readiness</button>
+            </div>
+          </section>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Include styles</label>
           <label><input v-model="store.exportDefaults.includeSyntaxHighlighting" type="checkbox" /> Syntax highlighting</label>
@@ -5002,12 +5030,14 @@ import {
 	} from "./lib/docsLive";
 import {
   buildExportMetadataChecklist,
+  buildExportStepAssistance,
   DISTRIBUTION_APPROVAL_TARGETS as distributionApprovalTargets,
   exportMetadataChecklistHelp,
   EXPORT_TARGET_LABELS as exportTargetLabels,
   formatExportMetadataChecklistSummary,
   PUBLIC_METADATA_TARGETS as publicMetadataTargets,
   type ExportMetadataChecklistItem,
+  type ExportStepAssistance,
 } from "./lib/exportMetadataChecklist";
 import {
   frontMatterAnyList,
@@ -5537,6 +5567,7 @@ const rfpImportBusy = ref(false);
 const rfpImportMessage = ref("");
 const draggedTabId = ref("");
 const exportProfileName = ref("Client delivery");
+const exportReadinessNotes = ref("");
 const helpQuery = ref("");
 const helpCategory = ref<"all" | HelpCategory>("all");
 const selectedHelpTopicId = ref("getting-started");
@@ -6358,6 +6389,18 @@ const exportDistributionChecklist = computed<ExportMetadataChecklistItem[]>(() =
 });
 const exportDistributionChecklistSummary = computed(() => formatExportMetadataChecklistSummary(exportDistributionChecklist.value));
 const exportDistributionChecklistHelp = computed(() => exportMetadataChecklistHelp(store.exportTarget));
+const exportStepAssistance = computed(() =>
+  buildExportStepAssistance({
+    target: store.exportTarget,
+    text: active.value.text,
+    metadata: active.value.compile?.metadata,
+    exportDefaults: store.exportDefaults,
+    outlineCount: active.value.compile?.semantic.outline.length || 0,
+    checklist: exportDistributionChecklist.value,
+    readiness: store.exportReadiness,
+    notes: exportReadinessNotes.value,
+  }),
+);
 const exportPreviewSummary = computed(() => {
   const manifest = store.exportReadiness?.manifest || active.value.compile?.export_manifest;
   const readiness = store.exportReadiness;
@@ -14844,6 +14887,33 @@ function applyExportMetadataScaffold() {
   void nextTick(() => syncEditorViewFromActiveDocument());
 }
 
+function exportStepAssistanceBlock(item: ExportStepAssistance) {
+  return [
+    `${item.stepLabel}: ${item.suggestedAnswer}`,
+    `Rationale: ${item.rationale}`,
+    `Context signals: ${item.contextSignals.join("; ")}`,
+  ].join("\n");
+}
+
+function appendExportStepAssistance(item: ExportStepAssistance) {
+  exportReadinessNotes.value = appendTextBlock(exportReadinessNotes.value, exportStepAssistanceBlock(item));
+  store.statusMessage = `Added ${item.stepLabel.toLowerCase()} export guidance`;
+}
+
+function appendAllExportStepAssistance() {
+  const block = exportStepAssistance.value.map((item, index) => `${index + 1}. ${exportStepAssistanceBlock(item)}`).join("\n\n");
+  exportReadinessNotes.value = appendTextBlock(exportReadinessNotes.value, block);
+  store.statusMessage = "Added all export readiness guidance";
+}
+
+function insertExportReadinessNotes() {
+  const notes = exportReadinessNotes.value.trim();
+  if (!notes) return;
+  insertBlock(["## Export Readiness Notes", "", notes].join("\n"));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted export readiness notes";
+}
+
 function enableFrontMatterToc() {
   setFrontMatterField("toc", "true");
   store.statusMessage = "Enabled front matter table of contents";
@@ -18806,6 +18876,45 @@ select:hover {
 
 .export-metadata-checklist .snapshot-row[data-status="optional"] {
   border-left: 3px solid #7b8794;
+}
+
+.export-assistance-panel {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #d7dee7;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.export-assistance-panel header,
+.export-assistance-panel article {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.export-assistance-panel header div,
+.export-assistance-panel article div,
+.export-assistance-panel label {
+  display: grid;
+  gap: 4px;
+}
+
+.export-assistance-panel h3,
+.export-assistance-panel p,
+.export-assistance-panel ul {
+  margin: 0;
+}
+
+.export-assistance-panel small,
+.export-assistance-panel header span,
+.export-assistance-panel ul {
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .release-readiness-checklist,

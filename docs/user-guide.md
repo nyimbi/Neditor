@@ -503,7 +503,10 @@ NEditor is built for drafts that need evidence before publication.
 
 Export readiness reports unresolved comments, incomplete AI provenance,
 missing approval metadata, missing captions or labels, broken references, dirty
-Git state, and other issues that affect deliverability.
+Git state, and other issues that affect deliverability. The Export panel also
+shows AI Export Assistance for target metadata, readiness diagnostics, and
+artifact evidence; accepted guidance can be collected as editable export
+readiness notes and inserted into the document as an audit handoff.
 
 ## Transform Engines
 
