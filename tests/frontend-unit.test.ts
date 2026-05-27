@@ -1493,6 +1493,25 @@ test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   equal(vimPastePosition("one two", 3, { text: "X", linewise: false }, "before"), 3);
 });
 
+test("Vim word motions treat punctuation as modal word boundaries", () => {
+  const text = "client.name/value next";
+  equal(nextVimWordStart(text, 0), 6);
+  equal(nextVimWordStart(text, 6), 7);
+  equal(nextVimWordStart(text, 11), 12);
+  equal(nextVimWordStart(text, 17), 18);
+  equal(vimWordEnd(text, 0), 5);
+  equal(vimWordEnd(text, 5), 6);
+  equal(vimWordEnd(text, 6), 10);
+  equal(vimWordEnd(text, 11), 16);
+  equal(previousVimWordStart(text, 12), 11);
+  equal(previousVimWordStart(text, 11), 7);
+  equal(previousVimWordStart(text, 7), 6);
+  deepEqual(vimMotionRange(text, 0, "w", "d"), { from: 0, to: 6 });
+  deepEqual(vimMotionRange(text, 0, "w", "c"), { from: 0, to: 6 });
+  deepEqual(vimMotionRange(text, 0, "e", "d"), { from: 0, to: 6 });
+  deepEqual(vimMotionRange(text, 12, "b", "d"), { from: 11, to: 12 });
+});
+
 test("multi-cursor helpers select repeated terms and split selected lines", () => {
   const text = "alpha beta\nalpha gamma\nnested-alpha alpha\n";
   deepEqual(occurrenceRangesForSelection(text, 0, 5), {

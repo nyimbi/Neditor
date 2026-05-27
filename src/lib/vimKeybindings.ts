@@ -114,7 +114,8 @@ export function nextVimWordStart(text: string, cursor: number) {
   if (isVimWhitespace(text[position])) {
     while (position < text.length && isVimWhitespace(text[position])) position += 1;
   } else {
-    while (position < text.length && !isVimWhitespace(text[position])) position += 1;
+    const startKind = vimCharacterKind(text[position]);
+    while (position < text.length && vimCharacterKind(text[position]) === startKind) position += 1;
     while (position < text.length && isVimWhitespace(text[position])) position += 1;
   }
   return position;
@@ -124,14 +125,16 @@ export function vimWordEnd(text: string, cursor: number) {
   if (!text.length) return 0;
   let position = Math.max(0, Math.min(text.length - 1, cursor + 1));
   while (position < text.length && isVimWhitespace(text[position])) position += 1;
-  while (position < text.length - 1 && !isVimWhitespace(text[position + 1])) position += 1;
+  const startKind = vimCharacterKind(text[position]);
+  while (position < text.length - 1 && vimCharacterKind(text[position + 1]) === startKind) position += 1;
   return position;
 }
 
 export function previousVimWordStart(text: string, cursor: number) {
   let position = Math.max(0, Math.min(text.length, cursor) - 1);
   while (position > 0 && isVimWhitespace(text[position])) position -= 1;
-  while (position > 0 && !isVimWhitespace(text[position - 1])) position -= 1;
+  const startKind = vimCharacterKind(text[position]);
+  while (position > 0 && vimCharacterKind(text[position - 1]) === startKind) position -= 1;
   return position;
 }
 
@@ -375,6 +378,11 @@ function normalizedRange(from: number, to: number) {
 
 function ensureLinewiseRegisterText(text: string) {
   return text.endsWith("\n") ? text : `${text}\n`;
+}
+
+function vimCharacterKind(char: string | undefined) {
+  if (isVimWhitespace(char)) return "space";
+  return /[A-Za-z0-9_]/.test(char || "") ? "word" : "punctuation";
 }
 
 function isVimWhitespace(char: string | undefined) {

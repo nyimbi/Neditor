@@ -2928,6 +2928,23 @@ test("runs configurable Emacs and Vim-style editor keybinding modes", async ({ p
   await page.keyboard.insertText("!");
   await expect.poll(() => editorText(page)).toContain("copy source line!");
 
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("G");
+  await page.keyboard.press("o");
+  await page.keyboard.insertText("client.name/value next");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("0");
+  await page.keyboard.press("d");
+  await page.keyboard.press("e");
+  await expect.poll(() => editorText(page)).toContain(".name/value next");
+  await page.keyboard.press("d");
+  await page.keyboard.press("w");
+  await expect.poll(() => editorText(page)).toContain("name/value next");
+  await page.keyboard.press("w");
+  await page.keyboard.press("i");
+  await page.keyboard.insertText("-PUNCT-");
+  await expect.poll(() => editorText(page)).toContain("name-PUNCT-/value next");
+
   await page.getByRole("button", { name: "Save Workspace" }).click();
   await page.reload();
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("settings");

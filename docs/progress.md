@@ -5005,6 +5005,14 @@ Text-preserving table cell edits:
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after the table text-edit helper started preserving the source row style during two-way table edits. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow still proves table creation, direct Markdown source replacement, source-to-grid sync, edited-source CSV export, and cursor-cell text editing after the source-preserving cell edit change. |
 
+Vim punctuation word-motion parity:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 87 frontend unit/static tests passed after Vim `w`/`e`/`b` and operator-motion ranges started treating punctuation runs as word boundaries, covering `client.name/value next` alongside existing word, linewise yank, paste, and Emacs kill/yank semantics. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the Vim motion helper started using punctuation-aware character classes. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs configurable Emacs and Vim-style editor keybinding modes" --project chromium` | Pass | Focused Chromium workflow now proves punctuation-aware Vim operator motions and word motions in the actual CodeMirror editor by deleting `client`, deleting `.`, and inserting before `/` in `client.name/value next`. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
