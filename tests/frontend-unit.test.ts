@@ -171,6 +171,7 @@ import {
   appendTableSummaryFormulaRow,
   applyTableCellSpanToDraft,
   buildTableFormulaRow,
+  buildTableTwoWayState,
   clearTableCellSpanFromDraft,
   createDefaultTableDraft,
   createTableSourceSnapshot,
@@ -431,6 +432,44 @@ test("table drafts resync from direct document text edits and write back through
     }),
     null,
   );
+});
+
+test("table two-way state explains text and grid round trips", () => {
+  deepEqual(buildTableTwoWayState({}), {
+    status: "Synced",
+    statusClass: "ready",
+    hint: "Grid and document text are synced; edit either the visual grid or the Markdown source lines.",
+  });
+  deepEqual(buildTableTwoWayState({ sourceEditError: "bad separator" }), {
+    status: "Source invalid",
+    statusClass: "error",
+    hint: "Fix the Markdown pipe table text; the visual grid keeps the last valid table draft.",
+  });
+  deepEqual(buildTableTwoWayState({ sourceEditDirty: true, sourceEditLiveSynced: true }), {
+    status: "Source draft",
+    statusClass: "attention",
+    hint: "Valid Markdown text changes are previewing in the grid; apply source text to write them into the document.",
+  });
+  deepEqual(buildTableTwoWayState({ sourceEditDirty: true }), {
+    status: "Source draft",
+    statusClass: "attention",
+    hint: "Keep typing the Markdown table until it parses, then sync the text into the grid.",
+  });
+  deepEqual(buildTableTwoWayState({ draftSourceChanged: true, selectedSourceAvailable: false, sourceSyncMessage: "Repair text first." }), {
+    status: "Text repair",
+    statusClass: "attention",
+    hint: "Repair text first.",
+  });
+  deepEqual(buildTableTwoWayState({ draftSourceChanged: true, selectedSourceAvailable: true }), {
+    status: "Document changed",
+    statusClass: "attention",
+    hint: "The Markdown table source changed. Reload from source or explicitly apply the visual draft over the source.",
+  });
+  deepEqual(buildTableTwoWayState({ newDraft: true }), {
+    status: "New draft",
+    statusClass: "attention",
+    hint: "Create visually, insert as Markdown text, then continue editing either the source lines or the grid.",
+  });
 });
 
 test("table paste handles quoted CSV and markdown table captions", () => {
@@ -4148,6 +4187,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
   const vimKeybindings = readFileSync("src/lib/vimKeybindings.ts", "utf8");
   const emacsKeybindings = readFileSync("src/lib/emacsKeybindings.ts", "utf8");
+  const tables = readFileSync("src/lib/tables.ts", "utf8");
 
   ok(app.includes(':data-toolbar-display="store.toolbarDisplay"'));
   ok(app.includes(':style="appShellStyle"'));
@@ -4750,7 +4790,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Edit table text"));
   ok(app.includes("Sync text to grid"));
   ok(app.includes("Apply grid to text"));
-  ok(app.includes("Grid and document text are synced; edit either the visual grid or the Markdown source lines."));
+  ok(tables.includes("Grid and document text are synced; edit either the visual grid or the Markdown source lines."));
   ok(app.includes("tableDraftSourceChanged"));
   ok(app.includes("selectedTableForDraft"));
   ok(app.includes("findMarkdownTableForSourceSnapshot"));

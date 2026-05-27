@@ -4876,6 +4876,13 @@ Configuration setup and two-way table polish:
 | `pnpm run test:unit -- --runInBand` | Pass | 84 frontend unit/static tests passed after extracting configuration setup readiness, suggested-answer, note-block, and section metadata into `src/lib/configurationSetup.ts`; the same static coverage now guards the explicit two-way table action panel labels for creating tables in Markdown text, editing table text, syncing text to the grid, and applying grid edits back to text. |
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after the Tables panel gained a dedicated two-way status hint and the configuration setup wizard delegated setup scoring and assistance copy through the extracted helper module. |
 
+Table two-way state extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit -- --runInBand` | Pass | 85 frontend unit/static tests passed, including direct `buildTableTwoWayState` coverage for synced, invalid source, valid dirty-source preview, still-invalid dirty source, text-repair, document-changed, and new-draft states so table text/grid round-trip guidance is behavior-tested instead of only embedded in `App.vue`. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the Tables panel delegated its two-way status, status class, and hint through the extracted table helper. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

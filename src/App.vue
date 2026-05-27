@@ -5365,6 +5365,7 @@ import {
   appendTableSummaryFormulaRow,
   applyTableCellSpanToDraft,
   buildTableFormulaRow,
+  buildTableTwoWayState,
   clearTableCellSpanFromDraft,
   createDefaultTableDraft,
   createTableSourceSnapshot,
@@ -7189,28 +7190,20 @@ const tableTextCellEditSummary = computed(() => {
   const rowLabel = edit.rowKind === "header" ? "header" : `row ${edit.rowIndex + 1}`;
   return `Editing ${rowLabel}, column ${edit.columnLabel}, line ${edit.lineNumber}. Applying writes directly to the Markdown text.`;
 });
-const tableTwoWayStatus = computed(() => {
-  if (tableSourceEditError.value) return "Source invalid";
-  if (tableSourceEditDirty.value) return "Source draft";
-  if (tableDraftSourceChanged.value) return selectedTableForDraft.value ? "Document changed" : "Text repair";
-  if (isNewTableDraft.value) return "New draft";
-  return "Synced";
-});
-const tableTwoWayHint = computed(() => {
-  if (tableSourceEditError.value) return "Fix the Markdown pipe table text; the visual grid keeps the last valid table draft.";
-  if (tableSourceEditDirty.value && tableSourceEditLiveSynced.value) {
-    return "Valid Markdown text changes are previewing in the grid; apply source text to write them into the document.";
-  }
-  if (tableSourceEditDirty.value) return "Keep typing the Markdown table until it parses, then sync the text into the grid.";
-  if (tableDraftSourceChanged.value) return tableSourceSyncMessage.value;
-  if (isNewTableDraft.value) return "Create visually, insert as Markdown text, then continue editing either the source lines or the grid.";
-  return "Grid and document text are synced; edit either the visual grid or the Markdown source lines.";
-});
-const tableTwoWayStatusClass = computed(() => {
-  if (tableSourceEditError.value) return "error";
-  if (tableSourceEditDirty.value || tableDraftSourceChanged.value || isNewTableDraft.value) return "attention";
-  return "ready";
-});
+const tableTwoWayState = computed(() =>
+  buildTableTwoWayState({
+    sourceEditError: tableSourceEditError.value,
+    sourceEditDirty: tableSourceEditDirty.value,
+    sourceEditLiveSynced: tableSourceEditLiveSynced.value,
+    draftSourceChanged: tableDraftSourceChanged.value,
+    selectedSourceAvailable: Boolean(selectedTableForDraft.value),
+    newDraft: isNewTableDraft.value,
+    sourceSyncMessage: tableSourceSyncMessage.value,
+  }),
+);
+const tableTwoWayStatus = computed(() => tableTwoWayState.value.status);
+const tableTwoWayHint = computed(() => tableTwoWayState.value.hint);
+const tableTwoWayStatusClass = computed(() => tableTwoWayState.value.statusClass);
 const tableDraftDirty = computed(() => {
   const snapshot = tableSourceSnapshot.value;
   if (isNewTableDraft.value && tableDraft.value) return true;

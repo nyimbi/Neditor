@@ -141,6 +141,63 @@ export interface TableSpanCellOption {
   label: string;
 }
 
+export type TableTwoWayStatus = "Source invalid" | "Source draft" | "Document changed" | "Text repair" | "New draft" | "Synced";
+export type TableTwoWayStatusClass = "ready" | "attention" | "error";
+
+export interface TableTwoWayStateInput {
+  sourceEditError?: string;
+  sourceEditDirty?: boolean;
+  sourceEditLiveSynced?: boolean;
+  draftSourceChanged?: boolean;
+  selectedSourceAvailable?: boolean;
+  newDraft?: boolean;
+  sourceSyncMessage?: string;
+}
+
+export interface TableTwoWayState {
+  status: TableTwoWayStatus;
+  statusClass: TableTwoWayStatusClass;
+  hint: string;
+}
+
+export function buildTableTwoWayState(input: TableTwoWayStateInput): TableTwoWayState {
+  if (input.sourceEditError) {
+    return {
+      status: "Source invalid",
+      statusClass: "error",
+      hint: "Fix the Markdown pipe table text; the visual grid keeps the last valid table draft.",
+    };
+  }
+  if (input.sourceEditDirty) {
+    return {
+      status: "Source draft",
+      statusClass: "attention",
+      hint: input.sourceEditLiveSynced
+        ? "Valid Markdown text changes are previewing in the grid; apply source text to write them into the document."
+        : "Keep typing the Markdown table until it parses, then sync the text into the grid.",
+    };
+  }
+  if (input.draftSourceChanged) {
+    return {
+      status: input.selectedSourceAvailable ? "Document changed" : "Text repair",
+      statusClass: "attention",
+      hint: input.sourceSyncMessage || "The Markdown table source changed. Reload from source or explicitly apply the visual draft over the source.",
+    };
+  }
+  if (input.newDraft) {
+    return {
+      status: "New draft",
+      statusClass: "attention",
+      hint: "Create visually, insert as Markdown text, then continue editing either the source lines or the grid.",
+    };
+  }
+  return {
+    status: "Synced",
+    statusClass: "ready",
+    hint: "Grid and document text are synced; edit either the visual grid or the Markdown source lines.",
+  };
+}
+
 export function parseMarkdownTables(text: string): MarkdownTable[] {
   const lines = text.split("\n");
   const tables: MarkdownTable[] = [];
