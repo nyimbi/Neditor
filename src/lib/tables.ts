@@ -326,7 +326,7 @@ export function tableDraftFromMarkdownSource(sourceText: string): ParsedTableSou
 
 export function tableMarkdownForExport(options: TableExportMarkdownOptions): TableExportMarkdownSelection {
   const sourceEditText = options.sourceEditText?.trim() || "";
-  if (options.sourceEditDirty && sourceEditText) {
+  if (options.sourceEditDirty) {
     return tableDraftFromMarkdownSource(sourceEditText)
       ? { markdown: sourceEditText, source: "source-edit", sourceEditValid: true }
       : { markdown: "", source: "source-edit", sourceEditValid: false };

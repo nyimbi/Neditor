@@ -406,6 +406,20 @@ test("table export markdown selection honors dirty source edits", () => {
     },
   );
 
+  deepEqual(
+    tableMarkdownForExport({
+      draftMarkdown,
+      documentText: sourceEditText,
+      sourceEditDirty: true,
+      sourceEditText: "  \n  ",
+    }),
+    {
+      markdown: "",
+      source: "source-edit",
+      sourceEditValid: false,
+    },
+  );
+
   deepEqual(tableMarkdownForExport({ draftMarkdown, documentText: sourceEditText }), {
     markdown: draftMarkdown,
     source: "draft",
