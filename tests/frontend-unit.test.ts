@@ -981,6 +981,9 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(suggestions.some((suggestion) => suggestion.stepLabel === "Section-by-section draft" && suggestion.answer.includes("Executive Summary")));
   ok(suggestions.some((suggestion) => suggestion.stepLabel === "Placeholder values" && suggestion.answer.includes("distribution target: Google Docs")));
   ok(suggestions.every((suggestion) => suggestion.answer.length > 40 && suggestion.source.includes("Suggested")));
+  ok(suggestions.every((suggestion) => suggestion.rationale.length > 40));
+  ok(suggestions.every((suggestion) => suggestion.contextSignals.some((signal) => signal.startsWith("document type:"))));
+  ok(suggestions.some((suggestion) => suggestion.contextSignals.includes("known fields: client, owner, distribution target")));
 
   const draft = buildDocsLiveDraft({
     documentType: "proposal",
@@ -4127,6 +4130,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("AI-created questionnaire"));
   ok(app.includes('aria-label="AI suggested optimal answers"'));
   ok(app.includes("buildDocsLiveSuggestedAnswers"));
+  ok(app.includes("suggestion.rationale"));
+  ok(app.includes("suggestion.contextSignals"));
+  ok(app.includes("Context signals:"));
   ok(app.includes("step.contextSignals.join"));
   ok(app.includes("appendAllDocsLiveSuggestedAnswers"));
   ok(app.includes("Context-aware starting points for every wizard step."));

@@ -92,6 +92,8 @@ export interface DocsLiveSuggestedAnswer {
   question: string;
   answer: string;
   source: string;
+  rationale: string;
+  contextSignals: string[];
 }
 
 export interface DocsLiveWorkflowStep {
@@ -689,13 +691,20 @@ export function buildDocsLiveSuggestedAnswers(documentType: string, request: Doc
   const placeholders = extractDocsLivePlaceholders([request.placeholders, contextInput].filter(Boolean).join("\n"));
   const contextSentences = extractContextSentences(contextInput);
   const questions = docsLiveQuestionnaireQuestions(type, request);
-  return questions.map((question, index) => ({
-    id: `${type}-${index + 1}`,
-    stepLabel: suggestedAnswerStepLabel(index, question, blueprint),
-    question,
-    answer: suggestedQuestionnaireAnswer(question, index, blueprint, outlineItems, placeholders, contextSentences, request),
-    source: suggestedAnswerSource(placeholders, contextSentences, outlineItems),
-  }));
+  return questions.map((question, index) => {
+    const stepLabel = suggestedAnswerStepLabel(index, question, blueprint);
+    const contextSignals = suggestedAnswerContextSignals(stepLabel, blueprint, outlineItems, placeholders, contextSentences, request);
+    const answer = suggestedQuestionnaireAnswer(question, index, blueprint, outlineItems, placeholders, contextSentences, request);
+    return {
+      id: `${type}-${index + 1}`,
+      stepLabel,
+      question,
+      answer,
+      source: suggestedAnswerSource(placeholders, contextSentences, outlineItems),
+      rationale: suggestedAnswerRationale(stepLabel, question, contextSignals, blueprint),
+      contextSignals,
+    };
+  });
 }
 
 function docsLiveQuestionnaireQuestions(documentType: string, request: DocsLiveQuestionnaireRequest = {}) {
@@ -1304,6 +1313,42 @@ function suggestedAnswerSource(placeholders: Record<string, string>, contextSent
   if (contextSentences.length) sources.push(`${contextSentences.length} context note${contextSentences.length === 1 ? "" : "s"}`);
   if (outlineItems.length) sources.push(`${outlineItems.length} outline item${outlineItems.length === 1 ? "" : "s"}`);
   return sources.length ? `Suggested from ${sources.join(", ")}.` : "Suggested from the selected document type; replace bracketed values before drafting.";
+}
+
+function suggestedAnswerContextSignals(
+  stepLabel: string,
+  blueprint: DocsLiveBlueprint,
+  outlineItems: OutlinePlanItem[],
+  placeholders: Record<string, string>,
+  contextSentences: string[],
+  request: DocsLiveQuestionnaireRequest,
+) {
+  const signals = [`document type: ${blueprint.label}`, `step: ${stepLabel}`];
+  if ((request.title || "").trim()) signals.push(`title: ${(request.title || "").trim()}`);
+  if (outlineItems.length) signals.push(`outline items: ${outlineItems.length}`);
+  if (Object.keys(placeholders).length) signals.push(`placeholder values: ${Object.keys(placeholders).length}`);
+  if (contextSentences.length) signals.push(`context notes: ${contextSentences.length}`);
+  if ((request.transcript || "").trim()) signals.push("voice/freeform transcript present");
+  const namedSignals = ["client", "audience", "outcome", "owner", "deadline", "distribution target", "evidence", "tone", "reviewer"].filter((key) => placeholders[key]);
+  if (namedSignals.length) signals.push(`known fields: ${namedSignals.join(", ")}`);
+  return Array.from(new Set(signals));
+}
+
+function suggestedAnswerRationale(stepLabel: string, question: string, contextSignals: string[], blueprint: DocsLiveBlueprint) {
+  const lower = question.toLowerCase();
+  if (lower.includes("placeholder")) return "Fills repeated document facts first so later drafting steps can reuse names, dates, owners, evidence, and distribution targets consistently.";
+  if (lower.includes("human review") || lower.includes("export") || lower.includes("publication")) return "Keeps generated material gated before export by naming what needs evidence, review, approval, or publication metadata.";
+  if (lower.includes("outline") || lower.includes("architecture") || lower.includes("plot") || lower.includes("rundown") || lower.includes("beat sheet")) {
+    return `Locks the ${blueprint.label.toLowerCase()} structure before prose so each later section can be drafted and reviewed sequentially.`;
+  }
+  if (lower.startsWith("for \"") || lower.includes("facts") || lower.includes("examples") || lower.includes("calculations") || lower.includes("caveats")) {
+    return "Turns the selected outline item into a scoped drafting brief with facts, caveats, evidence, and reviewer ownership visible.";
+  }
+  if (lower.includes("quality") || lower.includes("checked")) return "Converts quality expectations into explicit review gates instead of hiding weak assumptions inside polished prose.";
+  if (contextSignals.some((signal) => signal.startsWith("placeholder values:")) || contextSignals.some((signal) => signal.startsWith("context notes:"))) {
+    return "Uses supplied context and placeholders to create a reviewable starting answer while leaving uncertain facts editable.";
+  }
+  return `Uses the ${blueprint.label.toLowerCase()} blueprint as a conservative starting point for the ${stepLabel.toLowerCase()} step and marks replaceable assumptions for review.`;
 }
 
 function suggestedQuestionnaireAnswer(

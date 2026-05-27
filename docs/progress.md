@@ -112,6 +112,10 @@ Recent pushed checkpoints visible in current git history:
   humanization, and review handoff. The same stage assistance appears in the UI
   and generated Drafting Plan table so users can see the suggested next action
   and context signals while moving through the document creation process.
+- Docs Live questionnaire suggestions now expose the rationale and context
+  signals behind each suggested optimal answer, and accepting a suggestion
+  carries the answer, rationale, and signals into the editable answer block so
+  users can review the AI advice before drafting.
 - Agent Workspace step assistance now makes the accept/replan loop one action:
   **Add answer and replan** appends the selected context-aware optimal answer
   with rationale and context signals, immediately rebuilds the plan from the
@@ -2803,6 +2807,17 @@ Agentic step assistance accept-and-replan verification:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with the accept-and-replan proof recorded. |
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the Agent Workspace step-assistance update. |
 | `git diff --check` | Pass | No whitespace errors after the Agent Workspace step-assistance update. |
+
+Docs Live suggested-answer rationale verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding rationale and context signals to Docs Live suggested questionnaire answers, including static UI proof and typed helper coverage. |
+| `pnpm run check` | Pass | Vue typecheck passed after rendering Docs Live suggestion rationale and context-signal lists. |
+| `pnpm run check:docs` | Pass | Markdown docs were checked after documenting rationale-visible Docs Live suggested answers; local links resolve. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with Docs Live suggestion rationale evidence recorded. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the Docs Live suggested-answer rationale update. |
+| `git diff --check` | Pass | No whitespace errors after the Docs Live suggested-answer rationale update. |
 
 Business wizard step-assistance verification:
 

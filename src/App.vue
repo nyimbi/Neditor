@@ -3291,7 +3291,11 @@
 	                <small>{{ suggestion.stepLabel }}</small>
 	                <strong>{{ suggestion.question }}</strong>
 	                <p>{{ suggestion.answer }}</p>
+	                <p class="sidebar-hint">{{ suggestion.rationale }}</p>
 	                <span>{{ suggestion.source }}</span>
+	                <ul>
+	                  <li v-for="signal in suggestion.contextSignals" :key="signal">{{ signal }}</li>
+	                </ul>
 	              </div>
 	              <button type="button" @click="appendDocsLiveSuggestedAnswer(suggestion)">Use</button>
 	            </article>
@@ -15403,17 +15407,26 @@ function refreshDocsLiveQuestionnaire() {
 }
 
 function appendDocsLiveSuggestedAnswer(suggestion: DocsLiveSuggestedAnswer) {
-  const answer = [`${suggestion.stepLabel}: ${suggestion.question}`, suggestion.answer].join("\n");
+  const answer = docsLiveSuggestedAnswerBlock(suggestion);
   docsLiveQuestionnaireAnswerText.value = appendTextBlock(docsLiveQuestionnaireAnswerText.value, answer);
   store.statusMessage = `Added suggested ${suggestion.stepLabel.toLowerCase()} answer`;
 }
 
 function appendAllDocsLiveSuggestedAnswers() {
   const answerBlock = docsLiveSuggestedAnswers.value
-    .map((suggestion, index) => [`${index + 1}. ${suggestion.stepLabel}: ${suggestion.question}`, suggestion.answer].join("\n"))
+    .map((suggestion, index) => [`${index + 1}. ${docsLiveSuggestedAnswerBlock(suggestion)}`].join("\n"))
     .join("\n\n");
   docsLiveQuestionnaireAnswerText.value = appendTextBlock(docsLiveQuestionnaireAnswerText.value, answerBlock);
   store.statusMessage = "Added all suggested Docs Live answers";
+}
+
+function docsLiveSuggestedAnswerBlock(suggestion: DocsLiveSuggestedAnswer) {
+  return [
+    `${suggestion.stepLabel}: ${suggestion.question}`,
+    suggestion.answer,
+    `Rationale: ${suggestion.rationale}`,
+    `Context signals: ${suggestion.contextSignals.join("; ")}`,
+  ].join("\n");
 }
 
 function appendTextBlock(existing: string, block: string) {
@@ -22221,6 +22234,14 @@ select:hover {
   color: #17212d;
   font-size: 13px;
   line-height: 1.45;
+}
+
+.docs-live-suggestions article ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .docs-live-workflow {

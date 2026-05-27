@@ -453,10 +453,13 @@ NEditor is built for drafts that need evidence before publication.
   questionnaire, combine the answers with dictated direction, freeform context,
   and placeholder values, then generate a section-by-section draft with a
   drafting plan, review packet, QA checks, humanization tasks, and reviewer
-  handoff prompts. The review packet summarizes context sources, the section
-  work queue, assumptions to verify, cleanup checks, and reviewer ownership,
-  and can be inserted or copied as a standalone audit handoff. Recent Docs Live
-  drafts remain available locally for later append/copy and packet handoff.
+  handoff prompts. Suggested questionnaire answers now show the rationale and
+  context signals behind each recommendation, and accepting a suggestion carries
+  those notes into the editable answer block for review. The review packet
+  summarizes context sources, the section work queue, assumptions to verify,
+  cleanup checks, and reviewer ownership, and can be inserted or copied as a
+  standalone audit handoff. Recent Docs Live drafts remain available locally for
+  later append/copy and packet handoff.
 - Use the Templates panel document builders when you want wizard assistance for
   proposals, RFPs, RFQs, tenders, tutorials, lesson content, textbooks, novels,
   podcast scripts, movie scripts, business cases, and executive briefs. Each
