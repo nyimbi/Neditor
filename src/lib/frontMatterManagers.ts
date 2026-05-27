@@ -58,7 +58,7 @@ const yamlTagNamePattern = "[A-Za-z0-9_.:/@-]+";
 const yamlAliasScalarRegex = new RegExp(`^\\*(${yamlAnchorNamePattern})$`);
 const yamlAnchorPrefixRegex = new RegExp(`^&(${yamlAnchorNamePattern})(?:\\s+|$)(.*)$`);
 const yamlTagPrefixRegex = new RegExp(
-  `^(?:!<[^>]+>|!!${yamlTagNamePattern}|!${yamlTagNamePattern}!${yamlTagNamePattern}|!${yamlTagNamePattern})(?:\\s+|$)(.*)$`,
+  `^(!<[^>]+>|!!${yamlTagNamePattern}|!${yamlTagNamePattern}!${yamlTagNamePattern}|!${yamlTagNamePattern}|!)(?:\\s+|$)(.*)$`,
 );
 const yamlKeyScalarRegex = new RegExp(`^${yamlKeyNamePattern}$`);
 const yamlKeyValueRegex = new RegExp(`^(${yamlKeyNamePattern}):\\s*(.*)$`);
@@ -583,7 +583,7 @@ export function parseFrontMatterVariables(text: string): FrontMatterVariableRow[
     if (hasChildren) stack.push({ indent, path, excluded, anchor: parsed.anchor });
     if (excluded) continue;
     if (!value || value === "[]" || value === "{}") {
-      if (!hasChildren) setVariableRow(rows, { key: path, value: "", status: "empty", line: index + 1 });
+      if (!hasChildren) recordScalarForPath(path, excluded, "", index + 1);
       continue;
     }
     if (value.startsWith("[") || value.startsWith("{")) continue;
@@ -796,14 +796,19 @@ function firstIndentedYamlChildIsSequence(lines: string[], endIndex: number, ind
 function cleanYamlScalar(value: string) {
   const withoutComment = stripYamlComment(value).trim();
   const decorated = stripLeadingYamlDecorators(withoutComment);
-  if (decorated.scalar.length >= 2) {
-    const quote = decorated.scalar[0];
-    if ((quote === "\"" || quote === "'") && decorated.scalar.endsWith(quote)) {
-      const body = decorated.scalar.slice(1, -1);
-      return quote === "'" ? body.replace(/''/g, "'") : body.replace(/\\"/g, "\"");
+  return cleanDecoratedYamlScalar(decorated.scalar, decorated.tags);
+}
+
+function cleanDecoratedYamlScalar(value: string, tags: string[]) {
+  let scalar = value;
+  if (scalar.length >= 2) {
+    const quote = scalar[0];
+    if ((quote === "\"" || quote === "'") && scalar.endsWith(quote)) {
+      const body = scalar.slice(1, -1);
+      scalar = quote === "'" ? body.replace(/''/g, "'") : body.replace(/\\"/g, "\"");
     }
   }
-  return decorated.scalar;
+  return normalizeTaggedYamlScalar(scalar, tags);
 }
 
 function parseYamlScalar(value: string) {
@@ -813,13 +818,14 @@ function parseYamlScalar(value: string) {
   return {
     anchor: decorated.anchor,
     alias,
-    value: cleanYamlScalar(decorated.scalar),
+    value: cleanDecoratedYamlScalar(decorated.scalar, decorated.tags),
   };
 }
 
 function stripLeadingYamlDecorators(value: string) {
   let scalar = value.trim();
   let anchor = "";
+  const tags: string[] = [];
   let previous = "";
   while (scalar && scalar !== previous) {
     previous = scalar;
@@ -831,10 +837,34 @@ function stripLeadingYamlDecorators(value: string) {
     }
     const tagMatch = scalar.match(yamlTagPrefixRegex);
     if (tagMatch) {
-      scalar = tagMatch[1].trim();
+      tags.push(tagMatch[1]);
+      scalar = tagMatch[2].trim();
     }
   }
-  return { anchor, scalar };
+  return { anchor, scalar, tags };
+}
+
+function normalizeTaggedYamlScalar(value: string, tags: string[]) {
+  if (tags.some(isYamlNullTag) && isYamlNullToken(value)) return "";
+  if (tags.some(isYamlBoolTag)) {
+    if (/^(?:true|yes|y|on)$/i.test(value)) return "true";
+    if (/^(?:false|no|n|off)$/i.test(value)) return "false";
+  }
+  return value;
+}
+
+function isYamlNullTag(tag: string) {
+  const normalized = tag.toLowerCase();
+  return normalized === "!!null" || normalized === "!<tag:yaml.org,2002:null>";
+}
+
+function isYamlBoolTag(tag: string) {
+  const normalized = tag.toLowerCase();
+  return normalized === "!!bool" || normalized === "!<tag:yaml.org,2002:bool>";
+}
+
+function isYamlNullToken(value: string) {
+  return value === "" || value === "~" || /^null$/i.test(value);
 }
 
 function collectYamlBlockScalar(lines: string[], endIndex: number, index: number, indent: number, style: string) {

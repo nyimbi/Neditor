@@ -1012,6 +1012,10 @@ test("front matter managers resolve tagged scalars and simple merge aliases", ()
     "  reviewer: !!str QA Team",
     "  budget: !<tag:yaml.org,2002:int> 125000",
     "  channel: !docs!channel Partner",
+    "  optionalNote: !!null null",
+    "  approved: !!bool YES",
+    "  blocked: !<tag:yaml.org,2002:bool> off",
+    "  visibleNullString: !!str null",
     "  address:",
     "    city: Nairobi",
     "    country: Kenya",
@@ -1038,10 +1042,18 @@ test("front matter managers resolve tagged scalars and simple merge aliases", ()
   ok(rows.some((row) => row.key === "defaults.reviewer" && row.value === "QA Team"));
   ok(rows.some((row) => row.key === "defaults.budget" && row.value === "125000"));
   ok(rows.some((row) => row.key === "defaults.channel" && row.value === "Partner"));
+  ok(rows.some((row) => row.key === "defaults.optionalNote" && row.value === "" && row.status === "empty"));
+  ok(rows.some((row) => row.key === "defaults.approved" && row.value === "true"));
+  ok(rows.some((row) => row.key === "defaults.blocked" && row.value === "false"));
+  ok(rows.some((row) => row.key === "defaults.visibleNullString" && row.value === "null"));
   ok(rows.some((row) => row.key === "client.owner" && row.value === "Delivery Team"));
   ok(rows.some((row) => row.key === "client.reviewer" && row.value === "QA Team"));
   ok(rows.some((row) => row.key === "client.budget" && row.value === "125000"));
   ok(rows.some((row) => row.key === "client.channel" && row.value === "Partner"));
+  ok(rows.some((row) => row.key === "client.optionalNote" && row.value === "" && row.status === "empty"));
+  ok(rows.some((row) => row.key === "client.approved" && row.value === "true"));
+  ok(rows.some((row) => row.key === "client.blocked" && row.value === "false"));
+  ok(rows.some((row) => row.key === "client.visibleNullString" && row.value === "null"));
   ok(rows.some((row) => row.key === "client.address.city" && row.value === "Nairobi"));
   ok(rows.some((row) => row.key === "client.address.country" && row.value === "Kenya"));
   ok(rows.some((row) => row.key === "client.delivery.timezone" && row.value === "EAT"));

@@ -264,6 +264,11 @@ Recent pushed checkpoints visible in current git history:
   `!custom`, `!docs!channel`, and `!<tag:yaml.org,2002:str>` can populate
   repeated client, owner, reviewer, budget, or region variables while explicit
   values still win.
+- Front matter typed scalar handling now does more than strip tags: `!!null`
+  and `!<tag:yaml.org,2002:null>` inventory as empty values, `!!bool` and
+  `!<tag:yaml.org,2002:bool>` normalize common yes/no/on/off forms to
+  `true`/`false`, and `!!str null` remains the literal string `null`. Anchored
+  typed defaults also merge into downstream document-variable rows.
 - Generated table-of-contents controls now accept structured metadata such as
   `toc: {enabled: true, depth: 2, numbered: true}` in addition to the legacy
   flat `tocDepth` and `tocNumbered` keys, and the DOCX TOC field uses the same
@@ -3803,6 +3808,12 @@ Front matter manager merge keys and tags:
 | --- | --- | --- |
 | `pnpm exec tsc -p tsconfig.test.json` | Pass | Test TypeScript compilation passed after adding conservative tagged-scalar and simple merge-key handling. |
 | `node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Four focused frontend unit tests passed, including `!!str`, `!custom`, `!<tag:yaml.org,2002:str>`, simple `<<: *defaults` merges, list-form merge aliases, nested scalar defaults such as `address.city`/`delivery.timezone`, inherited anchored-map defaults, and explicit value override of merged defaults. |
+
+Front matter manager typed tags:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm exec tsc -p tsconfig.test.json && node --test --test-name-pattern "front matter managers" .tmp-tests/tests/frontend-unit.test.js` | Pass | Seven focused front-matter manager tests passed after adding typed scalar behavior: `!!null` and URI null tags become empty rows, `!!bool` and URI bool tags normalize yes/no/on/off forms, `!!str null` stays a literal string, and anchored typed defaults merge into downstream variables. |
 
 Front matter manager inline maps:
 
