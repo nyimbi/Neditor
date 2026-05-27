@@ -2805,7 +2805,7 @@
       </span>
     </footer>
 
-    <div v-if="buttonHelp.visible" class="button-help-tooltip" role="tooltip" :style="buttonHelpStyle">
+    <div v-if="buttonHelp.visible" id="button-help-tooltip" class="button-help-tooltip" role="tooltip" :style="buttonHelpStyle">
       {{ buttonHelp.text }}
     </div>
 
@@ -3122,7 +3122,7 @@
             <strong>Reusable placeholders</strong>
             <span>These values flow into templates, snippets, Docs Live, and agent handoff packages.</span>
           </header>
-          <textarea :value="businessProfilePlaceholderText(businessProfileDraft)" rows="8" readonly></textarea>
+          <textarea :value="businessProfilePlaceholderText(businessProfileDraft)" rows="8" readonly aria-label="Reusable business placeholders preview"></textarea>
         </section>
         <section class="business-profile-preview" aria-label="Local agent integrations">
           <header>
@@ -3435,7 +3435,14 @@
 	                  <li v-for="signal in suggestion.contextSignals" :key="signal">{{ signal }}</li>
 	                </ul>
 	              </div>
-	              <button type="button" @click="appendDocsLiveSuggestedAnswer(suggestion)">Use</button>
+              <button
+                type="button"
+                :aria-label="`Use Docs Live suggested answer: ${suggestion.question}`"
+                :title="`Use Docs Live suggested answer: ${suggestion.question}`"
+                @click="appendDocsLiveSuggestedAnswer(suggestion)"
+              >
+                Use
+              </button>
 	            </article>
 	          </section>
 	          <label>
@@ -5654,6 +5661,8 @@ const helpQuery = ref("");
 const helpCategory = ref<"all" | HelpCategory>("all");
 const selectedHelpTopicId = ref("getting-started");
 const buttonHelp = ref({ visible: false, text: "", x: 0, y: 0, placement: "bottom" as "top" | "bottom" });
+const buttonHelpTooltipId = "button-help-tooltip";
+let buttonHelpDescribedButton: HTMLButtonElement | null = null;
 
 type FigureCropPosition = "center" | "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -13822,6 +13831,19 @@ function buttonHelpText(button: HTMLButtonElement) {
   return `${base}. ${disabledReason}`;
 }
 
+function describeButtonWithHelp(button: HTMLButtonElement) {
+  if (buttonHelpDescribedButton && buttonHelpDescribedButton !== button) clearButtonHelpDescription();
+  button.setAttribute("aria-describedby", buttonHelpTooltipId);
+  buttonHelpDescribedButton = button;
+}
+
+function clearButtonHelpDescription() {
+  if (buttonHelpDescribedButton?.getAttribute("aria-describedby") === buttonHelpTooltipId) {
+    buttonHelpDescribedButton.removeAttribute("aria-describedby");
+  }
+  buttonHelpDescribedButton = null;
+}
+
 function handleButtonHelpEnter(event: Event) {
   const button = buttonFromEvent(event);
   if (!button || button.closest(".button-help-tooltip")) return;
@@ -13831,6 +13853,7 @@ function handleButtonHelpEnter(event: Event) {
   const placement = rect.bottom + 52 < window.innerHeight ? "bottom" : "top";
   const x = Math.min(Math.max(rect.left + rect.width / 2, 96), Math.max(96, window.innerWidth - 96));
   const y = placement === "bottom" ? rect.bottom + 8 : rect.top - 8;
+  describeButtonWithHelp(button);
   buttonHelp.value = { visible: true, text, x, y, placement };
 }
 
@@ -13843,6 +13866,7 @@ function handleButtonHelpLeave(event: Event) {
 }
 
 function hideButtonHelp() {
+  clearButtonHelpDescription();
   buttonHelp.value = { ...buttonHelp.value, visible: false };
 }
 

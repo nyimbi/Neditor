@@ -4577,6 +4577,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(accessibilityGuard.includes("handleButtonHelpEnter"));
   ok(accessibilityGuard.includes("data-help fallback"));
   ok(accessibilityGuard.includes("disabled help fallback"));
+  ok(accessibilityGuard.includes("aria-described relationship"));
+  ok(accessibilityGuard.includes("aria-described cleanup"));
   ok(accessibilityGuard.includes("role\\s*=\\s*[\"']tooltip"));
   ok(aiRoadmap.includes("neditor.ai-first-roadmap-report.v1"));
   ok(aiRoadmap.includes("roadmap must contain exactly 50 numbered changes"));

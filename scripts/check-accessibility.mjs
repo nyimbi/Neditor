@@ -116,6 +116,7 @@ function checkButtons() {
 
 function checkButtonHoverHelp() {
   const requirements = [
+    ["tooltip id", /id\s*=\s*["']button-help-tooltip["'][\s\S]*?class\s*=\s*["']button-help-tooltip["']|class\s*=\s*["']button-help-tooltip["'][\s\S]*?id\s*=\s*["']button-help-tooltip["']/],
     ["tooltip role", /class\s*=\s*["']button-help-tooltip["'][\s\S]*?role\s*=\s*["']tooltip["']/],
     ["mouseover listener", /window\.addEventListener\(["']mouseover["'],\s*handleButtonHelpEnter\)/],
     ["focusin listener", /window\.addEventListener\(["']focusin["'],\s*handleButtonHelpEnter\)/],
@@ -128,6 +129,8 @@ function checkButtonHoverHelp() {
     ["aria-label fallback", /button\.getAttribute\(["']aria-label["']\)/],
     ["visible text fallback", /button\.innerText\.replace/],
     ["disabled help fallback", /data-disabled-help/],
+    ["aria-described relationship", /button\.setAttribute\(["']aria-describedby["'],\s*buttonHelpTooltipId\)/],
+    ["aria-described cleanup", /removeAttribute\(["']aria-describedby["']\)/],
   ];
   for (const [label, pattern] of requirements) {
     if (!pattern.test(source)) {
@@ -342,15 +345,27 @@ function checkEditorPreviewSurfaceLabels() {
     return;
   }
   const attrs = contentAttributes[0];
-  for (const required of ['role: "textbox"', '"aria-label": "Markdown editor"', '"aria-multiline": "true"', 'spellcheck: "true"', 'autocapitalize: "sentences"']) {
-    if (!attrs.includes(required)) {
-      issues.push(`${sourcePath}:1 CodeMirror content attributes must include ${required}`);
+  const requiredAttributes = [
+    { label: 'role: "textbox"', test: () => attrs.includes('role: "textbox"') },
+    {
+      label: '"aria-label": "Markdown editor"',
+      test: () =>
+        attrs.includes('"aria-label": "Markdown editor"') ||
+        (attrs.includes('"aria-label": label') && /function\s+editorExtensions\(label\s*=\s*["']Markdown editor["']/.test(source)),
+    },
+    { label: '"aria-multiline": "true"', test: () => attrs.includes('"aria-multiline": "true"') },
+    { label: 'spellcheck: "true"', test: () => attrs.includes('spellcheck: "true"') },
+    { label: 'autocapitalize: "sentences"', test: () => attrs.includes('autocapitalize: "sentences"') },
+  ];
+  for (const required of requiredAttributes) {
+    if (!required.test()) {
+      issues.push(`${sourcePath}:1 CodeMirror content attributes must include ${required.label}`);
     }
   }
 }
 
 function hasAccessibleName(attrs) {
-  return /\b(:?aria-label|aria-labelledby|title)\s*=/.test(attrs);
+  return /(?:^|\s)(?::?aria-label|aria-labelledby|title)\s*=/.test(attrs);
 }
 
 function isInsideLabel(index) {

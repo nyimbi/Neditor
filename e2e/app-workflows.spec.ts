@@ -2082,19 +2082,27 @@ test("shows delegated button help on hover and focus", async ({ page }) => {
   const newButton = page.getByRole("button", { name: "New", exact: true });
   await newButton.hover();
   await expect(tooltip).toContainText("New document");
+  await expect(tooltip).toHaveAttribute("id", "button-help-tooltip");
+  await expect(newButton).toHaveAttribute("aria-describedby", "button-help-tooltip");
 
   await page.mouse.move(0, 0);
   await expect(tooltip).toBeHidden();
+  await expect(newButton).not.toHaveAttribute("aria-describedby", "button-help-tooltip");
 
   const commandsButton = page.getByRole("button", { name: "Commands" });
   await commandsButton.focus();
   await expect(tooltip).toContainText("Open command palette");
+  await expect(commandsButton).toHaveAttribute("aria-describedby", "button-help-tooltip");
 
   await page.keyboard.press("Tab");
+  const helpToolbarButton = page.locator("#main-commands").getByRole("button", { name: "Help", exact: true });
   await expect(tooltip).toContainText("Open Help Center");
+  await expect(commandsButton).not.toHaveAttribute("aria-describedby", "button-help-tooltip");
+  await expect(helpToolbarButton).toHaveAttribute("aria-describedby", "button-help-tooltip");
 
   await page.locator("#document-workspace").focus();
   await expect(tooltip).toBeHidden();
+  await expect(helpToolbarButton).not.toHaveAttribute("aria-describedby", "button-help-tooltip");
 
   await selectSidebarPanelOption(page, "tables");
   const disabledExport = page.getByRole("button", { name: "Export CSV" });
@@ -2102,6 +2110,7 @@ test("shows delegated button help on hover and focus", async ({ page }) => {
   await disabledExport.hover({ force: true });
   await expect(tooltip).toContainText("Export CSV");
   await expect(tooltip).toContainText("This action is unavailable until the required document state is ready.");
+  await expect(disabledExport).toHaveAttribute("aria-describedby", "button-help-tooltip");
 });
 
 test("supports keyboard-only operation for deep workbench controls", async ({ page }) => {

@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `1f7d0ff Extract table
-  source sync helpers`
+- Latest inspected committed baseline before this update: `eb2af1b Prove delegated
+  button help at runtime`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`
 
@@ -35,6 +35,10 @@ Recent pushed checkpoints visible in current git history:
   focused browser accessibility workflow verifies tooltip text on hover,
   keyboard focus handoff between toolbar buttons, hiding after focus leaves
   buttons, and disabled-button guidance for table actions.
+- Delegated button help now exposes the active tooltip through a stable
+  `aria-describedby` relationship on the hovered or focused button, clears that
+  relationship when focus/hover leaves the control, and keeps static guardrails
+  aligned with the dynamic CodeMirror editor label pattern.
 - Table editing now has source-sync protection beyond command discoverability.
   The visual table editor records the Markdown source range it loaded, auto
   reloads clean visual drafts when the user edits the table directly in source
@@ -4295,6 +4299,20 @@ Native table menu workflow proof:
 | `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 75 tests, including static guards for the native table-menu smoke evidence and desktop smoke validator expectations. |
 | `pnpm run check:release-readiness` | Pass | Release readiness returned `current-host-ready-with-external-gaps` after refreshing native smoke and WebDriver fallback evidence for the rebuilt binary. |
 | `git diff --check` | Pass | No whitespace errors are present in the native table menu proof diff. |
+
+Button-help tooltip semantics:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:a11y` | Pass | Static accessibility guardrails passed after requiring the delegated button-help tooltip id, `aria-describedby` relationship creation, relationship cleanup, dynamic CodeMirror default editor label recognition, and labels for the business-placeholder preview plus Docs Live suggested-answer controls. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "shows delegated button help on hover and focus"` | Pass | Focused Chromium workflow passed and now proves the New, Commands, Help, and disabled Export CSV buttons receive `aria-describedby="button-help-tooltip"` while their help is visible and lose it when the help is hidden or handed off. |
+| `pnpm run check:a11y:runtime` | Pass | Runtime accessibility audit passed all 7 focused Chromium workflows, including the delegated button-help workflow, and rewrote `.tmp/accessibility/runtime-report.json`. |
+| `pnpm run test:unit` | Pass | Frontend unit/static tests passed with 76 tests, including table source-sync helpers and accessibility guard assertions for button-help relationship creation/cleanup. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after correcting the Docs Live suggested-answer control labels. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after the progress and spec evidence updates. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` while recording the stronger button-help accessibility proof. |
+| `pnpm run test:e2e` | Pass | Full Chromium browser workflow suite passed with 66 tests after adding the tooltip relationship assertions to the runtime accessibility workflow. |
+| `git diff --check` | Pass | No whitespace errors are present in the button-help semantics diff. |
 
 ## Next Execution Order
 
