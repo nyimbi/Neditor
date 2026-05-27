@@ -163,6 +163,7 @@ import {
   parseMarkdownTables,
   parseTablePaste,
   replaceMarkdownTableInText,
+  replaceMarkdownTableSnapshotInText,
   removeTableDraftColumn,
   removeTableDraftRow,
   serializeMarkdownTable,
@@ -179,6 +180,7 @@ import {
   tableFormulaTargetOptions,
   tableHeaderLabel,
   tableMarkdownForExport,
+  tableOverlapsSourceSnapshot,
   tableSpanCellOptions,
   tableSourceChanged,
   tableSourceText,
@@ -284,6 +286,33 @@ test("table source snapshots detect source and draft divergence", () => {
   equal(tableSourceChanged(sourceText, null, snapshot, "doc-1"), true);
   equal(tableSourceChanged(sourceText.replace("East", "West"), table, snapshot, "other-doc"), false);
   equal(tableSourceChanged(sourceText.replace("East", "West"), table, snapshot, "doc-1", true), false);
+  equal(tableOverlapsSourceSnapshot(table, snapshot, "doc-1"), true);
+
+  const invalidFirstTableText = [
+    "# Report",
+    "",
+    "Table: Regional revenue {#tbl:revenue}",
+    "| Region | Revenue |",
+    "| separator is being edited |",
+    "| West | 2400 |",
+    "",
+    "Table: Other {#tbl:other}",
+    "| Name |",
+    "| --- |",
+    "| Later |",
+  ].join("\n");
+  const [otherParsedTable] = parseMarkdownTables(invalidFirstTableText);
+  equal(otherParsedTable.id, "tbl:other");
+  equal(tableOverlapsSourceSnapshot(otherParsedTable, snapshot, "doc-1"), false);
+
+  const replacement = replaceMarkdownTableSnapshotInText(invalidFirstTableText, snapshot, {
+    ...draft,
+    rows: [["North", "3100"]],
+  });
+  ok(replacement.text.includes("| North | 3100 |"));
+  ok(replacement.text.includes("Table: Other {#tbl:other}"));
+  equal(replacement.startLine, 3);
+  equal(replacement.endLine, 6);
 });
 
 test("table paste handles quoted CSV and markdown table captions", () => {
@@ -4393,6 +4422,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("updateTableDraftFromSourceText"));
   ok(app.includes("applyTableSourceEdit"));
   ok(app.includes("tableDraftSourceChanged"));
+  ok(app.includes("selectedTableForDraft"));
+  ok(app.includes("tableOverlapsSourceSnapshot"));
+  ok(app.includes("replaceMarkdownTableSnapshotInText"));
+  ok(app.includes("The source table is not currently parseable"));
   ok(app.includes("Synced table editor from Markdown source changes"));
   ok(app.includes("loadTableAtCursor"));
   ok(app.includes("findMarkdownTableIndexForLineRange"));

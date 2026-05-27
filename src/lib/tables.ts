@@ -176,6 +176,21 @@ export function replaceMarkdownTableInText(text: string, table: MarkdownTable, d
   };
 }
 
+export function replaceMarkdownTableSnapshotInText(text: string, snapshot: TableSourceSnapshot, draft: TableDraft) {
+  const lines = text.split("\n");
+  const replaceStart = clampInteger(snapshot.startLine, 1, Math.max(1, lines.length + 1));
+  const replaceEnd = clampInteger(snapshot.endLine, replaceStart, Math.max(replaceStart, lines.length));
+  const normalizedDraft = normalizeTableDraft(draft);
+  const serialized = serializeMarkdownTable(normalizedDraft);
+  lines.splice(replaceStart - 1, replaceEnd - replaceStart + 1, ...serialized);
+  return {
+    text: lines.join("\n"),
+    draft: normalizedDraft,
+    startLine: replaceStart,
+    endLine: replaceStart + serialized.length - 1,
+  };
+}
+
 export function tableSourceText(text: string, table: MarkdownTable) {
   const lines = text.split("\n");
   const startLine = table.captionLine || table.startLine;
@@ -213,6 +228,16 @@ export function tableSourceChanged(
   if (!snapshot || isNewDraft || snapshot.documentId !== documentId) return false;
   if (!table) return true;
   return tableSourceText(text, table) !== snapshot.sourceText;
+}
+
+export function tableOverlapsSourceSnapshot(
+  table: MarkdownTable | null | undefined,
+  snapshot: TableSourceSnapshot | null | undefined,
+  documentId: string,
+) {
+  if (!table || !snapshot || snapshot.documentId !== documentId) return false;
+  const tableStart = table.captionLine || table.startLine;
+  return tableStart <= snapshot.endLine && table.endLine >= snapshot.startLine;
 }
 
 function parseTableCaption(line: string) {

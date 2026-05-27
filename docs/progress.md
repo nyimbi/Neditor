@@ -60,6 +60,11 @@ Recent pushed checkpoints visible in current git history:
   editable **Markdown source** block; users can type pipe-table text, parse it
   back into the visual grid, regenerate source text from grid edits, and apply
   the source text into the document.
+- Direct in-text table editing is now more forgiving while users are still
+  typing. If the original pipe-table range temporarily stops parsing, the
+  Tables panel keeps the visual draft, labels the source as not currently
+  parseable, prevents accidental context switches, and lets users either fix
+  the Markdown text or explicitly apply the draft over the original range.
 - Delegated button help now has runtime proof, not only static guardrails. The
   focused browser accessibility workflow verifies tooltip text on hover,
   keyboard focus handoff between toolbar buttons, hiding after focus leaves
@@ -4481,6 +4486,17 @@ Table dirty source export guard:
 | `pnpm run check:docs` | Pass | Markdown links resolved after documenting dirty editable-source table export behavior. |
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the dirty source export guard. |
 | `git diff --check` | Pass | No whitespace errors are present in the dirty source export guard diff. |
+
+Direct text table editing hardening:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed after adding source-snapshot overlap and replacement recovery helpers; direct coverage proves a temporarily invalid first table is not confused with a later parsed table and can be recovered by replacing the original source range. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after routing table source synchronization through `selectedTableForDraft`, overlap checks, invalid-source messaging, and snapshot-range recovery. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow proves direct in-text source editing still syncs clean table edits into the visual grid, keeps the visual draft visible when the separator row is temporarily invalid, and resumes the workflow after the text is fixed. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting in-text table editing recovery. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording source-snapshot overlap and invalid in-text table recovery evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the direct text table editing hardening diff. |
 
 RFP URL and DOCX source cleanup hardening:
 

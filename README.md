@@ -529,11 +529,15 @@ web app.
   source table changes while the grid is open, NEditor syncs a clean visual
   draft from the source and protects dirty visual drafts from silently
   overwriting text edits until the user reloads or explicitly applies the draft
-  over the current source. Unsaved source-block or grid edits also block
-  switching to a different table until the current edit is applied or
-  cancelled. The same source-table workflow is exposed from the Tables panel,
-  Writing Tools menu, command palette, toolbar, and native desktop menu so
-  users can find it without memorizing where the Tables sidebar lives.
+  over the current source. If a user temporarily breaks the pipe-table syntax
+  while editing in the main text, the table editor keeps the last visual draft,
+  marks the source range as not currently parseable, and offers recovery by
+  fixing the text or applying the draft back over the original range. Unsaved
+  source-block or grid edits also block switching to a different table until
+  the current edit is applied or cancelled. The same source-table workflow is
+  exposed from the Tables panel, Writing Tools menu, command palette, toolbar,
+  and native desktop menu so users can find it without memorizing where the
+  Tables sidebar lives.
 - Markdown tables, CSV fences, and TSV fences can carry formulas such as
   `=10+15`, `=SUM(2,3)`, and named table references.
 - Data transforms for CSV, TSV, JSON, YAML, SQLite SQL, OpenAPI, and JSON

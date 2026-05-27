@@ -3726,6 +3726,16 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await expect.poll(() => editorText(page)).toContain("Pipeline");
   await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Pipeline");
 
+  await page.getByRole("textbox", { name: "Find" }).fill("| --- | ---: |");
+  await page.getByRole("textbox", { name: "Replace" }).fill("| separator is being edited |");
+  await page.locator(".cm-search").getByRole("button", { name: "replace all" }).click();
+  await expect(page.getByText("not currently parseable")).toBeVisible();
+  await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Pipeline");
+  await page.getByRole("textbox", { name: "Find" }).fill("| separator is being edited |");
+  await page.getByRole("textbox", { name: "Replace" }).fill("| --- | ---: |");
+  await page.locator(".cm-search").getByRole("button", { name: "replace all" }).click();
+  await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Pipeline");
+
   await page.locator(".table-source-editor textarea").fill(
     [
       "Table: Workflow budget {#tbl:workflow-budget}",

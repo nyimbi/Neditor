@@ -562,7 +562,7 @@
             >
               Edit table at cursor
             </button>
-            <button type="button" :disabled="!selectedTable" @click="goToSelectedTableSource">Go to source table</button>
+            <button type="button" :disabled="!selectedTableForDraft && !tableSourceSnapshot" @click="goToSelectedTableSource">Go to source table</button>
             <button
               type="button"
               :disabled="tableDraftDirty"
@@ -594,7 +594,7 @@
             </div>
             <section v-if="tableDraftSourceChanged" class="table-source-sync" aria-label="Table source synchronization">
               <strong>Source table changed</strong>
-              <p>The Markdown table was edited after this visual draft was loaded. Reload to keep editing the source changes, or explicitly overwrite the current source table with this draft.</p>
+              <p>{{ tableSourceSyncMessage }}</p>
               <div class="table-actions">
                 <button type="button" title="Reload the visual grid from the current Markdown source table" @click="reloadTableDraftFromSource">Reload from source</button>
                 <button type="button" :disabled="tableDraftHasErrors" title="Replace the current Markdown table with this visual draft" @click="applyTableDraft(true)">Apply draft over source</button>
@@ -5249,6 +5249,7 @@ import {
   parseMarkdownTables,
   parseTableCellSpan,
   replaceMarkdownTableInText,
+  replaceMarkdownTableSnapshotInText,
   removeTableDraftColumn,
   removeTableDraftRow,
   serializeMarkdownTable,
@@ -5263,6 +5264,7 @@ import {
   tableHeaderLabel as tableDraftHeaderLabel,
   tableCellLabel as tableDraftCellLabel,
   tableMarkdownForExport,
+  tableOverlapsSourceSnapshot,
   tableTotalLabel as tableDraftTotalLabel,
   tableSpanCellOptions as tableDraftSpanCellOptions,
   tableSourceChanged,
@@ -6835,6 +6837,12 @@ const citationStyle = computed(() =>
 );
 const markdownTables = computed(() => parseMarkdownTables(active.value?.text || ""));
 const selectedTable = computed(() => markdownTables.value[selectedTableIndex.value] || null);
+const selectedTableForDraft = computed(() => {
+  const table = selectedTable.value;
+  const snapshot = tableSourceSnapshot.value;
+  if (!snapshot || isNewTableDraft.value || snapshot.documentId !== active.value.id) return table;
+  return tableOverlapsSourceSnapshot(table, snapshot, active.value.id) ? table : null;
+});
 const outlineHeadings = computed(() =>
   (active.value.compile?.document_ast.blocks || []).flatMap((block) => {
     if (block.kind !== "heading") return [];
@@ -6993,7 +7001,11 @@ const tableColumnTotals = computed(() => {
 });
 const selectedTableEditSummary = computed(() => {
   if (isNewTableDraft.value) return "New table draft will be inserted at the cursor.";
-  const table = selectedTable.value;
+  const table = selectedTableForDraft.value;
+  const snapshot = tableSourceSnapshot.value;
+  if (!table && snapshot && snapshot.documentId === active.value.id) {
+    return `The source table loaded from lines ${snapshot.startLine}-${snapshot.endLine} is not currently parseable. Fix it in Markdown text, reload when valid, or apply the draft over that source range.`;
+  }
   if (!table) return "Place the cursor inside a Markdown table or choose a source table to edit.";
   const start = table.captionLine || table.startLine;
   return `Editing source table lines ${start}-${table.endLine}: ${table.caption || table.headers.join(", ")}`;
@@ -7013,10 +7025,17 @@ const tableSourceEditSummary = computed(() => {
 const tableDraftDirty = computed(() => {
   const snapshot = tableSourceSnapshot.value;
   if (isNewTableDraft.value && tableDraft.value) return true;
+  if (tableDraft.value && snapshot && !selectedTableForDraft.value && tableSourceChanged(active.value.text, null, snapshot, active.value.id)) return true;
   return Boolean(tableSourceEditDirty.value || (tableDraft.value && snapshot && tableDraftMarkdownPreview.value !== snapshot.draftMarkdown));
 });
 const tableDraftSourceChanged = computed(() => {
-  return tableSourceChanged(active.value.text, selectedTable.value, tableSourceSnapshot.value, active.value.id, isNewTableDraft.value);
+  return tableSourceChanged(active.value.text, selectedTableForDraft.value, tableSourceSnapshot.value, active.value.id, isNewTableDraft.value);
+});
+const tableSourceSyncMessage = computed(() => {
+  if (!selectedTableForDraft.value && tableSourceSnapshot.value) {
+    return "The Markdown text where this table was loaded is temporarily not a valid pipe table. Keep editing the text until it parses again, or explicitly apply this visual draft over the original source range.";
+  }
+  return "The Markdown table was edited after this visual draft was loaded. Reload to keep editing the source changes, or explicitly overwrite the current source table with this draft.";
 });
 const tableDataRowCount = computed(() => {
   return tableDraftDataRowCount(tableDraft.value);
@@ -10692,6 +10711,7 @@ watch(
   () => [active.value.id, active.value.text, store.sidebar, selectedTableIndex.value, tableDraftMarkdownPreview.value],
   () => {
     if (store.sidebar !== "tables" || !tableDraft.value || isNewTableDraft.value || !tableDraftSourceChanged.value) return;
+    if (!selectedTableForDraft.value) return;
     if (tableDraftDirty.value) return;
     loadSelectedTable({ force: true });
     store.statusMessage = "Synced table editor from Markdown source changes";
@@ -13264,6 +13284,10 @@ watch(
   markdownTables,
   (tables) => {
     if (!tables.length) {
+      if (tableDraft.value && tableSourceSnapshot.value && tableSourceSnapshot.value.documentId === active.value.id) {
+        selectedTableIndex.value = 0;
+        return;
+      }
       if (!isNewTableDraft.value) tableDraft.value = null;
       selectedTableIndex.value = 0;
       return;
@@ -16859,11 +16883,19 @@ function selectTableForEditing(value: string) {
 }
 
 function goToSelectedTableSource() {
-  const table = selectedTable.value;
-  if (!table) return;
+  const table = selectedTableForDraft.value;
+  if (table) {
+    void goToSourceTarget({
+      line: table.captionLine || table.startLine,
+      end_line: table.endLine,
+    });
+    return;
+  }
+  const snapshot = tableSourceSnapshot.value;
+  if (!snapshot || snapshot.documentId !== active.value.id) return;
   void goToSourceTarget({
-    line: table.captionLine || table.startLine,
-    end_line: table.endLine,
+    line: snapshot.startLine,
+    end_line: snapshot.endLine,
   });
 }
 
@@ -16923,6 +16955,10 @@ function loadSelectedTable(options: { force?: boolean } = {}) {
 }
 
 function reloadTableDraftFromSource() {
+  if (!selectedTableForDraft.value && tableSourceSnapshot.value && tableSourceSnapshot.value.documentId === active.value.id) {
+    store.statusMessage = "The source table is not currently parseable; fix the Markdown text or apply the draft over source";
+    return;
+  }
   loadSelectedTable({ force: true });
   store.statusMessage = "Reloaded table editor from the current Markdown source table";
 }
@@ -16940,7 +16976,7 @@ function applyTableDraft(forceSourceOverwrite = false) {
   if (!isNewTableDraft.value && !selectedTable.value && markdownTables.value.length) {
     selectedTableIndex.value = clampInteger(selectedTableIndex.value, 0, markdownTables.value.length - 1);
   }
-  const table = selectedTable.value;
+  const table = selectedTableForDraft.value;
   const draft = tableDraft.value;
   if (!draft) return;
   const issues = validateTableDraft(draft);
@@ -16968,8 +17004,24 @@ function applyTableDraft(forceSourceOverwrite = false) {
       draftMarkdown: serialized.join("\n"),
     };
   } else if (!isNewTableDraft.value) {
-    store.statusMessage = "The source table is no longer available; reload from source or create a new table draft";
-    return;
+    const snapshot = tableSourceSnapshot.value;
+    if (forceSourceOverwrite && snapshot && snapshot.documentId === active.value.id) {
+      const replacement = replaceMarkdownTableSnapshotInText(active.value.text, snapshot, normalizedDraft);
+      store.updateText(replacement.text);
+      void nextTick(() => syncEditorViewFromActiveDocument());
+      store.statusMessage = `Replaced source table range ${replacement.startLine}-${replacement.endLine}`;
+      tableSourceSnapshot.value = {
+        documentId: active.value.id,
+        tableIndex: selectedTableIndex.value,
+        startLine: replacement.startLine,
+        endLine: replacement.endLine,
+        sourceText: serialized.join("\n"),
+        draftMarkdown: serialized.join("\n"),
+      };
+    } else {
+      store.statusMessage = "The source table is no longer available; reload from source or create a new table draft";
+      return;
+    }
   } else {
     insertTableAtCursor(serialized);
     const insertedSourceText = serialized.join("\n");
