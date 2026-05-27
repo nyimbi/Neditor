@@ -4548,7 +4548,7 @@ test("edits pasted tables with sorting, formulas, and merged cells", async ({ pa
   await page.getByRole("button", { name: "Replace from paste" }).click();
 
   const tableGrid = page.getByRole("group", { name: "Table editor grid" });
-  const markdownPreview = page.getByLabel("Markdown preview");
+  const markdownPreview = page.locator(".table-source-editor textarea");
   await expect(tableGrid.getByRole("group", { name: "Sort controls for column B" })).toBeVisible();
   await expect(tableGrid.getByRole("group", { name: "Row 1 controls" })).toBeVisible();
   await expect(markdownPreview).toHaveValue(/Table: Regional sales \{#tbl:sales\}/);
@@ -4581,7 +4581,7 @@ test("edits table structure with formats and cancels draft changes", async ({ pa
   await expect.poll(() => editorText(page)).toContain("| Revenue | 125000 |");
 
   await selectSidebarPanelOption(page, "tables");
-  const markdownPreview = page.getByLabel("Markdown preview");
+  const markdownPreview = page.locator(".table-source-editor textarea");
   await expect(page.getByLabel("Value, row 1, column B")).toHaveValue("125000");
 
   await page.getByLabel("Column B format").selectOption("currency");

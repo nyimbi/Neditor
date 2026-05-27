@@ -4425,6 +4425,17 @@ Table editor architecture extraction:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the added table helper extraction evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the table architecture extraction diff. |
 
+Table merged-cell helper extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 77 frontend unit/static tests passed after moving merged-cell span preview, apply, and clear behavior into `src/lib/tables.ts`; the table span helper test now proves bounded span preview, draft application, and span clearing. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after `App.vue` delegated merged-cell controls through the table helper module. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "edits pasted tables with sorting, formulas, and merged cells" --project chromium` | Pass | Focused Chromium workflow passed after merged-cell controls delegated through table helpers and the workflow targeted the current editable Markdown source area. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting the merged-cell helper extraction. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the table span helper evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the merged-cell helper extraction diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

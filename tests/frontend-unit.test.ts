@@ -147,7 +147,9 @@ import {
   addTableDraftColumn,
   addTableDraftRow,
   appendTableSummaryFormulaRow,
+  applyTableCellSpanToDraft,
   buildTableFormulaRow,
+  clearTableCellSpanFromDraft,
   createTableSourceSnapshot,
   duplicateTableDraftColumn,
   duplicateTableDraftRow,
@@ -165,6 +167,7 @@ import {
   serializeMarkdownTable,
   setTableCellSpan,
   sortTableDraftRows,
+  tableCellSpanPreview,
   tableColumnRange,
   tableDraftMarkdown,
   tableDraftFromRows,
@@ -357,6 +360,15 @@ test("table span helpers preserve merged-cell attributes through serialization",
   ok(!validateTableDraft(draft).some((issue) => issue.severity === "error"));
   ok(serializeMarkdownTable(draft).join("\n").includes("Discovery {colspan=2}"));
   ok(serializeMarkdownTable(draft).join("\n").includes("Delivery {rowspan=2}"));
+
+  equal(
+    tableCellSpanPreview(draft, { rowIndex: 2, columnIndex: 1, colspan: 5, rowspan: 4 }),
+    "Launch {colspan=2}",
+  );
+  applyTableCellSpanToDraft(draft, { rowIndex: 2, columnIndex: 1, colspan: 5, rowspan: 4 });
+  equal(draft.rows[2][1], "Launch {colspan=2}");
+  deepEqual(clearTableCellSpanFromDraft(draft, 2, 1), { text: "Launch", colspan: 2, rowspan: 1 });
+  equal(draft.rows[2][1], "Launch");
 });
 
 test("table draft sorting preserves summary rows and typed ordering", () => {

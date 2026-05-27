@@ -66,6 +66,13 @@ export interface TableCellSpan {
   rowspan: number;
 }
 
+export interface TableCellSpanSelection {
+  rowIndex: number;
+  columnIndex: number;
+  colspan: number;
+  rowspan: number;
+}
+
 export function parseMarkdownTables(text: string): MarkdownTable[] {
   const lines = text.split("\n");
   const tables: MarkdownTable[] = [];
@@ -514,6 +521,38 @@ export function setTableCellSpan(value: string, colspan: number, rowspan: number
     rowspan > 1 ? `rowspan=${Math.trunc(rowspan)}` : "",
   ].filter(Boolean);
   return attrs.length ? `${current.text} {${attrs.join(" ")}}`.trim() : current.text;
+}
+
+export function tableCellSpanPreview(draft: TableDraft, selection: TableCellSpanSelection) {
+  const resolved = resolveTableCellSpanSelection(draft, selection);
+  const row = draft.rows[resolved.rowIndex];
+  const value = row?.[resolved.columnIndex];
+  if (value === undefined) return "";
+  return setTableCellSpan(value, resolved.colspan, resolved.rowspan);
+}
+
+export function applyTableCellSpanToDraft(draft: TableDraft, selection: TableCellSpanSelection) {
+  const resolved = resolveTableCellSpanSelection(draft, selection);
+  const row = draft.rows[resolved.rowIndex];
+  if (!row || row[resolved.columnIndex] === undefined) return draft;
+  row[resolved.columnIndex] = setTableCellSpan(row[resolved.columnIndex] || "", resolved.colspan, resolved.rowspan);
+  return draft;
+}
+
+export function clearTableCellSpanFromDraft(draft: TableDraft, rowIndex: number, columnIndex: number) {
+  const row = draft.rows[rowIndex];
+  if (!row || row[columnIndex] === undefined) return null;
+  const span = parseTableCellSpan(row[columnIndex]);
+  row[columnIndex] = span.text;
+  return span;
+}
+
+function resolveTableCellSpanSelection(draft: TableDraft, selection: TableCellSpanSelection) {
+  const rowIndex = clampInteger(selection.rowIndex, 0, Math.max(0, draft.rows.length - 1));
+  const columnIndex = clampInteger(selection.columnIndex, 0, Math.max(0, draft.headers.length - 1));
+  const colspan = clampInteger(selection.colspan, 1, Math.max(1, draft.headers.length - columnIndex));
+  const rowspan = clampInteger(selection.rowspan, 1, Math.max(1, draft.rows.length - rowIndex));
+  return { rowIndex, columnIndex, colspan, rowspan };
 }
 
 function spanAttribute(attrs: string, name: "colspan" | "rowspan") {

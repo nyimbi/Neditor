@@ -5232,7 +5232,9 @@ import {
   addTableDraftColumn,
   addTableDraftRow,
   appendTableSummaryFormulaRow,
+  applyTableCellSpanToDraft,
   buildTableFormulaRow,
+  clearTableCellSpanFromDraft,
   createTableSourceSnapshot,
   duplicateTableDraftColumn,
   duplicateTableDraftRow,
@@ -5251,9 +5253,9 @@ import {
   removeTableDraftColumn,
   removeTableDraftRow,
   serializeMarkdownTable,
-  setTableCellSpan,
   sortTableDraftRows,
   spreadsheetColumnName,
+  tableCellSpanPreview as tableDraftCellSpanPreview,
   tableDraftMarkdown,
   tableSourceChanged,
   tableSourceText,
@@ -7060,12 +7062,12 @@ const tableSpanMaxRowspan = computed(() => {
 const tableSpanPreview = computed(() => {
   const draft = tableDraft.value;
   if (!draft) return "";
-  const row = draft.rows[tableSpanRow.value];
-  const value = row?.[tableSpanColumn.value];
-  if (value === undefined) return "";
-  const colspan = clampInteger(tableSpanColspan.value, 1, tableSpanMaxColspan.value);
-  const rowspan = clampInteger(tableSpanRowspan.value, 1, tableSpanMaxRowspan.value);
-  return setTableCellSpan(value, colspan, rowspan);
+  return tableDraftCellSpanPreview(draft, {
+    rowIndex: tableSpanRow.value,
+    columnIndex: tableSpanColumn.value,
+    colspan: tableSpanColspan.value,
+    rowspan: tableSpanRowspan.value,
+  });
 });
 const diagnosticSignature = computed(() =>
   (active.value.compile?.diagnostics || [])
@@ -17103,22 +17105,19 @@ function appendCustomTableFormulaRow() {
 function applyTableCellSpan() {
   const draft = tableDraft.value;
   if (!draft) return;
-  const rowIndex = clampInteger(tableSpanRow.value, 0, Math.max(0, draft.rows.length - 1));
-  const columnIndex = clampInteger(tableSpanColumn.value, 0, Math.max(0, draft.headers.length - 1));
-  const row = draft.rows[rowIndex];
-  if (!row) return;
-  const colspan = clampInteger(tableSpanColspan.value, 1, Math.max(1, draft.headers.length - columnIndex));
-  const rowspan = clampInteger(tableSpanRowspan.value, 1, Math.max(1, draft.rows.length - rowIndex));
-  row[columnIndex] = setTableCellSpan(row[columnIndex] || "", colspan, rowspan);
+  applyTableCellSpanToDraft(draft, {
+    rowIndex: tableSpanRow.value,
+    columnIndex: tableSpanColumn.value,
+    colspan: tableSpanColspan.value,
+    rowspan: tableSpanRowspan.value,
+  });
 }
 
 function clearTableCellSpan() {
   const draft = tableDraft.value;
   if (!draft) return;
-  const row = draft.rows[tableSpanRow.value];
-  if (!row || row[tableSpanColumn.value] === undefined) return;
-  const span = parseTableCellSpan(row[tableSpanColumn.value]);
-  row[tableSpanColumn.value] = span.text;
+  const span = clearTableCellSpanFromDraft(draft, tableSpanRow.value, tableSpanColumn.value);
+  if (!span) return;
   tableSpanColspan.value = 1;
   tableSpanRowspan.value = 1;
 }
