@@ -179,31 +179,58 @@ pub(crate) fn render_stl_svg(
         diagnostics.push(diagnostic);
         return "<section class=\"transform transform-stl transform-error\">No ASCII STL vertices found</section>".to_string();
     }
-    let positions = vertices
-        .iter()
-        .map(|(x, y, _)| (*x, *y))
-        .collect::<Vec<_>>();
-    let (min_x, max_x, min_y, max_y) = geojson_bounds(&positions);
     let triangles = vertices
         .chunks(3)
         .filter(|triangle| triangle.len() == 3)
-        .map(|triangle| {
-            let points = triangle
+        .map(|triangle| StlTrianglePreview {
+            projected: triangle
                 .iter()
-                .map(|(x, y, _)| {
-                    let (x, y) = project_geojson_position((*x, *y), min_x, max_x, min_y, max_y);
-                    format!("{x:.2},{y:.2}")
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
-            format!("<polygon points=\"{points}\" fill=\"rgba(39,93,168,.18)\" stroke=\"#275DA8\" stroke-width=\"2\"/>")
+                .map(|vertex| stl_isometric_position(*vertex))
+                .collect::<Vec<_>>(),
+            average_z: triangle.iter().map(|(_, _, z)| *z).sum::<f64>() / 3.0,
+        })
+        .collect::<Vec<_>>();
+    if triangles.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "STL transform did not contain complete ASCII triangle facets.",
+            None,
+            None,
+            Some("Provide vertex records in groups of three so the static STL preview can draw triangles."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-stl transform-error\">No complete STL triangles found</section>".to_string();
+    }
+    let positions = triangles
+        .iter()
+        .flat_map(|triangle| triangle.projected.iter().copied())
+        .collect::<Vec<_>>();
+    let (min_x, max_x, min_y, max_y) = geojson_bounds(&positions);
+    let (min_z, max_z) = stl_depth_bounds(&vertices);
+    let mut sorted_triangles = triangles;
+    sorted_triangles.sort_by(|left, right| {
+        left.average_z
+            .partial_cmp(&right.average_z)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let triangle_polygons = sorted_triangles
+        .iter()
+        .map(|triangle| {
+            let points = projected_points(&triangle.projected, min_x, max_x, min_y, max_y);
+            let opacity = stl_depth_opacity(triangle.average_z, min_z, max_z);
+            format!(
+                "<polygon points=\"{points}\" data-depth=\"{:.2}\" fill=\"rgba(39,93,168,{opacity:.2})\" stroke=\"#275DA8\" stroke-width=\"2\" stroke-linejoin=\"round\"/>",
+                triangle.average_z
+            )
         })
         .collect::<Vec<_>>()
         .join("");
+    let z_summary = stl_depth_summary(min_z, max_z);
     format!(
-        "<svg class=\"transform transform-stl\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#cbd5e1\"/>{triangles}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#334155\">{} triangles / {} vertices</text></svg>",
-        vertices.len() / 3,
-        vertices.len()
+        "<svg class=\"transform transform-stl\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\" data-projection=\"isometric-depth-fit\" data-coordinate-assumption=\"ascii-stl-xyz\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#cbd5e1\"/>{triangle_polygons}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#334155\">{} triangles / {} vertices{z_summary}</text></svg>",
+        sorted_triangles.len(),
+        vertices.len(),
     )
 }
 
@@ -1022,6 +1049,51 @@ fn apply_topojson_transform(
     }: TopojsonTransform,
 ) -> (f64, f64) {
     (x * scale_x + translate_x, y * scale_y + translate_y)
+}
+
+#[derive(Clone, Debug)]
+struct StlTrianglePreview {
+    projected: Vec<(f64, f64)>,
+    average_z: f64,
+}
+
+fn stl_isometric_position((x, y, z): (f64, f64, f64)) -> (f64, f64) {
+    (x - (z * 0.45), y + (z * 0.35))
+}
+
+fn stl_depth_bounds(vertices: &[(f64, f64, f64)]) -> (f64, f64) {
+    vertices
+        .iter()
+        .map(|(_, _, z)| *z)
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(min_z, max_z), z| {
+            (min_z.min(z), max_z.max(z))
+        })
+}
+
+fn stl_depth_opacity(value: f64, min_z: f64, max_z: f64) -> f64 {
+    let range = (max_z - min_z).abs();
+    if range < f64::EPSILON {
+        return 0.24;
+    }
+    let normalized = ((value - min_z) / range).clamp(0.0, 1.0);
+    0.18 + (normalized * 0.18)
+}
+
+fn stl_depth_summary(min_z: f64, max_z: f64) -> String {
+    let depth = max_z - min_z;
+    if depth.abs() < f64::EPSILON {
+        return String::new();
+    }
+    format!(" / z-depth {}", format_stl_number(depth))
+}
+
+fn format_stl_number(value: f64) -> String {
+    let rounded = (value * 100.0).round() / 100.0;
+    if rounded.fract().abs() < 0.001 {
+        format!("{rounded:.0}")
+    } else {
+        format!("{rounded:.2}")
+    }
 }
 
 fn parse_ascii_stl_vertices(body: &str) -> Vec<(f64, f64, f64)> {

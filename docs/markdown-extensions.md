@@ -431,7 +431,7 @@ Native visual-data transform subsets:
 | `vega-lite` | Inline JSON specs with `data.values`, `encoding.x.field`, `encoding.y.field`, optional `encoding.color.field` grouping/series, `encoding.x.title`/`encoding.y.title`, numeric y values including negatives with a real zero baseline, y aggregates (`sum`, `mean`, `average`, `min`, `max`), and `bar`, `line`, `point`, or `area` marks. |
 | `geojson` | GeoJSON Feature, FeatureCollection, GeometryCollection, Point/MultiPoint, LineString/MultiLineString, Polygon, and MultiPolygon rendered as typed static SVG map previews. Native previews mark their projection as `linear-wgs84-fit`, assume longitude/latitude coordinates, and warn when legacy `crs` metadata or out-of-range projected coordinates are detected. |
 | `topojson` | Topology `arcs` arrays with optional `transform.scale` and `transform.translate`, plus object geometries that reference arcs, including reversed arc references; quantized `Point` and `MultiPoint` coordinates use the same transform so markers align with decoded arcs. |
-| `stl` | ASCII STL vertex data rendered as projected triangle previews. |
+| `stl` | ASCII STL vertex data rendered as depth-aware isometric triangle previews with per-triangle depth ordering and `z-depth` summary metadata. |
 
 Example chart:
 

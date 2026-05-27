@@ -991,6 +991,49 @@ fn stl_transform_renders_ascii_static_svg_preview() {
 }
 
 #[test]
+fn stl_transform_renders_depth_aware_isometric_preview() {
+    let artifact = run_transform(
+        "stl".to_string(),
+        "solid depth
+facet normal 0 0 1
+outer loop
+vertex 0 0 0
+vertex 10 0 0
+vertex 0 10 0
+endloop
+endfacet
+facet normal 0 0 1
+outer loop
+vertex 0 0 10
+vertex 10 0 10
+vertex 0 10 10
+endloop
+endfacet
+endsolid depth"
+            .to_string(),
+    )
+    .expect("depth-aware stl transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-stl"));
+    assert!(artifact
+        .html
+        .contains("data-projection=\"isometric-depth-fit\""));
+    assert!(artifact
+        .html
+        .contains("data-coordinate-assumption=\"ascii-stl-xyz\""));
+    assert!(artifact
+        .html
+        .contains("2 triangles / 6 vertices / z-depth 10"));
+    assert!(artifact.html.contains("data-depth=\"0.00\""));
+    assert!(artifact.html.contains("data-depth=\"10.00\""));
+    assert!(artifact.html.contains("rgba(39,93,168,0.18)"));
+    assert!(artifact.html.contains("rgba(39,93,168,0.36)"));
+    assert!(artifact.html.find("data-depth=\"0.00\"") < artifact.html.find("data-depth=\"10.00\""));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn vega_lite_transform_renders_static_svg_preview() {
     let artifact = run_transform(
             "vega-lite".to_string(),

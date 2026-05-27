@@ -4804,6 +4804,12 @@ TopoJSON mixed geometry fidelity:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked topojson_transform_applies_quantized_point_geometry_transform --lib` | Pass | Focused transform proof shows TopoJSON `Point` and `MultiPoint` object coordinates use the same `transform.scale`/`transform.translate` decoding as arcs, keeping markers aligned with mixed line/point static SVG previews. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked visual_data_transforms_survive_cross_target_exports --lib` | Pass | Cross-target visual-data export proof remains clean for static SVG artifacts after the TopoJSON point-transform decoder update. |
 
+STL depth-aware static previews:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked stl_transform_renders_depth_aware_isometric_preview --lib` | Pass | Focused transform proof shows native STL previews preserve XYZ input through an isometric projection, draw lower-depth triangles first, expose per-triangle `data-depth`, vary opacity by depth, and report `z-depth` summary metadata. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
