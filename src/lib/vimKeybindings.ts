@@ -18,13 +18,20 @@ import {
 import type { EditorView } from "@codemirror/view";
 
 export type VimInputMode = "insert" | "normal";
-export type VimPendingOperator = "" | "d" | "c";
+export type VimPendingOperator = "" | "d" | "c" | "y";
 export type VimMotionKey = "w" | "e" | "b";
+
+export interface VimRegister {
+  text: string;
+  linewise: boolean;
+}
 
 export interface VimKeybindingController {
   pendingOperator(): VimPendingOperator;
+  yankRegister(): VimRegister;
   setInputMode(mode: VimInputMode): void;
   setPendingOperator(operator: VimPendingOperator): void;
+  setYankRegister(register: VimRegister): void;
 }
 
 export function resetVimPendingOperator(controller: VimKeybindingController) {
@@ -44,7 +51,9 @@ export function handleVimNormalKey(event: KeyboardEvent, view: EditorView, contr
   if (pendingOperator) {
     if (event.key === pendingOperator) {
       event.preventDefault();
-      return pendingOperator === "d" ? vimDeleteCurrentLine(view, controller) : vimChangeCurrentLine(view, controller);
+      if (pendingOperator === "d") return vimDeleteCurrentLine(view, controller);
+      if (pendingOperator === "c") return vimChangeCurrentLine(view, controller);
+      return vimYankCurrentLine(view, controller);
     }
     if (isVimOperatorMotionKey(event.key)) {
       event.preventDefault();
@@ -70,6 +79,7 @@ export function handleVimNormalKey(event: KeyboardEvent, view: EditorView, contr
     x: () => deleteCharForward(view),
     D: () => deleteToLineEnd(view),
     C: () => vimChangeToLineEnd(view, controller),
+    P: () => vimPasteBeforeCursor(view, controller),
     I: () => vimInsertAtLineStart(view, controller),
     A: () => vimAppendAtLineEnd(view, controller),
     i: () => vimEnterInsertMode(view, controller),
@@ -80,12 +90,13 @@ export function handleVimNormalKey(event: KeyboardEvent, view: EditorView, contr
     G: () => cursorDocEnd(view),
     g: () => cursorDocStart(view),
     J: () => vimJoinLineWithNext(view),
+    p: () => vimPasteAfterCursor(view, controller),
   }[event.key];
   if (run) {
     event.preventDefault();
     return run();
   }
-  if (event.key === "d" || event.key === "c") {
+  if (event.key === "d" || event.key === "c" || event.key === "y") {
     event.preventDefault();
     controller.setPendingOperator(event.key);
     return true;
@@ -124,7 +135,7 @@ export function previousVimWordStart(text: string, cursor: number) {
   return position;
 }
 
-export function vimMotionRange(text: string, cursor: number, motion: VimMotionKey, operator: "d" | "c" = "d") {
+export function vimMotionRange(text: string, cursor: number, motion: VimMotionKey, operator: "d" | "c" | "y" = "d") {
   const start = Math.max(0, Math.min(text.length, cursor));
   if (motion === "b") {
     return normalizedRange(previousVimWordStart(text, start), start);
@@ -133,6 +144,53 @@ export function vimMotionRange(text: string, cursor: number, motion: VimMotionKe
     return normalizedRange(start, Math.min(text.length, vimWordEnd(text, start) + 1));
   }
   return normalizedRange(start, nextVimWordStart(text, start));
+}
+
+export function vimLineTextRange(text: string, cursor: number) {
+  const safeCursor = Math.max(0, Math.min(text.length, cursor));
+  let lineStart = text.lastIndexOf("\n", Math.max(0, safeCursor - 1)) + 1;
+  let nextLineStart = text.indexOf("\n", safeCursor);
+  if (nextLineStart === -1) nextLineStart = text.length;
+  else nextLineStart += 1;
+  if (lineStart > text.length) lineStart = text.length;
+  return {
+    from: lineStart,
+    to: Math.max(lineStart, nextLineStart),
+    text: ensureLinewiseRegisterText(text.slice(lineStart, Math.max(lineStart, nextLineStart))),
+    linewise: true,
+  };
+}
+
+export function vimPastePosition(text: string, cursor: number, register: VimRegister, placement: "after" | "before") {
+  return vimPasteEdit(text, cursor, register, placement).position;
+}
+
+export function vimPasteEdit(text: string, cursor: number, register: VimRegister, placement: "after" | "before") {
+  const safeCursor = Math.max(0, Math.min(text.length, cursor));
+  if (!register.linewise) {
+    return {
+      position: placement === "after" ? Math.min(text.length, safeCursor + 1) : safeCursor,
+      text: register.text,
+    };
+  }
+  const registerText = ensureLinewiseRegisterText(register.text);
+  if (placement === "before") {
+    return {
+      position: text.lastIndexOf("\n", Math.max(0, safeCursor - 1)) + 1,
+      text: registerText,
+    };
+  }
+  const lineEnd = text.indexOf("\n", safeCursor);
+  if (lineEnd === -1) {
+    return {
+      position: text.length,
+      text: text.length && !text.endsWith("\n") ? `\n${registerText}` : registerText,
+    };
+  }
+  return {
+    position: lineEnd + 1,
+    text: registerText,
+  };
 }
 
 function vimEnterInsertMode(view: EditorView, controller: VimKeybindingController) {
@@ -200,11 +258,14 @@ function vimMoveCursor(view: EditorView, position: number) {
 
 function vimDeleteCurrentLine(view: EditorView, controller: VimKeybindingController) {
   controller.setPendingOperator("");
+  const range = vimLineTextRange(view.state.doc.toString(), view.state.selection.main.head);
+  controller.setYankRegister({ text: range.text, linewise: true });
   return deleteLine(view);
 }
 
 function vimChangeCurrentLine(view: EditorView, controller: VimKeybindingController) {
   const line = view.state.doc.lineAt(view.state.selection.main.head);
+  controller.setYankRegister({ text: line.text, linewise: true });
   view.dispatch({
     changes: { from: line.from, to: line.to, insert: "" },
     selection: EditorSelection.cursor(line.from),
@@ -214,27 +275,38 @@ function vimChangeCurrentLine(view: EditorView, controller: VimKeybindingControl
 }
 
 function vimChangeToLineEnd(view: EditorView, controller: VimKeybindingController) {
+  const cursor = view.state.selection.main.head;
+  const line = view.state.doc.lineAt(cursor);
+  controller.setYankRegister({ text: view.state.doc.sliceString(cursor, line.to), linewise: false });
   deleteToLineEnd(view);
   return vimEnterInsertMode(view, controller);
 }
 
-function vimApplyOperatorMotion(view: EditorView, controller: VimKeybindingController, operator: "d" | "c", motion: VimMotionKey) {
+function vimApplyOperatorMotion(view: EditorView, controller: VimKeybindingController, operator: VimPendingOperator, motion: VimMotionKey) {
+  if (operator !== "d" && operator !== "c" && operator !== "y") return false;
   const range = vimMotionRange(view.state.doc.toString(), view.state.selection.main.head, motion, operator);
   return vimApplyOperatorRange(view, controller, operator, range.from, range.to);
 }
 
-function vimApplyLineOperatorMotion(view: EditorView, controller: VimKeybindingController, operator: "d" | "c", motion: "0" | "$") {
+function vimApplyLineOperatorMotion(view: EditorView, controller: VimKeybindingController, operator: VimPendingOperator, motion: "0" | "$") {
+  if (operator !== "d" && operator !== "c" && operator !== "y") return false;
   const cursor = view.state.selection.main.head;
   const line = view.state.doc.lineAt(cursor);
   const range = motion === "0" ? normalizedRange(line.from, cursor) : normalizedRange(cursor, line.to);
   return vimApplyOperatorRange(view, controller, operator, range.from, range.to);
 }
 
-function vimApplyOperatorRange(view: EditorView, controller: VimKeybindingController, operator: "d" | "c", from: number, to: number) {
+function vimApplyOperatorRange(view: EditorView, controller: VimKeybindingController, operator: "d" | "c" | "y", from: number, to: number) {
   controller.setPendingOperator("");
   const docLength = view.state.doc.length;
   const start = Math.max(0, Math.min(docLength, from));
   const end = Math.max(0, Math.min(docLength, to));
+  const yankedText = view.state.doc.sliceString(start, end);
+  if (yankedText) controller.setYankRegister({ text: yankedText, linewise: false });
+  if (operator === "y") {
+    view.focus();
+    return true;
+  }
   if (start !== end) {
     view.dispatch({
       changes: { from: start, to: end, insert: "" },
@@ -243,6 +315,35 @@ function vimApplyOperatorRange(view: EditorView, controller: VimKeybindingContro
     });
   }
   if (operator === "c") return vimEnterInsertMode(view, controller);
+  view.focus();
+  return true;
+}
+
+function vimYankCurrentLine(view: EditorView, controller: VimKeybindingController) {
+  controller.setPendingOperator("");
+  const range = vimLineTextRange(view.state.doc.toString(), view.state.selection.main.head);
+  controller.setYankRegister({ text: range.text, linewise: true });
+  view.focus();
+  return true;
+}
+
+function vimPasteAfterCursor(view: EditorView, controller: VimKeybindingController) {
+  return vimPasteRegister(view, controller, "after");
+}
+
+function vimPasteBeforeCursor(view: EditorView, controller: VimKeybindingController) {
+  return vimPasteRegister(view, controller, "before");
+}
+
+function vimPasteRegister(view: EditorView, controller: VimKeybindingController, placement: "after" | "before") {
+  const register = controller.yankRegister();
+  if (!register.text) return true;
+  const paste = vimPasteEdit(view.state.doc.toString(), view.state.selection.main.head, register, placement);
+  view.dispatch({
+    changes: { from: paste.position, to: paste.position, insert: paste.text },
+    selection: EditorSelection.cursor(paste.position + paste.text.length),
+    scrollIntoView: true,
+  });
   view.focus();
   return true;
 }
@@ -270,6 +371,10 @@ function isVimOperatorMotionKey(key: string): key is VimMotionKey {
 
 function normalizedRange(from: number, to: number) {
   return from <= to ? { from, to } : { from: to, to: from };
+}
+
+function ensureLinewiseRegisterText(text: string) {
+  return text.endsWith("\n") ? text : `${text}\n`;
 }
 
 function isVimWhitespace(char: string | undefined) {

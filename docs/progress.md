@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Vim-style editing now has first-class yank/paste register behavior. The
+  editor supports pending `y` operators for `yy`, word motions, and line
+  motions, plus `p`/`P` paste placement with linewise register semantics, and
+  focused frontend unit coverage proves the word, line, and paste helpers that
+  keep modal edits predictable.
 - Spec-completion evidence now produces a machine-readable closure plan instead
   of only a flat partial-row count. `pnpm run check:spec-completion` writes
   `.tmp/spec-completion/report.json` plus `.tmp/spec-completion/gap-plan.md`,

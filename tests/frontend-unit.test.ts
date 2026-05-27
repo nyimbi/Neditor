@@ -155,7 +155,7 @@ import {
   normalizeTtsPreferences,
   WORKSPACE_SCHEMA_VERSION,
 } from "../src/lib/workspacePersistence.js";
-import { nextVimWordStart, previousVimWordStart, vimMotionRange, vimWordEnd } from "../src/lib/vimKeybindings.js";
+import { nextVimWordStart, previousVimWordStart, vimLineTextRange, vimMotionRange, vimPasteEdit, vimPastePosition, vimWordEnd } from "../src/lib/vimKeybindings.js";
 import {
   appendConflictMergeLine,
   appendConflictMergePart,
@@ -1461,6 +1461,15 @@ test("Vim keybinding word helpers follow modal editor cursor semantics", () => {
   deepEqual(vimMotionRange(text, 0, "w", "c"), { from: 0, to: 4 });
   deepEqual(vimMotionRange(text, 10, "b", "d"), { from: 5, to: 10 });
   deepEqual(vimMotionRange(text, 5, "e", "d"), { from: 5, to: 10 });
+  deepEqual(vimMotionRange(text, 5, "w", "y"), { from: 5, to: 11 });
+  deepEqual(vimLineTextRange("one\ntwo\nthree", 5), { from: 4, to: 8, text: "two\n", linewise: true });
+  deepEqual(vimLineTextRange("one\ntwo\nthree", 10), { from: 8, to: 13, text: "three\n", linewise: true });
+  equal(vimPastePosition("one\ntwo\nthree", 5, { text: "alpha\n", linewise: true }, "after"), 8);
+  equal(vimPastePosition("one\ntwo\nthree", 5, { text: "alpha\n", linewise: true }, "before"), 4);
+  deepEqual(vimPasteEdit("one\ntwo\nthree", 10, { text: "alpha\n", linewise: true }, "after"), { position: 13, text: "\nalpha\n" });
+  deepEqual(vimPasteEdit("one\ntwo\nthree\n", 10, { text: "alpha", linewise: true }, "after"), { position: 14, text: "alpha\n" });
+  equal(vimPastePosition("one two", 3, { text: "X", linewise: false }, "after"), 4);
+  equal(vimPastePosition("one two", 3, { text: "X", linewise: false }, "before"), 3);
 });
 
 test("Emacs keybinding helpers preserve kill and word navigation semantics", () => {
@@ -5146,7 +5155,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(vimKeybindings.includes("vimMoveWordEnd"));
   ok(vimKeybindings.includes("vimApplyOperatorMotion"));
   ok(vimKeybindings.includes("vimJoinLineWithNext"));
-  ok(vimKeybindings.includes('event.key === "d" || event.key === "c"'));
+  ok(vimKeybindings.includes("VimRegister"));
+  ok(vimKeybindings.includes("vimYankCurrentLine"));
+  ok(vimKeybindings.includes("vimPasteRegister"));
+  ok(vimKeybindings.includes('event.key === "d" || event.key === "c" || event.key === "y"'));
+  ok(app.includes("vimYankRegister"));
   ok(app.includes("Vim-style mode starts in insert mode"));
   ok(types.includes("savedText?: string"));
   ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
@@ -5907,8 +5920,11 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow edited with Vim normal insert and append"));
   ok(app.includes("native workflow edited with Vim operator motions"));
   ok(app.includes("vimPendingOperator"));
+  ok(app.includes("vimYankRegister"));
   ok(vimKeybindings.includes("vimDeleteCurrentLine"));
   ok(vimKeybindings.includes("vimChangeCurrentLine"));
+  ok(vimKeybindings.includes("vimYankCurrentLine"));
+  ok(vimKeybindings.includes("vimPasteAfterCursor"));
   ok(app.includes("collectNativeOutlineNavigationEvidence"));
   ok(app.includes("native workflow navigated outline heading to source"));
   ok(app.includes("collectNativeDiagnosticNavigationEvidence"));

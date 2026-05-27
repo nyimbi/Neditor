@@ -5420,6 +5420,7 @@ import {
   type VimInputMode,
   type VimKeybindingController,
   type VimPendingOperator,
+  type VimRegister,
 } from "./lib/vimKeybindings";
 import { useDocumentsStore } from "./stores/documents";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
@@ -5655,14 +5656,19 @@ let secondaryEditorView: EditorView | null = null;
 let syncingEditorFromStore = false;
 const vimInputMode = ref<VimInputMode>("insert");
 const vimPendingOperator = ref<VimPendingOperator>("");
+const vimYankRegister = ref<VimRegister>({ text: "", linewise: false });
 const emacsKillRing: EmacsKillRing = { text: "" };
 const vimKeybindingController: VimKeybindingController = {
   pendingOperator: () => vimPendingOperator.value,
+  yankRegister: () => vimYankRegister.value,
   setInputMode: (mode) => {
     vimInputMode.value = mode;
   },
   setPendingOperator: (operator) => {
     vimPendingOperator.value = operator;
+  },
+  setYankRegister: (register) => {
+    vimYankRegister.value = register;
   },
 };
 const previewTextCommit = createDebouncedTextCommit((text) => store.updateText(text), {
@@ -7892,7 +7898,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
     tips: [
       "The command palette is the fastest way to find actions while learning the app.",
       "AI drafting, outline planning, review readiness, and distribution preparation all have direct shortcuts so collapsed toolbars remain practical.",
-      "Vim-style mode starts in insert mode; press Escape for normal mode, then use h/j/k/l, 0, ^, $, w, e, b, x, D, C, J, i, a, o, O, u, Ctrl+R, g, G, dd, dw, de, db, d0, d$, cw, and cc.",
+      "Vim-style mode starts in insert mode; press Escape for normal mode, then use h/j/k/l, 0, ^, $, w, e, b, x, D, C, J, i, a, o, O, u, Ctrl+R, g, G, dd, dw, de, db, d0, d$, cw, cc, yy, yw, ye, yb, y0, y$, p, and P.",
       "Emacs-style mode adds familiar Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Ctrl+P, Ctrl+N, Ctrl+D, Ctrl+K, Ctrl+Y, Ctrl+W, Alt+D, Alt+Backspace, Alt+F, and Alt+B navigation/editing keys.",
       "Toolbar text can be resized or hidden if you prefer icons only.",
     ],
