@@ -510,13 +510,16 @@ web app.
   Markdown table, CSV/TSV/XLSX import, CSV/XLSX export, cancel/apply workflows,
   and readable Markdown output. Tables are two-way: create a new table visually
   or place the cursor inside a Markdown table and edit that exact source table
-  through the visual grid. If the Markdown source table changes while the grid
-  is open, NEditor syncs a clean visual draft from the source and protects dirty
-  visual drafts from silently overwriting text edits until the user reloads or
-  explicitly applies the draft over the current source. The same source-table
-  workflow is exposed from the Tables panel, Writing Tools menu, command
-  palette, toolbar, and native desktop menu so users can find it without
-  memorizing where the Tables sidebar lives.
+  through the visual grid or the editable Markdown source block beside it.
+  Source text edits can be parsed back into the grid, and grid edits can
+  regenerate readable Markdown before applying to the document. If the Markdown
+  source table changes while the grid is open, NEditor syncs a clean visual
+  draft from the source and protects dirty visual drafts from silently
+  overwriting text edits until the user reloads or explicitly applies the draft
+  over the current source. The same source-table workflow is exposed from the
+  Tables panel, Writing Tools menu, command palette, toolbar, and native
+  desktop menu so users can find it without memorizing where the Tables sidebar
+  lives.
 - Markdown tables, CSV fences, and TSV fences can carry formulas such as
   `=10+15`, `=SUM(2,3)`, and named table references.
 - Data transforms for CSV, TSV, JSON, YAML, SQLite SQL, OpenAPI, and JSON

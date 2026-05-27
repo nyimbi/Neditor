@@ -766,10 +766,34 @@
               </button>
               <span></span>
             </div>
-            <label class="table-preview">
-              Markdown preview
-              <textarea :value="tableDraftMarkdownPreview" rows="7" readonly></textarea>
+            <label class="table-preview table-source-editor">
+              Markdown source
+              <textarea
+                v-model="tableSourceEditText"
+                rows="7"
+                spellcheck="false"
+                :aria-invalid="Boolean(tableSourceEditError)"
+                @input="markTableSourceEditDirty"
+              ></textarea>
             </label>
+            <div class="table-actions">
+              <button type="button" :disabled="!tableDraft || !tableSourceEditDirty" title="Parse the Markdown source text into the visual grid" @click="updateTableDraftFromSourceText">
+                Update grid from source
+              </button>
+              <button type="button" :disabled="!tableDraft" title="Regenerate Markdown source text from the current visual grid" @click="refreshTableSourceEditFromDraft">
+                Refresh source from grid
+              </button>
+              <button
+                type="button"
+                :disabled="!tableDraft || (!isNewTableDraft && tableDraftSourceChanged)"
+                title="Parse and write this Markdown source table into the document"
+                @click="applyTableSourceEdit()"
+              >
+                {{ isNewTableDraft ? "Insert source text" : "Apply source text" }}
+              </button>
+            </div>
+            <p v-if="tableSourceEditError" class="table-source-error" role="alert">{{ tableSourceEditError }}</p>
+            <p v-else class="sidebar-hint">{{ tableSourceEditSummary }}</p>
           </template>
           <p v-else>No Markdown table selected.</p>
         </template>
@@ -5617,6 +5641,9 @@ const documentSetRenameDraft = ref("");
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const tableSourceSnapshot = ref<TableSourceSnapshot | null>(null);
+const tableSourceEditText = ref("");
+const tableSourceEditError = ref("");
+const tableSourceEditDirty = ref(false);
 const isNewTableDraft = ref(false);
 const tableDataBusy = ref(false);
 const tableFormulaFunction = ref<TableFormulaFunction>("SUM");
@@ -6941,9 +6968,14 @@ const tableDraftMarkdownPreview = computed(() => {
   if (!draft) return "";
   return tableDraftMarkdown(draft);
 });
+const tableSourceEditSummary = computed(() => {
+  if (!tableDraft.value) return "Select or create a table to edit Markdown source text.";
+  if (tableSourceEditDirty.value) return "Markdown source text has unsaved edits. Update the grid or apply the source text before switching tables.";
+  return "Edit the Markdown table text directly, update the visual grid from it, or regenerate source text from the grid.";
+});
 const tableDraftDirty = computed(() => {
   const snapshot = tableSourceSnapshot.value;
-  return Boolean(tableDraft.value && snapshot && tableDraftMarkdownPreview.value !== snapshot.draftMarkdown);
+  return Boolean(tableSourceEditDirty.value || (tableDraft.value && snapshot && tableDraftMarkdownPreview.value !== snapshot.draftMarkdown));
 });
 const tableDraftSourceChanged = computed(() => {
   return tableSourceChanged(active.value.text, selectedTable.value, tableSourceSnapshot.value, active.value.id, isNewTableDraft.value);
@@ -10640,6 +10672,14 @@ watch(
     if (tableDraftDirty.value) return;
     loadSelectedTable();
     store.statusMessage = "Synced table editor from Markdown source changes";
+  },
+);
+
+watch(
+  tableDraftMarkdownPreview,
+  (markdown) => {
+    if (tableSourceEditDirty.value) return;
+    tableSourceEditText.value = markdown;
   },
 );
 
@@ -16794,17 +16834,51 @@ function rememberTableSource(table: MarkdownTable, draft: TableDraft) {
   tableSourceSnapshot.value = createTableSourceSnapshot(active.value.text, active.value.id, selectedTableIndex.value, table, draft);
 }
 
+function refreshTableSourceEditFromDraft() {
+  tableSourceEditText.value = tableDraft.value ? tableDraftMarkdownPreview.value : "";
+  tableSourceEditError.value = "";
+  tableSourceEditDirty.value = false;
+}
+
+function markTableSourceEditDirty() {
+  tableSourceEditDirty.value = true;
+  tableSourceEditError.value = "";
+}
+
+function updateTableDraftFromSourceText() {
+  const tables = parseMarkdownTables(tableSourceEditText.value);
+  if (!tables.length) {
+    tableSourceEditError.value = "Enter a valid Markdown pipe table with a header row and separator row.";
+    store.statusMessage = "Markdown table source could not be parsed";
+    return false;
+  }
+  const draft = markdownTableToDraft(tables[0]);
+  tableDraft.value = draft;
+  tableSourceEditText.value = tableDraftMarkdown(draft);
+  tableSourceEditError.value = "";
+  tableSourceEditDirty.value = false;
+  store.statusMessage = "Updated visual table grid from Markdown source text";
+  return true;
+}
+
+function applyTableSourceEdit(forceSourceOverwrite = false) {
+  if (!updateTableDraftFromSourceText()) return;
+  applyTableDraft(forceSourceOverwrite);
+}
+
 function loadSelectedTable() {
   const table = selectedTable.value;
   isNewTableDraft.value = false;
   if (!table) {
     tableDraft.value = null;
     tableSourceSnapshot.value = null;
+    refreshTableSourceEditFromDraft();
     return;
   }
   const draft = markdownTableToDraft(table);
   tableDraft.value = draft;
   rememberTableSource(table, draft);
+  refreshTableSourceEditFromDraft();
 }
 
 function reloadTableDraftFromSource() {
@@ -16826,6 +16900,7 @@ function createTableDraft() {
       ["Cost", "74000"],
     ],
   };
+  refreshTableSourceEditFromDraft();
 }
 
 function applyTableDraft(forceSourceOverwrite = false) {
@@ -16869,12 +16944,14 @@ function applyTableDraft(forceSourceOverwrite = false) {
   }
   isNewTableDraft.value = false;
   tableDraft.value = normalizedDraft;
+  refreshTableSourceEditFromDraft();
 }
 
 function cancelTableDraft() {
   if (isNewTableDraft.value) {
     tableDraft.value = null;
     isNewTableDraft.value = false;
+    refreshTableSourceEditFromDraft();
     if (selectedTable.value) loadSelectedTable();
     store.statusMessage = "Cancelled new table";
     return;
@@ -17068,6 +17145,7 @@ function replaceTableFromPaste() {
   });
   if (!nextDraft) return;
   tableDraft.value = nextDraft;
+  refreshTableSourceEditFromDraft();
 }
 
 async function importTableFromSpreadsheet() {
@@ -17091,6 +17169,7 @@ async function importTableFromSpreadsheet() {
     tableSourceSnapshot.value = null;
     isNewTableDraft.value = true;
     tablePasteText.value = response.markdown;
+    refreshTableSourceEditFromDraft();
     store.sidebar = "tables";
     store.statusMessage = `Imported ${response.rows} rows and ${response.columns} columns from ${response.source_format.toUpperCase()}`;
     if (response.warnings.length) store.lastError = response.warnings.join(" ");
@@ -22386,6 +22465,17 @@ select:hover {
 .table-preview textarea {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre;
+}
+
+.table-source-editor textarea[aria-invalid="true"] {
+  border-color: #b91c1c;
+  background: #fff7f7;
+}
+
+.table-source-error {
+  margin: -6px 0 12px;
+  color: #b91c1c;
+  font-size: 12px;
 }
 
 .editor-pane {

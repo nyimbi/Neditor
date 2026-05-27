@@ -4149,6 +4149,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Source table changed"));
   ok(app.includes("Reload from source"));
   ok(app.includes("Apply draft over source"));
+  ok(app.includes("Markdown source"));
+  ok(app.includes("Update grid from source"));
+  ok(app.includes("Refresh source from grid"));
+  ok(app.includes("Apply source text"));
+  ok(app.includes("tableSourceEditDirty"));
+  ok(app.includes("updateTableDraftFromSourceText"));
+  ok(app.includes("applyTableSourceEdit"));
   ok(app.includes("tableDraftSourceChanged"));
   ok(app.includes("Synced table editor from Markdown source changes"));
   ok(app.includes("loadTableAtCursor"));

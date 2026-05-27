@@ -16,10 +16,11 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `a7f7c3b Associate button
-  help with active controls`
+- Latest inspected committed baseline before this update: `338025f Make business
+  profile setup scriptable`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: clean and aligned with `origin/main`
+- Worktree before this log update: contained pending `src-tauri` CLI/RFP edits;
+  this table-editing slice keeps those changes intact and separate.
 
 ## Durable Planning Artifacts
 
@@ -31,6 +32,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Table editing is now explicitly two-way inside the Tables sidebar, not only
+  through the main Markdown editor. The loaded or newly created table has an
+  editable **Markdown source** block; users can type pipe-table text, parse it
+  back into the visual grid, regenerate source text from grid edits, and apply
+  the source text into the document.
 - Delegated button help now has runtime proof, not only static guardrails. The
   focused browser accessibility workflow verifies tooltip text on hover,
   keyboard focus handoff between toolbar buttons, hiding after focus leaves
@@ -1513,6 +1519,10 @@ Current verification recorded on 2026-05-21 through 2026-05-27:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after adding the editable table Markdown source block, including static guards for source-to-grid parsing, grid-to-source refresh, source-text apply, and source-edit dirty tracking. |
+| `pnpm run check` | Pass | Vue typecheck passed after wiring the editable table source textarea and its parse/apply controls into the Tables sidebar. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting explicit source-text table editing. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording editable source block evidence for table editing. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "shows delegated button help on hover and focus"` | Pass | Focused Chromium workflow proved delegated button help appears on pointer hover, follows keyboard focus from Commands to Help, hides when focus leaves button controls, and includes disabled-state guidance for the table Export CSV action. |
 | `pnpm run check:a11y:runtime` | Pass | Runtime accessibility audit now runs seven focused Chromium workflows and includes delegated button-help proof for hover, keyboard focus handoff, tooltip hiding, and disabled-button guidance. |
 | `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after updating the runtime accessibility workflow guard to require delegated button-help coverage. |
