@@ -202,7 +202,7 @@ settings.
 | Continue editing in Google Docs | Export the Google Docs package, then import the included DOCX into Google Docs. |
 | Share a long-form reader copy | Export the EPUB ebook, then open it in an EPUB reader before sending it. |
 | Keep formal evidence for approvals | Use export manifests, review status, approval metadata, snapshots, release tags, and the AI Export Assistance notes for metadata, readiness diagnostics, and artifact evidence when your team needs an audit trail. |
-| Add calculations, charts, or diagrams | Insert a built-in transform template, replace the sample values, and preview the result. |
+| Add calculations, charts, or diagrams | Open **Templates**, use **AI template assistance** to choose a suitable calc/chart/diagram/data template, replace sample values with sourced inputs, preview the result, and insert transform review notes when the output affects business claims. |
 
 ### What NEditor Helps With
 
@@ -503,8 +503,11 @@ web app.
 
 - Visual Markdown table editor with paste import, row and column editing,
   alignment, numeric sorting, column formats, totals, formula rows, merged-cell
-  metadata, CSV/TSV/XLSX import, CSV/XLSX export, cancel/apply workflows, and
-  readable Markdown output.
+  metadata, source-table selection, cursor-aware editing of an existing
+  Markdown table, CSV/TSV/XLSX import, CSV/XLSX export, cancel/apply workflows,
+  and readable Markdown output. Tables are two-way: create a new table visually
+  or place the cursor inside a Markdown table and edit that exact source table
+  through the visual grid.
 - Markdown tables, CSV fences, and TSV fences can carry formulas such as
   `=10+15`, `=SUM(2,3)`, and named table references.
 - Data transforms for CSV, TSV, JSON, YAML, SQLite SQL, OpenAPI, and JSON
@@ -512,6 +515,11 @@ web app.
   SQLite table queries behind explicit engine trust, and relative database paths
   resolve from the current Markdown document's folder without allowing relative
   escapes outside that folder.
+- The Templates sidebar includes **AI template assistance** that uses the
+  current filters, document context, custom-template draft, and notes to suggest
+  which template to use, which values to replace, how to preview and verify the
+  result, and what review handoff to insert before relying on the transform in
+  business prose.
 
 ### Diagrams And Transform Blocks
 

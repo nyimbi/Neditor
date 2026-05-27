@@ -19,6 +19,26 @@ export interface TransformTemplateFillField {
   source: "calc-assignment" | "structured-field";
 }
 
+export interface TransformTemplateAssistance {
+  stepId: string;
+  stepLabel: string;
+  suggestedAnswer: string;
+  rationale: string;
+  contextSignals: string[];
+  actionLabel: string;
+}
+
+export interface TransformTemplateAssistanceInput {
+  templates: TransformTemplate[];
+  filteredTemplates: TransformTemplate[];
+  query?: string | null;
+  category?: string | null;
+  transform?: string | null;
+  documentText?: string | null;
+  customTemplate?: Partial<CustomTransformTemplate> | null;
+  assistanceNotes?: string | null;
+}
+
 const fenceTicks = "```";
 
 function fenced(transform: string, content: string, options = "") {
@@ -1028,6 +1048,85 @@ export function transformTemplateFillFields(template: Pick<TransformTemplate, "b
   return fields.slice(0, 12);
 }
 
+export function buildTransformTemplateAssistance(input: TransformTemplateAssistanceInput): TransformTemplateAssistance[] {
+  const templates = input.templates;
+  const filtered = input.filteredTemplates.length ? input.filteredTemplates : templates;
+  const query = (input.query || "").trim();
+  const category = (input.category || "all").trim() || "all";
+  const transform = (input.transform || "all").trim() || "all";
+  const documentText = input.documentText || "";
+  const selected = recommendedTemplate(filtered, query, documentText);
+  const selectedFields = selected ? transformTemplateFillFields(selected) : [];
+  const customFields = input.customTemplate ? transformTemplateFillFields({
+    body: input.customTemplate.body || "",
+    transform: input.customTemplate.transform || "calc",
+  }) : [];
+  const calcCount = templates.filter((template) => template.transform === "calc").length;
+  const customCount = templates.filter((template) => template.source === "custom").length;
+  const noteWords = wordCount(input.assistanceNotes || "");
+  const baseSignals = [
+    `Library templates: ${templates.length}`,
+    `Filtered templates: ${filtered.length}`,
+    `Calc templates: ${calcCount}`,
+    `Custom templates: ${customCount}`,
+    `Search: ${query || "none"}`,
+    `Category: ${category}`,
+    `Transform: ${transform}`,
+  ];
+  const selectedLabel = selected ? `${selected.name} (${selected.category} ${selected.transform})` : "no matching template";
+
+  return [
+    {
+      stepId: "choose-template",
+      stepLabel: "Choose the right template",
+      suggestedAnswer: selected
+        ? `Start with "${selected.name}" because it best matches the current filters and document context. Keep the filter narrow enough for business users: ${category === "all" ? "choose a category" : `category ${category}`}, ${transform === "all" ? "choose a transform kind" : `transform ${transform}`}, then insert only after the template purpose matches the narrative claim.`
+        : "Broaden the search, category, or transform filters until at least one template matches the business question, calculation, chart, diagram, data, API, or publishing task.",
+      rationale: "Template choice should be driven by the document's decision or evidence need, not by browsing a long library at random.",
+      contextSignals: [...baseSignals, `Recommended template: ${selectedLabel}`],
+      actionLabel: "Add template choice guidance",
+    },
+    {
+      stepId: "fill-values",
+      stepLabel: "Fill values responsibly",
+      suggestedAnswer: selectedFields.length
+        ? `Replace sample values for ${selectedFields.slice(0, 6).map((field) => field.name).join(", ")} with sourced document values, and keep assumptions visible when a value is estimated or pending review.`
+        : "Identify the user-editable values in the transform body, replace examples with sourced inputs, and record any assumptions before the transform result is used in prose.",
+      rationale: "Business and scientific transforms are only as reliable as their inputs; visible assumptions make downstream review possible.",
+      contextSignals: [
+        `Recommended template: ${selectedLabel}`,
+        `Detected fill fields: ${selectedFields.length ? selectedFields.map((field) => field.name).join(", ") : "none"}`,
+        `Custom draft fill fields: ${customFields.length ? customFields.map((field) => field.name).join(", ") : "none"}`,
+      ],
+      actionLabel: "Add fill-value guidance",
+    },
+    {
+      stepId: "preview-and-verify",
+      stepLabel: "Preview and verify",
+      suggestedAnswer: selected
+        ? `After inserting "${selected.name}", run the transform preview and verify that the rendered result, labels, captions, units, source values, and dependent narrative all agree before export.`
+        : "After inserting any transform, run preview, inspect diagnostics, and verify rendered output before relying on the result in the document.",
+      rationale: "Preview catches syntax, engine, unit, and rendering issues before a calculated or visual claim reaches review.",
+      contextSignals: [
+        `Document words: ${wordCount(documentText)}`,
+        `Template output kind: ${selected?.transform || transform}`,
+        `Assistance notes words: ${noteWords}`,
+      ],
+      actionLabel: "Add preview guidance",
+    },
+    {
+      stepId: "review-handoff",
+      stepLabel: "Prepare review handoff",
+      suggestedAnswer: selected
+        ? `Document why "${selected.name}" was used, which values were replaced, who owns verification, and which section depends on the result. Add the transform to the QA handoff when it affects a financial, scientific, compliance, or client-facing claim.`
+        : "Create a transform handoff note that names the calculation or visual, source data, owner, verification status, and affected sections before distribution.",
+      rationale: "Transform results influence claims and decisions, so reviewers need ownership, evidence, and dependency context rather than a silent rendered block.",
+      contextSignals: [...baseSignals, `Assistance notes words: ${noteWords}`],
+      actionLabel: "Add handoff guidance",
+    },
+  ];
+}
+
 export function createCustomTransformTemplateId() {
   return `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -1107,4 +1206,29 @@ function isEditableLiteral(value: string) {
     /^(['"]).*\1$/.test(value) ||
     /^(true|false)$/i.test(value)
   );
+}
+
+function recommendedTemplate(templates: TransformTemplate[], query: string, documentText: string) {
+  if (!templates.length) return null;
+  const terms = new Set(
+    `${query} ${documentText}`
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((term) => term.length > 2),
+  );
+  let best = templates[0];
+  let bestScore = -1;
+  for (const template of templates) {
+    const haystack = [template.name, template.category, template.transform, template.summary, ...template.tags].join(" ").toLowerCase();
+    const score = [...terms].reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0) + (template.transform === "calc" ? 0.25 : 0);
+    if (score > bestScore) {
+      best = template;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+function wordCount(value: string) {
+  return value.trim() ? value.trim().split(/\s+/).length : 0;
 }

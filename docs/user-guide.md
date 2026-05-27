@@ -277,7 +277,11 @@ blocks. The built-in library includes business, scientific, and mathematical
 Schema, and QR templates. Built-ins can be inserted directly or duplicated into
 custom templates that are saved with the workspace. Template cards show the
 detected fill values for calculation and structured transform bodies before
-insertion.
+insertion. The same panel includes **AI template assistance** for the full
+template workflow: choose the right template from the current filters and
+document context, replace sample values with sourced inputs, preview and verify
+the result, and write a reviewer handoff note when the transform supports a
+financial, scientific, compliance, or client-facing claim.
 
 ## Product Boundaries
 
@@ -356,7 +360,11 @@ Use [Markdown extensions](markdown-extensions.md) as the syntax reference.
 Use normal Markdown tables for readable source. The table editor can import
 pasted tables, add or remove rows and columns, sort numeric data, apply
 alignment, add totals, preserve merged-cell metadata, and write clean Markdown
-back to the document.
+back to the document. It is also a two-way source editor: place the cursor
+inside an existing Markdown table, open Tables, choose **Edit table at cursor**,
+change the grid, then choose **Apply** to replace that exact table in the text.
+Use **Go to source table** when you need to jump from the visual editor back to
+the Markdown range being edited.
 
 Use `calc` blocks for document-level calculations:
 
@@ -388,6 +396,12 @@ batches, resolves relative database paths such as `data/revenue.sqlite` from
 the Markdown document's folder, blocks relative paths that escape that folder,
 and renders the result as a Markdown table that can be reviewed, copied, and
 exported with the rest of the document.
+
+Before inserting a calculation, chart, diagram, SQL query, or other transform,
+open Templates and review the AI template assistance cards. Accept the guidance
+into transform assistance notes, add owners and source values, then insert the
+notes into the document when the rendered output affects claims, budgets,
+requirements, or review decisions.
 
 ## Citations, Glossary, Index, And References
 

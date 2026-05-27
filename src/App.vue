@@ -539,6 +539,7 @@
 
         <template v-else-if="store.sidebar === 'tables'">
           <h2>Tables</h2>
+          <p class="sidebar-hint">{{ selectedTableEditSummary }}</p>
           <label>
             Table
             <select v-model.number="selectedTableIndex" @change="loadSelectedTable">
@@ -547,7 +548,11 @@
               </option>
             </select>
           </label>
-          <button type="button" @click="createTableDraft">New table</button>
+          <div class="table-actions">
+            <button type="button" @click="loadTableAtCursor()">Edit table at cursor</button>
+            <button type="button" :disabled="!selectedTable" @click="goToSelectedTableSource">Go to source table</button>
+            <button type="button" @click="createTableDraft">New table</button>
+          </div>
           <div class="table-actions">
             <button type="button" :disabled="tableDataBusy" @click="importTableFromSpreadsheet">
               {{ tableDataBusy ? "Working..." : "Import CSV/XLSX" }}
@@ -1023,6 +1028,35 @@
                 <option v-for="transform in transformTemplateKindOptions" :key="transform" :value="transform">{{ transform }}</option>
               </select>
             </label>
+          </section>
+          <section class="transform-template-assistance" aria-label="AI transform template assistance">
+            <header>
+              <div>
+                <h3>AI template assistance</h3>
+                <span>{{ filteredTransformTemplates.length }} matching templates</span>
+              </div>
+              <button type="button" @click="appendAllTransformTemplateAssistance">Use all</button>
+            </header>
+            <p>Context-aware guidance helps choose the right calculation or transform, replace sample values responsibly, preview results, and prepare a review handoff.</p>
+            <article
+              v-for="item in transformTemplateAssistance"
+              :key="item.stepId"
+              class="snapshot-row"
+              data-status="improve"
+            >
+              <strong>{{ item.stepLabel }}</strong>
+              <p>{{ item.suggestedAnswer }}</p>
+              <small>{{ item.rationale }}</small>
+              <ul class="signal-list">
+                <li v-for="signal in item.contextSignals" :key="`${item.stepId}-${signal}`">{{ signal }}</li>
+              </ul>
+              <button type="button" @click="appendTransformTemplateAssistance(item)">{{ item.actionLabel }}</button>
+            </article>
+            <label>
+              Transform assistance notes
+              <textarea v-model="transformTemplateAssistanceNotes" aria-label="Transform assistance notes" rows="6" placeholder="Accept guidance, record source values, owners, preview findings, and review questions here."></textarea>
+            </label>
+            <button type="button" @click="insertTransformTemplateAssistanceNotes">Insert transform notes</button>
           </section>
           <section class="template-list" role="list" aria-label="Transform templates">
             <article
@@ -5111,7 +5145,9 @@ import {
   transformTemplateCategories,
   transformTemplateKinds,
   transformTemplateMarkdown,
+  buildTransformTemplateAssistance,
   type CustomTransformTemplate,
+  type TransformTemplateAssistance,
   type TransformTemplate,
 } from "./lib/transformTemplates";
 import {
@@ -5135,6 +5171,7 @@ import {
   type ConflictMergeSource,
 } from "./lib/workflows";
 import {
+  findMarkdownTableIndexForLineRange,
   formatTableTotal,
   inferTableFormat,
   isFormulaCell,
@@ -5572,6 +5609,7 @@ const tableSpanRowspan = ref(1);
 const templateQuery = ref("");
 const templateCategory = ref("all");
 const templateTransform = ref("all");
+const transformTemplateAssistanceNotes = ref("");
 const customTemplateDraft = ref<CustomTransformTemplate>(blankCustomTransformTemplate());
 const editingCustomTemplateId = ref("");
 const businessProfileOpen = ref(false);
@@ -6865,6 +6903,13 @@ const tableColumnTotals = computed(() => {
   if (!draft) return [];
   return draft.headers.map((_, columnIndex) => formatTableTotal(draft, columnIndex));
 });
+const selectedTableEditSummary = computed(() => {
+  if (isNewTableDraft.value) return "New table draft will be inserted at the cursor.";
+  const table = selectedTable.value;
+  if (!table) return "Place the cursor inside a Markdown table or choose a source table to edit.";
+  const start = table.captionLine || table.startLine;
+  return `Editing source table lines ${start}-${table.endLine}: ${table.caption || table.headers.join(", ")}`;
+});
 const tableDraftIssues = computed(() => (tableDraft.value ? validateTableDraft(tableDraft.value) : []));
 const tableDraftHasErrors = computed(() => tableDraftIssues.value.some((issue) => issue.severity === "error"));
 const tableDraftMarkdownPreview = computed(() => {
@@ -6965,6 +7010,18 @@ const filteredTransformTemplates = computed(() => {
     return [template.name, template.category, template.transform, template.summary, ...template.tags].join(" ").toLowerCase().includes(query);
   });
 });
+const transformTemplateAssistance = computed<TransformTemplateAssistance[]>(() =>
+  buildTransformTemplateAssistance({
+    templates: allTransformTemplates.value,
+    filteredTemplates: filteredTransformTemplates.value,
+    query: templateQuery.value,
+    category: templateCategory.value,
+    transform: templateTransform.value,
+    documentText: active.value.text,
+    customTemplate: customTemplateDraft.value,
+    assistanceNotes: transformTemplateAssistanceNotes.value,
+  }),
+);
 const filteredBusinessTemplates = computed(() => {
   const query = businessTemplateQuery.value.trim().toLowerCase();
   return businessDocumentTemplates.filter((template) => {
@@ -13906,6 +13963,40 @@ function templateFillFields(template: Pick<TransformTemplate, "body" | "transfor
   return transformTemplateFillFields(template);
 }
 
+function transformTemplateAssistanceBlock(item: TransformTemplateAssistance) {
+  return [
+    `${item.stepLabel}: ${item.suggestedAnswer}`,
+    `Rationale: ${item.rationale}`,
+    `Context signals: ${item.contextSignals.join("; ")}`,
+  ].join("\n");
+}
+
+function appendTransformTemplateAssistance(item: TransformTemplateAssistance) {
+  transformTemplateAssistanceNotes.value = appendTextBlock(transformTemplateAssistanceNotes.value, transformTemplateAssistanceBlock(item));
+  store.statusMessage = `Added ${item.stepLabel.toLowerCase()} guidance to transform notes`;
+}
+
+function appendAllTransformTemplateAssistance() {
+  const block = transformTemplateAssistance.value
+    .map((item, index) => `${index + 1}. ${transformTemplateAssistanceBlock(item)}`)
+    .join("\n\n");
+  transformTemplateAssistanceNotes.value = appendTextBlock(transformTemplateAssistanceNotes.value, block);
+  store.statusMessage = "Added all AI transform template assistance to notes";
+}
+
+function insertTransformTemplateAssistanceNotes() {
+  const notes = transformTemplateAssistanceNotes.value.trim();
+  if (!notes) {
+    store.statusMessage = "Add transform assistance notes before inserting";
+    return;
+  }
+  flushEditorTextToStore();
+  insertBlock(["## Transform Template Review Notes", "", notes, ""].join("\n"));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "templates";
+  store.statusMessage = "Inserted transform template review notes";
+}
+
 function insertTransformTemplate(template: TransformTemplate) {
   insertBlock(transformTemplateMarkdown(template));
   store.statusMessage = `Inserted ${template.name} template`;
@@ -16493,9 +16584,53 @@ function isFigureCropPosition(value: string | undefined): value is FigureCropPos
 }
 
 function openTableEditor() {
+  flushEditorTextToStore();
   store.sidebar = "tables";
-  if (markdownTables.value.length && !tableDraft.value) loadSelectedTable();
+  if (markdownTables.value.length && !tableDraft.value) {
+    if (!loadTableAtCursor(true)) {
+      loadSelectedTable();
+      store.statusMessage = "Opened first source table for editing";
+    }
+  }
   if (!markdownTables.value.length && !tableDraft.value) createTableDraft();
+}
+
+function editorSelectionLineRange() {
+  if (!editorView) return null;
+  const selection = editorView.state.selection.main;
+  return {
+    fromLine: editorView.state.doc.lineAt(selection.from).number,
+    toLine: editorView.state.doc.lineAt(selection.to).number,
+  };
+}
+
+function loadTableAtCursor(silent = false) {
+  flushEditorTextToStore();
+  const range = editorSelectionLineRange();
+  if (!range) {
+    if (!silent) store.statusMessage = "Open the source editor and place the cursor inside a Markdown table";
+    return false;
+  }
+  const index = findMarkdownTableIndexForLineRange(markdownTables.value, range.fromLine, range.toLine);
+  if (index < 0) {
+    if (!silent) store.statusMessage = "No Markdown table found at the current cursor or selection";
+    return false;
+  }
+  selectedTableIndex.value = index;
+  loadSelectedTable();
+  store.sidebar = "tables";
+  const table = selectedTable.value;
+  store.statusMessage = `Loaded source table from line ${table?.captionLine || table?.startLine || range.fromLine} for editing`;
+  return true;
+}
+
+function goToSelectedTableSource() {
+  const table = selectedTable.value;
+  if (!table) return;
+  void goToSourceTarget({
+    line: table.captionLine || table.startLine,
+    end_line: table.endLine,
+  });
 }
 
 function loadSelectedTable() {
@@ -16546,6 +16681,8 @@ function applyTableDraft() {
     const replaceStart = table.captionLine || table.startLine;
     lines.splice(replaceStart - 1, table.endLine - replaceStart + 1, ...serialized);
     store.updateText(lines.join("\n"));
+    void nextTick(() => syncEditorViewFromActiveDocument());
+    store.statusMessage = `Updated source table at lines ${replaceStart}-${table.endLine}`;
   } else {
     insertTableAtCursor(serialized);
     const nextTableIndex = markdownTables.value.length;
@@ -19199,6 +19336,60 @@ select:hover {
 
 .template-filters {
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.transform-template-assistance {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid #c9d2dc;
+  border-left: 3px solid #6a5a2f;
+  border-radius: 7px;
+  background: #fffdf7;
+}
+
+.transform-template-assistance header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.transform-template-assistance header div {
+  display: grid;
+  gap: 2px;
+}
+
+.transform-template-assistance h3,
+.transform-template-assistance p,
+.transform-template-assistance ul {
+  margin: 0;
+}
+
+.transform-template-assistance header span,
+.transform-template-assistance p,
+.transform-template-assistance small,
+.transform-template-assistance label {
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.transform-template-assistance label {
+  display: grid;
+  gap: 4px;
+}
+
+.transform-template-assistance textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid #bac4d1;
+  border-radius: 6px;
+  padding: 8px;
+  color: #18212f;
+  background: #ffffff;
 }
 
 .business-template-hub {

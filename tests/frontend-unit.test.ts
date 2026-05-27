@@ -116,6 +116,7 @@ import {
   releaseReadinessAuditMarkdown,
 } from "../src/lib/releaseReadiness.js";
 import {
+  buildTransformTemplateAssistance,
   builtinTransformTemplates,
   normalizeCustomTransformTemplates,
   transformTemplateFillFields,
@@ -144,6 +145,7 @@ import {
 } from "../src/lib/workflows.js";
 import {
   formatTableTotal,
+  findMarkdownTableIndexForLineRange,
   parseTableCellSpan,
   parseMarkdownTables,
   parseTablePaste,
@@ -197,6 +199,10 @@ test("table parsing preserves captions, alignment, and escaped pipes", () => {
   equal(table.caption, "Regional revenue");
   deepEqual(table.alignments, ["left", "right", "left"]);
   deepEqual(table.rows[0], ["East", "$1,200", "margin|stable"]);
+  equal(findMarkdownTableIndexForLineRange([table], 1), 0);
+  equal(findMarkdownTableIndexForLineRange([table], 3), 0);
+  equal(findMarkdownTableIndexForLineRange([table], 5), -1);
+  equal(findMarkdownTableIndexForLineRange([table], 0, 2), 0);
 });
 
 test("table paste handles quoted CSV and markdown table captions", () => {
@@ -3465,6 +3471,23 @@ test("transform template library covers reusable calculations and custom templat
       tags: [],
     },
   ]);
+
+  const filtered = builtinTransformTemplates.filter((template) => template.category === "Business" && template.transform === "calc");
+  const assistance = buildTransformTemplateAssistance({
+    templates: builtinTransformTemplates,
+    filteredTemplates: filtered,
+    query: "roi payback",
+    category: "Business",
+    transform: "calc",
+    documentText: "The proposal needs ROI, payback, investment, annual benefit, and reviewer evidence.",
+    customTemplate: { transform: "calc", body: "```calc\nrevenue = 100\ncost = 60\nprofit = revenue - cost\n```" },
+    assistanceNotes: "Finance owner will verify assumptions.",
+  });
+  equal(assistance.length, 4);
+  ok(assistance[0].suggestedAnswer.includes("ROI and payback"));
+  ok(assistance.some((item) => item.stepId === "fill-values" && item.suggestedAnswer.includes("investment")));
+  ok(assistance.some((item) => item.contextSignals.some((signal) => signal.includes("Custom draft fill fields: revenue"))));
+  ok(assistance.some((item) => item.contextSignals.includes("Category: Business")));
 });
 
 test("workbench command bar exposes icon display controls and workflow groups", () => {
@@ -4037,6 +4060,18 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("export_markdown_tables"));
   ok(app.includes("import_spreadsheet_table"));
   ok(app.includes("Insert SQL transform"));
+  ok(app.includes("Edit table at cursor"));
+  ok(app.includes("loadTableAtCursor"));
+  ok(app.includes("findMarkdownTableIndexForLineRange"));
+  ok(app.includes("goToSelectedTableSource"));
+  ok(app.includes("selectedTableEditSummary"));
+  ok(app.includes('aria-label="AI transform template assistance"'));
+  ok(app.includes('aria-label="Transform assistance notes"'));
+  ok(app.includes("transformTemplateAssistance"));
+  ok(app.includes("buildTransformTemplateAssistance"));
+  ok(app.includes("appendTransformTemplateAssistance"));
+  ok(app.includes("appendAllTransformTemplateAssistance"));
+  ok(app.includes("insertTransformTemplateAssistanceNotes"));
   ok(app.includes('database="data/example.sqlite"'));
   ok(app.includes("read_text_aloud"));
   ok(app.includes("stop_text_aloud"));

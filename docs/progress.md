@@ -31,6 +31,18 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Table editing now works as a two-way source workflow. The Tables panel can
+  load the Markdown table at the current source cursor or selection, show the
+  exact source-line range being edited, jump back to that source table, and
+  apply visual-grid edits back over the original Markdown table range instead
+  of only inserting new tables.
+- The Templates sidebar now provides **AI template assistance** for calculation
+  and transform work. `buildTransformTemplateAssistance` uses the current
+  template filters, document text, custom-template draft, and assistance notes
+  to suggest a template choice, fill-value plan, preview/verification pass, and
+  reviewer handoff. Users can accept one or all suggestions into editable
+  transform notes and insert those notes into the document before relying on a
+  calculation, chart, diagram, SQL query, or other transform in business prose.
 - The Review sidebar now provides **AI quality assistance** on top of the
   deterministic QA/QI recommendations. `buildQualityStepAssistance` turns the
   current findings, document title, export target, document length, and review
@@ -1472,6 +1484,13 @@ Current verification recorded on 2026-05-21 through 2026-05-27:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding cursor-aware two-way Markdown table editing, including direct proof for table line-range matching and static wiring for source-table load/jump/apply controls. |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding AI transform template assistance, including direct proof that ROI/payback context generates four template-workflow suggestions and static wiring for the Templates sidebar notes workflow. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding two-way source table editing and AI transform template assistance. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting two-way table editing and AI transform template assistance. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the table and transform workflow updates. |
+| `pnpm run check:release-readiness` | Pass with external gaps | Wrote `.tmp/release-readiness/report.json` with status `current-host-ready-with-external-gaps`; external release evidence gaps remain unchanged. |
+| `git diff --check` | Pass | No whitespace errors are present in the table editing and transform assistance diff. |
 | `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding AI quality review assistance, including direct proof that quality findings produce four context-aware suggestions and static wiring for the Review sidebar notes workflow. |
 | `pnpm run check` | Pass | Vue typecheck passed after wiring quality step assistance into the Review sidebar and editable quality review notes. |
 | `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting AI quality assistance in the README, user guide, progress log, and spec completion matrix. |

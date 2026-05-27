@@ -76,6 +76,15 @@ export function parseMarkdownTables(text: string): MarkdownTable[] {
   return tables;
 }
 
+export function findMarkdownTableIndexForLineRange(tables: MarkdownTable[], fromLine: number, toLine = fromLine) {
+  const start = Math.max(1, Math.min(fromLine, toLine));
+  const end = Math.max(1, Math.max(fromLine, toLine));
+  return tables.findIndex((table) => {
+    const tableStart = table.captionLine || table.startLine;
+    return end >= tableStart && start <= table.endLine;
+  });
+}
+
 function parseTableCaption(line: string) {
   if (!line.toLowerCase().startsWith("table:")) return null;
   const id = line.match(/\{#([^}\s]+)(?:\s+[^}]*)?\}/)?.[1] || "";
