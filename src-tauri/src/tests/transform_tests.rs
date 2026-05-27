@@ -572,6 +572,32 @@ fn structured_data_transforms_render_tables_and_trees() {
     assert!(yaml_artifact.html.contains("<dt>version</dt>"));
     assert!(yaml_artifact.html.contains("/accounts"));
     assert!(yaml_artifact.diagnostics.is_empty());
+
+    let nested_json_artifact = run_transform(
+        "json".to_string(),
+        r#"{"data":[{"region":"East","revenue":120},{"region":"West","revenue":98}],"generatedAt":"2026-05-27"}"#.to_string(),
+    )
+    .expect("nested json table transform");
+    assert!(nested_json_artifact.html.contains("transform-json"));
+    assert!(nested_json_artifact
+        .html
+        .contains("<caption>data</caption>"));
+    assert!(nested_json_artifact.html.contains("<th>revenue</th>"));
+    assert!(nested_json_artifact.html.contains("<td>98</td>"));
+    assert!(nested_json_artifact.diagnostics.is_empty());
+
+    let nested_yaml_artifact = run_transform(
+        "yaml".to_string(),
+        "records:\n  - account: Acme\n    status: active\n  - account: Beta\n    status: review\n"
+            .to_string(),
+    )
+    .expect("nested yaml table transform");
+    assert!(nested_yaml_artifact.html.contains("transform-yaml"));
+    assert!(nested_yaml_artifact
+        .html
+        .contains("<caption>records</caption>"));
+    assert!(nested_yaml_artifact.html.contains("<td>Beta</td>"));
+    assert!(nested_yaml_artifact.diagnostics.is_empty());
 }
 
 #[test]

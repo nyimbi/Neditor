@@ -3096,6 +3096,12 @@ JSON Schema dialect transform verification:
 | `pnpm run verify:local` | Pass | The quick local verification baseline passed after the schema dialect update. |
 | `git diff --check` | Pass | No whitespace errors after the schema dialect update. |
 
+Nested JSON/YAML table transforms:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked structured_data_transforms_render_tables_and_trees --lib` | Pass | Focused transform coverage now proves top-level arrays, `{ "data": [...] }` JSON objects, and `records:` YAML objects with row arrays render as inspectable `transform-json`/`transform-yaml` tables with field captions instead of falling back to tree-only summaries. |
+
 Full registered IPC command coverage verification:
 
 | Command | Result | Evidence |

@@ -1135,13 +1135,13 @@ fn value_list_summary(values: &[Value]) -> String {
 }
 
 fn render_structured_table(format: &str, value: &Value) -> Option<String> {
-    let rows = value.as_array()?;
-    if rows.is_empty() || !rows.iter().all(Value::is_object) {
+    let (caption, rows) = structured_table_rows(value)?;
+    if rows.is_empty() || !rows.iter().all(|row| row.is_object()) {
         return None;
     }
     let headers = rows
         .iter()
-        .filter_map(Value::as_object)
+        .filter_map(|row| row.as_object())
         .flat_map(|object| object.keys().cloned())
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -1149,7 +1149,11 @@ fn render_structured_table(format: &str, value: &Value) -> Option<String> {
     if headers.is_empty() {
         return None;
     }
-    let mut html = format!("<table class=\"transform-table transform-{format}\"><thead><tr>");
+    let mut html = format!("<table class=\"transform-table transform-{format}\">");
+    if let Some(caption) = caption {
+        html.push_str(&format!("<caption>{}</caption>", escape_html(caption)));
+    }
+    html.push_str("<thead><tr>");
     for header in &headers {
         html.push_str(&format!("<th>{}</th>", escape_html(header)));
     }
@@ -1168,6 +1172,27 @@ fn render_structured_table(format: &str, value: &Value) -> Option<String> {
     }
     html.push_str("</tbody></table>");
     Some(html)
+}
+
+fn structured_table_rows(value: &Value) -> Option<(Option<&str>, &[Value])> {
+    if let Some(rows) = value.as_array() {
+        return Some((None, rows));
+    }
+    let object = value.as_object()?;
+    for key in ["rows", "records", "data", "items", "values"] {
+        if let Some(rows) = object.get(key).and_then(Value::as_array) {
+            return Some((Some(key), rows));
+        }
+    }
+    let mut array_fields = object
+        .iter()
+        .filter_map(|(key, value)| value.as_array().map(|rows| (key.as_str(), rows)));
+    let (key, rows) = array_fields.next()?;
+    if array_fields.next().is_none() {
+        Some((Some(key), rows))
+    } else {
+        None
+    }
 }
 
 fn render_structured_tree(label: &str, value: &Value) -> String {
