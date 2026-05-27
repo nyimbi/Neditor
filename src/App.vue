@@ -5262,6 +5262,7 @@ import {
   tableFormulaTargetOptions,
   tableHeaderLabel as tableDraftHeaderLabel,
   tableCellLabel as tableDraftCellLabel,
+  tableMarkdownForExport,
   tableTotalLabel as tableDraftTotalLabel,
   tableSpanCellOptions as tableDraftSpanCellOptions,
   tableSourceChanged,
@@ -17176,8 +17177,18 @@ async function importTableFromSpreadsheet() {
 }
 
 async function exportSelectedTable(format: "csv" | "xlsx") {
-  const markdown = tableDraftMarkdownPreview.value || active.value.text;
-  if (!markdown.trim()) {
+  const exportMarkdown = tableMarkdownForExport({
+    draftMarkdown: tableDraftMarkdownPreview.value,
+    documentText: active.value.text,
+    sourceEditDirty: tableSourceEditDirty.value,
+    sourceEditText: tableSourceEditText.value,
+  });
+  if (!exportMarkdown.sourceEditValid) {
+    tableSourceEditError.value = "Enter a valid Markdown pipe table before exporting this edited source text.";
+    store.statusMessage = "Markdown table source could not be parsed for export";
+    return;
+  }
+  if (!exportMarkdown.markdown.trim()) {
     store.statusMessage = "No table is available to export";
     return;
   }
@@ -17191,13 +17202,14 @@ async function exportSelectedTable(format: "csv" | "xlsx") {
   try {
     const response = await invoke<ExportMarkdownTablesResponse>("export_markdown_tables", {
       request: {
-        markdown,
+        markdown: exportMarkdown.markdown,
         output_path: outputPath,
         format,
         table_index: 0,
       },
     });
-    store.statusMessage = `Exported ${response.exported_tables} table${response.exported_tables === 1 ? "" : "s"} to ${format.toUpperCase()}`;
+    const sourceLabel = exportMarkdown.source === "source-edit" ? " from edited Markdown source" : "";
+    store.statusMessage = `Exported ${response.exported_tables} table${response.exported_tables === 1 ? "" : "s"}${sourceLabel} to ${format.toUpperCase()}`;
   } catch (error) {
     store.lastError = error instanceof Error ? error.message : String(error);
     store.statusMessage = `${format.toUpperCase()} table export failed`;

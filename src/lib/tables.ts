@@ -49,6 +49,19 @@ export interface ParsedTableSourceDraft {
   sourceText: string;
 }
 
+export interface TableExportMarkdownOptions {
+  draftMarkdown?: string | null;
+  documentText?: string | null;
+  sourceEditDirty?: boolean;
+  sourceEditText?: string | null;
+}
+
+export interface TableExportMarkdownSelection {
+  markdown: string;
+  source: "source-edit" | "draft" | "document" | "none";
+  sourceEditValid: boolean;
+}
+
 export interface TableDraftFromRowsOptions {
   id?: string;
   caption?: string;
@@ -309,6 +322,20 @@ export function tableDraftFromMarkdownSource(sourceText: string): ParsedTableSou
     draft,
     sourceText: tableDraftMarkdown(draft),
   };
+}
+
+export function tableMarkdownForExport(options: TableExportMarkdownOptions): TableExportMarkdownSelection {
+  const sourceEditText = options.sourceEditText?.trim() || "";
+  if (options.sourceEditDirty && sourceEditText) {
+    return tableDraftFromMarkdownSource(sourceEditText)
+      ? { markdown: sourceEditText, source: "source-edit", sourceEditValid: true }
+      : { markdown: "", source: "source-edit", sourceEditValid: false };
+  }
+  const draftMarkdown = options.draftMarkdown?.trim() || "";
+  if (draftMarkdown) return { markdown: draftMarkdown, source: "draft", sourceEditValid: true };
+  const documentText = options.documentText?.trim() || "";
+  if (documentText) return { markdown: documentText, source: "document", sourceEditValid: true };
+  return { markdown: "", source: "none", sourceEditValid: true };
 }
 
 export function tableDraftFromRows(rows: string[][], options: TableDraftFromRowsOptions = {}): TableDraft | null {

@@ -178,6 +178,7 @@ import {
   tableDraftFromRows,
   tableFormulaTargetOptions,
   tableHeaderLabel,
+  tableMarkdownForExport,
   tableSpanCellOptions,
   tableSourceChanged,
   tableSourceText,
@@ -361,6 +362,61 @@ test("table source draft helpers normalize editable markdown source", () => {
   equal(source.sourceText, tableDraftMarkdown(source.draft));
   ok(source.sourceText.includes("| West | 900 |"));
   equal(tableDraftFromMarkdownSource("not a table"), null);
+});
+
+test("table export markdown selection honors dirty source edits", () => {
+  const draftMarkdown = [
+    "Table: Draft {#tbl:draft}",
+    "| Item | Value |",
+    "| --- | ---: |",
+    "| Stale | 10 |",
+  ].join("\n");
+  const sourceEditText = [
+    "Table: Edited {#tbl:edited}",
+    "| Item | Value |",
+    "| --- | ---: |",
+    "| Fresh | 99 |",
+  ].join("\n");
+
+  deepEqual(
+    tableMarkdownForExport({
+      draftMarkdown,
+      documentText: `${draftMarkdown}\n\nAfter.`,
+      sourceEditDirty: true,
+      sourceEditText,
+    }),
+    {
+      markdown: sourceEditText,
+      source: "source-edit",
+      sourceEditValid: true,
+    },
+  );
+
+  deepEqual(
+    tableMarkdownForExport({
+      draftMarkdown,
+      documentText: sourceEditText,
+      sourceEditDirty: true,
+      sourceEditText: "not a table",
+    }),
+    {
+      markdown: "",
+      source: "source-edit",
+      sourceEditValid: false,
+    },
+  );
+
+  deepEqual(tableMarkdownForExport({ draftMarkdown, documentText: sourceEditText }), {
+    markdown: draftMarkdown,
+    source: "draft",
+    sourceEditValid: true,
+  });
+
+  deepEqual(tableMarkdownForExport({ documentText: sourceEditText }), {
+    markdown: sourceEditText,
+    source: "document",
+    sourceEditValid: true,
+  });
 });
 
 test("table accessibility label helpers describe draft controls", () => {

@@ -1487,6 +1487,15 @@ async function installTauriMock(page: Page, stateKey: string) {
           ],
         };
       }
+      if (cmd === "export_markdown_tables") {
+        const request = args.request as { markdown: string; output_path: string; format: string; table_index?: number | null };
+        setFile(request.output_path, [`format=${request.format}`, `table_index=${request.table_index ?? 0}`, request.markdown].join("\n"));
+        return {
+          exported_tables: request.markdown.trim() ? 1 : 0,
+          output_path: request.output_path,
+          manifest_path: null,
+        };
+      }
       return null;
     }
 
@@ -3728,6 +3737,11 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   );
   await expect(page.getByRole("button", { name: "Edit table at cursor" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "New table" })).toBeDisabled();
+  await queueDialogSelection(page, "/workspace/edited-source-table.csv");
+  await page.getByRole("button", { name: "Export CSV" }).click();
+  await expect.poll(() => mockFileText(page, "/workspace/edited-source-table.csv")).toContain("Services");
+  await expect.poll(() => mockFileText(page, "/workspace/edited-source-table.csv")).not.toContain("Pipeline");
+  await expect(page.locator(".status-bar")).toContainText("Exported 1 table from edited Markdown source to CSV");
   await page.getByRole("button", { name: "Update grid from source" }).click();
   await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Services");
   await page.getByRole("button", { name: "Apply source text" }).click();

@@ -4471,6 +4471,17 @@ Table accessibility label helper extraction:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording table accessibility label helper evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the table accessibility label helper extraction diff. |
 
+Table dirty source export guard:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed after adding `tableMarkdownForExport`; direct coverage proves dirty valid Markdown source is selected for CSV/XLSX export, dirty invalid source is blocked, and clean exports still fall back to the visual draft or full document text. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after `App.vue` routed table export through the shared table export-source selector. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium table workflow now proves a user can type a new Markdown table in the editable source block, export CSV before applying/updating the grid, and receive the edited source table rather than the stale visual draft. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting dirty editable-source table export behavior. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the dirty source export guard. |
+| `git diff --check` | Pass | No whitespace errors are present in the dirty source export guard diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
