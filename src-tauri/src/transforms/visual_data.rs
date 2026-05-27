@@ -41,7 +41,14 @@ pub(crate) fn render_vega_lite_svg(
         return vega_lite_missing_field("y", artifact_diags, diagnostics);
     };
     let color_field = vega_lite_encoding_field(&spec, "color");
-    let values = vega_lite_values(&spec, &x_field, &y_field, color_field.as_deref());
+    let y_aggregate = vega_lite_encoding_aggregate(&spec, "y");
+    let values = vega_lite_values(
+        &spec,
+        &x_field,
+        &y_field,
+        color_field.as_deref(),
+        y_aggregate.as_deref(),
+    );
     if values.is_empty() {
         let diagnostic = diag(
             "warning",
@@ -58,7 +65,9 @@ pub(crate) fn render_vega_lite_svg(
         .get("title")
         .and_then(Value::as_str)
         .unwrap_or("Vega-Lite chart");
-    render_vega_lite_chart_svg(title, &mark, &values)
+    let x_title = vega_lite_encoding_title(&spec, "x").unwrap_or(x_field);
+    let y_title = vega_lite_encoding_title(&spec, "y").unwrap_or(y_field);
+    render_vega_lite_chart_svg(title, &mark, &values, &x_title, &y_title)
 }
 
 pub(crate) fn render_geojson_svg(
@@ -199,6 +208,20 @@ fn vega_lite_encoding_field(spec: &Value, channel: &str) -> Option<String> {
         .map(ToString::to_string)
 }
 
+fn vega_lite_encoding_title(spec: &Value, channel: &str) -> Option<String> {
+    spec.pointer(&format!("/encoding/{channel}/title"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .map(ToString::to_string)
+}
+
+fn vega_lite_encoding_aggregate(spec: &Value, channel: &str) -> Option<String> {
+    spec.pointer(&format!("/encoding/{channel}/aggregate"))
+        .and_then(Value::as_str)
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| matches!(value.as_str(), "sum" | "mean" | "average" | "min" | "max"))
+}
+
 #[derive(Clone, Debug)]
 struct VegaLiteDatum {
     label: String,
@@ -211,8 +234,10 @@ fn vega_lite_values(
     x_field: &str,
     y_field: &str,
     color_field: Option<&str>,
+    y_aggregate: Option<&str>,
 ) -> Vec<VegaLiteDatum> {
-    spec.pointer("/data/values")
+    let values = spec
+        .pointer("/data/values")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
@@ -231,7 +256,60 @@ fn vega_lite_values(
                 series,
             })
         })
+        .collect::<Vec<_>>();
+    match y_aggregate {
+        Some(aggregate) => aggregate_vega_lite_values(values, aggregate),
+        None => values,
+    }
+}
+
+#[derive(Clone, Debug)]
+struct VegaLiteAggregateBucket {
+    label: String,
+    series: Option<String>,
+    values: Vec<f64>,
+}
+
+fn aggregate_vega_lite_values(values: Vec<VegaLiteDatum>, aggregate: &str) -> Vec<VegaLiteDatum> {
+    let mut buckets: Vec<VegaLiteAggregateBucket> = Vec::new();
+    for value in values {
+        if let Some(bucket) = buckets
+            .iter_mut()
+            .find(|bucket| bucket.label == value.label && bucket.series == value.series)
+        {
+            bucket.values.push(value.value);
+        } else {
+            buckets.push(VegaLiteAggregateBucket {
+                label: value.label,
+                series: value.series,
+                values: vec![value.value],
+            });
+        }
+    }
+    buckets
+        .into_iter()
+        .filter_map(|bucket| {
+            let value = aggregate_vega_bucket(&bucket.values, aggregate)?;
+            Some(VegaLiteDatum {
+                label: bucket.label,
+                value,
+                series: bucket.series,
+            })
+        })
         .collect()
+}
+
+fn aggregate_vega_bucket(values: &[f64], aggregate: &str) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    match aggregate {
+        "sum" => Some(values.iter().sum()),
+        "mean" | "average" => Some(values.iter().sum::<f64>() / values.len() as f64),
+        "min" => values.iter().copied().reduce(f64::min),
+        "max" => values.iter().copied().reduce(f64::max),
+        _ => None,
+    }
 }
 
 fn value_to_axis_label(value: &Value) -> String {
@@ -260,26 +338,29 @@ fn vega_lite_missing_field(
     )
 }
 
-fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[VegaLiteDatum]) -> String {
-    let max = values
-        .iter()
-        .map(|datum| datum.value)
-        .reduce(f64::max)
-        .unwrap_or(1.0)
-        .max(1.0);
+fn render_vega_lite_chart_svg(
+    title: &str,
+    mark: &str,
+    values: &[VegaLiteDatum],
+    x_title: &str,
+    y_title: &str,
+) -> String {
+    let domain = VegaLiteDomain::from_values(values);
     let width = 820usize;
-    let height = 320usize;
+    let height = 340usize;
     let plot_left = 72usize;
-    let plot_bottom = 262usize;
     let plot_width = 680usize;
     let labels = unique_vega_labels(values);
     let series = unique_vega_series(values);
     let step = plot_width / labels.len().max(1);
     let mut svg = format!(
-        "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><text x=\"72\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><line x1=\"72\" y1=\"262\" x2=\"770\" y2=\"262\" stroke=\"#94a3b8\"/><line x1=\"72\" y1=\"54\" x2=\"72\" y2=\"262\" stroke=\"#94a3b8\"/>",
-        escape_html(title)
+        "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><text x=\"72\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><line x1=\"72\" y1=\"262\" x2=\"770\" y2=\"262\" stroke=\"#94a3b8\"/><line x1=\"72\" y1=\"54\" x2=\"72\" y2=\"262\" stroke=\"#94a3b8\"/><line class=\"vega-zero-line\" x1=\"72\" y1=\"{:.1}\" x2=\"770\" y2=\"{:.1}\" stroke=\"#64748b\" stroke-dasharray=\"4 3\"/>",
+        escape_html(title),
+        domain.zero_y,
+        domain.zero_y
     );
     render_vega_axis_labels(&mut svg, &labels, plot_left, step);
+    render_vega_axis_titles(&mut svg, x_title, y_title);
     if mark == "bar" {
         let series_count = series.len().max(1);
         let bar_width = ((step.saturating_sub(16)) / series_count).max(4);
@@ -293,17 +374,21 @@ fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[VegaLiteDatum])
                 .as_ref()
                 .and_then(|name| series.iter().position(|series| series == name))
                 .unwrap_or(0);
-            let bar_height = ((datum.value / max) * 190.0) as usize;
             let x = plot_left + label_index * step + 8 + series_index * bar_width;
-            let y = plot_bottom - bar_height;
             let color = VEGA_SERIES_COLORS[series_index % VEGA_SERIES_COLORS.len()];
             let series_attr = datum
                 .series
                 .as_deref()
                 .map(|series| format!(" data-series=\"{}\"", escape_html(series)))
                 .unwrap_or_default();
+            let y = domain.y(datum.value);
+            let bar_y = y.min(domain.zero_y);
+            let bar_height = (y - domain.zero_y).abs().max(1.0);
+            let value_label = format_vega_value(datum.value);
             svg.push_str(&format!(
-                "<rect x=\"{x}\" y=\"{y}\" width=\"{bar_width}\" height=\"{bar_height}\" fill=\"{color}\"{series_attr}/>"
+                "<rect x=\"{x}\" y=\"{bar_y:.1}\" width=\"{bar_width}\" height=\"{bar_height:.1}\" fill=\"{color}\" data-label=\"{}\" data-value=\"{}\"{series_attr}/>",
+                escape_html(&datum.label),
+                escape_html(&value_label)
             ));
         }
     } else {
@@ -323,8 +408,8 @@ fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[VegaLiteDatum])
                 .filter_map(|datum| {
                     let label_index = labels.iter().position(|label| label == &datum.label)?;
                     let x = plot_left + label_index * step + step / 2;
-                    let y = plot_bottom - ((datum.value / max) * 190.0) as usize;
-                    Some((x, y, datum.label.as_str()))
+                    let y = domain.y(datum.value);
+                    Some((x, y, datum.label.as_str(), datum.value))
                 })
                 .collect::<Vec<_>>();
             let color = VEGA_SERIES_COLORS[series_index % VEGA_SERIES_COLORS.len()];
@@ -334,15 +419,15 @@ fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[VegaLiteDatum])
                 format!(" data-series=\"{}\"", escape_html(series_name))
             };
             if mark == "area" {
-                let baseline = plot_bottom;
+                let baseline = domain.zero_y;
                 let area_points = points
                     .iter()
-                    .map(|(x, y, _)| format!("{x},{y}"))
+                    .map(|(x, y, _, _)| format!("{x},{y:.1}"))
                     .collect::<Vec<_>>()
                     .join(" ");
                 let area = match (points.first(), points.last()) {
-                    (Some((first_x, _, _)), Some((last_x, _, _))) => {
-                        format!("{first_x},{baseline} {area_points} {last_x},{baseline}")
+                    (Some((first_x, _, _, _)), Some((last_x, _, _, _))) => {
+                        format!("{first_x},{baseline:.1} {area_points} {last_x},{baseline:.1}")
                     }
                     _ => String::new(),
                 };
@@ -353,22 +438,25 @@ fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[VegaLiteDatum])
             } else if mark == "line" {
                 let polyline = points
                     .iter()
-                    .map(|(x, y, _)| format!("{x},{y}"))
+                    .map(|(x, y, _, _)| format!("{x},{y:.1}"))
                     .collect::<Vec<_>>()
                     .join(" ");
                 svg.push_str(&format!(
                     "<polyline points=\"{polyline}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"3\"{series_attr}/>"
                 ));
             }
-            for (x, y, label) in points {
+            for (x, y, label, value) in points {
                 let label = if series_name.is_empty() {
                     label.to_string()
                 } else {
                     format!("{label}: {series_name}")
                 };
+                let value_label = format_vega_value(value);
                 svg.push_str(&format!(
-                    "<circle cx=\"{x}\" cy=\"{y}\" r=\"5\" fill=\"{color}\" aria-label=\"{}\"{series_attr}/>",
-                    escape_html(&label)
+                    "<circle cx=\"{x}\" cy=\"{y:.1}\" r=\"5\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}/>",
+                    escape_html(&label),
+                    escape_html(&value_label),
+                    escape_html(&value_label)
                 ));
             }
         }
@@ -376,6 +464,54 @@ fn render_vega_lite_chart_svg(title: &str, mark: &str, values: &[VegaLiteDatum])
     render_vega_legend(&mut svg, &series);
     svg.push_str("</svg>");
     svg
+}
+
+#[derive(Clone, Debug)]
+struct VegaLiteDomain {
+    min: f64,
+    max: f64,
+    zero_y: f64,
+}
+
+impl VegaLiteDomain {
+    fn from_values(values: &[VegaLiteDatum]) -> Self {
+        let mut min = 0.0_f64;
+        let mut max = 0.0_f64;
+        for value in values
+            .iter()
+            .map(|datum| datum.value)
+            .filter(|value| value.is_finite())
+        {
+            min = min.min(value);
+            max = max.max(value);
+        }
+        if (max - min).abs() < f64::EPSILON {
+            max = (max + 1.0).max(1.0);
+            min = min.min(0.0);
+        }
+        let zero_y = chart_value_y(0.0, min, max);
+        Self { min, max, zero_y }
+    }
+
+    fn y(&self, value: f64) -> f64 {
+        chart_value_y(value, self.min, self.max)
+    }
+}
+
+fn chart_value_y(value: f64, min: f64, max: f64) -> f64 {
+    let plot_top = 54.0_f64;
+    let plot_bottom = 262.0_f64;
+    let range = (max - min).abs().max(1.0);
+    plot_top + ((max - value) / range) * (plot_bottom - plot_top)
+}
+
+fn format_vega_value(value: f64) -> String {
+    let rounded = (value * 100.0).round() / 100.0;
+    if (rounded.fract()).abs() < 0.001 {
+        format!("{rounded:.0}")
+    } else {
+        format!("{rounded:.2}")
+    }
 }
 
 const VEGA_SERIES_COLORS: [&str; 8] = [
@@ -411,6 +547,21 @@ fn render_vega_axis_labels(svg: &mut String, labels: &[String], plot_left: usize
             "<text x=\"{}\" y=\"286\" font-size=\"12\" text-anchor=\"middle\">{}</text>",
             x,
             escape_html(label)
+        ));
+    }
+}
+
+fn render_vega_axis_titles(svg: &mut String, x_title: &str, y_title: &str) {
+    if !x_title.trim().is_empty() {
+        svg.push_str(&format!(
+            "<text class=\"vega-axis-title vega-x-title\" x=\"410\" y=\"326\" font-size=\"12\" text-anchor=\"middle\" fill=\"#475569\">{}</text>",
+            escape_html(x_title)
+        ));
+    }
+    if !y_title.trim().is_empty() {
+        svg.push_str(&format!(
+            "<text class=\"vega-axis-title vega-y-title\" x=\"20\" y=\"160\" font-size=\"12\" text-anchor=\"middle\" fill=\"#475569\" transform=\"rotate(-90 20 160)\">{}</text>",
+            escape_html(y_title)
         ));
     }
 }

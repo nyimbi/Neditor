@@ -4755,6 +4755,12 @@ Citation style fidelity:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked citation --lib` | Pass | 20 focused Rust citation tests passed after preserving common citation-style intent. APA, Chicago author-date, MLA, IEEE, and Vancouver now keep distinct generated bibliography formatting and citation labels instead of collapsing every CSL alias to generic author-year or numeric output. |
 | `pnpm run test:unit` | Pass | 80 frontend unit/static tests passed after adding MLA to supported persisted bibliography defaults and exposing the style in the References and Settings citation-style selectors. |
 
+Vega-Lite native preview fidelity:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked vega_lite --lib` | Pass | Focused transform tests passed after the native Vega-Lite SVG renderer learned object-form marks, y-axis `sum`/`mean`/`average`/`min`/`max` aggregates, axis titles, negative values with a real zero baseline, grouped-series metadata, and export-safe `data-value` labels for variance charts. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

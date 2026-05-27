@@ -936,6 +936,27 @@ fn vega_lite_color_encoding_renders_grouped_series_preview() {
 }
 
 #[test]
+fn vega_lite_preview_preserves_negative_values_aggregation_and_axis_titles() {
+    let artifact = run_transform(
+            "vega-lite".to_string(),
+            r##"{"mark":{"type":"bar"},"title":"Net Revenue Variance","data":{"values":[{"month":"Jan","region":"East","net":120},{"month":"Jan","region":"East","net":-30},{"month":"Jan","region":"West","net":-45},{"month":"Feb","region":"East","net":75},{"month":"Feb","region":"West","net":30}]},"encoding":{"x":{"field":"month","type":"ordinal","title":"Month"},"y":{"field":"net","type":"quantitative","aggregate":"sum","title":"Net revenue"},"color":{"field":"region","type":"nominal"}}}"##.to_string(),
+        )
+        .expect("vega-lite variance transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("Net Revenue Variance"));
+    assert!(artifact.html.contains("vega-zero-line"));
+    assert!(artifact.html.contains("vega-axis-title vega-x-title"));
+    assert!(artifact.html.contains(">Month<"));
+    assert!(artifact.html.contains(">Net revenue<"));
+    assert!(artifact.html.contains("data-series=\"East\""));
+    assert!(artifact.html.contains("data-series=\"West\""));
+    assert!(artifact.html.contains("data-value=\"90\""));
+    assert!(artifact.html.contains("data-value=\"-45\""));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn vega_lite_unsupported_marks_report_supported_static_subset() {
     let artifact = run_transform(
             "vega-lite".to_string(),
