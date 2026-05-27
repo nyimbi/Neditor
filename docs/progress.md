@@ -16,11 +16,11 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `338025f Make business
-  profile setup scriptable`
+- Latest inspected committed baseline before this update: `aca8b8c Make table
+  source editing explicitly two-way`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: contained pending `src-tauri` CLI/RFP edits;
-  this table-editing slice keeps those changes intact and separate.
+  this slice completes and verifies those headless RFP command changes.
 
 ## Durable Planning Artifacts
 
@@ -32,6 +32,13 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- The packaged `ned` CLI now has a headless RFP analysis and response workflow
+  for procurement teams. `ned rfp-response` / `ned analyze-rfp` accepts
+  Markdown/stdin, PDF, DOCX, or URL sources through native RFP intake, extracts
+  requirements plus stated and implied buyer intent, timelines, budget hints,
+  evaluation criteria, mandatory attachments, risks, and verification
+  questions, then writes a response draft, a compliance matrix, or schema
+  `neditor.ned-rfp-response.v1` JSON output for automation.
 - Table editing is now explicitly two-way inside the Tables sidebar, not only
   through the main Markdown editor. The loaded or newly created table has an
   editable **Markdown source** block; users can type pipe-table text, parse it
@@ -1519,6 +1526,16 @@ Current verification recorded on 2026-05-21 through 2026-05-27:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `pnpm run check:cli` | Pass | Rust CLI tests passed with 22 focused tests and rebuilt `src-tauri/target/debug/ned`; coverage now includes `ned rfp-response` JSON/schema output, response and compliance-matrix file writing, stdin `ned analyze-rfp - --matrix`, shell completions, and help text. |
+| `src-tauri/target/debug/ned analyze-rfp - --matrix` with piped RFP text | Pass | Direct packaged-binary smoke read stdin and printed a compliance matrix with pricing and implementation timeline requirements mapped to response sections and evidence prompts. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting stayed clean after adding the RFP CLI parser, analyzer, response renderer, and tests. |
+| `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after adding Settings guidance and static guards for `ned rfp-response`, `ned analyze-rfp`, schema `neditor.ned-rfp-response.v1`, and the command dispatcher. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding RFP CLI examples to the Configuration Center copy. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting headless RFP response/matrix generation. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording headless RFP CLI setup guidance. |
+| `pnpm run check:platform-packaging` | Pass | Cross-platform package configuration contract still accepts the packaged `ned` sidecar after adding the new RFP CLI commands. |
+| `pnpm run check:homebrew` | Pass | Homebrew cask packaging contract still passes after the `ned` command surface was extended. |
+| `git diff --check` | Pass | No whitespace errors are present after the headless RFP CLI update. |
 | `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after adding the editable table Markdown source block, including static guards for source-to-grid parsing, grid-to-source refresh, source-text apply, and source-edit dirty tracking. |
 | `pnpm run check` | Pass | Vue typecheck passed after wiring the editable table source textarea and its parse/apply controls into the Tables sidebar. |
 | `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting explicit source-text table editing. |

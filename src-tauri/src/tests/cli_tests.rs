@@ -267,6 +267,127 @@ fn ned_cli_manages_reusable_business_profile() {
 }
 
 #[test]
+fn ned_cli_analyzes_rfp_sources_and_writes_response() {
+    let workspace = temp_workspace_path("rfp-profile");
+    fs::create_dir_all(&workspace).expect("create rfp workspace");
+    crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "profile".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--init".to_string(),
+        "--set".to_string(),
+        "fullName=Jane Doe".to_string(),
+        "--set".to_string(),
+        "companyName=Acme Advisory".to_string(),
+        "--set".to_string(),
+        "defaultClientName=Globex".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("profile setup");
+    let source = temp_markdown_path("customer-support-rfp");
+    fs::write(
+        &source,
+        [
+            "# Globex Customer Support RFP",
+            "",
+            "Purpose: Globex seeks a partner to improve customer support operations and reduce implementation risk.",
+            "1. Vendor must provide a phased implementation plan within 90 days.",
+            "2. Proposer shall include pricing, payment terms, and all assumptions.",
+            "3. Vendor must demonstrate SOC 2 security controls and data protection practices.",
+            "4. Submit signed insurance certificate and three relevant customer references.",
+            "Evaluation criteria: technical merit 40 points, price 30 points, experience 30 points.",
+        ]
+        .join("\n"),
+    )
+    .expect("write rfp");
+    let response = temp_markdown_path("customer-support-rfp-response");
+    let matrix = temp_markdown_path("customer-support-rfp-matrix");
+    let outcome = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "rfp-response".to_string(),
+        source.to_string_lossy().to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--context".to_string(),
+        "Win theme: reduce implementation risk.".to_string(),
+        "--output".to_string(),
+        response.to_string_lossy().to_string(),
+        "--matrix-output".to_string(),
+        matrix.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("rfp response json");
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("rfp json");
+    assert_eq!(report["schema"], "neditor.ned-rfp-response.v1");
+    assert_eq!(report["analysis"]["source"]["kind"], "markdown");
+    assert_eq!(
+        report["analysis"]["requirements"]
+            .as_array()
+            .expect("requirements")
+            .len(),
+        4
+    );
+    assert!(report["analysis"]["evaluationCriteria"]
+        .as_array()
+        .expect("criteria")
+        .iter()
+        .any(|item| item
+            .as_str()
+            .is_some_and(|value| value.contains("technical merit"))));
+    assert!(report["analysis"]["mandatoryAttachments"]
+        .as_array()
+        .expect("attachments")
+        .iter()
+        .any(|item| item
+            .as_str()
+            .is_some_and(|value| value.contains("insurance certificate"))));
+    assert!(report["analysis"]["statedIntent"]
+        .as_array()
+        .expect("stated")
+        .iter()
+        .any(|item| item
+            .as_str()
+            .is_some_and(|value| value.contains("improve customer support"))));
+    assert!(report["analysis"]["impliedIntent"]
+        .as_array()
+        .expect("implied")
+        .iter()
+        .any(|item| item
+            .as_str()
+            .is_some_and(|value| value.contains("easily scored response"))));
+    assert_eq!(
+        report["analysis"]["verificationSummary"]["allRequirementsMapped"],
+        true
+    );
+    let response_text = fs::read_to_string(&response).expect("response markdown");
+    assert!(response_text.contains("## Compliance Matrix"));
+    assert!(response_text.contains("## Requirement Response Drafts"));
+    assert!(response_text.contains("Win theme: reduce implementation risk."));
+    assert!(response_text.contains("SOC 2 security controls"));
+    assert!(response_text
+        .contains("<!-- ai-assisted: status=needs-review | source=NEditor ned RFP Response"));
+    let matrix_text = fs::read_to_string(&matrix).expect("matrix markdown");
+    assert!(matrix_text.contains("| ID | Requirement | Category | Compliance status |"));
+    assert!(matrix_text.contains("RFP-REQ-001"));
+
+    let stdin_matrix = crate::cli::run_cli_with_args_and_stdin(
+        &[
+            "ned".to_string(),
+            "analyze-rfp".to_string(),
+            "-".to_string(),
+            "--matrix".to_string(),
+        ],
+        Some("Vendor must submit pricing and implementation timeline."),
+    )
+    .expect("stdin rfp matrix");
+    assert!(stdin_matrix.message.contains("## Compliance Matrix"));
+    assert!(stdin_matrix
+        .message
+        .contains("pricing and implementation timeline"));
+}
+
+#[test]
 fn ned_cli_creates_new_business_document_from_template() {
     let path = temp_markdown_path("new-proposal");
     let args = vec![
@@ -1148,6 +1269,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("support-bundle"));
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
+    assert!(bash.message.contains("--matrix-output"));
     assert!(bash.message.contains("markdown-bundle"));
 
     let zsh = crate::cli::run_cli_with_args(&[
@@ -1170,6 +1292,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--markdown"));
     assert!(zsh.message.contains("--fields"));
     assert!(zsh.message.contains("--get"));
+    assert!(zsh.message.contains("--matrix-output"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1187,6 +1310,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("ids-only"));
     assert!(fish.message.contains("fields"));
     assert!(fish.message.contains("get"));
+    assert!(fish.message.contains("matrix-output"));
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("epub"));

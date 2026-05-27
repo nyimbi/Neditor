@@ -100,6 +100,8 @@ ned profile --workspace . --set fullName="Jane Doe" --set companyName="Acme Advi
 ned profile --fields --json
 ned profile --workspace . --get companyName
 ned profile --workspace . --placeholders
+ned rfp-response buyer-rfp.pdf --output response.md --matrix-output compliance-matrix.md --json
+cat buyer-rfp.md | ned analyze-rfp - --matrix
 ned targets --json
 ned handlers --platform windows --commands-only
 ned readiness --json
@@ -147,7 +149,16 @@ address, website, industry, default client, and brand voice values that appear i
 templates, snippets, Docs Live, and agent handoffs; use `--json` for help desks,
 `--fields` to list supported fields and aliases, `--get companyName` to print
 one value for scripts, `--markdown` for a reusable identity block, and
-`--placeholders` for Docs Live answers. `ned targets` lists export
+`--placeholders` for Docs Live answers. `ned rfp-response` and `ned analyze-rfp`
+give procurement teams a headless RFP workflow for Markdown/stdin, PDF, DOCX,
+or public URL sources. The command imports the source, extracts stated
+requirements, stated and implied buyer intent, capabilities, timelines, budget
+hints, evaluation criteria, mandatory attachments, risks, and verification
+questions, then writes a full response draft and/or compliance matrix with JSON
+automation output. Use `--context` to add win themes or bid notes, `--workspace`
+to reuse `.neditor/business-profile.json`, `--matrix` for matrix-only terminal
+output, and `--matrix-output` when a submission owner needs a separate
+compliance workbook starter. `ned targets` lists export
 formats, with `--json` output for help desk scripts and deployment checks. `ned
 handlers` lists copyable setup plans for optional transform handlers such as
 Graphviz, D2, PlantUML, Pikchr, and SQLite; use `--commands-only` when a support
@@ -193,7 +204,7 @@ settings.
 | Ask the app to plan and run the whole document workflow | Use **Agent** or **AI Agent Workspace**, describe the outcome in plain language, generate an agent packet, then apply the governed creation, revision, QA, and distribution output for human review. |
 | Draft a board paper, proposal, report, or briefing note | Start in **Outline** mode, create the structure, then fill in each section. |
 | Start from an AI-first document brief | Use **AI Create** to open Docs Live with an intent-first workflow for document type, outline, context, placeholders, QA, humanization, and review handoff. |
-| Start a proposal, RFP, RFQ, tender, or tutorial | Open **Templates**, set up **Business info**, then use the **Document creation wizard** to insert a fillable template, open Docs Live, or prepare a Claude Code, Codex, or OpenCode handoff package. For RFPs, the native wizard turns each extracted requirement into a compliance row with a suggested response answer, evidence owner, verification note, and response section, then groups those answers into a **Requirement Response Drafts** section for the first response pass. The RFP wizard also provides AI step assistance for source intake, requirement analysis, buyer intent, drafting, evidence QA, and handoff; accepted guidance goes into editable response-context notes. The Agent Workspace can also write a governed local-agent handoff file under `.neditor/agent-handoffs` and verify whether the selected CLI is available on `PATH`. |
+| Start a proposal, RFP, RFQ, tender, or tutorial | Open **Templates**, set up **Business info**, then use the **Document creation wizard** to insert a fillable template, open Docs Live, or prepare a Claude Code, Codex, or OpenCode handoff package. For RFPs, the native wizard turns each extracted requirement into a compliance row with a suggested response answer, evidence owner, verification note, and response section, then groups those answers into a **Requirement Response Drafts** section for the first response pass. The RFP wizard also provides AI step assistance for source intake, requirement analysis, buyer intent, drafting, evidence QA, and handoff; accepted guidance goes into editable response-context notes. The packaged `ned rfp-response` command provides the same procurement-oriented intake for Markdown, PDF, DOCX, URL, or stdin sources when a bid team needs scriptable response and compliance-matrix drafts outside the GUI. The Agent Workspace can also write a governed local-agent handoff file under `.neditor/agent-handoffs` and verify whether the selected CLI is available on `PATH`. |
 | Get to a first draft by talking through the document | Use **Docs Live** in the Writing toolbar, run **Check AI runtime** when you want proof that voice and clipboard capabilities are available, dictate the intent, add placeholder values, review the AI-created questionnaire, use or edit the context-aware suggested answers for each wizard step, inspect the rationale and context signals behind those answers, review the section runbook and review packet, then apply the section-by-section draft with QA, humanization notes, and review handoff prompts. |
 | Listen to a draft or selected passage | Use **Read Sel.** or **Read Doc** in the Writing toolbar, or configure **Read aloud** in Settings for browser speech, macOS Say, or Supertonic CLI. |
 | Reuse a company format | Save your name, email, company, address, website, industry, client, and brand voice in **Business info**, then insert reusable document parts such as contact blocks, company overview, scope, pricing assumptions, compliance matrix, risk register, and review handoff. |

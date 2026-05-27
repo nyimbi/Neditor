@@ -4213,6 +4213,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned profile --workspace . --set companyName=Acme --json"));
   ok(app.includes("ned profile --fields --json"));
   ok(app.includes("ned profile --workspace . --get companyName"));
+  ok(app.includes("ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json"));
+  ok(app.includes("ned analyze-rfp - --matrix"));
   ok(app.includes("ned new tender.md --template tender --json"));
   ok(app.includes("ned new podcast.md --template podcast-script --json"));
   ok(app.includes("ned evidence --json"));
@@ -4236,6 +4238,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(cli.includes("neditor.ned-profile.v1"));
   ok(cli.includes("business-profile.json"));
   ok(cli.includes("run_profile_command"));
+  ok(cli.includes("neditor.ned-rfp-response.v1"));
+  ok(cli.includes("run_rfp_response_command"));
+  ok(cli.includes("--matrix-output"));
   ok(cli.includes("--ids-only"));
   ok(cli.includes("neditor.ned-evidence-status.v1"));
   ok(cli.includes("neditor.ned-default-reader.v1"));

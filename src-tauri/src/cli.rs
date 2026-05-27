@@ -5,6 +5,7 @@ use crate::{
         PrepareExportRequest,
     },
     metadata_string,
+    rfp_import::{import_rfp_source, ImportRfpSourceRequest},
     transform_install::{
         installable_external_transform_engines, transform_handler_installer_plans_for_platform,
         TransformHandlerInstallerPlan,
@@ -71,6 +72,9 @@ const CLI_COMMANDS: &[&str] = &[
     "parts",
     "profile",
     "business-profile",
+    "rfp",
+    "rfp-response",
+    "analyze-rfp",
     "targets",
     "handlers",
     "transform-handlers",
@@ -166,6 +170,72 @@ struct BusinessProfile {
     brand_voice: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RfpCliSource {
+    kind: String,
+    title: String,
+    path: Option<String>,
+    url: Option<String>,
+    extraction_method: String,
+    line_count: usize,
+    word_count: usize,
+    warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RfpCliRequirement {
+    id: String,
+    text: String,
+    category: String,
+    source_line: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RfpCliComplianceRow {
+    id: String,
+    requirement: String,
+    category: String,
+    compliance_status: String,
+    response_section: String,
+    suggested_response: String,
+    evidence_needed: String,
+    owner: String,
+    verification: String,
+    source_line: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RfpCliVerificationSummary {
+    total_requirements: usize,
+    compliance_rows: usize,
+    all_requirements_mapped: bool,
+    rows_needing_evidence: usize,
+    checklist: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RfpCliAnalysis {
+    source: RfpCliSource,
+    requirements: Vec<RfpCliRequirement>,
+    compliance_rows: Vec<RfpCliComplianceRow>,
+    verification_summary: RfpCliVerificationSummary,
+    capabilities: Vec<String>,
+    stated_intent: Vec<String>,
+    implied_intent: Vec<String>,
+    timelines: Vec<String>,
+    budget_hints: Vec<String>,
+    evaluation_criteria: Vec<String>,
+    mandatory_attachments: Vec<String>,
+    risks: Vec<String>,
+    questions: Vec<String>,
+    completeness_score: u8,
+}
+
 pub fn run_cli() -> i32 {
     let args = env::args().collect::<Vec<_>>();
     match run_cli_with_args(&args) {
@@ -212,6 +282,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "templates" => run_templates_command(&args[2..]),
         "snippets" | "parts" => run_snippets_command(&args[2..]),
         "profile" | "business-profile" => run_profile_command(&args[2..]),
+        "rfp" | "rfp-response" | "analyze-rfp" => run_rfp_response_command(&args[2..], stdin_text),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
@@ -1302,6 +1373,182 @@ fn run_profile_command(args: &[String]) -> Result<CliOutcome, String> {
             should_write,
             dry_run,
             &profile,
+        ),
+        exit_code: 0,
+    })
+}
+
+fn run_rfp_response_command(
+    args: &[String],
+    stdin_text: Option<&str>,
+) -> Result<CliOutcome, String> {
+    let mut source: Option<String> = None;
+    let mut source_type: Option<String> = None;
+    let mut url: Option<String> = None;
+    let mut output: Option<PathBuf> = None;
+    let mut matrix_output: Option<PathBuf> = None;
+    let mut workspace = PathBuf::from(".");
+    let mut context_notes = String::new();
+    let mut json_output = false;
+    let mut markdown_output = false;
+    let mut matrix_only = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--source-type" | "--kind" => {
+                index += 1;
+                source_type = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            "--source-type requires markdown, pdf, docx, or url".to_string()
+                        })?
+                        .to_string(),
+                );
+            }
+            "--url" => {
+                index += 1;
+                url = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--url requires an http:// or https:// URL".to_string())?
+                        .to_string(),
+                );
+            }
+            "--output" | "-o" => {
+                index += 1;
+                output = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--output requires a Markdown output path".to_string()
+                })?));
+            }
+            "--matrix-output" => {
+                index += 1;
+                matrix_output = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--matrix-output requires a Markdown output path".to_string()
+                })?));
+            }
+            "--workspace" | "-w" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
+            "--context" | "--notes" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| "--context requires response guidance text".to_string())?;
+                context_notes = append_cli_block(&context_notes, value);
+            }
+            "--json" => json_output = true,
+            "--markdown" => markdown_output = true,
+            "--matrix" => matrix_only = true,
+            "-" => {
+                if source.is_some() {
+                    return Err("Only one RFP source can be analyzed at a time.".to_string());
+                }
+                source = Some("-".to_string());
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("Unsupported RFP option '{value}'"));
+            }
+            value => {
+                if source.is_some() {
+                    return Err("Only one RFP source can be analyzed at a time.".to_string());
+                }
+                source = Some(value.to_string());
+            }
+        }
+        index += 1;
+    }
+
+    if url.is_some() && source.is_none() {
+        source = url.clone();
+    }
+    let source = source.ok_or_else(|| {
+        "Usage: ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--json|--markdown|--matrix]"
+            .to_string()
+    })?;
+    let inferred_type =
+        source_type.unwrap_or_else(|| infer_rfp_source_type(&source, url.as_deref()));
+    let (path, source_url, text) = if source == "-" {
+        let text = if let Some(text) = stdin_text {
+            text.to_string()
+        } else {
+            let mut text = String::new();
+            io::stdin()
+                .read_to_string(&mut text)
+                .map_err(|err| format!("Could not read RFP source from stdin: {err}"))?;
+            text
+        };
+        (None, url.clone(), Some(text))
+    } else if inferred_type == "url" {
+        (None, Some(url.unwrap_or_else(|| source.clone())), None)
+    } else {
+        (Some(source.clone()), url.clone(), None)
+    };
+    let imported = import_rfp_source(ImportRfpSourceRequest {
+        source_type: inferred_type,
+        path,
+        url: source_url,
+        text,
+    })?;
+    let profile_path = workspace.join(".neditor").join("business-profile.json");
+    let profile = if profile_path.exists() {
+        read_business_profile(&profile_path)?
+    } else {
+        BusinessProfile::default()
+    };
+    let analysis = analyze_rfp_text(&imported, &profile);
+    let matrix_markdown = rfp_cli_compliance_matrix_markdown(&analysis);
+    let response_markdown = rfp_cli_response_markdown(&analysis, &profile, &context_notes);
+
+    if let Some(path) = output.as_ref() {
+        write_cli_markdown_output(path, &response_markdown)?;
+    }
+    if let Some(path) = matrix_output.as_ref() {
+        write_cli_markdown_output(path, &matrix_markdown)?;
+    }
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-rfp-response.v1",
+                "analysis": analysis,
+                "responseMarkdown": response_markdown,
+                "complianceMatrixMarkdown": matrix_markdown,
+                "outputs": {
+                    "response": output.as_ref().map(|path| path_to_display(path)),
+                    "matrix": matrix_output.as_ref().map(|path| path_to_display(path)),
+                },
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    if matrix_only {
+        return Ok(CliOutcome {
+            message: matrix_markdown,
+            exit_code: 0,
+        });
+    }
+    if markdown_output || output.is_none() {
+        return Ok(CliOutcome {
+            message: response_markdown,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: format!(
+            "Analyzed {} RFP requirement(s); wrote response to {}{}.",
+            analysis.requirements.len(),
+            output
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "(stdout)".to_string()),
+            matrix_output
+                .as_ref()
+                .map(|path| format!(" and matrix to {}", path.display()))
+                .unwrap_or_default()
         ),
         exit_code: 0,
     })
@@ -3205,6 +3452,894 @@ fn business_profile_text_report(
     .join("\n")
 }
 
+fn append_cli_block(existing: &str, value: &str) -> String {
+    if existing.trim().is_empty() {
+        value.trim().to_string()
+    } else {
+        format!("{}\n\n{}", existing.trim(), value.trim())
+    }
+}
+
+fn infer_rfp_source_type(source: &str, url: Option<&str>) -> String {
+    if url.is_some() || source.starts_with("http://") || source.starts_with("https://") {
+        return "url".to_string();
+    }
+    if source == "-" {
+        return "markdown".to_string();
+    }
+    match Path::new(source)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "pdf" => "pdf".to_string(),
+        "docx" => "docx".to_string(),
+        _ => "markdown".to_string(),
+    }
+}
+
+fn write_cli_markdown_output(path: &Path, markdown: &str) -> Result<(), String> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("Could not create directory {}: {err}", parent.display()))?;
+    }
+    fs::write(path, format!("{}\n", markdown.trim_end()))
+        .map_err(|err| format!("Could not write {}: {err}", path.display()))
+}
+
+fn analyze_rfp_text(
+    imported: &crate::rfp_import::ImportRfpSourceResponse,
+    profile: &BusinessProfile,
+) -> RfpCliAnalysis {
+    let significant_lines = imported
+        .text
+        .lines()
+        .enumerate()
+        .map(|(index, line)| (index + 1, normalize_cli_whitespace(line)))
+        .filter(|(_, line)| !line.is_empty())
+        .collect::<Vec<_>>();
+    let mut requirements = significant_lines
+        .iter()
+        .filter(|(_, line)| is_rfp_requirement_line(line))
+        .enumerate()
+        .map(|(index, (line_number, line))| RfpCliRequirement {
+            id: format!("RFP-REQ-{:03}", index + 1),
+            text: trim_requirement_marker(line),
+            category: rfp_requirement_category(line),
+            source_line: *line_number,
+        })
+        .collect::<Vec<_>>();
+    requirements = dedupe_rfp_requirements(requirements);
+    if requirements.is_empty() {
+        requirements = significant_lines
+            .iter()
+            .take(6)
+            .enumerate()
+            .map(|(index, (line_number, line))| RfpCliRequirement {
+                id: format!("RFP-REQ-{:03}", index + 1),
+                text: trim_requirement_marker(line),
+                category: rfp_requirement_category(line),
+                source_line: *line_number,
+            })
+            .collect();
+    }
+    for (index, requirement) in requirements.iter_mut().enumerate() {
+        requirement.id = format!("RFP-REQ-{:03}", index + 1);
+    }
+
+    let timelines = extract_rfp_lines(
+        &significant_lines,
+        &[
+            "deadline",
+            "due",
+            "schedule",
+            "timeline",
+            "milestone",
+            "weeks",
+            "months",
+            "days",
+            "implementation",
+            "submission",
+        ],
+        8,
+    );
+    let budget_hints = extract_rfp_lines(
+        &significant_lines,
+        &[
+            "budget",
+            "price",
+            "pricing",
+            "cost",
+            "fee",
+            "commercial",
+            "payment",
+            "invoice",
+            "rate",
+            "$",
+        ],
+        8,
+    );
+    let evaluation_criteria = extract_rfp_lines(
+        &significant_lines,
+        &[
+            "evaluation",
+            "score",
+            "scoring",
+            "weight",
+            "criteria",
+            "points",
+            "award",
+            "selection",
+            "technical merit",
+            "best value",
+        ],
+        8,
+    );
+    let mandatory_attachments = extract_rfp_lines(
+        &significant_lines,
+        &[
+            "attachment",
+            "appendix",
+            "form",
+            "certificate",
+            "insurance",
+            "tax",
+            "license",
+            "registration",
+            "declaration",
+            "signature",
+            "signed",
+            "mandatory document",
+        ],
+        10,
+    );
+    let capabilities = infer_rfp_capabilities(&requirements, &imported.text, profile);
+    let stated_intent = infer_rfp_stated_intent(&significant_lines, &requirements);
+    let implied_intent = infer_rfp_implied_intent(
+        &requirements,
+        &timelines,
+        &budget_hints,
+        &evaluation_criteria,
+        &mandatory_attachments,
+    );
+    let compliance_rows = requirements
+        .iter()
+        .map(|requirement| build_rfp_compliance_row(requirement, profile))
+        .collect::<Vec<_>>();
+    let rows_needing_evidence = compliance_rows
+        .iter()
+        .filter(|row| row.evidence_needed.contains("Attach"))
+        .count();
+    let verification_summary = RfpCliVerificationSummary {
+        total_requirements: requirements.len(),
+        compliance_rows: compliance_rows.len(),
+        all_requirements_mapped: !requirements.is_empty()
+            && requirements.len() == compliance_rows.len(),
+        rows_needing_evidence,
+        checklist: rfp_verification_checklist(
+            requirements.len(),
+            rows_needing_evidence,
+            &mandatory_attachments,
+            &evaluation_criteria,
+        ),
+    };
+    let risks = infer_rfp_risks(
+        &requirements,
+        &timelines,
+        &budget_hints,
+        &mandatory_attachments,
+    );
+    let questions = infer_rfp_questions(
+        &requirements,
+        &timelines,
+        &budget_hints,
+        &evaluation_criteria,
+        &mandatory_attachments,
+    );
+    let warnings = imported.warnings.clone();
+    let completeness_score = rfp_completeness_score(
+        requirements.len(),
+        capabilities.len(),
+        timelines.len(),
+        budget_hints.len(),
+        evaluation_criteria.len(),
+        mandatory_attachments.len(),
+        warnings.len(),
+    );
+    RfpCliAnalysis {
+        source: RfpCliSource {
+            kind: imported.source_type.clone(),
+            title: imported.title.clone(),
+            path: imported.path.clone(),
+            url: imported.url.clone(),
+            extraction_method: imported.extraction_method.clone(),
+            line_count: significant_lines.len(),
+            word_count: imported.text.split_whitespace().count(),
+            warnings,
+        },
+        requirements,
+        compliance_rows,
+        verification_summary,
+        capabilities,
+        stated_intent,
+        implied_intent,
+        timelines,
+        budget_hints,
+        evaluation_criteria,
+        mandatory_attachments,
+        risks,
+        questions,
+        completeness_score,
+    }
+}
+
+fn normalize_cli_whitespace(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn is_rfp_requirement_line(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    let starts_like_requirement = line
+        .trim_start()
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_digit() || matches!(ch, '-' | '*' | '•'));
+    starts_like_requirement
+        || [
+            "must",
+            "shall",
+            "required",
+            "requirement",
+            "vendor",
+            "proposer",
+            "supplier",
+            "contractor",
+            "respondent",
+            "provide",
+            "submit",
+            "demonstrate",
+            "include",
+            "comply",
+            "certify",
+        ]
+        .iter()
+        .any(|needle| lower.contains(needle))
+}
+
+fn trim_requirement_marker(line: &str) -> String {
+    line.trim()
+        .trim_start_matches(|ch: char| {
+            ch.is_ascii_digit() || matches!(ch, '.' | ')' | '-' | '*' | '•' | ':')
+        })
+        .trim()
+        .to_string()
+}
+
+fn rfp_requirement_category(line: &str) -> String {
+    let lower = line.to_ascii_lowercase();
+    let category = if contains_any(
+        &lower,
+        &[
+            "security",
+            "privacy",
+            "data",
+            "soc",
+            "compliance",
+            "control",
+            "certif",
+        ],
+    ) {
+        "Compliance"
+    } else if contains_any(
+        &lower,
+        &["price", "pricing", "cost", "fee", "commercial", "payment"],
+    ) {
+        "Pricing"
+    } else if contains_any(
+        &lower,
+        &[
+            "deadline",
+            "timeline",
+            "schedule",
+            "days",
+            "weeks",
+            "months",
+            "milestone",
+            "implementation",
+        ],
+    ) {
+        "Delivery Plan"
+    } else if contains_any(
+        &lower,
+        &[
+            "experience",
+            "reference",
+            "team",
+            "staff",
+            "resume",
+            "cv",
+            "case study",
+        ],
+    ) {
+        "Team and Experience"
+    } else if contains_any(
+        &lower,
+        &[
+            "technical",
+            "solution",
+            "system",
+            "integration",
+            "support",
+            "training",
+            "implementation",
+        ],
+    ) {
+        "Technical Solution"
+    } else {
+        "Requirements Analysis"
+    };
+    category.to_string()
+}
+
+fn dedupe_rfp_requirements(requirements: Vec<RfpCliRequirement>) -> Vec<RfpCliRequirement> {
+    let mut seen = Vec::<String>::new();
+    let mut deduped = Vec::new();
+    for requirement in requirements {
+        let key = requirement.text.to_ascii_lowercase();
+        if seen.iter().any(|seen_key| seen_key == &key) {
+            continue;
+        }
+        seen.push(key);
+        deduped.push(requirement);
+    }
+    deduped
+}
+
+fn extract_rfp_lines(lines: &[(usize, String)], needles: &[&str], limit: usize) -> Vec<String> {
+    lines
+        .iter()
+        .filter(|(_, line)| contains_any(&line.to_ascii_lowercase(), needles))
+        .map(|(_, line)| line.clone())
+        .take(limit)
+        .collect()
+}
+
+fn infer_rfp_capabilities(
+    requirements: &[RfpCliRequirement],
+    text: &str,
+    profile: &BusinessProfile,
+) -> Vec<String> {
+    let lower = text.to_ascii_lowercase();
+    let mut capabilities = Vec::new();
+    for (needle, capability) in [
+        ("security", "Security controls and data protection"),
+        ("support", "Support operations and service management"),
+        (
+            "implementation",
+            "Implementation planning and delivery governance",
+        ),
+        ("training", "Training and adoption enablement"),
+        ("integration", "Systems integration and technical delivery"),
+        ("pricing", "Commercial pricing and assumption management"),
+        (
+            "reference",
+            "Relevant customer references and delivery proof",
+        ),
+    ] {
+        if lower.contains(needle)
+            || requirements
+                .iter()
+                .any(|requirement| requirement.text.to_ascii_lowercase().contains(needle))
+        {
+            capabilities.push(capability.to_string());
+        }
+    }
+    if capabilities.is_empty() {
+        capabilities.push(format!(
+            "{} capability narrative to be completed from the RFP source and evidence pack",
+            profile_fallback(&profile.company_name, "Bid team")
+        ));
+    }
+    capabilities
+}
+
+fn infer_rfp_stated_intent(
+    lines: &[(usize, String)],
+    requirements: &[RfpCliRequirement],
+) -> Vec<String> {
+    let mut intent = extract_rfp_lines(
+        lines,
+        &[
+            "purpose",
+            "objective",
+            "seeks",
+            "seeking",
+            "scope",
+            "goal",
+            "outcome",
+            "award",
+            "improve",
+            "reduce",
+        ],
+        5,
+    );
+    if intent.is_empty() {
+        intent = requirements
+            .iter()
+            .take(3)
+            .map(|requirement| format!("Buyer explicitly asks for {}", requirement.text))
+            .collect();
+    }
+    if intent.is_empty() {
+        intent.push("Add stated buyer intent from the RFP overview, purpose, objectives, scope, and award language.".to_string());
+    }
+    intent
+}
+
+fn infer_rfp_implied_intent(
+    requirements: &[RfpCliRequirement],
+    timelines: &[String],
+    budget_hints: &[String],
+    evaluation_criteria: &[String],
+    mandatory_attachments: &[String],
+) -> Vec<String> {
+    let mut intent = Vec::new();
+    if !evaluation_criteria.is_empty() {
+        intent.push("The buyer needs an easily scored response; mirror evaluation criteria, labels, and evidence in the executive summary and compliance matrix.".to_string());
+    }
+    if !timelines.is_empty() {
+        intent.push("Timeline language implies delivery-risk sensitivity; make milestones, mobilization, and governance concrete.".to_string());
+    }
+    if !budget_hints.is_empty() {
+        intent.push("Pricing language implies commercial scrutiny; state assumptions, exclusions, payment terms, and value drivers clearly.".to_string());
+    }
+    if !mandatory_attachments.is_empty()
+        || requirements
+            .iter()
+            .any(|requirement| requirement.category == "Compliance")
+    {
+        intent.push("The buyer is managing procurement risk; include declarations, certificates, controls, and reviewer sign-off instead of broad claims.".to_string());
+    }
+    if requirements
+        .iter()
+        .any(|requirement| requirement.category == "Team and Experience")
+    {
+        intent.push("The buyer needs confidence in delivery capacity; foreground relevant team credentials, references, and comparable work.".to_string());
+    }
+    if intent.is_empty() {
+        intent.push("Infer unstated priorities from criteria, mandatory evidence, timeline pressure, budget language, and risk signals.".to_string());
+    }
+    intent
+}
+
+fn build_rfp_compliance_row(
+    requirement: &RfpCliRequirement,
+    profile: &BusinessProfile,
+) -> RfpCliComplianceRow {
+    let owner = profile_fallback(&profile.full_name, "Bid owner");
+    let response_section = match requirement.category.as_str() {
+        "Compliance" => "Compliance and Security",
+        "Pricing" => "Pricing and Assumptions",
+        "Delivery Plan" => "Implementation Plan and Timeline",
+        "Team and Experience" => "Team and Experience",
+        "Technical Solution" => "Technical Response",
+        _ => "Requirements Analysis",
+    }
+    .to_string();
+    let requirement_text = requirement
+        .text
+        .trim_end_matches(|ch| matches!(ch, '.' | ';' | ':'));
+    let suggested_response = match requirement.category.as_str() {
+        "Compliance" => format!(
+            "Specific requirement: {}. Respond with mapped controls, certificates, policies, and named evidence owner.",
+            requirement_text
+        ),
+        "Pricing" => format!(
+            "Specific requirement: {}. State pricing, payment terms, assumptions, exclusions, and validity period.",
+            requirement_text
+        ),
+        "Delivery Plan" => format!(
+            "Specific requirement: {}. Provide milestone plan, dependencies, risks, and governance.",
+            requirement_text
+        ),
+        _ => format!(
+            "Specific requirement: {}. Answer directly, cite evidence, and avoid generic proposal copy.",
+            requirement_text
+        ),
+    };
+    RfpCliComplianceRow {
+        id: requirement.id.clone(),
+        requirement: requirement.text.clone(),
+        category: requirement.category.clone(),
+        compliance_status: "Needs evidence review".to_string(),
+        response_section,
+        suggested_response,
+        evidence_needed: format!(
+            "Attach source proof, owner approval, and reviewer sign-off for {}",
+            requirement.id
+        ),
+        owner,
+        verification: format!(
+            "Compliance Matrix row maps source line {} and needs suggested answer review.",
+            requirement.source_line
+        ),
+        source_line: requirement.source_line,
+    }
+}
+
+fn rfp_verification_checklist(
+    requirements: usize,
+    rows_needing_evidence: usize,
+    attachments: &[String],
+    criteria: &[String],
+) -> Vec<String> {
+    vec![
+        format!(
+            "{requirements} extracted requirement(s) mapped to {requirements} compliance row(s)."
+        ),
+        "Every extracted requirement has a response section and owner.".to_string(),
+        format!("{rows_needing_evidence} row(s) need evidence attachment and reviewer sign-off."),
+        if attachments.is_empty() {
+            "Review the source for mandatory forms, certificates, declarations, and signatures."
+                .to_string()
+        } else {
+            format!(
+                "Track {} mandatory attachment hint(s) through submission.",
+                attachments.len()
+            )
+        },
+        if criteria.is_empty() {
+            "Confirm scoring criteria and buyer priorities before final response review."
+                .to_string()
+        } else {
+            format!(
+                "Mirror {} evaluation criteria hint(s) in the response structure.",
+                criteria.len()
+            )
+        },
+    ]
+}
+
+fn infer_rfp_risks(
+    requirements: &[RfpCliRequirement],
+    timelines: &[String],
+    budget_hints: &[String],
+    attachments: &[String],
+) -> Vec<String> {
+    let mut risks = Vec::new();
+    if requirements.len() > 30 {
+        risks.push(
+            "Large requirement set; assign matrix owners and verify every row before submission."
+                .to_string(),
+        );
+    }
+    if !timelines.is_empty() {
+        risks.push(
+            "Timeline obligations need delivery-owner validation before commitments are made."
+                .to_string(),
+        );
+    }
+    if !budget_hints.is_empty() {
+        risks.push("Commercial assumptions need finance approval before submission.".to_string());
+    }
+    if !attachments.is_empty() {
+        risks.push("Mandatory attachments can block submission if certificates, declarations, or signatures are missing.".to_string());
+    }
+    if risks.is_empty() {
+        risks.push("Review source RFP for exceptions, addenda, submission portal rules, and attachments before final delivery.".to_string());
+    }
+    risks
+}
+
+fn infer_rfp_questions(
+    requirements: &[RfpCliRequirement],
+    timelines: &[String],
+    budget_hints: &[String],
+    criteria: &[String],
+    attachments: &[String],
+) -> Vec<String> {
+    let mut questions = Vec::new();
+    if requirements.is_empty() {
+        questions.push(
+            "Can the full RFP text be imported or pasted so every requirement is mapped?"
+                .to_string(),
+        );
+    }
+    if timelines.is_empty() {
+        questions.push(
+            "What is the submission deadline, question deadline, and expected delivery timeline?"
+                .to_string(),
+        );
+    }
+    if budget_hints.is_empty() {
+        questions.push(
+            "What pricing format, payment terms, or commercial assumptions does the buyer require?"
+                .to_string(),
+        );
+    }
+    if criteria.is_empty() {
+        questions.push(
+            "What evaluation criteria and scoring weights should the response mirror?".to_string(),
+        );
+    }
+    if attachments.is_empty() {
+        questions.push(
+            "Which certificates, forms, declarations, references, or signatures are mandatory?"
+                .to_string(),
+        );
+    }
+    questions
+}
+
+fn rfp_completeness_score(
+    requirements: usize,
+    capabilities: usize,
+    timelines: usize,
+    budget_hints: usize,
+    criteria: usize,
+    attachments: usize,
+    warnings: usize,
+) -> u8 {
+    let score = 20
+        + requirements.min(12) * 4
+        + capabilities.min(6) * 3
+        + timelines.min(4) * 3
+        + budget_hints.min(4) * 3
+        + criteria.min(4) * 3
+        + attachments.min(5) * 2;
+    score.saturating_sub(warnings * 5).min(100) as u8
+}
+
+fn rfp_cli_compliance_matrix_markdown(analysis: &RfpCliAnalysis) -> String {
+    let mut lines = vec![
+        "## Compliance Matrix".to_string(),
+        "".to_string(),
+        "| ID | Requirement | Category | Compliance status | Response section | Suggested response | Evidence / proof | Verification |".to_string(),
+        "| --- | --- | --- | --- | --- | --- | --- | --- |".to_string(),
+    ];
+    if analysis.compliance_rows.is_empty() {
+        lines.push("| RFP-REQ-001 | Import or paste the RFP text to populate requirements. | Intake | Needs evidence review | Requirements Analysis | Analyze the full source RFP before drafting. | Source RFP text | Not verified. |".to_string());
+    } else {
+        for row in &analysis.compliance_rows {
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} | {} | {} | {} |",
+                table_cell(&row.id),
+                table_cell(&row.requirement),
+                table_cell(&row.category),
+                table_cell(&row.compliance_status),
+                table_cell(&row.response_section),
+                table_cell(&row.suggested_response),
+                table_cell(&row.evidence_needed),
+                table_cell(&row.verification),
+            ));
+        }
+    }
+    lines.join("\n")
+}
+
+fn rfp_cli_response_markdown(
+    analysis: &RfpCliAnalysis,
+    profile: &BusinessProfile,
+    context_notes: &str,
+) -> String {
+    let company = profile_fallback(&profile.company_name, "Bid team");
+    let client = profile_fallback(&profile.default_client_name, &analysis.source.title);
+    let prepared_by = profile_fallback(&profile.full_name, "Response owner");
+    let mut lines = vec![
+        "---".to_string(),
+        format!(
+            "title: {}",
+            yaml_scalar(&format!("RFP response for {client}"))
+        ),
+        "status: draft".to_string(),
+        "documentType: RFP response".to_string(),
+        format!("company: {}", yaml_scalar(&company)),
+        format!("preparedBy: {}", yaml_scalar(&prepared_by)),
+        format!("rfpSource: {}", yaml_scalar(&analysis.source.title)),
+    ];
+    if let Some(url) = analysis.source.url.as_deref().filter(|url| !url.is_empty()) {
+        lines.push(format!("rfpUrl: {}", yaml_scalar(url)));
+    }
+    lines.extend([
+        "toc: true".to_string(),
+        "---".to_string(),
+        "".to_string(),
+        format!("# RFP response for {client}"),
+        "".to_string(),
+        "## Executive Response".to_string(),
+        "".to_string(),
+        format!("{company} has prepared a responsive draft for {client}. This response mirrors extracted RFP requirements, maps every detected requirement into a compliance matrix, and keeps evidence review visible before submission."),
+        "".to_string(),
+        "## RFP Intake Summary".to_string(),
+        "".to_string(),
+        format!("- Source type: {}", analysis.source.kind.to_uppercase()),
+        format!("- Source title: {}", analysis.source.title),
+        format!("- Extraction method: {}", analysis.source.extraction_method),
+        format!("- Extracted requirements: {}", analysis.requirements.len()),
+        format!("- Completeness score: {}/100", analysis.completeness_score),
+        format!("- Source size: {} words across {} non-empty lines", analysis.source.word_count, analysis.source.line_count),
+    ]);
+    if !context_notes.trim().is_empty() {
+        lines.extend([
+            "".to_string(),
+            "### Response Context and Decision Notes".to_string(),
+            "".to_string(),
+            context_notes.trim().to_string(),
+        ]);
+    }
+    lines.extend([
+        "".to_string(),
+        "## Requirements Analysis".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis
+            .requirements
+            .iter()
+            .map(|requirement| format!("**{}:** {}", requirement.id, requirement.text))
+            .collect::<Vec<_>>(),
+        "No requirements were extracted. Import or paste the full RFP and re-run analysis.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "## Buyer Intent Analysis".to_string(),
+        "".to_string(),
+        "### Stated Intent".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.stated_intent.clone(),
+        "Add stated buyer intent from the RFP overview, purpose, objectives, scope, and award language.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "### Implied Intent".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.implied_intent.clone(),
+        "Infer unstated priorities from criteria, mandatory evidence, timeline pressure, budget language, and risk signals.",
+    ));
+    lines.extend([
+        "".to_string(),
+        rfp_cli_compliance_matrix_markdown(analysis),
+        "".to_string(),
+        "## Requirement Response Drafts".to_string(),
+        "".to_string(),
+        "These draft answers are generated from the compliance matrix and must remain evidence-gated until the named owner attaches proof and a reviewer signs off.".to_string(),
+        "".to_string(),
+    ]);
+    for row in &analysis.compliance_rows {
+        lines.extend([
+            format!("### {} - {}", row.id, row.response_section),
+            "".to_string(),
+            format!("Suggested response: {}", row.suggested_response),
+            "".to_string(),
+            format!("- [ ] Evidence owner: {}", row.owner),
+            format!("- [ ] Evidence needed: {}", row.evidence_needed),
+            format!("- [ ] Verification: {}", row.verification),
+            "".to_string(),
+        ]);
+    }
+    lines.extend(["## Requirement Verification".to_string(), "".to_string()]);
+    lines.extend(
+        analysis
+            .verification_summary
+            .checklist
+            .iter()
+            .map(|item| format!("- [ ] {item}")),
+    );
+    lines.extend([
+        "".to_string(),
+        "## Capability Match".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.capabilities.clone(),
+        "Add capability evidence.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "## Implementation Plan and Timeline".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.timelines.clone(),
+        "Add the buyer deadline, milestones, and submission time zone.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "## Pricing and Budget Response".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.budget_hints.clone(),
+        "Add pricing basis, budget ceiling, required forms, and assumptions.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "## Evaluation Criteria Response".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.evaluation_criteria.clone(),
+        "Add the evaluation criteria and scoring weights.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "## Mandatory Attachments".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.mandatory_attachments.clone(),
+        "Add mandatory forms, certificates, declarations, and signatures.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "## Risk and Assumptions".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.risks.clone(),
+        "Review source RFP for risks, exceptions, and buyer constraints.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "## Open Questions for Buyer or Bid Team".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.questions.clone(),
+        "No open questions detected.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "## Submission QA Checklist".to_string(),
+        "".to_string(),
+        "- [ ] Every RFP requirement appears in the compliance matrix.".to_string(),
+        "- [ ] Every matrix row has a response section and evidence owner.".to_string(),
+        "- [ ] Mandatory forms, certificates, declarations, and signatures are attached.".to_string(),
+        "- [ ] Pricing matches the required format and stated assumptions.".to_string(),
+        "- [ ] Timeline, delivery milestones, and submission deadline are confirmed.".to_string(),
+        "- [ ] Legal, finance, and delivery reviewers have approved the final response.".to_string(),
+        "".to_string(),
+        "<!-- ai-assisted: status=needs-review | source=NEditor ned RFP Response | promptSummary=Analyze RFP, build compliance matrix, draft responsive response -->".to_string(),
+    ]);
+    lines.join("\n")
+}
+
+fn markdown_bullets(values: Vec<String>, fallback: &str) -> Vec<String> {
+    if values.is_empty() {
+        vec![format!("- {fallback}")]
+    } else {
+        values
+            .into_iter()
+            .map(|value| format!("- {value}"))
+            .collect()
+    }
+}
+
+fn profile_fallback(value: &str, fallback: &str) -> String {
+    if value.trim().is_empty() {
+        fallback.to_string()
+    } else {
+        value.trim().to_string()
+    }
+}
+
+fn table_cell(value: &str) -> String {
+    value.replace('|', "\\|").replace('\n', " ")
+}
+
+fn contains_any(haystack: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| haystack.contains(needle))
+}
+
 fn new_document_markdown(template: &str, title: &str) -> Result<String, String> {
     let template = template.trim().to_ascii_lowercase();
     if !NEW_DOCUMENT_TEMPLATES.contains(&template.as_str()) {
@@ -3477,6 +4612,9 @@ _ned() {{
       profile|business-profile)
         COMPREPLY=( $(compgen -W "--workspace --set --get --fields --init --force --dry-run --json --markdown --placeholders --placeholder-text" -- "$cur") )
         ;;
+      rfp|rfp-response|analyze-rfp)
+        COMPREPLY=( $(compgen -W "--source-type --kind --url --output --matrix-output --workspace --context --notes --json --markdown --matrix" -- "$cur") )
+        ;;
       handlers|transform-handlers)
         COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
         ;;
@@ -3559,6 +4697,9 @@ _ned() {{
       ;;
     profile|business-profile)
       _arguments '--workspace[workspace containing .neditor]:directory:_files -/' '--set[set profile field key=value]:assignment:' '--get[print one profile field]:field:' '--fields[list supported profile fields and aliases]' '--init[create profile file]' '--force[replace existing profile when initializing]' '--dry-run[preview write]' '--json[print machine-readable JSON]' '--markdown[print reusable identity block]' '--placeholders[print Docs Live placeholder values]' '--placeholder-text[alias for --placeholders]'
+      ;;
+    rfp|rfp-response|analyze-rfp)
+      _arguments '*:RFP source:_files' '--source-type[source type]:kind:(markdown pdf docx url)' '--kind[source type alias]:kind:(markdown pdf docx url)' '--url[fetch public RFP URL]:url:' '--output[write response Markdown]:file:_files' '--matrix-output[write compliance matrix Markdown]:file:_files' '--workspace[workspace containing .neditor]:directory:_files -/' '--context[response guidance]:notes:' '--notes[response guidance alias]:notes:' '--json[print machine-readable JSON]' '--markdown[print response Markdown]' '--matrix[print compliance matrix Markdown]'
       ;;
     targets)
       _arguments '--json[print machine-readable JSON]'
@@ -3668,6 +4809,17 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l markdown".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l placeholders".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l placeholder-text".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l source-type -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l kind -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l url -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l output -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l matrix-output -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l workspace -s w -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l context -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l notes -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l json".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l markdown".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l matrix".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l commands-only"
@@ -4069,6 +5221,7 @@ fn help_text() -> String {
         "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id]".to_string(),
         "  ned profile [--workspace path] [--init] [--set fullName=...] [--get field|--fields] [--json|--markdown|--placeholders]".to_string(),
+        "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--json|--markdown|--matrix]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json]"
