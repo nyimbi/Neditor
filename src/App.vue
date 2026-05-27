@@ -5179,6 +5179,7 @@ import {
   type ConflictMergeSource,
 } from "./lib/workflows";
 import {
+  createTableSourceSnapshot,
   findMarkdownTableIndexForLineRange,
   formatTableTotal,
   isFormulaCell,
@@ -5194,12 +5195,15 @@ import {
   setTableCellSpan,
   sortTableDraftRows,
   spreadsheetColumnName,
+  tableDraftMarkdown,
+  tableSourceChanged,
   tableDraftFromRows,
   tableColumnRange,
   validateTableDraft,
   type MarkdownTable,
   type TableDraft,
   type TableFormulaFunction,
+  type TableSourceSnapshot,
   type TableSortDirection,
 } from "./lib/tables";
 import {
@@ -5225,14 +5229,6 @@ interface AppMenuGroup {
   id: string;
   label: string;
   items: AppMenuItem[];
-}
-interface TableSourceSnapshot {
-  documentId: string;
-  tableIndex: number;
-  startLine: number;
-  endLine: number;
-  sourceText: string;
-  draftMarkdown: string;
 }
 interface AppMenu {
   id: string;
@@ -6934,22 +6930,14 @@ const tableDraftHasErrors = computed(() => tableDraftIssues.value.some((issue) =
 const tableDraftMarkdownPreview = computed(() => {
   const draft = tableDraft.value;
   if (!draft) return "";
-  return serializeMarkdownTable(normalizeTableDraft(draft)).join("\n");
-});
-const selectedTableSourceText = computed(() => {
-  const table = selectedTable.value;
-  return table ? tableSourceText(table) : "";
+  return tableDraftMarkdown(draft);
 });
 const tableDraftDirty = computed(() => {
   const snapshot = tableSourceSnapshot.value;
   return Boolean(tableDraft.value && snapshot && tableDraftMarkdownPreview.value !== snapshot.draftMarkdown);
 });
 const tableDraftSourceChanged = computed(() => {
-  const snapshot = tableSourceSnapshot.value;
-  const table = selectedTable.value;
-  if (!snapshot || isNewTableDraft.value || snapshot.documentId !== active.value.id) return false;
-  if (!table) return true;
-  return selectedTableSourceText.value !== snapshot.sourceText;
+  return tableSourceChanged(active.value.text, selectedTable.value, tableSourceSnapshot.value, active.value.id, isNewTableDraft.value);
 });
 const tableDataRowCount = computed(() => {
   const draft = tableDraft.value;
@@ -16778,23 +16766,8 @@ function goToSelectedTableSource() {
   });
 }
 
-function tableSourceText(table: MarkdownTable) {
-  const lines = active.value.text.split("\n");
-  const startLine = table.captionLine || table.startLine;
-  return lines.slice(startLine - 1, table.endLine).join("\n");
-}
-
 function rememberTableSource(table: MarkdownTable, draft: TableDraft) {
-  const startLine = table.captionLine || table.startLine;
-  const draftMarkdown = serializeMarkdownTable(normalizeTableDraft(draft)).join("\n");
-  tableSourceSnapshot.value = {
-    documentId: active.value.id,
-    tableIndex: selectedTableIndex.value,
-    startLine,
-    endLine: table.endLine,
-    sourceText: tableSourceText(table),
-    draftMarkdown,
-  };
+  tableSourceSnapshot.value = createTableSourceSnapshot(active.value.text, active.value.id, selectedTableIndex.value, table, draft);
 }
 
 function loadSelectedTable() {

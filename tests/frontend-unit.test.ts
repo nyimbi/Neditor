@@ -144,6 +144,7 @@ import {
   type ConflictMergePart,
 } from "../src/lib/workflows.js";
 import {
+  createTableSourceSnapshot,
   formatTableTotal,
   findMarkdownTableIndexForLineRange,
   markdownTableToDraft,
@@ -155,7 +156,10 @@ import {
   setTableCellSpan,
   sortTableDraftRows,
   tableColumnRange,
+  tableDraftMarkdown,
   tableDraftFromRows,
+  tableSourceChanged,
+  tableSourceText,
   validateTableDraft,
   type TableDraft,
 } from "../src/lib/tables.js";
@@ -230,6 +234,33 @@ test("table parsing preserves captions, alignment, and escaped pipes", () => {
   const [updatedTable] = parseMarkdownTables(replacement.text);
   equal(updatedTable.rows[0][1], "$2400");
   equal(updatedTable.rows[0][2], "margin|stable");
+});
+
+test("table source snapshots detect source and draft divergence", () => {
+  const sourceText = [
+    "# Report",
+    "",
+    "Table: Regional revenue {#tbl:revenue}",
+    "| Region | Revenue |",
+    "| --- | ---: |",
+    "| East | 1200 |",
+    "",
+    "After table.",
+  ].join("\n");
+  const [table] = parseMarkdownTables(sourceText);
+  const draft = markdownTableToDraft(table);
+  const snapshot = createTableSourceSnapshot(sourceText, "doc-1", 0, table, draft);
+
+  equal(snapshot.startLine, 3);
+  equal(snapshot.endLine, 6);
+  equal(snapshot.sourceText, "Table: Regional revenue {#tbl:revenue}\n| Region | Revenue |\n| --- | ---: |\n| East | 1200 |");
+  equal(snapshot.draftMarkdown, tableDraftMarkdown(draft));
+  equal(tableSourceText(sourceText, table), snapshot.sourceText);
+  equal(tableSourceChanged(sourceText, table, snapshot, "doc-1"), false);
+  equal(tableSourceChanged(sourceText.replace("East", "West"), table, snapshot, "doc-1"), true);
+  equal(tableSourceChanged(sourceText, null, snapshot, "doc-1"), true);
+  equal(tableSourceChanged(sourceText.replace("East", "West"), table, snapshot, "other-doc"), false);
+  equal(tableSourceChanged(sourceText.replace("East", "West"), table, snapshot, "doc-1", true), false);
 });
 
 test("table paste handles quoted CSV and markdown table captions", () => {

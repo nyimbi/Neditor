@@ -23,6 +23,15 @@ export interface TableDraft {
   rows: string[][];
 }
 
+export interface TableSourceSnapshot {
+  documentId: string;
+  tableIndex: number;
+  startLine: number;
+  endLine: number;
+  sourceText: string;
+  draftMarkdown: string;
+}
+
 export interface TableDraftIssue {
   severity: "warning" | "error";
   message: string;
@@ -116,6 +125,45 @@ export function replaceMarkdownTableInText(text: string, table: MarkdownTable, d
     startLine: replaceStart,
     endLine: replaceStart + serialized.length - 1,
   };
+}
+
+export function tableSourceText(text: string, table: MarkdownTable) {
+  const lines = text.split("\n");
+  const startLine = table.captionLine || table.startLine;
+  return lines.slice(startLine - 1, table.endLine).join("\n");
+}
+
+export function tableDraftMarkdown(draft: TableDraft) {
+  return serializeMarkdownTable(normalizeTableDraft(draft)).join("\n");
+}
+
+export function createTableSourceSnapshot(
+  text: string,
+  documentId: string,
+  tableIndex: number,
+  table: MarkdownTable,
+  draft: TableDraft,
+): TableSourceSnapshot {
+  return {
+    documentId,
+    tableIndex,
+    startLine: table.captionLine || table.startLine,
+    endLine: table.endLine,
+    sourceText: tableSourceText(text, table),
+    draftMarkdown: tableDraftMarkdown(draft),
+  };
+}
+
+export function tableSourceChanged(
+  text: string,
+  table: MarkdownTable | null | undefined,
+  snapshot: TableSourceSnapshot | null | undefined,
+  documentId: string,
+  isNewDraft = false,
+) {
+  if (!snapshot || isNewDraft || snapshot.documentId !== documentId) return false;
+  if (!table) return true;
+  return tableSourceText(text, table) !== snapshot.sourceText;
 }
 
 function parseTableCaption(line: string) {

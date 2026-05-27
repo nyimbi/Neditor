@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `2aa176c Prove native
-  table menu editing`
+- Latest inspected committed baseline before this update: `35db8d5 Protect
+  table edits across source changes`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`
 
@@ -37,6 +37,10 @@ Recent pushed checkpoints visible in current git history:
   text, and warns before a dirty visual draft can overwrite a concurrently
   changed source table. Users get explicit **Reload from source** and **Apply
   draft over source** choices when both sides diverge.
+- The table source synchronization behavior has been moved into direct-tested
+  helpers in `src/lib/tables.ts`: source extraction, draft Markdown
+  serialization, source snapshot creation, and source-change detection now have
+  reusable unit coverage instead of living only in the workbench component.
 - Table editing now works as a two-way source workflow. The Tables panel can
   load the Markdown table at the current source cursor or selection, show the
   exact source-line range being edited, jump back to that source table, and
@@ -1496,6 +1500,11 @@ Current verification recorded on 2026-05-21 through 2026-05-27:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| `pnpm run test:unit` | Pass | 76 frontend unit/static tests passed after extracting table source-sync helpers into `src/lib/tables.ts`, including direct source snapshot, source extraction, draft Markdown serialization, changed-source detection, deleted-table detection, other-document suppression, and new-draft suppression coverage. |
+| `pnpm run check` | Pass | Vue typecheck passed after moving table source synchronization helpers out of the workbench component. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after updating progress and the spec matrix for the helper extraction. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording frontend architecture and table editor evidence updates. |
+| `git diff --check` | Pass | No whitespace errors are present after extracting table source synchronization helpers. |
 | `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding source-sync protection for the table editor, including static guards for the source-change warning, reload action, explicit overwrite action, and synchronization status. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows"` | Pass | Focused Chromium workflow proved a visual table can be inserted, then a direct Markdown source edit from `Revenue` to `Pipeline` syncs back into the visual table grid cell without requiring a new table. |
 | `pnpm run test:e2e` | Pass | Full Chromium workflow suite passed 65 tests after the focused table run refreshed the full-suite browser evidence required by release readiness; the table workflow includes source-to-grid synchronization. |
