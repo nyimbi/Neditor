@@ -144,14 +144,24 @@ import {
   type ConflictMergePart,
 } from "../src/lib/workflows.js";
 import {
+  addTableDraftColumn,
+  addTableDraftRow,
+  appendTableSummaryFormulaRow,
+  buildTableFormulaRow,
   createTableSourceSnapshot,
+  duplicateTableDraftColumn,
+  duplicateTableDraftRow,
   formatTableTotal,
   findMarkdownTableIndexForLineRange,
   markdownTableToDraft,
+  moveTableDraftColumn,
+  moveTableDraftRow,
   parseTableCellSpan,
   parseMarkdownTables,
   parseTablePaste,
   replaceMarkdownTableInText,
+  removeTableDraftColumn,
+  removeTableDraftRow,
   serializeMarkdownTable,
   setTableCellSpan,
   sortTableDraftRows,
@@ -367,6 +377,62 @@ test("table draft sorting preserves summary rows and typed ordering", () => {
   deepEqual(sortTableDraftRows(draft, 1, "desc").rows.map((row) => row[0]), ["East", "North", "West", "Total"]);
   deepEqual(sortTableDraftRows(draft, 2, "asc").rows.map((row) => row[0]), ["East", "North", "West", "Total"]);
   deepEqual(sortTableDraftRows(draft, 0, "asc").rows.map((row) => row[0]), ["East", "North", "West", "Total"]);
+});
+
+test("table draft mutation helpers preserve grid structure and formulas", () => {
+  const draft: TableDraft = {
+    id: "tbl:ops",
+    caption: "Operations",
+    headers: ["Workstream", "Budget"],
+    alignments: ["left", "right"],
+    formats: ["text", "currency"],
+    rows: [
+      ["Discovery", "1200"],
+      ["Delivery", "2400"],
+    ],
+  };
+
+  addTableDraftRow(draft);
+  deepEqual(draft.rows[2], ["", ""]);
+
+  draft.rows[2] = ["Support", "800"];
+  duplicateTableDraftRow(draft, 1);
+  deepEqual(draft.rows[2], ["Delivery", "2400"]);
+
+  moveTableDraftRow(draft, 3, -1);
+  equal(draft.rows[2][0], "Support");
+  removeTableDraftRow(draft, 3);
+  equal(draft.rows.length, 3);
+
+  addTableDraftColumn(draft);
+  equal(draft.headers[2], "Column 3");
+  deepEqual(draft.rows.map((row) => row.length), [3, 3, 3]);
+
+  draft.headers[2] = "Owner";
+  draft.rows[0][2] = "Asha";
+  duplicateTableDraftColumn(draft, 2);
+  deepEqual(draft.headers.slice(2), ["Owner", "Owner copy"]);
+  equal(draft.rows[0][3], "Asha");
+
+  moveTableDraftColumn(draft, 3, -1);
+  deepEqual(draft.headers.slice(1, 4), ["Budget", "Owner copy", "Owner"]);
+
+  removeTableDraftColumn(draft, 2);
+  deepEqual(draft.headers, ["Workstream", "Budget", "Owner"]);
+
+  appendTableSummaryFormulaRow(draft, "SUM", "Total");
+  deepEqual(draft.rows[draft.rows.length - 1], ["Total", "=SUM(B1:B3)", "=SUM(C1:C3)"]);
+
+  deepEqual(
+    buildTableFormulaRow(draft, {
+      formula: "AVG",
+      targetColumn: 1,
+      startRow: 5,
+      endRow: 2,
+      label: "Average",
+    }),
+    ["Average", "=AVG(B2:B3)", ""],
+  );
 });
 
 test("bibliography manager helpers generate repairable citation snippets", () => {

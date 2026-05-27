@@ -4414,6 +4414,17 @@ Versioning release-tag and Git-history browser proof:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording snapshot, release tag, and Git-history restore evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the versioning workflow diff. |
 
+Table editor architecture extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 77 frontend unit/static tests passed after moving table row/column mutation, summary formula insertion, and custom formula-row construction into `src/lib/tables.ts`; the new direct test proves add/remove/duplicate/move row and column behavior plus formula row clamping. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after `App.vue` was reduced to delegating table editor actions through the extracted helpers. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow passed after the UI table editor actions were routed through extracted mutation and formula helpers. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting the table editor architecture extraction. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the added table helper extraction evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the table architecture extraction diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

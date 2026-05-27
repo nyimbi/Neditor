@@ -52,6 +52,14 @@ export interface TableDraftFromRowsOptions {
   alignments?: TableAlignment[];
 }
 
+export interface TableFormulaRowOptions {
+  formula: TableFormulaFunction;
+  targetColumn: number;
+  startRow: number;
+  endRow: number;
+  label?: string;
+}
+
 export interface TableCellSpan {
   text: string;
   colspan: number;
@@ -264,6 +272,92 @@ export function tableDraftFromRows(rows: string[][], options: TableDraftFromRows
     formats: headers.map((_, columnIndex) => inferTableFormat(draftRows.map((row) => row[columnIndex] || ""))),
     rows: draftRows,
   };
+}
+
+export function addTableDraftRow(draft: TableDraft) {
+  draft.rows.push(draft.headers.map(() => ""));
+  return draft;
+}
+
+export function removeTableDraftRow(draft: TableDraft, rowIndex: number) {
+  draft.rows.splice(rowIndex, 1);
+  return draft;
+}
+
+export function duplicateTableDraftRow(draft: TableDraft, rowIndex: number) {
+  const source = draft.rows[rowIndex] || draft.headers.map(() => "");
+  draft.rows.splice(rowIndex + 1, 0, padTableRow([...source], draft.headers.length));
+  return draft;
+}
+
+export function moveTableDraftRow(draft: TableDraft, rowIndex: number, direction: -1 | 1) {
+  moveArrayItem(draft.rows, rowIndex, rowIndex + direction);
+  return draft;
+}
+
+export function addTableDraftColumn(draft: TableDraft) {
+  const nextColumn = draft.headers.length + 1;
+  draft.headers.push(`Column ${nextColumn}`);
+  draft.alignments.push("left");
+  draft.formats.push("text");
+  for (const row of draft.rows) row.push("");
+  return draft;
+}
+
+export function removeTableDraftColumn(draft: TableDraft, columnIndex: number) {
+  if (draft.headers.length <= 1) return draft;
+  draft.headers.splice(columnIndex, 1);
+  draft.alignments.splice(columnIndex, 1);
+  draft.formats.splice(columnIndex, 1);
+  for (const row of draft.rows) row.splice(columnIndex, 1);
+  return draft;
+}
+
+export function duplicateTableDraftColumn(draft: TableDraft, columnIndex: number) {
+  const header = draft.headers[columnIndex] || `Column ${columnIndex + 1}`;
+  draft.headers.splice(columnIndex + 1, 0, `${header} copy`);
+  draft.alignments.splice(columnIndex + 1, 0, draft.alignments[columnIndex] || "left");
+  draft.formats.splice(columnIndex + 1, 0, draft.formats[columnIndex] || "text");
+  for (const row of draft.rows) {
+    row.splice(columnIndex + 1, 0, row[columnIndex] || "");
+  }
+  return draft;
+}
+
+export function moveTableDraftColumn(draft: TableDraft, columnIndex: number, direction: -1 | 1) {
+  const targetIndex = columnIndex + direction;
+  moveArrayItem(draft.headers, columnIndex, targetIndex);
+  moveArrayItem(draft.alignments, columnIndex, targetIndex);
+  moveArrayItem(draft.formats, columnIndex, targetIndex);
+  for (const row of draft.rows) moveArrayItem(row, columnIndex, targetIndex);
+  return draft;
+}
+
+export function appendTableSummaryFormulaRow(draft: TableDraft, formula: TableFormulaFunction, label: string = formula) {
+  const dataRowCount = draft.rows.filter((row) => !isTableSummaryRow(row)).length;
+  const row = draft.headers.map((_, columnIndex) => {
+    if (columnIndex === 0) return label;
+    if (!dataRowCount) return "";
+    return `=${formula}(${tableColumnRange(columnIndex, dataRowCount)})`;
+  });
+  draft.rows.push(row);
+  return draft;
+}
+
+export function buildTableFormulaRow(draft: TableDraft, options: TableFormulaRowOptions) {
+  if (!draft.headers.length) return null;
+  const firstFormulaColumn = draft.headers.length > 1 ? 1 : 0;
+  const targetColumn = clampInteger(options.targetColumn, firstFormulaColumn, draft.headers.length - 1);
+  const dataRowCount = Math.max(1, draft.rows.filter((row) => !isTableSummaryRow(row)).length);
+  const startRow = clampInteger(options.startRow, 1, dataRowCount);
+  const endRow = clampInteger(options.endRow, 1, dataRowCount);
+  const [fromRow, toRow] = startRow <= endRow ? [startRow, endRow] : [endRow, startRow];
+  const column = spreadsheetColumnName(targetColumn + 1);
+  const row = draft.headers.map(() => "");
+  const label = options.label?.trim() || options.formula;
+  if (targetColumn > 0) row[0] = label;
+  row[targetColumn] = `=${options.formula}(${column}${fromRow}:${column}${toRow})`;
+  return row;
 }
 
 export function validateTableDraft(draft: TableDraft): TableDraftIssue[] {
@@ -568,6 +662,12 @@ export function sortTableDraftRows(
   return { ...normalized, rows };
 }
 
+function moveArrayItem<T>(items: T[], from: number, to: number) {
+  if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return;
+  const [item] = items.splice(from, 1);
+  items.splice(to, 0, item);
+}
+
 function formatTableCell(value: string, format: TableFormat) {
   const span = parseTableCellSpan(value);
   const trimmed = span.text.trim();
@@ -633,6 +733,11 @@ export function spreadsheetColumnName(index: number) {
     value = Math.floor(value / 26);
   }
   return name || "A";
+}
+
+function clampInteger(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(Math.trunc(value), min), max);
 }
 
 function spreadsheetColumnIndex(name: string) {

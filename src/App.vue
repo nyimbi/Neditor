@@ -5229,18 +5229,27 @@ import {
   type ConflictMergeSource,
 } from "./lib/workflows";
 import {
+  addTableDraftColumn,
+  addTableDraftRow,
+  appendTableSummaryFormulaRow,
+  buildTableFormulaRow,
   createTableSourceSnapshot,
+  duplicateTableDraftColumn,
+  duplicateTableDraftRow,
   findMarkdownTableIndexForLineRange,
   formatTableTotal,
   isFormulaCell,
   isTableSummaryRow,
   markdownTableToDraft,
+  moveTableDraftColumn,
+  moveTableDraftRow,
   normalizeTableDraft,
-  padTableRow,
   parseMarkdownTables,
   parseTablePaste,
   parseTableCellSpan,
   replaceMarkdownTableInText,
+  removeTableDraftColumn,
+  removeTableDraftRow,
   serializeMarkdownTable,
   setTableCellSpan,
   sortTableDraftRows,
@@ -5249,7 +5258,6 @@ import {
   tableSourceChanged,
   tableSourceText,
   tableDraftFromRows,
-  tableColumnRange,
   validateTableDraft,
   type MarkdownTable,
   type TableDraft,
@@ -17033,70 +17041,46 @@ function insertTableAtCursor(lines: string[]) {
 
 function addTableRow() {
   if (!tableDraft.value) return;
-  tableDraft.value.rows.push(tableDraft.value.headers.map(() => ""));
+  addTableDraftRow(tableDraft.value);
 }
 
 function removeTableRow(rowIndex: number) {
   if (!tableDraft.value) return;
-  tableDraft.value.rows.splice(rowIndex, 1);
+  removeTableDraftRow(tableDraft.value, rowIndex);
 }
 
 function duplicateTableRow(rowIndex: number) {
   const draft = tableDraft.value;
   if (!draft) return;
-  const source = draft.rows[rowIndex] || draft.headers.map(() => "");
-  draft.rows.splice(rowIndex + 1, 0, padTableRow([...source], draft.headers.length));
+  duplicateTableDraftRow(draft, rowIndex);
 }
 
 function moveTableRow(rowIndex: number, direction: -1 | 1) {
   const draft = tableDraft.value;
   if (!draft) return;
-  moveArrayItem(draft.rows, rowIndex, rowIndex + direction);
+  moveTableDraftRow(draft, rowIndex, direction);
 }
 
 function addTableColumn() {
   if (!tableDraft.value) return;
-  const nextColumn = tableDraft.value.headers.length + 1;
-  tableDraft.value.headers.push(`Column ${nextColumn}`);
-  tableDraft.value.alignments.push("left");
-  tableDraft.value.formats.push("text");
-  for (const row of tableDraft.value.rows) row.push("");
+  addTableDraftColumn(tableDraft.value);
 }
 
 function removeTableColumn(columnIndex: number) {
-  if (!tableDraft.value || tableDraft.value.headers.length <= 1) return;
-  tableDraft.value.headers.splice(columnIndex, 1);
-  tableDraft.value.alignments.splice(columnIndex, 1);
-  tableDraft.value.formats.splice(columnIndex, 1);
-  for (const row of tableDraft.value.rows) row.splice(columnIndex, 1);
+  if (!tableDraft.value) return;
+  removeTableDraftColumn(tableDraft.value, columnIndex);
 }
 
 function duplicateTableColumn(columnIndex: number) {
   const draft = tableDraft.value;
   if (!draft) return;
-  const header = draft.headers[columnIndex] || `Column ${columnIndex + 1}`;
-  draft.headers.splice(columnIndex + 1, 0, `${header} copy`);
-  draft.alignments.splice(columnIndex + 1, 0, draft.alignments[columnIndex] || "left");
-  draft.formats.splice(columnIndex + 1, 0, draft.formats[columnIndex] || "text");
-  for (const row of draft.rows) {
-    row.splice(columnIndex + 1, 0, row[columnIndex] || "");
-  }
+  duplicateTableDraftColumn(draft, columnIndex);
 }
 
 function moveTableColumn(columnIndex: number, direction: -1 | 1) {
   const draft = tableDraft.value;
   if (!draft) return;
-  const targetIndex = columnIndex + direction;
-  moveArrayItem(draft.headers, columnIndex, targetIndex);
-  moveArrayItem(draft.alignments, columnIndex, targetIndex);
-  moveArrayItem(draft.formats, columnIndex, targetIndex);
-  for (const row of draft.rows) moveArrayItem(row, columnIndex, targetIndex);
-}
-
-function moveArrayItem<T>(items: T[], from: number, to: number) {
-  if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return;
-  const [item] = items.splice(from, 1);
-  items.splice(to, 0, item);
+  moveTableDraftColumn(draft, columnIndex, direction);
 }
 
 function addTableTotalsRow() {
@@ -17106,13 +17090,7 @@ function addTableTotalsRow() {
 function addTableFormulaRow(formula: TableFormulaFunction, label: string = formula) {
   const draft = tableDraft.value;
   if (!draft) return;
-  const dataRowCount = draft.rows.filter((row) => !isTableSummaryRow(row)).length;
-  const totals = draft.headers.map((_, columnIndex) => {
-    if (columnIndex === 0) return label;
-    if (!dataRowCount) return "";
-    return `=${formula}(${tableColumnRange(columnIndex, dataRowCount)})`;
-  });
-  draft.rows.push(totals);
+  appendTableSummaryFormulaRow(draft, formula, label);
 }
 
 function appendCustomTableFormulaRow() {
@@ -17161,29 +17139,14 @@ function syncTableSpanControlsFromCell() {
 
 function buildCustomTableFormulaRow() {
   const draft = tableDraft.value;
-  if (!draft || !draft.headers.length) return null;
-  const targetColumn = resolvedFormulaTargetColumn(draft);
-  const [startRow, endRow] = resolvedFormulaRows();
-  const column = spreadsheetColumnName(targetColumn + 1);
-  const row = draft.headers.map(() => "");
-  const label = tableFormulaLabel.value.trim() || tableFormulaFunction.value;
-  if (targetColumn > 0) row[0] = label;
-  row[targetColumn] = `=${tableFormulaFunction.value}(${column}${startRow}:${column}${endRow})`;
-  return row;
-}
-
-function resolvedFormulaTargetColumn(draft: TableDraft) {
-  const preferred = Number(tableFormulaTargetColumn.value);
-  const firstFormulaColumn = draft.headers.length > 1 ? 1 : 0;
-  if (!Number.isInteger(preferred)) return firstFormulaColumn;
-  return Math.min(Math.max(preferred, firstFormulaColumn), draft.headers.length - 1);
-}
-
-function resolvedFormulaRows() {
-  const maxRow = tableDataRowCount.value;
-  const start = clampInteger(tableFormulaStartRow.value, 1, maxRow);
-  const end = clampInteger(tableFormulaEndRow.value, 1, maxRow);
-  return start <= end ? [start, end] : [end, start];
+  if (!draft) return null;
+  return buildTableFormulaRow(draft, {
+    formula: tableFormulaFunction.value,
+    targetColumn: Number(tableFormulaTargetColumn.value),
+    startRow: tableFormulaStartRow.value,
+    endRow: tableFormulaEndRow.value,
+    label: tableFormulaLabel.value,
+  });
 }
 
 function clampInteger(value: number, min: number, max: number) {
