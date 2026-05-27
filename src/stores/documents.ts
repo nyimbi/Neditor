@@ -821,6 +821,7 @@ export const useDocumentsStore = defineStore("documents", {
       const target = path || doc.path;
       if (!target) throw new Error("Choose a save path before saving this document.");
       const isExistingDocumentSave = Boolean(doc.path && target === doc.path);
+      const pathChanged = !doc.path || target !== doc.path;
       if (isExistingDocumentSave) {
         const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: target });
         if (metadata.exists && metadata.hash && metadata.hash !== doc.savedHash) {
@@ -862,6 +863,11 @@ export const useDocumentsStore = defineStore("documents", {
       if (this.workspaceRoot) await this.refreshWorkspace();
       await this.refreshGitStatus();
       await this.persistWorkspace();
+      if (pathChanged) {
+        const savedStatus = this.statusMessage;
+        await this.compileActive();
+        this.statusMessage = savedStatus;
+      }
     },
     async revertActive() {
       const doc = this.activeDocument;
@@ -904,6 +910,9 @@ export const useDocumentsStore = defineStore("documents", {
       if (this.workspaceRoot) await this.refreshWorkspace();
       await this.refreshGitStatus();
       await this.persistWorkspace();
+      const renameStatus = this.statusMessage;
+      await this.compileActive();
+      this.statusMessage = renameStatus;
     },
     async duplicateActive(path: string) {
       const doc = this.activeDocument;

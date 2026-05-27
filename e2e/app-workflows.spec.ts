@@ -4035,6 +4035,27 @@ test("saves a document as a new file and reopens it from recently closed", async
   await expect.poll(() => activeFileRowText(page)).toContain("market-approved.md");
 });
 
+test("moves clean watcher roots after save-as path changes", async ({ page }) => {
+  await queueDialogSelection(page, "/workspace/market.md");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/market.md"))).toBe(true);
+
+  await queueDialogSelection(page, "/workspace/watch-moved.md");
+  await page.getByRole("button", { name: "Save As" }).click();
+  await expect.poll(() => mockFileText(page, "/workspace/watch-moved.md")).toContain("Original saved content.");
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/watch-moved.md"))).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__NEDITOR_APP_E2E__?.state().watchedPaths.includes("/workspace/market.md"))).toBe(false);
+
+  await setMockFileText(page, "/workspace/market.md", "# Market Entry Report\n\nStale old path update.");
+  await emitMockFileWatch(page, "/workspace/market.md");
+  await expect.poll(() => editorText(page)).not.toContain("Stale old path update.");
+
+  await setMockFileText(page, "/workspace/watch-moved.md", "# Market Entry Report\n\nNew path external update.");
+  await emitMockFileWatch(page, "/workspace/watch-moved.md");
+  await expect.poll(() => editorText(page)).toContain("New path external update.");
+  await expect(page.locator(".status-bar")).toContainText("Reloaded external changes");
+});
+
 test("runs snapshot restore and release tagging workflows", async ({ page }) => {
   await queueDialogSelection(page, "/workspace/market.md");
   await page.getByRole("button", { name: "Open", exact: true }).click();

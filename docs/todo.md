@@ -1460,8 +1460,11 @@ Finish:
   coverage for dialog-driven save-copy and full line-composition gestures in a
   desktop window.
 - Multi-tab watcher switching beyond the current tab-activation proof.
-- Stale watcher cleanup when tabs close or paths move beyond current
-  recent-path cleanup coverage.
+- Stale watcher cleanup when paths move is now browser-proven for clean Save
+  As: path-changing saves and renames recompile to resync watcher roots, the
+  focused workflow proves the old root is dropped, stale old-root events are
+  ignored, and the new root reloads clean external changes. Remaining stale
+  watcher cleanup work is close-tab/native edge proof across supported hosts.
 - Include graph changes after editing include directives are now browser-proven:
   the focused workflow swaps a master document from `chapters/risk.md` to
   `chapters/ops.md`, proves the watched path set and include graph move to the
