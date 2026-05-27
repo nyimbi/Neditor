@@ -52,7 +52,8 @@ produces hostile output, or fails unpredictably.
 Mitigations:
 
 - External engines are disabled until explicitly trusted per engine.
-- Engine paths must point to executable files.
+- Engine paths must point to regular executable files; directories, project
+  files, and shell command text are rejected before spawn.
 - Adapters construct fixed argument lists and do not interpolate shell strings.
 - Execution is bounded by timeout and output-size limits.
 - Cache keys include source, engine path, input mode, and adapter behavior.

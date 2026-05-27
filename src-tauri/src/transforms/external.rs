@@ -103,9 +103,15 @@ pub(crate) fn run_external_transform(
             "Engine path must be absolute; shell lookup is intentionally disabled.".to_string(),
         );
     }
-    if !engine_path.is_file() {
+    let engine_metadata = fs::metadata(&engine_path).map_err(|err| {
+        format!(
+            "Engine path does not exist or cannot be read: {} ({err})",
+            engine_path.display()
+        )
+    })?;
+    if !engine_metadata.is_file() {
         return Err(format!(
-            "Engine path does not exist: {}",
+            "Engine path is not a regular executable file: {}",
             engine_path.display()
         ));
     }

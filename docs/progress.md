@@ -4774,6 +4774,13 @@ Nested structured data tables:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked structured_data_tables_flatten_nested_business_rows --lib` | Pass | Focused transform proof shows nested JSON/YAML business row objects flatten into dot-path table columns instead of opaque object summaries, including scalar-array cells. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked front_matter_data_sources_survive_cross_target_exports --lib` | Pass | Cross-target data-source proof remains clean after nested structured-row flattening and now asserts export-safe numeric `data-value` cells for CSV/TSV data-source tables. |
 
+External transform executable validation:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked external_transform_rejects_directory_engine_path_before_spawn --lib` | Pass | Focused external-transform safety proof shows configured engine paths must be regular executable files and directories are rejected before process spawn. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked external_transform --lib` | Pass | 16 external-transform tests passed, including trust gating, disabled fallback, missing path diagnostics, non-executable rejection, directory-as-engine rejection, timeout, stderr, adapter shapes, installed-engine conformance, and cache invalidation. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

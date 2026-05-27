@@ -983,6 +983,33 @@ fn external_transform_rejects_non_executable_engine_path() {
     assert!(error.contains("not executable"));
 }
 
+#[test]
+fn external_transform_rejects_directory_engine_path_before_spawn() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let directory = std::env::temp_dir().join(format!("neditor-engine-dir-{unique}"));
+    fs::create_dir(&directory).expect("create fake engine directory");
+
+    let error = run_external_transform(ExternalTransformRequest {
+        name: "dot".to_string(),
+        body: "digraph {}".to_string(),
+        engine_path: Some(path_to_string(&directory)),
+        trusted: true,
+        input_mode: Some("stdin".to_string()),
+        output_format: None,
+        timeout_ms: Some(1000),
+        max_input_bytes: Some(1024),
+        max_output_bytes: Some(1024),
+    })
+    .unwrap_err();
+
+    let _ = fs::remove_dir(directory);
+    assert!(error.contains("not a regular executable file"));
+    assert!(!error.contains("No such file"));
+}
+
 #[cfg(unix)]
 #[test]
 fn external_transform_timeout_covers_blocked_stdin() {

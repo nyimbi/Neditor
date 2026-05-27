@@ -24,7 +24,8 @@ Current platform evidence is tracked in
 
 ## Safety Model
 
-- Engine paths must point to real executable files.
+- Engine paths must point to real regular executable files, not folders,
+  project files, package directories, or shell command text.
 - Each engine has an adapter profile for arguments, stdin/file mode, output handling, and diagnostics.
 - Trust is per engine.
 - Disabled engines are skipped before trust/path execution checks.
