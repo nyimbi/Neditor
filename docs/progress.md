@@ -4459,6 +4459,18 @@ Table paste/import helper extraction:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording paste/import draft helper evidence. |
 | `git diff --check` | Pass | No whitespace errors are present in the table paste/import helper extraction diff. |
 
+Table accessibility label helper extraction:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 79 frontend unit/static tests passed after moving table data-row counts, formula target options, span-cell options, and table grid header/cell/total label text into `src/lib/tables.ts`; the new direct test proves generated labels for named and unnamed columns. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after `App.vue` delegated table accessibility labels and table option lists through table helpers. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium table workflow passed after table labels and options delegated through helpers. |
+| `pnpm exec playwright test e2e/app-workflows.spec.ts -g "supports keyboard-only operation for deep workbench controls" --project chromium` | Pass | Focused Chromium keyboard workflow passed after label extraction, proving table-editor cells/actions remain keyboard reachable. A first parallel attempt collided on the shared Vite port and was rerun sequentially. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after documenting the table accessibility label helper extraction. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording table accessibility label helper evidence. |
+| `git diff --check` | Pass | No whitespace errors are present in the table accessibility label helper extraction diff. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

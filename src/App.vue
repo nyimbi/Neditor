@@ -5242,7 +5242,6 @@ import {
   findMarkdownTableIndexForLineRange,
   formatTableTotal,
   isFormulaCell,
-  isTableSummaryRow,
   markdownTableToDraft,
   moveTableDraftColumn,
   moveTableDraftRow,
@@ -5259,6 +5258,12 @@ import {
   tableDraftFromMarkdownSource,
   tableDraftFromPasteText,
   tableDraftMarkdown,
+  tableDraftDataRowCount,
+  tableFormulaTargetOptions,
+  tableHeaderLabel as tableDraftHeaderLabel,
+  tableCellLabel as tableDraftCellLabel,
+  tableTotalLabel as tableDraftTotalLabel,
+  tableSpanCellOptions as tableDraftSpanCellOptions,
   tableSourceChanged,
   tableSourceText,
   validateTableDraft,
@@ -7013,18 +7018,10 @@ const tableDraftSourceChanged = computed(() => {
   return tableSourceChanged(active.value.text, selectedTable.value, tableSourceSnapshot.value, active.value.id, isNewTableDraft.value);
 });
 const tableDataRowCount = computed(() => {
-  const draft = tableDraft.value;
-  if (!draft) return 1;
-  return Math.max(1, draft.rows.filter((row) => !isTableSummaryRow(row)).length);
+  return tableDraftDataRowCount(tableDraft.value);
 });
 const tableFormulaTargetColumns = computed(() => {
-  const draft = tableDraft.value;
-  if (!draft) return [];
-  const options = draft.headers.map((header, index) => ({
-    index,
-    label: `${spreadsheetColumnName(index + 1)} - ${header || `Column ${index + 1}`}`,
-  }));
-  return options.length > 1 ? options.slice(1) : options;
+  return tableFormulaTargetOptions(tableDraft.value);
 });
 const tableFormulaPreview = computed(() => {
   const row = buildCustomTableFormulaRow();
@@ -7041,14 +7038,7 @@ const selectedTableSpanCell = computed({
   },
 });
 const tableSpanCellOptions = computed(() => {
-  const draft = tableDraft.value;
-  if (!draft) return [];
-  return draft.rows.flatMap((row, rowIndex) =>
-    draft.headers.map((header, columnIndex) => ({
-      value: `${rowIndex}:${columnIndex}`,
-      label: `${spreadsheetColumnName(columnIndex + 1)}${rowIndex + 1} - ${header || `Column ${columnIndex + 1}`} - ${row[columnIndex] || "blank"}`,
-    })),
-  );
+  return tableDraftSpanCellOptions(tableDraft.value);
 });
 const tableSpanMaxColspan = computed(() => {
   const draft = tableDraft.value;
@@ -17238,21 +17228,15 @@ function sortTableRows(columnIndex: number, direction: TableSortDirection) {
 }
 
 function tableHeaderLabel(columnIndex: number) {
-  return `Column ${spreadsheetColumnName(columnIndex + 1)} header`;
+  return tableDraftHeaderLabel(columnIndex);
 }
 
 function tableCellLabel(rowIndex: number, columnIndex: number) {
-  const draft = tableDraft.value;
-  const header = draft?.headers[columnIndex]?.trim();
-  const column = spreadsheetColumnName(columnIndex + 1);
-  return header ? `${header}, row ${rowIndex + 1}, column ${column}` : `Row ${rowIndex + 1}, column ${column}`;
+  return tableDraftCellLabel(tableDraft.value, rowIndex, columnIndex);
 }
 
 function tableTotalLabel(columnIndex: number) {
-  const draft = tableDraft.value;
-  const header = draft?.headers[columnIndex]?.trim();
-  const column = spreadsheetColumnName(columnIndex + 1);
-  return header ? `Total for ${header}, column ${column}` : `Total for column ${column}`;
+  return tableDraftTotalLabel(tableDraft.value, columnIndex);
 }
 
 async function goToSourceTarget(target: {

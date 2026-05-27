@@ -170,12 +170,18 @@ import {
   sortTableDraftRows,
   tableCellSpanPreview,
   tableColumnRange,
+  tableCellLabel,
   tableDraftFromMarkdownSource,
   tableDraftFromPasteText,
+  tableDraftDataRowCount,
   tableDraftMarkdown,
   tableDraftFromRows,
+  tableFormulaTargetOptions,
+  tableHeaderLabel,
+  tableSpanCellOptions,
   tableSourceChanged,
   tableSourceText,
+  tableTotalLabel,
   validateTableDraft,
   type TableDraft,
 } from "../src/lib/tables.js";
@@ -355,6 +361,39 @@ test("table source draft helpers normalize editable markdown source", () => {
   equal(source.sourceText, tableDraftMarkdown(source.draft));
   ok(source.sourceText.includes("| West | 900 |"));
   equal(tableDraftFromMarkdownSource("not a table"), null);
+});
+
+test("table accessibility label helpers describe draft controls", () => {
+  const draft: TableDraft = {
+    id: "tbl:labels",
+    caption: "Labels",
+    headers: ["Task", "Cost", ""],
+    alignments: ["left", "right", "left"],
+    formats: ["text", "currency", "text"],
+    rows: [
+      ["Draft", "200", "Ana"],
+      ["Review", "100", ""],
+      ["Total", "=SUM(B1:B2)", ""],
+    ],
+  };
+
+  equal(tableDraftDataRowCount(draft), 2);
+  equal(tableDraftDataRowCount(null), 1);
+  deepEqual(tableFormulaTargetOptions(draft), [
+    { index: 1, label: "B - Cost" },
+    { index: 2, label: "C - Column 3" },
+  ]);
+  deepEqual(tableSpanCellOptions(draft).slice(0, 4), [
+    { value: "0:0", label: "A1 - Task - Draft" },
+    { value: "0:1", label: "B1 - Cost - 200" },
+    { value: "0:2", label: "C1 - Column 3 - Ana" },
+    { value: "1:0", label: "A2 - Task - Review" },
+  ]);
+  equal(tableHeaderLabel(2), "Column C header");
+  equal(tableCellLabel(draft, 1, 1), "Cost, row 2, column B");
+  equal(tableCellLabel(draft, 1, 2), "Row 2, column C");
+  equal(tableTotalLabel(draft, 1), "Total for Cost, column B");
+  equal(tableTotalLabel(draft, 2), "Total for column C");
 });
 
 test("table validation and formatting cover editor formulas and totals", () => {

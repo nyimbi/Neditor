@@ -71,6 +71,11 @@ export interface TableFormulaRowOptions {
   label?: string;
 }
 
+export interface TableFormulaTargetOption {
+  index: number;
+  label: string;
+}
+
 export interface TableCellSpan {
   text: string;
   colspan: number;
@@ -82,6 +87,11 @@ export interface TableCellSpanSelection {
   columnIndex: number;
   colspan: number;
   rowspan: number;
+}
+
+export interface TableSpanCellOption {
+  value: string;
+  label: string;
 }
 
 export function parseMarkdownTables(text: string): MarkdownTable[] {
@@ -325,6 +335,46 @@ export function tableDraftFromPasteText(text: string, options: TableDraftFromPas
     fallbackCaption: options.fallbackCaption,
     alignments: parsed.alignments,
   });
+}
+
+export function tableDraftDataRowCount(draft: TableDraft | null | undefined) {
+  if (!draft) return 1;
+  return Math.max(1, draft.rows.filter((row) => !isTableSummaryRow(row)).length);
+}
+
+export function tableFormulaTargetOptions(draft: TableDraft | null | undefined): TableFormulaTargetOption[] {
+  if (!draft) return [];
+  const options = draft.headers.map((header, index) => ({
+    index,
+    label: `${spreadsheetColumnName(index + 1)} - ${header || `Column ${index + 1}`}`,
+  }));
+  return options.length > 1 ? options.slice(1) : options;
+}
+
+export function tableSpanCellOptions(draft: TableDraft | null | undefined): TableSpanCellOption[] {
+  if (!draft) return [];
+  return draft.rows.flatMap((row, rowIndex) =>
+    draft.headers.map((header, columnIndex) => ({
+      value: `${rowIndex}:${columnIndex}`,
+      label: `${spreadsheetColumnName(columnIndex + 1)}${rowIndex + 1} - ${header || `Column ${columnIndex + 1}`} - ${row[columnIndex] || "blank"}`,
+    })),
+  );
+}
+
+export function tableHeaderLabel(columnIndex: number) {
+  return `Column ${spreadsheetColumnName(columnIndex + 1)} header`;
+}
+
+export function tableCellLabel(draft: TableDraft | null | undefined, rowIndex: number, columnIndex: number) {
+  const header = draft?.headers[columnIndex]?.trim();
+  const column = spreadsheetColumnName(columnIndex + 1);
+  return header ? `${header}, row ${rowIndex + 1}, column ${column}` : `Row ${rowIndex + 1}, column ${column}`;
+}
+
+export function tableTotalLabel(draft: TableDraft | null | undefined, columnIndex: number) {
+  const header = draft?.headers[columnIndex]?.trim();
+  const column = spreadsheetColumnName(columnIndex + 1);
+  return header ? `Total for ${header}, column ${column}` : `Total for column ${column}`;
 }
 
 export function addTableDraftRow(draft: TableDraft) {
