@@ -31,15 +31,23 @@ pub(crate) fn render_delimited_table(
         return "<table></table>".to_string();
     }
     evaluate_delimited_table_formula_rows(&mut rows, artifact_diags, diagnostics);
+    let numeric_columns = delimited_numeric_columns(&rows);
     let mut html = String::from("<table class=\"transform-table\"><thead><tr>");
-    for cell in &rows[0] {
-        html.push_str(&format!("<th>{}</th>", escape_html(cell)));
+    for (column_index, cell) in rows[0].iter().enumerate() {
+        if numeric_columns.get(column_index).copied().unwrap_or(false) {
+            html.push_str(&format!(
+                "<th class=\"numeric\" scope=\"col\">{}</th>",
+                escape_html(cell)
+            ));
+        } else {
+            html.push_str(&format!("<th scope=\"col\">{}</th>", escape_html(cell)));
+        }
     }
     html.push_str("</tr></thead><tbody>");
     for row in rows.iter().skip(1) {
         html.push_str("<tr>");
         for cell in row {
-            html.push_str(&format!("<td>{}</td>", escape_html(cell)));
+            html.push_str(&render_delimited_cell_html(cell));
         }
         html.push_str("</tr>");
     }
@@ -53,6 +61,98 @@ pub(crate) fn delimited_rows_for_export(body: &str, delimiter: char) -> Vec<Vec<
     let mut diagnostics = Vec::new();
     evaluate_delimited_table_formula_rows(&mut rows, &mut artifact_diags, &mut diagnostics);
     rows
+}
+
+#[derive(Debug)]
+struct NumericCell {
+    value: f64,
+    format: &'static str,
+}
+
+fn delimited_numeric_columns(rows: &[Vec<String>]) -> Vec<bool> {
+    let width = rows.iter().map(Vec::len).max().unwrap_or(0);
+    (0..width)
+        .map(|column_index| {
+            let mut numeric = 0usize;
+            let mut text = 0usize;
+            for row in rows.iter().skip(1) {
+                let Some(cell) = row.get(column_index) else {
+                    continue;
+                };
+                if cell.trim().is_empty() {
+                    continue;
+                }
+                if numeric_cell(cell).is_some() {
+                    numeric += 1;
+                } else {
+                    text += 1;
+                }
+            }
+            numeric > 0 && text == 0
+        })
+        .collect()
+}
+
+fn render_delimited_cell_html(cell: &str) -> String {
+    let escaped = escape_html(cell);
+    let Some(numeric) = numeric_cell(cell) else {
+        return format!("<td>{escaped}</td>");
+    };
+    let negative_class = if numeric.value < 0.0 { " negative" } else { "" };
+    format!(
+        "<td class=\"numeric{negative_class}\" data-format=\"{}\" data-value=\"{}\">{escaped}</td>",
+        numeric.format,
+        escape_html(&format_numeric_data_value(numeric.value))
+    )
+}
+
+fn numeric_cell(cell: &str) -> Option<NumericCell> {
+    let trimmed = cell.trim();
+    if trimmed.is_empty() || trimmed.starts_with('=') || trimmed == "#ERROR" {
+        return None;
+    }
+    let parenthesized_negative = trimmed.starts_with('(') && trimmed.ends_with(')');
+    let inner = if parenthesized_negative {
+        trimmed.trim_start_matches('(').trim_end_matches(')').trim()
+    } else {
+        trimmed
+    };
+    let currency = inner
+        .chars()
+        .next()
+        .is_some_and(|ch| matches!(ch, '$' | '£' | '€'));
+    let percent = inner.ends_with('%');
+    let cleaned = inner
+        .trim_start_matches(['$', '£', '€'])
+        .trim_end_matches('%')
+        .replace([',', '_', ' '], "");
+    let mut value = cleaned.parse::<f64>().ok()?;
+    if parenthesized_negative {
+        value = -value.abs();
+    }
+    if !value.is_finite() {
+        return None;
+    }
+    let format = if currency {
+        "currency"
+    } else if percent {
+        "percent"
+    } else {
+        "number"
+    };
+    Some(NumericCell { value, format })
+}
+
+fn format_numeric_data_value(value: f64) -> String {
+    if value.fract().abs() < f64::EPSILON {
+        format!("{}", value as i64)
+    } else {
+        let formatted = format!("{value:.6}");
+        formatted
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string()
+    }
 }
 
 fn evaluate_delimited_table_formula_rows(
@@ -554,12 +654,22 @@ fn table_column_label(mut column: usize) -> String {
 }
 
 fn parse_table_number(value: &str) -> Option<f64> {
-    value
-        .trim()
-        .trim_start_matches('=')
-        .replace([',', '$', '%'], "")
-        .parse::<f64>()
-        .ok()
+    let trimmed = value.trim().trim_start_matches('=').trim();
+    let parenthesized_negative = trimmed.starts_with('(') && trimmed.ends_with(')');
+    let inner = if parenthesized_negative {
+        trimmed.trim_start_matches('(').trim_end_matches(')').trim()
+    } else {
+        trimmed
+    };
+    let cleaned = inner
+        .trim_start_matches(['$', '£', '€'])
+        .trim_end_matches('%')
+        .replace([',', '_', ' '], "");
+    let mut parsed = cleaned.parse::<f64>().ok()?;
+    if parenthesized_negative {
+        parsed = -parsed.abs();
+    }
+    parsed.is_finite().then_some(parsed)
 }
 
 fn register_named_table(

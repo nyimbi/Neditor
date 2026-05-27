@@ -82,12 +82,12 @@ fn csv_and_tsv_transforms_evaluate_table_formula_cells() {
             file_path: None,
         });
 
-    assert!(response.html.contains("<td>25</td>"));
-    assert!(response.html.contains("<td>3</td>"));
-    assert!(response.html.contains("<td>1</td>"));
-    assert!(response.html.contains("<td>5</td>"));
-    assert!(response.html.contains("<td>28</td>"));
-    assert!(response.html.contains("<td>12</td>"));
+    assert!(response.html.contains(">25</td>"));
+    assert!(response.html.contains(">3</td>"));
+    assert!(response.html.contains(">1</td>"));
+    assert!(response.html.contains(">5</td>"));
+    assert!(response.html.contains(">28</td>"));
+    assert!(response.html.contains(">12</td>"));
     assert!(!response
         .diagnostics
         .iter()
@@ -121,6 +121,41 @@ fn csv_and_tsv_transforms_evaluate_table_formula_cells() {
     let pdf_text = String::from_utf8_lossy(&pdf);
     assert!(pdf_text.contains(" re S"));
     assert!(pdf_text.contains("(25) Tj"));
+}
+
+#[test]
+fn csv_and_tsv_transforms_mark_numeric_cells_for_export_safe_formatting() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Numeric Data\nstatus: approved\napprovedBy: QA\n---\n# Numeric Data\n```csv\nRegion,Revenue,Margin,Notes\nEast,\"$1,200\",25%,ok\nWest,\"($950)\",-5%,review\nTotal,=SUM(B1:B2),20%,formula\n```\n\n```tsv\nMetric\tValue\nPipeline\t1_250\nCoverage\t3.5\n```\n".to_string(),
+            file_path: None,
+        });
+
+    assert!(response
+        .html
+        .contains("<th class=\"numeric\" scope=\"col\">Revenue</th>"));
+    assert!(response
+        .html
+        .contains("<th class=\"numeric\" scope=\"col\">Margin</th>"));
+    assert!(response.html.contains("<th scope=\"col\">Notes</th>"));
+    assert!(response
+        .html
+        .contains("class=\"numeric\" data-format=\"currency\" data-value=\"1200\">$1,200</td>"));
+    assert!(response.html.contains(
+        "class=\"numeric negative\" data-format=\"currency\" data-value=\"-950\">($950)</td>"
+    ));
+    assert!(response
+        .html
+        .contains("class=\"numeric negative\" data-format=\"percent\" data-value=\"-5\">-5%</td>"));
+    assert!(response
+        .html
+        .contains("class=\"numeric\" data-format=\"number\" data-value=\"1250\">1_250</td>"));
+    assert!(response
+        .html
+        .contains("class=\"numeric\" data-format=\"number\" data-value=\"3.5\">3.5</td>"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("Table formula error")));
 }
 
 #[test]
@@ -331,7 +366,9 @@ fn sql_transform_runs_trusted_sqlite_query_against_document_relative_database() 
 
     assert!(response.html.contains("transform-sql"));
     assert!(response.html.contains("<td>East</td>"));
-    assert!(response.html.contains("<td>120</td>"));
+    assert!(response
+        .html
+        .contains("class=\"numeric\" data-format=\"number\" data-value=\"120\">120</td>"));
     assert!(response.html.contains("<td>West</td>"));
     assert!(response
         .transform_artifacts

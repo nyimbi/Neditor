@@ -22870,6 +22870,19 @@ select:hover {
   padding: 6px 8px;
 }
 
+.preview-document td.numeric,
+.preview-document th.numeric,
+.transform-table td.numeric,
+.transform-table th.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-document td.numeric.negative,
+.transform-table td.numeric.negative {
+  color: #9f1239;
+}
+
 .preview-document figure[data-float="right"],
 .preview-document .figure-float-right {
   float: right;

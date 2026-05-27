@@ -112,6 +112,10 @@ Recent pushed checkpoints visible in current git history:
   readable without requiring Vega-Lite. The same native chart syntax now also
   supports multi-series bar, line, and area charts for budget-vs-actual,
   revenue-vs-cost, segment, and scenario comparisons.
+- CSV and TSV transforms now tag numeric columns and cells with export-safe
+  alignment and `data-format`/`data-value` metadata for plain numbers,
+  currencies, percentages, and negative values while preserving the authored
+  table text.
 - Direct text-edited tables now accept common Markdown pipe-table syntax with
   or without outer pipes. The frontend table editor parses `A | B` / `--- |
   ---` source edits into the visual grid, and the backend compiler normalizes

@@ -1001,7 +1001,8 @@ Requirements:
 
 - Header detection.
 - Alignment.
-- Numeric formatting.
+- Numeric formatting metadata for plain numbers, currency, percentages, and
+  negative values.
 - Export-safe table rendering.
 
 #### 10.4.10 `tsv`
