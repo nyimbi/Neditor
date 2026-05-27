@@ -431,6 +431,9 @@ Research and business documents can keep reference metadata near the source.
 - Add `[BIBLIOGRAPHY]` where the rendered references should appear.
 - Import BibTeX with brace or parenthesis entries, Zotero/Better BibTeX-style
   metadata records, dotted keys, and `@` characters inside field values.
+- Use BibTeX transform previews when you need to inspect reference metadata:
+  entry type, author, year/date, journal or book title, publisher, volume,
+  issue, pages, DOI, and URL fields are shown before export.
 - Import CSL JSON as a root array, a single item, or an object with `items`,
   `references`, `bibliography`, or `data`.
 - Choose `title`, `author-year`, `key`, `numeric`, or a common CSL alias such

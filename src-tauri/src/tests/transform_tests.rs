@@ -520,7 +520,7 @@ fn qr_matrix_reserves_finder_separators() {
 fn bibtex_transform_renders_bibliography_preview() {
     let artifact = run_transform(
         "bibtex".to_string(),
-        "@book{porter1985, title={Competitive Advantage}, author={Michael Porter}, year={1985}}\n@article{doe2026, title=\"Evidence Based Reports\", author=\"Jane Doe\", date=\"2026-05-21\"}".to_string(),
+        "@book{porter1985, title={Competitive Advantage}, author={Michael Porter}, year={1985}, publisher={Free Press}}\n@article{doe2026, title=\"Evidence Based Reports\", author=\"Jane Doe\", date=\"2026-05-21\", journal=\"Business Evidence Review\", volume={4}, number={2}, pages={10--18}, doi={10.1000/example}, url={https://example.test/evidence}}".to_string(),
     )
     .expect("bibtex transform");
 
@@ -530,12 +530,18 @@ fn bibtex_transform_renders_bibliography_preview() {
     assert!(artifact.html.contains("<cite>Competitive Advantage</cite>"));
     assert!(artifact.html.contains("Michael Porter"));
     assert!(artifact.html.contains("1985"));
+    assert!(artifact.html.contains("Publisher"));
+    assert!(artifact.html.contains("Free Press"));
     assert!(artifact.html.contains("<dt>doe2026</dt>"));
     assert!(artifact
         .html
         .contains("<cite>Evidence Based Reports</cite>"));
     assert!(artifact.html.contains("Jane Doe"));
     assert!(artifact.html.contains("2026"));
+    assert!(artifact.html.contains("Business Evidence Review"));
+    assert!(artifact.html.contains("10.1000/example"));
+    assert!(artifact.html.contains("https://example.test/evidence"));
+    assert!(artifact.html.contains("bibtex-entry-metadata"));
     assert!(artifact.diagnostics.is_empty());
 
     let engines = list_transform_engines();

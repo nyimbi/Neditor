@@ -1,4 +1,7 @@
-use crate::{bibliography::parse_bibliography_source, diag, escape_html, DocumentDiagnostic};
+use crate::{
+    bibliography::{parse_bibliography_source, BibliographyEntry},
+    diag, escape_html, DocumentDiagnostic,
+};
 
 pub(crate) fn render_glossary_html(body: &str) -> String {
     let mut html = String::from("<dl class=\"glossary\">");
@@ -35,18 +38,7 @@ pub(crate) fn render_bibtex_html(
     }
     let mut html = String::from("<dl class=\"transform transform-bibtex\">");
     for entry in entries {
-        let metadata = [entry.author.as_deref(), entry.issued.as_deref()]
-            .into_iter()
-            .flatten()
-            .filter(|value| !value.trim().is_empty())
-            .map(escape_html)
-            .collect::<Vec<_>>()
-            .join(" | ");
-        let metadata = if metadata.is_empty() {
-            String::new()
-        } else {
-            format!("<small>{metadata}</small>")
-        };
+        let metadata = bibtex_entry_metadata_html(&entry);
         html.push_str(&format!(
             "<dt>{}</dt><dd><cite>{}</cite>{metadata}</dd>",
             escape_html(&entry.key),
@@ -55,6 +47,47 @@ pub(crate) fn render_bibtex_html(
     }
     html.push_str("</dl>");
     html
+}
+
+fn bibtex_entry_metadata_html(entry: &BibliographyEntry) -> String {
+    let mut rows = Vec::new();
+    push_bibtex_metadata_row(&mut rows, "Type", entry.entry_type.as_deref());
+    push_bibtex_metadata_row(&mut rows, "Author", entry.author.as_deref());
+    push_bibtex_metadata_row(&mut rows, "Issued", entry.issued.as_deref());
+    for (label, fields) in [
+        (
+            "Journal",
+            &["journal", "journaltitle", "container-title"][..],
+        ),
+        ("Book title", &["booktitle", "collection-title"][..]),
+        ("Publisher", &["publisher"][..]),
+        ("Volume", &["volume"][..]),
+        ("Issue", &["number", "issue"][..]),
+        ("Pages", &["pages", "page"][..]),
+        ("DOI", &["doi"][..]),
+        ("URL", &["url", "URL"][..]),
+    ] {
+        let value = fields.iter().find_map(|field| entry.fields.get(*field));
+        push_bibtex_metadata_row(&mut rows, label, value.map(String::as_str));
+    }
+    if rows.is_empty() {
+        return String::new();
+    }
+    format!(
+        "<table class=\"bibtex-entry-metadata\"><tbody>{}</tbody></table>",
+        rows.join("")
+    )
+}
+
+fn push_bibtex_metadata_row(rows: &mut Vec<String>, label: &str, value: Option<&str>) {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return;
+    };
+    rows.push(format!(
+        "<tr><th>{}</th><td>{}</td></tr>",
+        escape_html(label),
+        escape_html(value)
+    ));
 }
 
 pub(crate) fn render_timeline_svg(body: &str) -> String {

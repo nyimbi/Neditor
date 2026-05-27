@@ -31,6 +31,11 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- BibTeX transform previews now preserve and show richer reference metadata.
+  The bibliography parser records entry type plus common scalar fields, and the
+  embedded BibTeX transform renders author/year alongside publisher, journal or
+  book title, volume, issue, pages, DOI, and URL rows so reference packs are
+  inspectable before export.
 - Table editing now has a text-cell path in addition to the visual grid and
   editable source block. **Edit Table Cell at Cursor** locates the Markdown
   header/body cell under the source cursor, loads its value into the Tables

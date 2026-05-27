@@ -290,13 +290,15 @@ Use `[BIBLIOGRAPHY]` where references should render:
 ```
 
 BibTeX fields may be split across lines or written inline; `title`, `author`,
-`year`, and `date` metadata is used in bibliography previews and export
+`year`, `date`, entry type, journal or book title, publisher, volume, issue,
+pages, DOI, and URL metadata is used in bibliography previews and export
 artifacts. The BibTeX reader handles `@string`, `@comment`, and `@preamble`
 metadata without treating those records as bibliography entries, supports
 brace or parenthesis entry delimiters, keeps `@` characters inside field values
 such as URLs, and accepts dotted citation keys. CSL JSON may be a root array,
 a single item object, or an object wrapping an `items`, `references`,
-`bibliography`, or `data` array.
+`bibliography`, or `data` array; supported scalar fields are preserved in the
+exported bibliography metadata.
 
 ```md
 [BIBLIOGRAPHY]

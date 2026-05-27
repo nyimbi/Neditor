@@ -15,9 +15,13 @@ use std::{
 #[derive(Debug, Serialize)]
 pub(crate) struct BibliographyEntry {
     pub(crate) key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) entry_type: Option<String>,
     pub(crate) title: String,
     pub(crate) author: Option<String>,
     pub(crate) issued: Option<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) fields: BTreeMap<String, String>,
     pub(crate) raw: String,
     pub(crate) source_file: Option<String>,
     pub(crate) line: Option<usize>,
@@ -166,11 +170,14 @@ fn parse_bibliography_source_with_origin(
             let key_offset = entry.key_offset + leading_whitespace_len(entry.raw_key);
             let (line, column) = source_position_for_offset(body, start_line, key_offset);
             let title = bibtex_field(entry.raw, "title").unwrap_or_else(|| entry.kind.to_string());
+            let fields = bibtex_fields(entry.raw);
             entries.push(BibliographyEntry {
                 key: key.to_string(),
+                entry_type: Some(entry.kind.to_ascii_lowercase()),
                 title,
                 author: bibtex_field(entry.raw, "author"),
                 issued: bibtex_issued_year(entry.raw),
+                fields,
                 raw: entry.raw.to_string(),
                 source_file: source_file.map(ToString::to_string),
                 line: Some(line),
@@ -349,6 +356,7 @@ fn parse_hayagriva_yaml_bibliography(
                 let entry = serde_yaml::from_str::<Value>(&span.body).unwrap_or(Value::Null);
                 BibliographyEntry {
                     key: span.key.clone(),
+                    entry_type: bibliography_entry_type(&entry),
                     title: entry
                         .get("title")
                         .and_then(Value::as_str)
@@ -356,6 +364,7 @@ fn parse_hayagriva_yaml_bibliography(
                         .to_string(),
                     author: yaml_author(&entry),
                     issued: yaml_issued_year(&entry),
+                    fields: bibliography_fields_from_value(&entry),
                     raw: span.body,
                     source_file: source_file.map(ToString::to_string),
                     line: Some(span.line),
@@ -380,9 +389,11 @@ fn parse_hayagriva_yaml_bibliography(
             let location = bibliography_key_location(body, key, start_line);
             BibliographyEntry {
                 key: key.to_string(),
+                entry_type: bibliography_entry_type(entry),
                 title,
                 author: yaml_author(entry),
                 issued: yaml_issued_year(entry),
+                fields: bibliography_fields_from_value(entry),
                 raw: serde_yaml::to_string(entry).unwrap_or_default(),
                 source_file: source_file.map(ToString::to_string),
                 line: location.map(|location| location.0),
@@ -419,9 +430,11 @@ fn parse_csl_json_bibliography(
                 .to_string();
             Some(BibliographyEntry {
                 key: key.to_string(),
+                entry_type: bibliography_entry_type(entry),
                 title,
                 author: csl_author(entry),
                 issued: csl_issued_year(entry),
+                fields: bibliography_fields_from_value(entry),
                 raw: entry.to_string(),
                 source_file: source_file.map(ToString::to_string),
                 line: location.map(|location| location.0),
@@ -581,6 +594,58 @@ fn bibtex_field(raw: &str, field: &str) -> Option<String> {
     Some(clean_bibliography_value(&value)).filter(|value| !value.is_empty())
 }
 
+fn bibtex_fields(raw: &str) -> BTreeMap<String, String> {
+    let mut fields = BTreeMap::new();
+    let mut index = 0usize;
+    while index < raw.len() {
+        let Some((field_start, field_ch)) = raw[index..]
+            .char_indices()
+            .find(|(_, ch)| is_bibtex_identifier_char(*ch))
+        else {
+            break;
+        };
+        let field_start = index + field_start;
+        let field_end = raw[field_start..]
+            .char_indices()
+            .find_map(|(offset, ch)| {
+                (!is_bibtex_identifier_char(ch)).then_some(field_start + offset)
+            })
+            .unwrap_or(raw.len());
+        let field = raw[field_start..field_end].trim().to_ascii_lowercase();
+        if field.is_empty() {
+            index = field_start + field_ch.len_utf8();
+            continue;
+        }
+        let after_field = &raw[field_end..];
+        let Some((equals_offset, _)) = after_field.char_indices().find(|(_, ch)| *ch == '=') else {
+            index = field_end;
+            continue;
+        };
+        if after_field[..equals_offset]
+            .chars()
+            .any(|ch| !ch.is_whitespace())
+        {
+            index = field_end;
+            continue;
+        }
+        let equals_index = field_end + equals_offset;
+        let Some((value_offset, _)) = raw[equals_index + 1..]
+            .char_indices()
+            .find(|(_, ch)| !ch.is_whitespace())
+        else {
+            break;
+        };
+        let value_start = equals_index + 1 + value_offset;
+        let value = parse_bibtex_value(&raw[value_start..]);
+        let cleaned = clean_bibliography_value(&value);
+        if !cleaned.is_empty() {
+            fields.insert(field, cleaned);
+        }
+        index = value_start + value.len().max(1);
+    }
+    fields
+}
+
 fn find_bibtex_field(raw: &str, field: &str) -> Option<usize> {
     for (index, _) in raw.char_indices() {
         let Some(candidate) = raw.get(index..index + field.len()) else {
@@ -700,6 +765,56 @@ fn csl_author(entry: &Value) -> Option<String> {
 
 fn csl_issued_year(entry: &Value) -> Option<String> {
     entry.get("issued").and_then(year_from_value)
+}
+
+fn bibliography_entry_type(entry: &Value) -> Option<String> {
+    ["type", "genre", "entry-type", "entry_type"]
+        .into_iter()
+        .find_map(|key| entry.get(key).and_then(Value::as_str))
+        .map(ToString::to_string)
+        .filter(|value| !value.trim().is_empty())
+}
+
+fn bibliography_fields_from_value(entry: &Value) -> BTreeMap<String, String> {
+    let mut fields = BTreeMap::new();
+    let Some(object) = entry.as_object() else {
+        return fields;
+    };
+    for (key, value) in object {
+        if matches!(
+            key.as_str(),
+            "id" | "citation-key" | "title" | "author" | "issued"
+        ) {
+            continue;
+        }
+        if let Some(value) = bibliography_field_value(value) {
+            fields.insert(key.to_string(), value);
+        }
+    }
+    fields
+}
+
+fn bibliography_field_value(value: &Value) -> Option<String> {
+    match value {
+        Value::String(value) => Some(value.clone()).filter(|value| !value.trim().is_empty()),
+        Value::Number(value) => Some(value.to_string()),
+        Value::Bool(value) => Some(value.to_string()),
+        Value::Array(values) => {
+            let items = values
+                .iter()
+                .filter_map(bibliography_field_value)
+                .collect::<Vec<_>>();
+            (!items.is_empty()).then(|| items.join("; "))
+        }
+        Value::Object(object) => object
+            .get("raw")
+            .or_else(|| object.get("literal"))
+            .or_else(|| object.get("date"))
+            .and_then(bibliography_field_value)
+            .or_else(|| year_from_value(value))
+            .or_else(|| Some(format!("{{{} fields}}", object.len()))),
+        Value::Null => None,
+    }
 }
 
 fn author_name_from_object(author: &serde_json::Map<String, Value>) -> Option<String> {

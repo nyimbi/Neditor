@@ -1017,7 +1017,7 @@ fn safe_business_transforms_survive_cross_target_exports() {
 #[test]
 fn bibtex_transform_survives_cross_target_exports_with_metadata() {
     let response = compile(CompileRequest {
-        text: "---\ntitle: Bibliography Transform Pack\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21T10:00:00Z\n---\n# Bibliography Transform Pack\n\n```bibtex\n@book{porter1985, title={Competitive Advantage}, author={Michael Porter}, year={1985}}\n@article{doe2026, title=\"Evidence Based Reports\", author=\"Jane Doe\", date=\"2026-05-21\"}\n```\n".to_string(),
+        text: "---\ntitle: Bibliography Transform Pack\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21T10:00:00Z\n---\n# Bibliography Transform Pack\n\n```bibtex\n@book{porter1985, title={Competitive Advantage}, author={Michael Porter}, year={1985}, publisher={Free Press}}\n@article{doe2026, title=\"Evidence Based Reports\", author=\"Jane Doe\", date=\"2026-05-21\", journal=\"Business Evidence Review\", volume={4}, number={2}, pages={10--18}, doi={10.1000/example}, url={https://example.test/evidence}}\n```\n".to_string(),
         file_path: None,
     });
     let options = json!({});
@@ -1032,13 +1032,19 @@ fn bibtex_transform_survives_cross_target_exports_with_metadata() {
         .iter()
         .any(|entry| entry.key == "porter1985"
             && entry.author.as_deref() == Some("Michael Porter")
-            && entry.issued.as_deref() == Some("1985")));
+            && entry.issued.as_deref() == Some("1985")
+            && entry.entry_type.as_deref() == Some("book")
+            && entry.fields.get("publisher").map(String::as_str) == Some("Free Press")));
     assert!(response
         .bibliography
         .iter()
         .any(|entry| entry.key == "doe2026"
             && entry.author.as_deref() == Some("Jane Doe")
-            && entry.issued.as_deref() == Some("2026")));
+            && entry.issued.as_deref() == Some("2026")
+            && entry.entry_type.as_deref() == Some("article")
+            && entry.fields.get("journal").map(String::as_str)
+                == Some("Business Evidence Review")
+            && entry.fields.get("doi").map(String::as_str) == Some("10.1000/example")));
     let artifact = response
         .transform_artifacts
         .iter()
@@ -1048,6 +1054,9 @@ fn bibtex_transform_survives_cross_target_exports_with_metadata() {
     assert_eq!(artifact.execution_kind, "embedded");
     assert!(artifact.html.contains("<cite>Competitive Advantage</cite>"));
     assert!(artifact.html.contains("Michael Porter"));
+    assert!(artifact.html.contains("bibtex-entry-metadata"));
+    assert!(artifact.html.contains("Business Evidence Review"));
+    assert!(artifact.html.contains("10.1000/example"));
     assert_eq!(artifact.source_hash.len(), 64);
     assert_eq!(artifact.output_hash.len(), 64);
     assert!(artifact.source_line.is_some());
@@ -1059,6 +1068,8 @@ fn bibtex_transform_survives_cross_target_exports_with_metadata() {
     assert!(html.contains("Michael Porter"));
     assert!(html.contains("Evidence Based Reports"));
     assert!(html.contains("Jane Doe"));
+    assert!(html.contains("Business Evidence Review"));
+    assert!(html.contains("https://example.test/evidence"));
 
     let pdf = render_pdf_bytes(&response, &options);
     let pdf_text = String::from_utf8_lossy(&pdf);
@@ -1093,6 +1104,8 @@ fn bibtex_transform_survives_cross_target_exports_with_metadata() {
     assert!(bundled_bibliography.contains("\"key\": \"porter1985\""));
     assert!(bundled_bibliography.contains("\"author\": \"Michael Porter\""));
     assert!(bundled_bibliography.contains("\"issued\": \"1985\""));
+    assert!(bundled_bibliography.contains("\"entry_type\": \"article\""));
+    assert!(bundled_bibliography.contains("\"doi\": \"10.1000/example\""));
     assert!(bundled_artifacts.contains("\"name\": \"bibtex\""));
     assert!(bundled_artifacts.contains("\"output_hash\""));
     assert!(bundled_artifacts.contains("\"source_line\""));
