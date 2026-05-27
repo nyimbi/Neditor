@@ -3941,6 +3941,10 @@ test("transform template library covers reusable calculations and custom templat
   if (!horizontalChartTemplate) throw new Error("missing horizontal chart template");
   ok(horizontalChartTemplate.body.includes("type: horizontal-bar"));
   ok(transformTemplateFillFields(horizontalChartTemplate).some((field) => field.name === "targetLabel"));
+  const vegaTickTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-risk-ticks");
+  if (!vegaTickTemplate) throw new Error("missing Vega-Lite tick template");
+  ok(vegaTickTemplate.body.includes('"type": "tick"'));
+  ok(vegaTickTemplate.tags.includes("qa"));
   deepEqual(
     transformTemplateFillFields({
       transform: "calc",

@@ -1165,6 +1165,26 @@ fn vega_lite_color_encoding_renders_grouped_series_preview() {
 }
 
 #[test]
+fn vega_lite_tick_mark_renders_static_distribution_preview() {
+    let artifact = run_transform(
+            "vega-lite".to_string(),
+            r##"{"mark":{"type":"tick"},"title":"Risk Score Distribution","data":{"values":[{"team":"Legal","risk":72,"lane":"Review"},{"team":"Finance","risk":58,"lane":"Review"},{"team":"Operations","risk":41,"lane":"Ready"}]},"encoding":{"x":{"field":"team","type":"nominal","title":"Team"},"y":{"field":"risk","type":"quantitative","title":"Risk score"},"color":{"field":"lane","type":"nominal"}}}"##.to_string(),
+        )
+        .expect("vega-lite tick transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("Risk Score Distribution"));
+    assert!(artifact.html.contains("vega-tick-mark"));
+    assert!(artifact.html.contains("data-series=\"Review\""));
+    assert!(artifact.html.contains("data-series=\"Ready\""));
+    assert!(artifact.html.contains("aria-label=\"Legal: Review 72\""));
+    assert!(artifact.html.contains("vega-axis-title vega-x-title"));
+    assert!(artifact.html.contains(">Risk score<"));
+    assert!(!artifact.html.contains("Unsupported Vega-Lite mark"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn vega_lite_preview_preserves_negative_values_aggregation_and_axis_titles() {
     let artifact = run_transform(
             "vega-lite".to_string(),
@@ -1198,7 +1218,7 @@ fn vega_lite_unsupported_marks_report_supported_static_subset() {
     assert!(artifact.diagnostics.iter().any(|diagnostic| diagnostic
         .suggestion
         .as_deref()
-        .is_some_and(|suggestion| suggestion.contains("bar, line, point, or area"))));
+        .is_some_and(|suggestion| suggestion.contains("bar, line, point, area, or tick"))));
 }
 
 #[test]

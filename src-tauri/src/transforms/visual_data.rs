@@ -22,13 +22,13 @@ pub(crate) fn render_vega_lite_svg(
         }
     };
     let mark = vega_lite_mark(&spec);
-    if !matches!(mark.as_str(), "bar" | "line" | "point" | "area") {
+    if !matches!(mark.as_str(), "bar" | "line" | "point" | "area" | "tick") {
         let diagnostic = diag(
             "warning",
             format!("Unsupported Vega-Lite mark for native preview: {mark}"),
             None,
             None,
-            Some("Use bar, line, point, or area marks for the native static preview."),
+            Some("Use bar, line, point, area, or tick marks for the native static preview."),
         );
         artifact_diags.push(diagnostic.clone());
         diagnostics.push(diagnostic);
@@ -496,12 +496,23 @@ fn render_vega_lite_chart_svg(
                     format!("{label}: {series_name}")
                 };
                 let value_label = format_vega_value(value);
-                svg.push_str(&format!(
-                    "<circle cx=\"{x}\" cy=\"{y:.1}\" r=\"5\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}/>",
-                    escape_html(&label),
-                    escape_html(&value_label),
-                    escape_html(&value_label)
-                ));
+                if mark == "tick" {
+                    let x1 = x.saturating_sub(10);
+                    let x2 = x + 10;
+                    svg.push_str(&format!(
+                        "<line class=\"vega-tick-mark\" x1=\"{x1}\" y1=\"{y:.1}\" x2=\"{x2}\" y2=\"{y:.1}\" stroke=\"{color}\" stroke-width=\"4\" stroke-linecap=\"round\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}/>",
+                        escape_html(&label),
+                        escape_html(&value_label),
+                        escape_html(&value_label)
+                    ));
+                } else {
+                    svg.push_str(&format!(
+                        "<circle cx=\"{x}\" cy=\"{y:.1}\" r=\"5\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}/>",
+                        escape_html(&label),
+                        escape_html(&value_label),
+                        escape_html(&value_label)
+                    ));
+                }
             }
         }
     }

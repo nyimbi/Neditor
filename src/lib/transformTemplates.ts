@@ -846,6 +846,33 @@ y: risk
     ["vega-lite", "grouped"],
   ),
   template(
+    "vega-lite-risk-ticks",
+    "Charts",
+    "vega-lite",
+    "Risk score tick plot",
+    "Creates a compact Vega-Lite tick plot for score distributions and QA review lanes.",
+    fenced(
+      "vega-lite",
+      `{
+  "mark": { "type": "tick" },
+  "title": "Risk score distribution",
+  "data": {
+    "values": [
+      { "team": "Legal", "risk": 72, "lane": "Review" },
+      { "team": "Finance", "risk": 58, "lane": "Review" },
+      { "team": "Operations", "risk": 41, "lane": "Ready" }
+    ]
+  },
+  "encoding": {
+    "x": { "field": "team", "title": "Team" },
+    "y": { "field": "risk", "title": "Risk score" },
+    "color": { "field": "lane" }
+  }
+}`,
+    ),
+    ["vega-lite", "tick", "risk", "qa"],
+  ),
+  template(
     "timeline-launch",
     "Business",
     "timeline",

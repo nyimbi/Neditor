@@ -43,6 +43,12 @@ Recent pushed checkpoints visible in current git history:
   settings do not appear as bogus diagram nodes. Cross-target export conformance
   now carries the same D2 artifact through HTML, PDF, DOCX, PPTX, and Markdown
   bundle evidence.
+- Vega-Lite native static previews now support `tick` marks for compact
+  distribution, risk-score, and QA dashboards. Tick marks preserve the existing
+  x/y field handling, color-series legend metadata, axis titles, and
+  export-safe SVG data values instead of forcing users to install a full Vega
+  renderer for common score-strip previews, and the Templates panel now includes
+  a ready-made risk-score tick plot starter.
 - Table editing now has a text-cell path in addition to the visual grid and
   editable source block. **Edit Table Cell at Cursor** locates the Markdown
   header/body cell under the source cursor, loads its value into the Tables
