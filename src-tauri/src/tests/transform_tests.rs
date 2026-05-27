@@ -949,6 +949,23 @@ fn topojson_transform_resolves_object_arc_references() {
 }
 
 #[test]
+fn topojson_transform_applies_quantized_point_geometry_transform() {
+    let artifact = run_transform(
+            "topojson".to_string(),
+            r#"{"type":"Topology","transform":{"scale":[0.1,0.1],"translate":[100,50]},"objects":{"route":{"type":"GeometryCollection","geometries":[{"type":"LineString","arcs":[0]},{"type":"Point","coordinates":[10,10]},{"type":"MultiPoint","coordinates":[[0,0],[5,5]]}]}},"arcs":[[[0,0],[10,0]]]}"#.to_string(),
+        )
+        .expect("topojson point transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-topojson"));
+    assert!(artifact.html.contains("<polyline"));
+    assert!(artifact.html.contains("<circle"));
+    assert!(artifact.html.contains("1 lines / 3 points / 5 coordinates"));
+    assert!(artifact.html.contains("<circle cx=\"852.00\" cy=\"48.00\""));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn stl_transform_renders_ascii_static_svg_preview() {
     let artifact = run_transform(
             "stl".to_string(),

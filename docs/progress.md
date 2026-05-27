@@ -4797,6 +4797,13 @@ Horizontal business charts:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked chart_transform --lib` | Pass | All five chart transform tests passed, covering YAML bars, pie, area, KPI, negative variance/target/unit charts, grouped bar/line charts, and horizontal business comparisons. |
 | `pnpm run test:unit` | Pass | Frontend template coverage now proves the built-in chart library includes a horizontal risk-comparison starter template with fill fields. |
 
+TopoJSON mixed geometry fidelity:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked topojson_transform_applies_quantized_point_geometry_transform --lib` | Pass | Focused transform proof shows TopoJSON `Point` and `MultiPoint` object coordinates use the same `transform.scale`/`transform.translate` decoding as arcs, keeping markers aligned with mixed line/point static SVG previews. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked visual_data_transforms_survive_cross_target_exports --lib` | Pass | Cross-target visual-data export proof remains clean for static SVG artifacts after the TopoJSON point-transform decoder update. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

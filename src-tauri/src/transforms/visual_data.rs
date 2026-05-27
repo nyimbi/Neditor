@@ -842,11 +842,12 @@ fn rings_from_value(value: &Value) -> Option<Vec<Vec<(f64, f64)>>> {
 }
 
 fn decode_topojson_shapes(value: &Value) -> Vec<GeoShape> {
-    let decoded_arcs = decode_topojson_arcs(value);
+    let transform = decode_topojson_transform(value);
+    let decoded_arcs = decode_topojson_arcs(value, transform);
     let mut shapes = Vec::new();
     if let Some(objects) = value.get("objects").and_then(Value::as_object) {
         for object in objects.values() {
-            collect_topojson_object_shapes(object, &decoded_arcs, &mut shapes);
+            collect_topojson_object_shapes(object, &decoded_arcs, transform, &mut shapes);
         }
     }
     if shapes.is_empty() {
@@ -855,7 +856,13 @@ fn decode_topojson_shapes(value: &Value) -> Vec<GeoShape> {
     shapes
 }
 
-fn decode_topojson_arcs(value: &Value) -> Vec<Vec<(f64, f64)>> {
+#[derive(Clone, Copy, Debug)]
+struct TopojsonTransform {
+    scale: (f64, f64),
+    translate: (f64, f64),
+}
+
+fn decode_topojson_transform(value: &Value) -> TopojsonTransform {
     let scale = value
         .pointer("/transform/scale")
         .and_then(Value::as_array)
@@ -866,18 +873,23 @@ fn decode_topojson_arcs(value: &Value) -> Vec<Vec<(f64, f64)>> {
         .and_then(Value::as_array)
         .and_then(|items| Some((items.first()?.as_f64()?, items.get(1)?.as_f64()?)))
         .unwrap_or((0.0, 0.0));
+    TopojsonTransform { scale, translate }
+}
+
+fn decode_topojson_arcs(value: &Value, transform: TopojsonTransform) -> Vec<Vec<(f64, f64)>> {
     value
         .get("arcs")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .filter_map(|arc| decode_topojson_arc(arc, scale, translate))
+        .filter_map(|arc| decode_topojson_arc(arc, transform))
         .collect()
 }
 
 fn collect_topojson_object_shapes(
     object: &Value,
     decoded_arcs: &[Vec<(f64, f64)>],
+    transform: TopojsonTransform,
     shapes: &mut Vec<GeoShape>,
 ) {
     let Some(kind) = object.get("type").and_then(Value::as_str) else {
@@ -887,7 +899,7 @@ fn collect_topojson_object_shapes(
         "GeometryCollection" => {
             if let Some(geometries) = object.get("geometries").and_then(Value::as_array) {
                 for geometry in geometries {
-                    collect_topojson_object_shapes(geometry, decoded_arcs, shapes);
+                    collect_topojson_object_shapes(geometry, decoded_arcs, transform, shapes);
                 }
             }
         }
@@ -937,12 +949,25 @@ fn collect_topojson_object_shapes(
             }
         }
         "Point" => {
-            if let Some(point) = object.get("coordinates").and_then(position_from_value) {
+            if let Some(point) = object
+                .get("coordinates")
+                .and_then(position_from_value)
+                .map(|point| apply_topojson_transform(point, transform))
+            {
                 shapes.push(GeoShape::Point(point));
             }
         }
         "MultiPoint" => {
-            if let Some(points) = object.get("coordinates").and_then(line_from_value) {
+            if let Some(points) =
+                object
+                    .get("coordinates")
+                    .and_then(line_from_value)
+                    .map(|points| {
+                        points
+                            .into_iter()
+                            .map(|point| apply_topojson_transform(point, transform))
+                    })
+            {
                 shapes.extend(points.into_iter().map(GeoShape::Point));
             }
         }
@@ -976,11 +1001,7 @@ fn topojson_arc_by_ref(arc_ref: i64, decoded_arcs: &[Vec<(f64, f64)>]) -> Option
     Some(arc)
 }
 
-fn decode_topojson_arc(
-    arc: &Value,
-    (scale_x, scale_y): (f64, f64),
-    (translate_x, translate_y): (f64, f64),
-) -> Option<Vec<(f64, f64)>> {
+fn decode_topojson_arc(arc: &Value, transform: TopojsonTransform) -> Option<Vec<(f64, f64)>> {
     let mut x = 0.0;
     let mut y = 0.0;
     let mut positions = Vec::new();
@@ -988,9 +1009,19 @@ fn decode_topojson_arc(
         let coordinates = point.as_array()?;
         x += coordinates.first()?.as_f64()?;
         y += coordinates.get(1)?.as_f64()?;
-        positions.push((x * scale_x + translate_x, y * scale_y + translate_y));
+        positions.push(apply_topojson_transform((x, y), transform));
     }
     (!positions.is_empty()).then_some(positions)
+}
+
+fn apply_topojson_transform(
+    (x, y): (f64, f64),
+    TopojsonTransform {
+        scale: (scale_x, scale_y),
+        translate: (translate_x, translate_y),
+    }: TopojsonTransform,
+) -> (f64, f64) {
+    (x * scale_x + translate_x, y * scale_y + translate_y)
 }
 
 fn parse_ascii_stl_vertices(body: &str) -> Vec<(f64, f64, f64)> {
