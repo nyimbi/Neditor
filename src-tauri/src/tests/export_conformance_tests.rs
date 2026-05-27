@@ -430,6 +430,7 @@ fn write_rendered_export_audit_artifacts(artifacts: RenderedExportAuditArtifacts
             "Inspect ZIP packages and confirm manifests plus publishing and Google Docs handoff files are present.",
             "Open review-cases/rich-blocks.* and confirm block quote, callout, task list, code, table, figure, equation, and generated figure/table lists remain legible across targets.",
             "Open review-cases/option-heavy.* and confirm cover/page numbers/watermark/style/appendix options are visible without corrupting body content.",
+            "Open review-cases/brand-layout.* and confirm brand logo, brand color, header/footer templates, page size/orientation, watermark, legal metadata, and page numbers survive across targets.",
             "Open review-cases/edited-tables.* and confirm edited values, formula rows, escaped pipes, and alignment survive across targets.",
             "Open review-cases/toc-page-numbers.* and confirm numbered generated TOC entries, PDF page-number leaders, and DOCX update-field guidance survive across targets."
         ]
@@ -506,6 +507,26 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
             ],
         ),
         (
+            "brand-layout",
+            "Brand Layout Export",
+            "---\ntitle: Brand Layout Export\nsubtitle: Branded page proof\nversion: 3.1.0\nstatus: approved\napprovedBy: Release QA\napprovedAt: 2026-05-21T11:20:00Z\nauthor: Release QA\nclassification: Internal\nlegalDisclaimer: \"Branded review only.\"\nbrand:\n  name: Acme Strategy\n  color: \"#0F766E\"\n  logo: \"data:image/svg+xml;base64,PHN2Zy8+\"\n  font: \"Aptos,Arial,sans-serif\"\nlayout:\n  pageSize: Letter\n  orientation: landscape\n  margins: compact\n  header: \"{{title}} | {{status}}\"\n  footer: \"{{classification}} | Page {{page}} of {{pages}}\"\n---\n# Brand Layout Export\n\nThis review case proves brand and page layout controls appear in inspectable exports.\n\nTable: Brand controls {#tbl:brand-controls}\n| Control | Expected |\n| --- | --- |\n| Brand | Acme Strategy |\n| Header | Brand Layout Export \\| approved |\n| Footer | Internal \\| Page 1 of 1 |\n| Watermark | BRAND |\n\nBranded review only.\n",
+            json!({
+                "includeStyles": true,
+                "includeSyntaxHighlighting": true,
+                "coverPage": true,
+                "pageNumbers": true,
+                "includeManifest": true,
+                "layoutPreset": "compact",
+                "watermark": "BRAND"
+            }),
+            vec![
+                "Brand Layout Export",
+                "Acme Strategy",
+                "Branded review only.",
+                "Brand controls",
+            ],
+        ),
+        (
             "edited-tables",
             "Edited Table Export",
             "---\ntitle: Edited Table Export\nstatus: approved\napprovedBy: Release QA\napprovedAt: 2026-05-21T10:50:00Z\n---\n# Edited Table Export\n\nThis review case represents a table that was created visually, corrected directly in Markdown source, and then exported after formulas, alignment, and escaped pipe values were normalized. Reviewers should confirm the calculated total row, right-aligned numeric columns, center-aligned owner column, and literal pipe in the Base Case label remain legible in every rendered target.\n\nTable: Edited revenue {#tbl:edited}\n| Region | Revenue | Margin | Notes |\n| :--- | ---: | ---: | --- |\n| East | $125,000 | 42% | source edited |\n| West | $98,000 | 38% | visual grid |\n| Total | =SUM(B1:B2) | =AVG(C1:C2) | formula row |\n\nTable: Scenario grid {#tbl:scenario}\n| Scenario | Owner | Score | Status |\n| :--- | :---: | ---: | --- |\n| Base \\| Case | Finance | $1,200.50 | Ready |\n| Stretch | Ops | 75% | Watch |\n| Floor | Risk | 20 | Hold |\n| Max | Summary | =MAX(C1:C3) | Formula |\n",
@@ -567,6 +588,7 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
 
             let pdf_text = String::from_utf8_lossy(&pdf);
             let docx_text = zip_entry_text(&docx, "word/document.xml");
+            let docx_footer = zip_entry_text(&docx, "word/footer1.xml");
             let pptx_text = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
             let bundle_text = zip_entry_text(&bundle, "document.md");
             for expected in &evidence {
@@ -592,6 +614,53 @@ fn write_rendered_export_review_cases(root: &Path) -> Vec<Value> {
                 assert!(
                     !docx_text.contains("[1 Alpha](#alpha)"),
                     "{slug} docx should replace Markdown TOC links with a native TOC field"
+                );
+            }
+            if slug == "brand-layout" {
+                assert!(
+                    html.contains("class=\"cover-logo\""),
+                    "{slug} html missing cover logo"
+                );
+                assert!(
+                    html.contains("data:image/svg+xml;base64,PHN2Zy8+"),
+                    "{slug} html missing inline brand logo source"
+                );
+                assert!(
+                    html.contains("#0F766E"),
+                    "{slug} html missing brand color styling"
+                );
+                assert!(
+                    html.contains("@page{size:Letter landscape;margin:12mm"),
+                    "{slug} html missing page size/orientation/margin CSS"
+                );
+                assert!(
+                    pdf_text.contains("Logo: data:image/svg+xml;base64,PHN2Zy8+"),
+                    "{slug} pdf missing logo metadata"
+                );
+                assert!(
+                    pdf_text.contains("Header: Brand Layout Export | approved"),
+                    "{slug} pdf missing rendered header template"
+                );
+                assert!(
+                    pdf_text.contains("Footer: Internal | Page 1 of 1"),
+                    "{slug} pdf missing rendered footer template"
+                );
+                assert!(
+                    pdf_text.contains("Layout preset: compact"),
+                    "{slug} pdf missing compact layout preset"
+                );
+                assert!(
+                    pdf_text.contains("Watermark: BRAND"),
+                    "{slug} pdf missing watermark metadata"
+                );
+                assert!(
+                    docx_text.contains("Logo: data:image/svg+xml;base64,PHN2Zy8+"),
+                    "{slug} docx missing logo metadata"
+                );
+                assert!(
+                    docx_footer.contains(r#"w:instr="PAGE""#)
+                        && docx_footer.contains(r#"w:instr="NUMPAGES""#),
+                    "{slug} docx missing page number fields"
                 );
             }
             assert!(pdf_text.contains(title), "{slug} pdf missing title");

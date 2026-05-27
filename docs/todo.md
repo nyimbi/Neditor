@@ -209,6 +209,12 @@ Most recent local verification evidence:
   HTML, PDF, DOCX, PPTX, and Markdown-bundle audit artifacts, including PDF
   page-number leaders, native DOCX TOC-field guidance, browser visual proof,
   and manual-review dashboard links.
+- `pnpm run test:rendered-exports`:
+  passed and now proves the brand/layout review case through HTML, PDF, DOCX,
+  PPTX, and Markdown-bundle audit artifacts, including cover-logo rendering,
+  brand color styling, compact landscape Letter page layout, rendered
+  header/footer templates, DOCX page-number fields, watermark metadata, Office
+  preview proof, browser visual proof, and manual-review dashboard links.
 - `cargo test --locked compiler_reports_circular_and_too_deep_includes --lib -- --nocapture`:
   passed and proves circular include diagnostics, include-chain graph depth, and
   maximum include depth enforcement.

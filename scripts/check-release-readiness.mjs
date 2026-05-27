@@ -680,7 +680,7 @@ function renderedExportAuditAccepted(report) {
   const missingTargets = requiredTargets.filter((target) => !targetNames.has(target));
   const reviewCases = Array.isArray(report.reviewCases) ? report.reviewCases : [];
   const reviewCaseBySlug = new Map(reviewCases.map((reviewCase) => [reviewCase?.slug, reviewCase]));
-  const requiredReviewCases = ["rich-blocks", "option-heavy", "toc-page-numbers", "edited-tables"];
+  const requiredReviewCases = ["rich-blocks", "option-heavy", "brand-layout", "toc-page-numbers", "edited-tables"];
   const missingReviewCases = requiredReviewCases.filter((slug) => !reviewCaseBySlug.has(slug));
   const incompleteReviewCases = [];
   for (const slug of requiredReviewCases) {
