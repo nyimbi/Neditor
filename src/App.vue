@@ -899,6 +899,27 @@
                 placeholder="Paste RFP text, extracted PDF/DOCX content, or use Import RFP file / Fetch URL."
               ></textarea>
             </label>
+            <label>
+              Response context and decision notes
+              <textarea
+                v-model="rfpResponseContextNotes"
+                rows="5"
+                aria-label="RFP response context notes"
+                placeholder="Add win themes, known differentiators, red-team concerns, pricing caveats, reviewer instructions, or accept AI step guidance here."
+              ></textarea>
+            </label>
+            <details class="business-wizard-assistance rfp-step-assistance" open>
+              <summary>AI RFP step assistance</summary>
+              <ol>
+                <li v-for="item in rfpWizardStepAssistance" :key="item.stepId">
+                  <strong>{{ item.stepLabel }}</strong>
+                  <p>{{ item.suggestedAnswer }}</p>
+                  <p class="sidebar-hint">{{ item.rationale }}</p>
+                  <small>{{ item.contextSignals.join(" | ") }}</small>
+                  <button type="button" @click="appendRfpWizardSuggestion(item)">{{ item.actionLabel }}</button>
+                </li>
+              </ol>
+            </details>
             <div class="template-actions">
               <button type="button" title="Import a PDF, DOCX, Markdown, or text RFP source through the native file picker" :disabled="rfpImportBusy" @click="importRfpSourceFile">
                 <span class="button-icon" aria-hidden="true">
@@ -4930,6 +4951,7 @@ import {
   businessTemplateMarkdown,
   businessWizardContext,
   buildBusinessWizardStepAssistance,
+  buildRfpWizardStepAssistance,
   normalizeBusinessProfile,
   rfpComplianceMatrixMarkdown,
   rfpResponseMarkdown,
@@ -4937,6 +4959,7 @@ import {
   type BusinessDocumentTemplate,
   type BusinessProfile,
   type RfpAnalysis,
+  type RfpWizardStepAssistance,
   type RfpSourceKind,
 } from "./lib/businessDocuments";
 import {
@@ -5486,6 +5509,7 @@ const rfpSourcePath = ref("");
 const rfpSourceUrl = ref("");
 const rfpSourceText = ref("");
 const rfpSourceTitle = ref("");
+const rfpResponseContextNotes = ref("");
 const rfpAnalysis = ref<RfpAnalysis | null>(null);
 const rfpImportBusy = ref(false);
 const rfpImportMessage = ref("");
@@ -7032,6 +7056,17 @@ const rfpAnalysisSummary = computed(() => {
   if (!analysis) return "No RFP analyzed yet";
   return `${analysis.requirements.length} requirements | ${analysis.statedIntent.length} stated intent | ${analysis.impliedIntent.length} implied intent | ${analysis.completenessScore}/100 ready`;
 });
+const rfpWizardStepAssistance = computed(() =>
+  buildRfpWizardStepAssistance({
+    sourceKind: rfpSourceKind.value,
+    sourceTitle: rfpSourceTitle.value || active.value.compile?.semantic.title || active.value.title,
+    sourceUrl: rfpSourceUrl.value,
+    sourceText: rfpSourceText.value || active.value.text,
+    responseNotes: rfpResponseContextNotes.value,
+    analysis: rfpAnalysis.value,
+    profile: store.businessProfile,
+  }),
+);
 const equationTemplateCategories = computed(() => [...new Set(equationEditorTemplates.map((template) => template.category))].sort());
 const filteredEquationEditorTemplates = computed(() => {
   const query = equationTemplateQuery.value.trim().toLowerCase();
@@ -13888,6 +13923,16 @@ function analyzeCurrentRfpSource() {
   store.statusMessage = `Analyzed RFP source with ${rfpAnalysis.value.requirements.length} requirements`;
 }
 
+function appendRfpWizardSuggestion(item: RfpWizardStepAssistance) {
+  const block = [
+    `${item.stepLabel}: ${item.suggestedAnswer}`,
+    `Rationale: ${item.rationale}`,
+    `Context signals: ${item.contextSignals.join("; ")}`,
+  ].join("\n");
+  rfpResponseContextNotes.value = appendTextBlock(rfpResponseContextNotes.value, block);
+  store.statusMessage = `Added RFP ${item.stepLabel.toLowerCase()} guidance to response notes`;
+}
+
 async function importRfpSourceFile() {
   const selected = await open({
     multiple: false,
@@ -13958,7 +14003,7 @@ function insertRfpComplianceMatrix() {
 
 function createResponsiveRfpResponse() {
   const analysis = ensureRfpAnalysis();
-  store.updateText(rfpResponseMarkdown(analysis, store.businessProfile));
+  store.updateText(rfpResponseMarkdown(analysis, store.businessProfile, rfpResponseContextNotes.value));
   store.sidebar = "review";
   store.statusMessage = `Created responsive RFP response with ${analysis.complianceRows.length} compliance rows`;
 }
@@ -13987,7 +14032,7 @@ function sendRfpResponseToDocsLive() {
     businessWizardContext(businessDocumentTemplates.find((template) => template.id === "rfp") || businessDocumentTemplates[0], store.businessProfile),
     "",
     "RFP analysis:",
-    rfpResponseAnalysisBrief(analysis),
+    rfpResponseAnalysisBrief(analysis, rfpResponseContextNotes.value),
   ].join("\n");
   docsLivePlaceholderText.value = businessProfilePlaceholderText(store.businessProfile);
   docsLiveDraftingDepth.value = "detailed";
@@ -14004,7 +14049,7 @@ function openAgentWorkspaceForRfpAnalysis() {
   openAgentWorkspace(
     "Prepare a fully responsive RFP response from the analyzed source. Verify every stated and implied requirement, complete the compliance matrix, flag evidence gaps, and return review-ready Markdown.",
   );
-  agentContextAnswers.value = rfpResponseAnalysisBrief(analysis);
+  agentContextAnswers.value = rfpResponseAnalysisBrief(analysis, rfpResponseContextNotes.value);
   buildAgentWorkspacePlan();
   generateAgentWorkspaceRun();
   buildAgentProviderPackage();
@@ -14023,7 +14068,8 @@ function rfpSourceKindFromPath(path: string): RfpSourceKind {
   return "markdown";
 }
 
-function rfpResponseAnalysisBrief(analysis: RfpAnalysis) {
+function rfpResponseAnalysisBrief(analysis: RfpAnalysis, responseNotes = "") {
+  const notes = responseNotes.trim();
   return [
     `Source: ${analysis.source.title}`,
     `Source type: ${analysis.source.kind}`,
@@ -14036,6 +14082,9 @@ function rfpResponseAnalysisBrief(analysis: RfpAnalysis) {
     "Requirement verification:",
     ...analysis.verificationSummary.checklist.map((item) => `- ${item}`),
     "",
+    notes ? "Response context and decision notes:" : "",
+    notes,
+    notes ? "" : "",
     "Stated intent:",
     ...analysis.statedIntent.map((item) => `- ${item}`),
     "",
@@ -18935,6 +18984,13 @@ select:hover {
 
 .business-wizard-assistance small {
   color: #526171;
+}
+
+.business-wizard-assistance button {
+  justify-self: start;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .rfp-source-grid {

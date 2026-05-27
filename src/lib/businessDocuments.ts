@@ -75,6 +75,10 @@ export interface AiDocumentWizardStepAssistance {
   contextSignals: string[];
 }
 
+export interface RfpWizardStepAssistance extends AiDocumentWizardStepAssistance {
+  actionLabel: string;
+}
+
 export interface AgenticCliIntegration {
   id: "claude-code" | "codex" | "opencode";
   label: string;
@@ -140,6 +144,16 @@ export interface RfpAnalysis {
   questions: string[];
   warnings: string[];
   completenessScore: number;
+}
+
+export interface RfpWizardStepAssistanceInput {
+  sourceKind: RfpSourceKind;
+  sourceTitle?: string;
+  sourceUrl?: string;
+  sourceText?: string;
+  responseNotes?: string;
+  analysis?: RfpAnalysis | null;
+  profile?: Partial<BusinessProfile>;
 }
 
 export const businessProfileFields: BusinessProfileField[] = [
@@ -808,6 +822,125 @@ function isProcurementTemplate(template: BusinessDocumentTemplate) {
   return template.id === "rfp" || template.id === "rfq" || template.id === "tender";
 }
 
+export function buildRfpWizardStepAssistance(input: RfpWizardStepAssistanceInput): RfpWizardStepAssistance[] {
+  const profile = normalizeBusinessProfile(input.profile || {});
+  const company = profile.companyName || "the responding organization";
+  const client = profile.defaultClientName || input.analysis?.source.title || input.sourceTitle || "the buyer";
+  const owner = profile.fullName || profile.roleTitle || "the accountable response owner";
+  const sourceTitle = normalizeWhitespace(input.sourceTitle || input.analysis?.source.title || "RFP source");
+  const sourceUrl = normalizeWhitespace(input.sourceUrl || input.analysis?.source.url || "");
+  const sourceText = input.sourceText || "";
+  const sourceWords = input.analysis?.source.wordCount || sourceText.split(/\s+/).filter(Boolean).length;
+  const notesWords = (input.responseNotes || "").split(/\s+/).filter(Boolean).length;
+  const analysis = input.analysis || null;
+  const baseSignals = [
+    `Source type: ${input.sourceKind.toUpperCase()}`,
+    `Source title: ${sourceTitle}`,
+    sourceUrl ? "URL supplied" : "No URL supplied",
+    sourceWords ? `Source words: ${sourceWords}` : "No source text captured",
+    notesWords ? `Response notes words: ${notesWords}` : "No response-context notes yet",
+    `Responder: ${company}`,
+    `Buyer/client: ${client}`,
+    `Owner: ${owner}`,
+  ];
+  const analyzedSignals = analysis
+    ? [
+        `Requirements: ${analysis.requirements.length}`,
+        `Compliance rows: ${analysis.complianceRows.length}`,
+        `Evidence checks: ${analysis.verificationSummary.rowsNeedingEvidence}`,
+        `Stated intent: ${analysis.statedIntent.length}`,
+        `Implied intent: ${analysis.impliedIntent.length}`,
+        `Readiness score: ${analysis.completenessScore}/100`,
+      ]
+    : ["RFP not analyzed yet"];
+  const rowPreview = analysis?.complianceRows.slice(0, 3).map((row) => `${row.id} -> ${row.responseSection}`).join("; ") || "No requirement rows yet";
+  const requirementSummary = analysis
+    ? `${analysis.requirements.length} extracted requirement(s), ${analysis.capabilities.length} capability hint(s), ${analysis.timelines.length} timeline hint(s), ${analysis.budgetHints.length} budget hint(s), and ${analysis.mandatoryAttachments.length} mandatory attachment hint(s).`
+    : "Analyze the full source RFP before drafting so requirements, attachments, timelines, and budget hints are mapped.";
+
+  const steps: Array<Omit<RfpWizardStepAssistance, "contextSignals"> & { extraSignals?: string[] }> = [
+    {
+      stepId: "source-intake",
+      stepLabel: "Source intake",
+      actionLabel: "Use intake guidance",
+      suggestedAnswer: [
+        `Use ${sourceTitle} as the authoritative buyer source for ${client}.`,
+        input.sourceKind === "url" ? "Fetch the URL and confirm the fetched text includes all addenda, tables, and attachments before analysis." : "Confirm the imported or pasted text includes all addenda, exhibits, pricing forms, and submission instructions.",
+        sourceWords < 400 ? "The source looks short; treat the analysis as incomplete until the full RFP package is captured." : "The source length is sufficient for a first requirement scan, but still verify appendices and attachments.",
+      ].join(" "),
+      rationale: "RFP response quality depends on complete source capture before any response prose is generated.",
+      extraSignals: [sourceWords < 400 ? "Short-source warning" : "Source ready for analysis"],
+    },
+    {
+      stepId: "requirement-analysis",
+      stepLabel: "Requirement analysis",
+      actionLabel: "Use analysis guidance",
+      suggestedAnswer: [
+        requirementSummary,
+        "Every mandatory, scored, contractual, delivery, attachment, and format requirement should become a compliance row with owner, evidence needed, verification, and response section.",
+      ].join(" "),
+      rationale: "A responsive bid needs a traceable requirement inventory before the team writes polished narrative.",
+      extraSignals: analyzedSignals,
+    },
+    {
+      stepId: "buyer-intent",
+      stepLabel: "Buyer intent",
+      actionLabel: "Use intent guidance",
+      suggestedAnswer: analysis
+        ? [
+            `Stated intent: ${analysis.statedIntent.slice(0, 3).join("; ") || "none detected"}.`,
+            `Implied intent: ${analysis.impliedIntent.slice(0, 3).join("; ") || "none detected"}.`,
+            "Use both stated and implied intent to shape the executive response, differentiators, risk posture, and compliance emphasis.",
+          ].join(" ")
+        : "After analysis, summarize both stated buyer goals and implied evaluator concerns before drafting the executive response.",
+      rationale: "RFP evaluators score more than literal compliance; intent guidance keeps the response aligned to the buyer's outcome and constraints.",
+      extraSignals: analysis ? analyzedSignals : [],
+    },
+    {
+      stepId: "response-drafting",
+      stepLabel: "Response drafting",
+      actionLabel: "Use drafting guidance",
+      suggestedAnswer: [
+        `Draft the response section-by-section for ${company}, starting from the compliance matrix rather than generic proposal copy.`,
+        `Use these first response-section routes: ${rowPreview}.`,
+        "Keep suggested answers evidence-gated until the named owner attaches proof.",
+      ].join(" "),
+      rationale: "Drafting from mapped requirements prevents a persuasive but non-responsive proposal.",
+      extraSignals: analysis ? [`Response sections: ${new Set(analysis.complianceRows.map((row) => row.responseSection)).size}`] : [],
+    },
+    {
+      stepId: "evidence-qa",
+      stepLabel: "Evidence QA",
+      actionLabel: "Use QA guidance",
+      suggestedAnswer: analysis
+        ? [
+            `${analysis.verificationSummary.rowsNeedingEvidence} row(s) still need evidence review.`,
+            "Verify attachments, certifications, pricing assumptions, timeline commitments, risks, exceptions, and every suggested answer before submission.",
+            analysis.questions.length ? `Open reviewer questions: ${analysis.questions.slice(0, 4).join("; ")}.` : "No open reviewer questions were generated, but require human sign-off before export.",
+          ].join(" ")
+        : "Run analysis first, then review evidence gaps, attachment obligations, exceptions, pricing assumptions, and reviewer questions before response generation.",
+      rationale: "Evidence QA keeps the AI-generated response from overstating unsupported capabilities or missing mandatory instructions.",
+      extraSignals: analysis ? analyzedSignals : [],
+    },
+    {
+      stepId: "handoff-distribution",
+      stepLabel: "Handoff and distribution",
+      actionLabel: "Use handoff guidance",
+      suggestedAnswer: [
+        `Prepare a governed handoff for ${owner}: full source summary, compliance matrix, Requirement Response Drafts, evidence gaps, owner assignments, and submission checklist.`,
+        "Use Docs Live for section-by-section drafting or Agent handoff for a local Claude Code, Codex, or OpenCode response pass; keep review blockers visible before export.",
+      ].join(" "),
+      rationale: "The final handoff must be actionable for business reviewers and local agents without losing compliance traceability.",
+      extraSignals: analysis ? analyzedSignals : [],
+    },
+  ];
+
+  return steps.map(({ extraSignals, ...step }) => ({
+    ...step,
+    contextSignals: Array.from(new Set([...baseSignals, ...(extraSignals || [])].filter(Boolean))),
+  }));
+}
+
 export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<BusinessProfile> = {}): RfpAnalysis {
   const normalizedProfile = businessProfilePlaceholderMap(profile);
   const title = normalizeWhitespace(input.title || input.url || "Imported RFP");
@@ -886,7 +1019,7 @@ export function rfpComplianceMatrixMarkdown(analysis: RfpAnalysis) {
   ].join("\n");
 }
 
-export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<BusinessProfile> = {}) {
+export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<BusinessProfile> = {}, responseNotes = "") {
   const placeholders = businessProfilePlaceholderMap(profile);
   const title = `RFP response for ${placeholders.defaultClientName}`;
   const requirementBullets = analysis.requirements.map((requirement) => `- **${requirement.id}:** ${requirement.text}`).join("\n") || "- No requirements were extracted. Import or paste the RFP text and re-run analysis.";
@@ -901,6 +1034,7 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
   const questionBullets = markdownBullets(analysis.questions, "No open questions detected.");
   const verificationBullets = analysis.verificationSummary.checklist.map((item) => `- [ ] ${item}`).join("\n");
   const responseDrafts = rfpRequirementResponseDraftsMarkdown(analysis.complianceRows);
+  const notes = responseNotes.trim();
   return fillBusinessTemplate(
     [
       "---",
@@ -933,6 +1067,9 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       `- Completeness score: ${analysis.completenessScore}/100`,
       `- Source size: ${analysis.source.wordCount} words across ${analysis.source.lineCount} non-empty lines`,
       "",
+      notes ? "### Response Context and Decision Notes" : "",
+      notes,
+      notes ? "" : "",
       "## Requirements Analysis",
       "",
       requirementBullets,

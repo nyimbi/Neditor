@@ -251,6 +251,11 @@ Recent pushed checkpoints visible in current git history:
   section that groups the suggested requirement answers by target response
   section, keeps evidence owners and proof needs attached to each answer, and
   gives reviewers usable draft prose before the verification checklist.
+- The native RFP response wizard now has its own AI step-assistance layer for
+  source intake, requirement analysis, buyer intent, response drafting, evidence
+  QA, and handoff. Users can accept guidance into editable response-context
+  notes, and those notes flow into generated full responses, Docs Live context,
+  and local-agent handoff context without altering the source RFP.
 - Export readiness now warns when a generated table of contents is requested
   but the document has no headings, and copies that diagnostic into manifest
   readiness with the other empty generated-section warnings.
@@ -2851,6 +2856,17 @@ RFP requirement response draft verification:
 | `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with grouped RFP response draft evidence recorded. |
 | `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the grouped RFP response draft update. |
 | `git diff --check` | Pass | No whitespace errors after the grouped RFP response draft update. |
+
+RFP wizard step-assistance verification:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 75 frontend unit/static tests passed after adding native RFP wizard step assistance, editable response-context notes, generated-response note carry-through, and static UI wiring. |
+| `pnpm run check` | Pass | Vue typecheck passed after rendering RFP step assistance and response-context note acceptance controls. |
+| `pnpm run check:docs` | Pass | Markdown docs were checked after documenting RFP wizard step assistance; local links resolve. |
+| `pnpm run check:spec-completion` | Pass | Spec completion matrix validator remains `partial-with-release-risks` with RFP wizard step-assistance evidence recorded. |
+| `pnpm run check:release-readiness` | Pass | Release readiness remains `current-host-ready-with-external-gaps` after the RFP wizard step-assistance update. |
+| `git diff --check` | Pass | No whitespace errors after the RFP wizard step-assistance update. |
 
 AI paste code fence cleanup verification:
 

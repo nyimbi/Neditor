@@ -48,6 +48,7 @@ import {
   businessDocumentTemplates,
   businessProfilePlaceholderText,
   buildBusinessWizardStepAssistance,
+  buildRfpWizardStepAssistance,
   businessSnippetMarkdown,
   businessTemplateMarkdown,
   businessWizardContext,
@@ -1406,6 +1407,22 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes("Suggested answer reviewed"))));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes(row.owner))));
 
+  const assistance = buildRfpWizardStepAssistance({
+    sourceKind: "markdown",
+    sourceTitle: "Globex Customer Support RFP",
+    sourceText: analysis.source.title,
+    responseNotes: "Win theme: reduce implementation risk and show support operating-model proof.",
+    analysis,
+    profile,
+  });
+  equal(assistance.length, 6);
+  ok(assistance.every((item) => item.suggestedAnswer.length > 80));
+  ok(assistance.every((item) => item.rationale.length > 60));
+  ok(assistance.every((item) => item.actionLabel.startsWith("Use ")));
+  ok(assistance.every((item) => item.contextSignals.some((signal) => signal.includes("Globex"))));
+  ok(assistance.some((item) => item.stepId === "buyer-intent" && item.suggestedAnswer.includes("improve customer support")));
+  ok(assistance.some((item) => item.stepId === "evidence-qa" && item.suggestedAnswer.includes("row(s) still need evidence review")));
+
   const matrix = rfpComplianceMatrixMarkdown(analysis);
   ok(matrix.includes("| ID | Requirement | Category | Compliance status | Response section | Suggested response | Evidence / proof | Verification |"));
   ok(matrix.includes("RFP-REQ-001"));
@@ -1413,8 +1430,10 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(matrix.includes("Suggested response"));
   ok(matrix.includes("Evidence to attach"));
 
-  const response = rfpResponseMarkdown(analysis, profile);
+  const response = rfpResponseMarkdown(analysis, profile, "Win theme: reduce implementation risk.");
   ok(response.includes("## Buyer Intent Analysis"));
+  ok(response.includes("### Response Context and Decision Notes"));
+  ok(response.includes("Win theme: reduce implementation risk."));
   ok(response.includes("### Stated Intent"));
   ok(response.includes("### Implied Intent"));
   ok(response.includes("## Compliance Matrix"));
@@ -3470,6 +3489,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("movie-script"));
   ok(app.includes('aria-label="Native RFP response wizard"'));
   ok(app.includes('aria-label="RFP analysis results"'));
+  ok(app.includes('aria-label="RFP response context notes"'));
+  ok(app.includes("AI RFP step assistance"));
+  ok(app.includes("rfpWizardStepAssistance"));
+  ok(app.includes("appendRfpWizardSuggestion"));
+  ok(app.includes("buildRfpWizardStepAssistance"));
   ok(app.includes("analyzeRfpSource"));
   ok(app.includes("import_rfp_source"));
   ok(app.includes("row.suggestedResponse"));

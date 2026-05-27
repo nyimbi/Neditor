@@ -487,6 +487,11 @@ NEditor is built for drafts that need evidence before publication.
   response section. The full response draft also groups those answers into a
   **Requirement Response Drafts** section, so each response area has usable
   starter prose while the evidence owner and proof requirements remain visible.
+  The RFP wizard also shows AI step assistance for source intake, requirement
+  analysis, buyer intent, response drafting, evidence QA, and handoff; accepting
+  a suggestion puts the answer, rationale, and context signals into editable
+  response-context notes that flow into Docs Live, local-agent handoff, and full
+  response drafts.
 - Use `ai-source` blocks and AI-assisted section metadata so generated content
   can be marked as needing review or human-reviewed.
 
