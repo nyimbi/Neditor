@@ -39,6 +39,7 @@ const evidenceFiles = [...explicitEvidence, ...discoverEvidenceFiles(evidenceDir
 const evidence = evidenceFiles.map((path) => validateEvidenceFile(path));
 const accepted = evidence.filter((item) => item.status === "accepted");
 const invalid = evidence.filter((item) => item.status === "invalid");
+const stale = evidence.filter((item) => item.status === "stale");
 const status = invalid.length > 0 ? "failed" : accepted.length > 0 ? "accepted" : "pending-real-runtime-evidence";
 
 writeReport(status, evidence, invalid);
@@ -76,6 +77,17 @@ function validateEvidenceFile(path) {
 
   requireValue(evidence.schema === "neditor.ai-runtime-evidence.v1", "schema must be neditor.ai-runtime-evidence.v1", itemIssues);
   requireValue(evidence.appVersion === packageJson.version, `appVersion must match package.json version ${packageJson.version}`, itemIssues);
+  if (evidence.sourceCommit && evidence.sourceCommit !== currentSourceCommit) {
+    return {
+      path,
+      status: "stale",
+      runtime: evidence.runtime || null,
+      platform: evidence.platform || null,
+      generatedAt: evidence.generatedAt || null,
+      sourceCommit: evidence.sourceCommit,
+      issues: [`sourceCommit ${evidence.sourceCommit} does not match current git commit ${currentSourceCommit}`],
+    };
+  }
   requireValue(evidence.sourceCommit === currentSourceCommit, `sourceCommit must match current git commit ${currentSourceCommit}`, itemIssues);
   requireValue(evidence.sourceTreeClean === true, "sourceTreeClean must be true when evidence is collected", itemIssues);
   requireValue(evidence.status === "passed", "status must be passed", itemIssues);
@@ -211,6 +223,7 @@ function writeReport(status, evidence, invalid) {
         summary: {
           acceptedEvidence: evidence.filter((item) => item.status === "accepted").length,
           invalidEvidence: invalid.length,
+          staleEvidence: stale.length,
           discoveredEvidence: evidence.length,
         },
         acceptedRuntimes: evidence.filter((item) => item.status === "accepted").map((item) => ({

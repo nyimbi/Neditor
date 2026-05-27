@@ -959,6 +959,11 @@ Required next coverage:
 - AI paste cleanup remaining proof: clipboard and richer review-state flows.
 - Export artifact fidelity, target-specific option matrices, and rendered audit
   proof now have executable coverage; broader manual viewer/platform QA remains.
+- Release evidence refresh now distinguishes stale prior-commit external proof
+  from malformed current proof for platform, AI provider/runtime, security,
+  performance, and Google Docs checks. Remaining work is collecting fresh
+  external evidence for the current release commit where credentials, supported
+  hosts, or human review are required.
 - The large-document browser performance workflow now passes locally through
   `pnpm run test:e2e`; native command workflow timing is recorded by
   `pnpm run test:desktop-smoke`.

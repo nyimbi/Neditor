@@ -96,11 +96,12 @@
             <button
               class="tab-main"
               type="button"
-              :aria-label="`${document.dirty ? 'Unsaved ' : ''}${document.title}`"
+              :aria-label="documentTabAriaLabel(document)"
               @click="activate(document.id)"
             >
               <span v-if="document.dirty" class="tab-dirty" aria-hidden="true"></span>
-              <span>{{ document.title }}</span>
+              <span class="tab-title">{{ document.title }}</span>
+              <small v-if="documentTabFileName(document)" class="tab-file-name">{{ documentTabFileName(document) }}</small>
             </button>
             <button
               class="tab-icon-button"
@@ -590,7 +591,7 @@
           </div>
           <template v-if="tableDraft">
             <div class="table-actions">
-              <button type="button" :disabled="tableDraftHasErrors || tableDraftSourceChanged" title="Write this visual table draft back to the Markdown source" @click="applyTableDraft()">{{ isNewTableDraft ? "Insert table" : "Apply" }}</button>
+              <button type="button" :disabled="tableDraftHasErrors || tableDraftSourceChanged" title="Write this visual table draft back to the Markdown source" @click="applyTableDraft()">{{ isNewTableDraft ? "Insert table" : "Apply table" }}</button>
               <button type="button" title="Discard the visual table draft and return to the current source table" @click="cancelTableDraft">Cancel table edit</button>
               <button type="button" title="Add a blank row to the visual table draft" @click="addTableRow">Add row</button>
               <button type="button" title="Add a blank column to the visual table draft" @click="addTableColumn">Add column</button>
@@ -5323,6 +5324,16 @@ interface AppMenu {
   id: string;
   label: string;
   groups: AppMenuGroup[];
+}
+function documentTabFileName(document: OpenDocument) {
+  if (!document.path) return "";
+  const fileName = document.path.split(/[\\/]/).pop() || "";
+  return fileName && fileName !== document.title ? fileName : "";
+}
+function documentTabAriaLabel(document: OpenDocument) {
+  const fileName = documentTabFileName(document);
+  const parts = [document.dirty ? "Unsaved" : "", document.title, fileName].filter(Boolean);
+  return parts.join(" ");
 }
 type WindowTitleTarget = {
   setTitle(title: string): Promise<void>;
@@ -18416,9 +18427,10 @@ select:hover {
 }
 
 .tab-main {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
+  column-gap: 6px;
   min-width: 0;
   flex: 1;
   min-height: 28px;
@@ -18428,7 +18440,8 @@ select:hover {
   text-align: left;
 }
 
-.tab-main span {
+.tab-main .tab-title,
+.tab-main .tab-file-name {
   display: block;
   min-width: 0;
   overflow: hidden;
@@ -18436,7 +18449,21 @@ select:hover {
   white-space: nowrap;
 }
 
+.tab-main .tab-title {
+  grid-column: 2;
+  line-height: 1.05;
+}
+
+.tab-main .tab-file-name {
+  grid-column: 2;
+  color: #607083;
+  font-size: 10px;
+  line-height: 1.05;
+}
+
 .tab-dirty {
+  grid-column: 1;
+  grid-row: 1 / span 2;
   width: 6px;
   height: 6px;
   flex: 0 0 6px;

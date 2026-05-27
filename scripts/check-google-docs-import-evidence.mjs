@@ -100,6 +100,17 @@ function validateImportEvidence(localArtifacts) {
     };
   }
 
+  if (evidence.sourceCommit && evidence.sourceCommit !== currentSourceCommit) {
+    return {
+      status: "stale",
+      detail: `Google Docs import evidence was collected for ${evidence.sourceCommit}; current commit is ${currentSourceCommit}.`,
+      generatedAt: evidence.generatedAt || null,
+      appVersion: evidence.appVersion || null,
+      sourceCommit: evidence.sourceCommit,
+      sourceTreeClean: evidence.sourceTreeClean ?? null,
+    };
+  }
+
   requireValue(evidence.schema === "neditor.google-docs-import-evidence.v1", "schema must be neditor.google-docs-import-evidence.v1");
   requireValue(evidence.status === "passed", "status must be passed");
   requireValue(isIsoDate(evidence.generatedAt), "generatedAt must be an ISO timestamp");

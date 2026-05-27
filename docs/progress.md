@@ -31,6 +31,15 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Release evidence validators now classify prior-commit external evidence as
+  `stale` instead of hard-invalid while still rejecting malformed or bad
+  current-commit evidence. Platform, AI provider/runtime, security review,
+  performance profile, and Google Docs import checks now keep local readiness
+  refreshes usable after source commits without accepting stale proof. The tab
+  bar also shows the file name beneath semantic document titles when they
+  differ, so Save As/Rename/Pin workflows keep file identity visible, and the
+  visual table action is labeled **Apply table** to avoid ambiguity with
+  **Apply source text**.
 - Table editor manual QA now has an executable sign-off contract. `pnpm run
   check:tables:manual` writes `.tmp/table-editor/manual-review-template.json`
   and `.tmp/table-editor/manual-review-summary.json`, validates completed
@@ -1440,6 +1449,15 @@ Recent pushed checkpoints visible in current git history:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new edited-table review case. |
 | `pnpm run test:rendered-exports` | Pass | Rendered export audit now verifies `review-cases/edited-tables` across HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts, browser visual proof, Office preview dashboards, Poppler proof where available, and manual-review/sign-off metadata. |
 | `pnpm run check:tables:manual` | Pass | Table editor manual-review contract now writes the reviewer template and pending summary, validates prerequisite report identity, and provides a strict `NEDITOR_TABLE_EDITOR_SIGNOFF` path for source/grid/spreadsheet/export/supported-host sign-off. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "opens, saves|saves a document|switches tabs|edits table structure" --project chromium` | Pass | Focused rerun proves Save/Open/Rename/Pin/Recently Closed tab identity and the table structure cancel/apply workflow after adding file-name subtitles and the explicit **Apply table** action. |
+| `pnpm run test:e2e` | Pass | Full Chromium browser workflow suite refreshed the authoritative `.tmp/e2e-browser/report.json` with 72 passed workflows and zero failures. |
+| `pnpm run check:platform-evidence` | Pass with pending external evidence | Stale Windows/Linux external platform evidence is now classified as stale/pending instead of hard-invalid after a new source commit. |
+| `pnpm run check:ai-provider` | Pass with pending live evidence | Prior-commit provider evidence is stale/pending while malformed current evidence remains invalid. |
+| `pnpm run check:security-review` | Pass with pending independent review | Prior-commit security review evidence is stale/pending while malformed current evidence remains invalid. |
+| `pnpm run check:performance-profile` | Pass with pending release-device profile | Prior-commit performance profile evidence is stale/pending while malformed current evidence remains invalid. |
+| `pnpm run check:ai-runtime` | Pass with pending real-device evidence | AI runtime evidence template/report refreshed for the current commit. |
+| `pnpm run check:google-docs-import` | Pass with pending Google Drive authorization | Prior-commit Google Docs import evidence is stale/pending while local rendered package proof remains current. |
+| `pnpm run check:release-ci` | Pass | Release CI workflow report refreshed after package script changes. |
 | `pnpm run verify:local -- --list` | Pass | Quick local verification list now includes the table editor manual-review contract so the release baseline keeps the new table QA gate visible. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "recomputes watched include paths" --project chromium` | Pass | Focused browser workflow proves editing include directives recomputes the include graph and watched paths, removes the old include, watches the new include, ignores stale old-include watch events, and recompiles after the new include changes. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "moves clean watcher roots" --project chromium` | Pass | Focused browser workflow proves Save As path changes resync the clean root watcher from the old path to the new path, ignore stale old-root events, and reload clean external changes from the moved path. |

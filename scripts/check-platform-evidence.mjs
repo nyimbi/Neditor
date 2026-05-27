@@ -45,7 +45,13 @@ writeTemplates();
 const platforms = platformSpecs.map((spec) => evaluatePlatform(spec));
 const missingItems = platforms.flatMap((platform) => platform.missingEvidence);
 const invalidItems = platforms.flatMap((platform) => platform.invalidEvidence);
-const status = invalidItems.length > 0 ? "failed" : missingItems.length > 0 ? "pending-external-evidence" : "complete";
+const staleItems = platforms.flatMap((platform) => platform.staleEvidence);
+const status =
+  invalidItems.length > 0
+    ? "failed"
+    : missingItems.length > 0 || staleItems.length > 0
+      ? "pending-external-evidence"
+      : "complete";
 
 writeReport({
   generatedAt: new Date().toISOString(),
@@ -59,10 +65,12 @@ writeReport({
     completePlatforms: platforms.filter((platform) => platform.status === "complete").length,
     missingEvidence: missingItems.length,
     invalidEvidence: invalidItems.length,
+    staleEvidence: staleItems.length,
   },
   platforms,
   missingEvidence: missingItems,
   invalidEvidence: invalidItems,
+  staleEvidence: staleItems,
 });
 
 if (invalidItems.length > 0) {
@@ -79,9 +87,14 @@ function evaluatePlatform(spec) {
   const webdriverEvidence = evaluateWebdriverReport(spec);
   const checks = [packageEvidence, webdriverEvidence];
   const invalidEvidence = checks.filter((check) => check.status === "invalid");
+  const staleEvidence = checks.filter((check) => check.status === "stale");
   const missingEvidence = checks.filter((check) => check.status === "missing");
   const status =
-    invalidEvidence.length > 0 ? "failed" : missingEvidence.length > 0 ? "pending-external-evidence" : "complete";
+    invalidEvidence.length > 0
+      ? "failed"
+      : missingEvidence.length > 0 || staleEvidence.length > 0
+        ? "pending-external-evidence"
+        : "complete";
 
   return {
     platform: spec.platform,
@@ -101,6 +114,13 @@ function evaluatePlatform(spec) {
       path: check.path,
       detail: check.detail,
     })),
+    staleEvidence: staleEvidence.map((check) => ({
+      id: check.id,
+      platform: spec.platform,
+      path: check.path,
+      detail: check.detail,
+      sourceCommit: check.sourceCommit,
+    })),
   };
 }
 
@@ -114,6 +134,14 @@ function evaluatePackageArtifacts(spec) {
   if (evidence.status === "invalid") return evidence;
 
   const report = evidence.report;
+  if (report.sourceCommit && report.sourceCommit !== currentSourceCommit) {
+    return stale(
+      "package-artifacts",
+      spec.packagePath,
+      `${spec.name} package artifact evidence was collected for ${report.sourceCommit}; current commit is ${currentSourceCommit}.`,
+      report.sourceCommit,
+    );
+  }
   const problems = [];
   requireValue(report.schema === "neditor.platform-package-artifacts.v1", problems, "schema must be neditor.platform-package-artifacts.v1");
   requireValue(report.platform === spec.platform, problems, `platform must be ${spec.platform}`);
@@ -165,6 +193,14 @@ function evaluateWebdriverReport(spec) {
   if (evidence.status === "invalid") return evidence;
 
   const report = evidence.report;
+  if (report.sourceCommit && report.sourceCommit !== currentSourceCommit) {
+    return stale(
+      "tauri-webdriver",
+      spec.webdriverPath,
+      `${spec.name} Tauri WebDriver evidence was collected for ${report.sourceCommit}; current commit is ${currentSourceCommit}.`,
+      report.sourceCommit,
+    );
+  }
   const problems = [];
   requireValue(report.platform === spec.platform, problems, `platform must be ${spec.platform}`);
   requireValue(report.status === "passed", problems, "status must be passed");
@@ -245,6 +281,16 @@ function invalid(id, path, detail) {
     path,
     status: "invalid",
     detail,
+  };
+}
+
+function stale(id, path, detail, sourceCommit) {
+  return {
+    id,
+    path,
+    status: "stale",
+    detail,
+    sourceCommit,
   };
 }
 

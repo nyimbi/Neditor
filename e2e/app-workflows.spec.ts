@@ -4950,7 +4950,7 @@ test("edits table structure with formats and cancels draft changes", async ({ pa
   await expect.poll(() => editorText(page)).not.toContain("999");
 
   await page.getByLabel("Value, row 1, column B").fill("250000");
-  await page.getByRole("button", { name: "Apply" }).click();
+  await page.getByRole("button", { name: "Apply table" }).click();
   await expect.poll(() => editorText(page)).toContain("| Revenue | 250000 |");
   await expect.poll(() => editorText(page)).not.toContain("| Revenue | 125000 |");
 });
