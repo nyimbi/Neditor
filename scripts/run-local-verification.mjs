@@ -23,6 +23,7 @@ const quickCommands = [
   command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"]),
   command("Markdown links", "pnpm", ["run", "check:docs"]),
   command("Spec completion matrix contract", "pnpm", ["run", "check:spec-completion"]),
+  command("Table editor manual review contract", "pnpm", ["run", "check:tables:manual"]),
   command("Rust formatting", "cargo", ["fmt", "--check"], "src-tauri"),
   command("Rust dev check", "cargo", ["check", "--locked"], "src-tauri"),
   command("Whitespace check", "git", ["diff", "--check"]),

@@ -34,6 +34,7 @@
     "check:security-review": "node scripts/check-security-review-evidence.mjs",
     "check:spec-completion": "node scripts/check-spec-completion-matrix.mjs",
     "check:structure": "node scripts/check-project-structure.mjs",
+    "check:tables:manual": "node scripts/check-table-editor-manual-signoff.mjs",
     "collect:ai-provider": "node scripts/collect-ai-provider-evidence.mjs",
     "collect:google-docs-import": "node scripts/collect-google-docs-import-evidence.mjs",
     "collect:platform-evidence": "node scripts/collect-platform-evidence.mjs",

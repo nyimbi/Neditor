@@ -19,6 +19,10 @@ const requiredReports = [
     "pending-human-review",
     "human-reviewed",
   ]),
+  requiredReport("manual-table-editor-contract", ".tmp/table-editor/manual-review-summary.json", [
+    "pending-human-review",
+    "human-reviewed",
+  ]),
   requiredReport("platform-package-config", ".tmp/desktop-bundle/platform-package-config-report.json", ["passed"]),
   requiredReport("external-platform-evidence", ".tmp/platform-evidence/report.json", [], platformEvidenceAccepted),
   requiredReport("release-signing-evidence", ".tmp/release-signing/report.json", [], releaseSigningAccepted),
@@ -270,6 +274,17 @@ function collectEvidenceGaps(checks) {
       status: accessibility?.humanSignoff?.status || "pending-human-review",
       evidence: ".tmp/accessibility/manual-review-summary.json",
       detail: "Static and runtime accessibility checks pass, but real screen-reader/native assistive-technology sign-off is pending.",
+    });
+  }
+
+  const tableEditor = reports["manual-table-editor-contract"];
+  if (tableEditor?.humanSignoff?.status !== "human-reviewed") {
+    gaps.push({
+      id: "table-editor-manual-supported-host-signoff",
+      status: tableEditor?.humanSignoff?.status || "pending-human-review",
+      evidence: ".tmp/table-editor/manual-review-summary.json",
+      detail:
+        "Two-way table editing has automated proof, but completed manual source/grid/spreadsheet/export/supported-host review has not been supplied.",
     });
   }
 
@@ -665,9 +680,10 @@ function renderedExportAuditAccepted(report) {
   const missingTargets = requiredTargets.filter((target) => !targetNames.has(target));
   const reviewCases = Array.isArray(report.reviewCases) ? report.reviewCases : [];
   const reviewCaseBySlug = new Map(reviewCases.map((reviewCase) => [reviewCase?.slug, reviewCase]));
-  const missingReviewCases = ["rich-blocks", "option-heavy"].filter((slug) => !reviewCaseBySlug.has(slug));
+  const requiredReviewCases = ["rich-blocks", "option-heavy", "edited-tables"];
+  const missingReviewCases = requiredReviewCases.filter((slug) => !reviewCaseBySlug.has(slug));
   const incompleteReviewCases = [];
-  for (const slug of ["rich-blocks", "option-heavy"]) {
+  for (const slug of requiredReviewCases) {
     const reviewCase = reviewCaseBySlug.get(slug);
     if (!reviewCase) continue;
     const caseTargets = new Set((Array.isArray(reviewCase.targets) ? reviewCase.targets : []).map((target) => target?.target));

@@ -115,6 +115,11 @@ const evidenceItems = [
     "rendered-export-human-review/visual-review-signoff.json",
     "visual-review-signoff.json",
   ]),
+  item("table-editor-signoff", ".tmp/table-editor/external/manual-review-signoff.json", "table-editor-signoff", [
+    "table-editor/manual-review-signoff.json",
+    "table-editor-human-review/manual-review-signoff.json",
+    "table-editor-signoff.json",
+  ]),
   item("accessibility-signoff", ".tmp/accessibility/external/manual-review-signoff.json", "accessibility-signoff", [
     "accessibility/manual-review-signoff.json",
     "accessibility-human-review/manual-review-signoff.json",
@@ -239,6 +244,13 @@ function runValidations(categories) {
     commands.push(
       command("accessibility signoff", "pnpm", ["run", "check:a11y:manual"], {
         NEDITOR_ACCESSIBILITY_SIGNOFF: join(root, ".tmp", "accessibility", "external", "manual-review-signoff.json"),
+      }),
+    );
+  }
+  if (categories.has("table-editor-signoff")) {
+    commands.push(
+      command("table editor signoff", "pnpm", ["run", "check:tables:manual"], {
+        NEDITOR_TABLE_EDITOR_SIGNOFF: join(root, ".tmp", "table-editor", "external", "manual-review-signoff.json"),
       }),
     );
   }

@@ -31,6 +31,12 @@ progress records prove the requested end state.
 
 Recent pushed checkpoints visible in current git history:
 
+- Table editor manual QA now has an executable sign-off contract. `pnpm run
+  check:tables:manual` writes `.tmp/table-editor/manual-review-template.json`
+  and `.tmp/table-editor/manual-review-summary.json`, validates completed
+  reviewer sign-off with current commit/source cleanliness plus prerequisite
+  report hashes, and surfaces the remaining supported-host/human-review work
+  through release readiness and the release evidence kit.
 - Rendered export audit now includes an edited-table review case. The generated
   `review-cases/edited-tables` artifacts cover table-editor style output with
   edited source text, formula rows, escaped pipes, and alignment across HTML,
@@ -1433,6 +1439,8 @@ Recent pushed checkpoints visible in current git history:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked api_schema_transforms_survive_cross_target_exports --lib` | Pass | Cross-target API/schema export conformance remains intact. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked representative_rendered_export_artifacts_are_package_inspectable --lib` | Pass | Focused Rust audit generation test writes the rendered export audit with the new edited-table review case. |
 | `pnpm run test:rendered-exports` | Pass | Rendered export audit now verifies `review-cases/edited-tables` across HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts, browser visual proof, Office preview dashboards, Poppler proof where available, and manual-review/sign-off metadata. |
+| `pnpm run check:tables:manual` | Pass | Table editor manual-review contract now writes the reviewer template and pending summary, validates prerequisite report identity, and provides a strict `NEDITOR_TABLE_EDITOR_SIGNOFF` path for source/grid/spreadsheet/export/supported-host sign-off. |
+| `pnpm run verify:local -- --list` | Pass | Quick local verification list now includes the table editor manual-review contract so the release baseline keeps the new table QA gate visible. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "recomputes watched include paths" --project chromium` | Pass | Focused browser workflow proves editing include directives recomputes the include graph and watched paths, removes the old include, watches the new include, ignores stale old-include watch events, and recompiles after the new include changes. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "moves clean watcher roots" --project chromium` | Pass | Focused browser workflow proves Save As path changes resync the clean root watcher from the old path to the new path, ignore stale old-root events, and reload clean external changes from the moved path. |
 | `pnpm exec playwright test e2e/app-workflows.spec.ts -g "moves watcher roots after closing" --project chromium` | Pass | Focused browser workflow proves closing the active watched tab moves the watcher root to the newly active tab, ignores stale closed-tab events, and reloads clean external changes from the active file. |

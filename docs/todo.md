@@ -948,8 +948,11 @@ Required next coverage:
   through `pnpm run test:rendered-exports`, which generates the
   `review-cases/edited-tables` HTML/PDF/DOCX/PPTX/Markdown-bundle artifacts
   and validates edited source text, formula totals, escaped pipes, and
-  alignment evidence. Remaining work is manual table QA and supported-host
-  coverage.
+  alignment evidence. Manual table QA is now an executable contract through
+  `pnpm run check:tables:manual`, which generates a current-commit reviewer
+  template and validates completed source/grid/spreadsheet/export/supported-host
+  sign-off. Remaining work is collecting completed human sign-off and broader
+  supported-host evidence.
 - External conflict modal: native desktop proof now covers rendered modal
   controls plus local/external merge-base seeding; remaining work is deeper
   manual UX QA for dialog-driven save-copy and full line-composition gestures.
