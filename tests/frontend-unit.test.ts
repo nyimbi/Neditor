@@ -4592,6 +4592,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("New table in text"));
   ok(app.includes("Insert draft in text"));
   ok(app.includes("insertTableDraftInMarkdownText"));
+  ok(app.includes("canEditMarkdownTableText"));
+  ok(app.includes("Place the cursor inside a Markdown table or create one before editing table text"));
   ok(app.includes("Markdown source"));
   ok(app.includes("valid source updates the visual grid as you type"));
   ok(app.includes("Valid pipe-table text updates the grid as you type"));

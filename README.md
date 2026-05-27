@@ -532,9 +532,10 @@ web app.
   or place the cursor inside a Markdown table and edit that exact source table
   through the visual grid, the editable Markdown source block beside it, the
   **New table in text**/**Insert draft in text** path for immediate Markdown
-  editing, or the explicit **Edit Markdown in text** action that selects the
-  exact table lines in the editor. Source text edits can be parsed back into
-  the grid, and grid edits can regenerate readable Markdown before applying to
+  editing, or the explicit **Edit Markdown in text** action that can load the
+  table at the cursor and select the exact table lines in the editor. Source
+  text edits can be parsed back into the grid, and grid edits can regenerate
+  readable Markdown before applying to
   the document. If
   the Markdown source table changes while the grid is open, NEditor syncs a clean visual
   draft from the source and protects dirty visual drafts from silently

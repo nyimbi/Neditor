@@ -130,9 +130,9 @@ Recent pushed checkpoints visible in current git history:
   runtime inspection paths.
 - Table editing now exposes direct Markdown-text editing as a first-class
   two-way action. The Tables sidebar has an explicit **Edit Markdown in text**
-  control that selects the exact source table range, and the focused Chromium
-  workflow proves replacing that text with a valid pipe table refreshes the
-  visual grid cells.
+  control that can load the table at the editor cursor, select the exact source
+  table range, and the focused Chromium workflow proves replacing that text
+  with a valid pipe table refreshes the visual grid cells.
 - Table editing source-block edits now preview into the visual grid
   immediately when the typed Markdown is a valid pipe table, while invalid or
   partial source remains editable until the user fixes, applies, or cancels it.

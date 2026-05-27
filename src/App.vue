@@ -603,7 +603,7 @@
             </button>
             <button
               type="button"
-              :disabled="!selectedTableForDraft && !tableSourceSnapshot"
+              :disabled="!canEditMarkdownTableText"
               title="Select the exact Markdown table lines in the editor so you can edit the table directly in text"
               @click="editSelectedTableInMarkdownText"
             >
@@ -6950,6 +6950,7 @@ const selectedTableForDraft = computed(() => {
   return selectedTableDraftMatch.value?.table || null;
 });
 const canGoToTableSource = computed(() => Boolean(selectedTableForDraft.value || tableSourceSnapshot.value));
+const canEditMarkdownTableText = computed(() => canGoToTableSource.value || (!tableDraftDirty.value && markdownTables.value.length > 0));
 const outlineHeadings = computed(() =>
   (active.value.compile?.document_ast.blocks || []).flatMap((block) => {
     if (block.kind !== "heading") return [];
@@ -8451,7 +8452,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "table", label: "Table", help: "Insert a Markdown table scaffold.", run: () => insertBlock(tableSnippet) },
           { id: "open-table-editor", label: "Open Table Editor", help: "Open the visual table grid for creating or editing Markdown tables.", run: () => openTableEditor() },
           { id: "edit-table-at-cursor", label: "Edit Table at Cursor", help: "Load the Markdown table under the cursor or selection into the visual table editor.", run: () => loadTableAtCursor() },
-          { id: "edit-table-markdown-text", label: "Edit Table in Markdown Text", help: "Select the exact Markdown table source lines so direct text edits can sync back to the visual grid.", disabled: !canGoToTableSource.value, run: () => editSelectedTableInMarkdownText() },
+          { id: "edit-table-markdown-text", label: "Edit Table in Markdown Text", help: "Select the exact Markdown table source lines so direct text edits can sync back to the visual grid.", disabled: !canEditMarkdownTableText.value, run: () => editSelectedTableInMarkdownText() },
           { id: "edit-table-cell-at-cursor", label: "Edit Table Cell at Cursor", help: "Load the exact Markdown table cell under the source cursor and write its value back into the text.", run: () => loadTableTextCellAtCursor() },
           { id: "go-to-source-table", label: "Go to Source Table", help: "Jump from the visual table grid back to the source Markdown table lines.", disabled: !canGoToTableSource.value, run: () => goToSelectedTableSource() },
           { id: "import-table", label: "Import CSV/XLSX Table", help: "Import spreadsheet data into the editable table grid.", disabled: tableDataBusy.value, run: () => importTableFromSpreadsheet() },
@@ -17064,6 +17065,17 @@ function goToSelectedTableSource(statusMessage = "") {
 }
 
 function editSelectedTableInMarkdownText() {
+  if (!selectedTableForDraft.value && !tableSourceSnapshot.value) {
+    if (!loadTableAtCursor(true)) {
+      if (tableContextSwitchBlocked("editing a Markdown table in text")) return;
+      if (markdownTables.value.length) {
+        loadSelectedTable({ force: true });
+      } else {
+        store.statusMessage = "Place the cursor inside a Markdown table or create one before editing table text";
+        return;
+      }
+    }
+  }
   goToSelectedTableSource("Selected the Markdown table text; direct source edits will refresh the visual grid when the pipe table is valid.");
 }
 
