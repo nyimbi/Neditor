@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `f848d26 Enable
-  native Antigravity handoffs`
+- Latest inspected committed baseline before this update: `439de25 Prove
+  advanced multi-cursor commands`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -47,6 +47,11 @@ Recent pushed checkpoints visible in current git history:
   open the table editor, load the table at the cursor, select the Markdown table
   source for direct text editing, edit a specific source cell, apply grid
   changes back to text, and sync edited Markdown source back into the grid.
+- Button help now resolves disabled controls by pointer coordinates as well as
+  event targets, so disabled table/export actions reliably show hover help and
+  `aria-describedby` guidance. Full Chromium workflow proof now includes the
+  delegated tooltip path and the two-way table editing path in the same clean
+  72-test browser run.
 - Multi-cursor editing now includes first-class select-all-occurrences and
   split-selection-into-line-cursors commands in the Edit menu, command palette,
   and writing toolbar, backed by pure helper tests for repeated-term selection

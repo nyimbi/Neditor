@@ -4346,7 +4346,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('role="tooltip"'));
   ok(app.includes("handleButtonHelpEnter"));
   ok(app.includes('window.addEventListener("mouseover", handleButtonHelpEnter)'));
+  ok(app.includes('window.addEventListener("mousemove", handleButtonHelpPointerMove)'));
   ok(app.includes('window.addEventListener("focusin", handleButtonHelpEnter)'));
+  ok(app.includes("buttonFromPointerEvent"));
   ok(app.includes('button.getAttribute("data-help")'));
   ok(app.includes('button.getAttribute("aria-label")'));
   ok(app.includes('button.innerText.replace'));

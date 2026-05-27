@@ -10740,6 +10740,7 @@ onMounted(async () => {
   void installDesktopWorkflowTestHooks();
   window.addEventListener("keydown", handleShortcut);
   window.addEventListener("mouseover", handleButtonHelpEnter);
+  window.addEventListener("mousemove", handleButtonHelpPointerMove);
   window.addEventListener("focusin", handleButtonHelpEnter);
   window.addEventListener("mouseout", handleButtonHelpLeave);
   window.addEventListener("focusout", handleButtonHelpLeave);
@@ -10757,6 +10758,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(scrollPersistHandle);
   window.removeEventListener("keydown", handleShortcut);
   window.removeEventListener("mouseover", handleButtonHelpEnter);
+  window.removeEventListener("mousemove", handleButtonHelpPointerMove);
   window.removeEventListener("focusin", handleButtonHelpEnter);
   window.removeEventListener("mouseout", handleButtonHelpLeave);
   window.removeEventListener("focusout", handleButtonHelpLeave);
@@ -14011,6 +14013,11 @@ function buttonFromEvent(event: Event) {
   return target?.closest("button") as HTMLButtonElement | null;
 }
 
+function buttonFromPointerEvent(event: MouseEvent) {
+  const target = document.elementFromPoint(event.clientX, event.clientY);
+  return target?.closest("button") as HTMLButtonElement | null;
+}
+
 function buttonHelpText(button: HTMLButtonElement) {
   const explicit = button.getAttribute("data-help") || button.getAttribute("title") || button.getAttribute("aria-label");
   const visible = button.innerText.replace(/\s+/g, " ").trim();
@@ -14034,7 +14041,7 @@ function clearButtonHelpDescription() {
 }
 
 function handleButtonHelpEnter(event: Event) {
-  const button = buttonFromEvent(event);
+  const button = buttonFromEvent(event) || (event instanceof MouseEvent ? buttonFromPointerEvent(event) : null);
   if (!button || button.closest(".button-help-tooltip")) return;
   const text = buttonHelpText(button);
   if (!text) return;
@@ -14044,6 +14051,18 @@ function handleButtonHelpEnter(event: Event) {
   const y = placement === "bottom" ? rect.bottom + 8 : rect.top - 8;
   describeButtonWithHelp(button);
   buttonHelp.value = { visible: true, text, x, y, placement };
+}
+
+function handleButtonHelpPointerMove(event: MouseEvent) {
+  const button = buttonFromEvent(event) || buttonFromPointerEvent(event);
+  if (button && !button.closest(".button-help-tooltip")) {
+    handleButtonHelpEnter(event);
+    return;
+  }
+  if (!buttonHelpDescribedButton) return;
+  const pointTarget = document.elementFromPoint(event.clientX, event.clientY);
+  if (pointTarget && buttonHelpDescribedButton.contains(pointTarget)) return;
+  hideButtonHelp();
 }
 
 function handleButtonHelpLeave(event: Event) {
