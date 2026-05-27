@@ -37,6 +37,7 @@
     "check:tables:manual": "node scripts/check-table-editor-manual-signoff.mjs",
     "collect:ai-provider": "node scripts/collect-ai-provider-evidence.mjs",
     "collect:google-docs-import": "node scripts/collect-google-docs-import-evidence.mjs",
+    "collect:engine-evidence": "node scripts/check-external-engines.mjs --write-evidence",
     "collect:platform-evidence": "node scripts/collect-platform-evidence.mjs",
     "collect:evidence-kit": "node scripts/collect-release-evidence-kit.mjs",
     "collect:release-signing": "node scripts/collect-release-signing-evidence.mjs",

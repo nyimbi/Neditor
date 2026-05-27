@@ -1009,6 +1009,13 @@ Recent pushed checkpoints visible in current git history:
   `NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR` or `.tmp/external-engines/external/`,
   fails malformed supplied evidence, and lets release readiness close missing
   optional engines only when accepted external proof exists.
+- This update adds `pnpm run collect:engine-evidence`, which reuses the same
+  bounded external-engine smoke probes and writes accepted
+  `neditor.external-engine-evidence.v1` files under
+  `.tmp/external-engines/external/` for every installed compatible engine. Use
+  `NEDITOR_TEST_*=/absolute/path/to/engine pnpm run collect:engine-evidence`
+  when a verifier host needs an explicit executable path such as a locally
+  built Pikchr binary.
 - This update adds native command workflow timing evidence to the desktop
   smoke. `pnpm run test:desktop-smoke` now writes
   `.tmp/desktop-smoke/native-command-report.json` with binary/build metadata,
@@ -4706,6 +4713,16 @@ JSON Schema dialect coverage:
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_renders_openapi_and_json_schema_tables --lib` | Pass | Focused compiler transform test passed after adding JSON Schema rendering for boolean schemas, draft-07 tuple `items: [...]`, and boolean `additionalItems`; the generated schema table now shows `any`/`never` rows and explicit boolean-schema constraints instead of blank entries. |
+
+Optional engine evidence collection:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `NEDITOR_TEST_PIKCHR=.tmp/pikchr-build/pikchr-trunk/pikchr pnpm run collect:engine-evidence` | Pass | The new collector reused the bounded engine smoke probes and wrote accepted `neditor.external-engine-evidence.v1` JSON under `.tmp/external-engines/external/` for Graphviz layout engines, D2, PlantUML, Pikchr, and SQLite. |
+| `pnpm run check:engines` | Pass | The normal probe accepted the generated evidence, including `.tmp/external-engines/external/pikchr.json`, so release readiness no longer reports a current-host optional-engine evidence gap when Pikchr is not on `PATH`. |
+| `pnpm run test:unit` | Pass | 80 frontend/static tests passed after exposing `collect:engine-evidence` and guarding the evidence-writer path. |
+| `pnpm run check:external-transform-docs` | Pass | External transform documentation checks now require the evidence collector instructions. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the package-script and test updates. |
 
 ## Next Execution Order
 

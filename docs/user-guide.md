@@ -561,7 +561,9 @@ the package manager, platform, exact commands, covered handlers, and privilege
 expectations before it starts an allowlisted installer.
 
 For release evidence, optional engines can be proven on another workstation.
-Run the release evidence kit, fill the returned engine template such as
+Run `pnpm run collect:engine-evidence` on that workstation, using
+`NEDITOR_TEST_*=/absolute/path/to/engine` when an executable is not on `PATH`.
+Then return the generated engine proof such as
 `external-engines/external/pikchr.json` or
 `external-engines/external/sqlite.json`, and import it with
 `pnpm run ingest:evidence`; NEditor validates the returned proof through the

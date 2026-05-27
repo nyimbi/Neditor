@@ -122,6 +122,24 @@ $env:NEDITOR_TEST_PIKCHR="C:\Users\<you>\.cargo\bin\pikchr-cli.exe"
 pnpm run check:engines
 ```
 
+To turn a passing installed-engine probe into reusable release evidence, run:
+
+```sh
+pnpm run collect:engine-evidence
+```
+
+If an engine is not on `PATH`, set its `NEDITOR_TEST_*` executable variable in
+the same command. For example:
+
+```sh
+NEDITOR_TEST_PIKCHR=/absolute/path/to/pikchr pnpm run collect:engine-evidence
+```
+
+The collector writes validator-ready
+`neditor.external-engine-evidence.v1` files under
+`.tmp/external-engines/external/`. A later `pnpm run check:engines` accepts
+those files so a release host can prove optional engines without retyping JSON.
+
 ## Engine Defaults
 
 | Engine | Input Mode | Expected Output | Notes |

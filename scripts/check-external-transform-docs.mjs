@@ -24,6 +24,7 @@ const requirements = [
   ["SQLite executable path", () => windowsSection.includes("sqlite3.exe")],
   ["Pikchr CLI executable path", () => windowsSection.includes("C:\\Users\\<you>\\.cargo\\bin\\pikchr-cli.exe")],
   ["PowerShell Pikchr probe", () => windowsSection.includes("$env:NEDITOR_TEST_PIKCHR") && windowsSection.includes("pnpm run check:engines")],
+  ["Engine evidence collector", () => markdown.includes("pnpm run collect:engine-evidence") && markdown.includes("neditor.external-engine-evidence.v1")],
   ["Shim guidance", () => /package manager shim/i.test(windowsSection) && /normal terminal/i.test(windowsSection)],
   ["Explicit path preference", () => /Prefer explicit executable paths/i.test(windowsSection)],
   ["SQL safety guidance", () => /read-only/i.test(markdown) && /SELECT/i.test(markdown) && /WITH/i.test(markdown) && /multi-statement/i.test(markdown)],

@@ -4854,6 +4854,7 @@ test("local verification scripts expose local baseline checks", () => {
   const signingCollector = readFileSync("scripts/collect-release-signing-evidence.mjs", "utf8");
   const releaseSigning = readFileSync("scripts/check-release-signing.mjs", "utf8");
   const externalTransformDocs = readFileSync("scripts/check-external-transform-docs.mjs", "utf8");
+  const externalEngineProbe = readFileSync("scripts/check-external-engines.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:ai-roadmap"], "node scripts/check-ai-first-roadmap.mjs");
@@ -4880,6 +4881,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
   equal(scripts["collect:ai-provider"], "node scripts/collect-ai-provider-evidence.mjs");
   equal(scripts["collect:google-docs-import"], "node scripts/collect-google-docs-import-evidence.mjs");
+  equal(scripts["collect:engine-evidence"], "node scripts/check-external-engines.mjs --write-evidence");
   equal(scripts["collect:platform-evidence"], "node scripts/collect-platform-evidence.mjs");
   equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
@@ -5146,6 +5148,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceIngest.includes("external-engine-pikchr"));
   ok(evidenceIngest.includes("external-engines/external/pikchr.json"));
   ok(evidenceIngest.includes("check:engines"));
+  ok(externalEngineProbe.includes("--write-evidence"));
+  ok(externalEngineProbe.includes("writeExternalEvidence"));
   ok(evidenceIngest.includes("pnpm"));
   ok(evidenceIngest.includes("check:release-signing"));
   ok(evidenceIngest.includes("check:ai-provider"));

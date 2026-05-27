@@ -18,6 +18,12 @@ On this macOS host, Pikchr is verified with the workspace-built executable:
 NEDITOR_TEST_PIKCHR=/Users/nyimbiodero/src/pjs/tooling/neditor/.tmp/pikchr-build/pikchr-trunk/pikchr pnpm run check:engines
 ```
 
+To collect reusable evidence JSON for every installed compatible engine, run:
+
+```sh
+NEDITOR_TEST_PIKCHR=/Users/nyimbiodero/src/pjs/tooling/neditor/.tmp/pikchr-build/pikchr-trunk/pikchr pnpm run collect:engine-evidence
+```
+
 The probe reports installed/missing optional engines without failing solely
 because an optional engine is absent. For installed diagram engines, it renders
 a small SVG smoke artifact through the same adapter shape NEditor uses. For
@@ -33,6 +39,11 @@ validated for schema, engine key, status, timestamp, platform, command, version,
 smoke bytes, smoke hash, required text markers, and zero unresolved
 blockers. Malformed supplied evidence fails the probe; absent optional engines
 without copied proof remain explicit release-readiness gaps.
+
+`pnpm run collect:engine-evidence` uses the same smoke proof but writes accepted
+`neditor.external-engine-evidence.v1` JSON under
+`.tmp/external-engines/external/`, avoiding hand-authored proof files for hosts
+where the engine is actually installed.
 
 Use:
 

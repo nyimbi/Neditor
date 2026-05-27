@@ -6,6 +6,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const requireInstalled = process.argv.includes("--require-installed");
+const writeEvidence = process.argv.includes("--write-evidence") || process.argv.includes("--collect-evidence");
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const reportPath = join(root, ".tmp", "external-engines", "probe-report.json");
 const artifactDir = join(root, ".tmp", "external-engines", "artifacts");
@@ -232,7 +233,7 @@ console.log("");
 console.log(`Wrote external transform engine probe report to ${relative(reportPath)}`);
 
 function probeEngine(engine) {
-  const externalEvidence = evaluateExternalEvidence(engine);
+  let externalEvidence = evaluateExternalEvidence(engine);
   const command = process.env[engine.env] || findFirstCommand([
     engine.command,
     ...(engine.alternateCommands || []),
@@ -267,6 +268,15 @@ function probeEngine(engine) {
       note: smoke.error || smoke.stderr || "Installed engine did not produce the expected smoke artifact.",
     };
   }
+  if (writeEvidence) {
+    writeExternalEvidence(engine, {
+      command,
+      path: path || command,
+      version: version || "version probe did not return output",
+      smoke,
+    });
+    externalEvidence = evaluateExternalEvidence(engine);
+  }
   return {
     key: engine.key,
     name: engine.name,
@@ -280,6 +290,43 @@ function probeEngine(engine) {
       ...smoke,
     },
   };
+}
+
+function writeExternalEvidence(engine, proof) {
+  mkdirSync(evidenceDir, { recursive: true });
+  const evidencePath = join(evidenceDir, `${engine.key}.json`);
+  writeFileSync(
+    evidencePath,
+    `${JSON.stringify(
+      {
+        schema: "neditor.external-engine-evidence.v1",
+        engine: engine.key,
+        status: "passed",
+        generatedAt: new Date().toISOString(),
+        platform: process.platform,
+        arch: process.arch,
+        command: proof.command,
+        path: proof.path,
+        version: proof.version,
+        adapter: {
+          smokeKind: engine.smoke?.kind || "none",
+          versionArgs: engine.versionArgs || [],
+        },
+        smoke: {
+          status: "passed",
+          artifact: proof.smoke.artifact || "",
+          bytes: proof.smoke.bytes || 0,
+          sha256: proof.smoke.sha256 || "",
+          needles: engine.smoke?.needles || [],
+        },
+        unresolvedBlockers: [],
+        notes:
+          "Collected by pnpm run collect:engine-evidence after the installed engine produced the required smoke artifact.",
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 function evaluateExternalEvidence(engine) {
