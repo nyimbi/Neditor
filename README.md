@@ -454,13 +454,14 @@ web app.
   or Tavily, download selected source documents into a document-associated
   `.neditor-sources` directory, rank candidates by deterministic citation fit,
   insert a CSL JSON bibliography stub, and retain a local source manifest for
-  review with provider, fit score, fit reasons, hash, size, and local file path.
+  review with provider, fit score, fit reasons, hash, size, local file path, and
+  live file-presence/hash-integrity status.
   Repeated downloads reuse the saved local copy when present, and the source
   library can be refreshed to cite saved sources again, insert their
   bibliography entries, insert/copy a source-library audit table, link to the
-  local files, or copy/reveal the downloaded evidence path. Users can also
-  bulk-save every visible source search result without changing the document
-  text.
+  local files, copy/reveal the downloaded evidence path, or re-download missing
+  and modified evidence files. Users can also bulk-save every visible source
+  search result without changing the document text.
   Deep Research uses the configured AI provider, including Ollama, to iterate
   search queries, summarize evidence, identify knowledge gaps, draft a sourced
   report, and expand it toward a slider-selected length from a 1-page brief to

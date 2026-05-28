@@ -14,6 +14,9 @@ export interface CitationSourceAuditItem {
   fit_label?: string;
   fit_reasons?: string[];
   file_exists?: boolean;
+  hash_matches?: boolean;
+  current_sha256?: string;
+  current_bytes?: number;
 }
 
 export function citationSourceLibraryAuditMarkdown(sources: CitationSourceAuditItem[]) {
@@ -21,12 +24,17 @@ export function citationSourceLibraryAuditMarkdown(sources: CitationSourceAuditI
   const rows = sources.map((source) => {
     const fit = source.fit_score === undefined ? "not scored" : `${source.fit_score}/100 ${source.fit_label || ""}`.trim();
     const localPath = source.relative_path || source.path || "";
-    const localStatus = source.file_exists === false ? `missing: ${localPath}` : localPath;
+    const localStatus = source.file_exists === false ? `missing: ${localPath}` : source.hash_matches === false ? `modified: ${localPath}` : localPath;
     const hash = source.sha256 ? source.sha256.slice(0, 16) : "";
+    const currentHash = source.hash_matches === false && source.current_sha256 ? `current sha256: ${source.current_sha256.slice(0, 16)}` : "";
+    const currentBytes = source.hash_matches === false && source.current_bytes !== undefined ? `current bytes: ${source.current_bytes}` : "";
     const reviewNotes = [
       source.source ? `provider: ${source.source}` : "",
       source.media_type ? `type: ${source.media_type}` : "",
       source.file_exists === false ? "local file missing" : "",
+      source.hash_matches === false ? "local file modified after download" : "",
+      currentHash,
+      currentBytes,
       source.fit_reasons?.length ? source.fit_reasons.join("; ") : "",
       source.downloaded_at ? `downloaded: ${source.downloaded_at}` : "",
     ].filter(Boolean).join("; ");

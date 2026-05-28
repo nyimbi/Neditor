@@ -1473,8 +1473,11 @@
                 <small>
                   @{{ source.citation_key }} | {{ source.source || "saved source" }}<template v-if="source.fit_score !== undefined"> | fit {{ source.fit_score }}/100 {{ source.fit_label }}</template> | {{ source.media_type || "source file" }} | {{ formatCitationSourceBytes(source.bytes) }}
                 </small>
-                <small v-if="source.file_exists === false" class="source-missing-warning">
+                <small v-if="source.file_exists === false" class="source-integrity-warning">
                   Local file missing; re-download before review, export, or evidence handoff.
+                </small>
+                <small v-else-if="source.hash_matches === false" class="source-integrity-warning">
+                  Local file changed after download; re-download or verify the modified evidence before review.
                 </small>
                 <small v-if="source.fit_reasons?.length">{{ source.fit_reasons.join(" | ") }}</small>
                 <small>{{ source.relative_path }}</small>
@@ -1483,7 +1486,7 @@
                   <button type="button" @click="insertCitationSourceReference(source)">Cite</button>
                   <button type="button" @click="insertCitationSourceBibliography(source)">Insert bibliography</button>
                   <button type="button" @click="insertBlock(`[${source.title}](${source.relative_path})`)">Insert local link</button>
-                  <button v-if="source.file_exists === false" type="button" :disabled="citationSourceBusyUrl === source.url" @click="redownloadCitationSource(source)">
+                  <button v-if="citationSourceNeedsRecovery(source)" type="button" :disabled="citationSourceBusyUrl === source.url" @click="redownloadCitationSource(source)">
                     {{ citationSourceBusyUrl === source.url ? "Re-downloading..." : "Re-download" }}
                   </button>
                   <button type="button" @click="copyCitationSourcePath(source)">Copy path</button>
@@ -10214,6 +10217,10 @@ function citationSourceBibliographyStub(source: CitationSourceLibraryItem) {
 function insertCitationSourceBibliography(source: CitationSourceLibraryItem) {
   insertBlock(citationSourceBibliographyStub(source));
   store.statusMessage = `Inserted bibliography entry for @${source.citation_key}`;
+}
+
+function citationSourceNeedsRecovery(source: CitationSourceLibraryItem) {
+  return source.file_exists === false || source.hash_matches === false;
 }
 
 function insertCitationSourceReference(source: CitationSourceLibraryItem) {
@@ -21705,7 +21712,7 @@ select:hover {
   gap: 6px;
 }
 
-.source-missing-warning {
+.source-integrity-warning {
   color: #8a4b0f;
   font-weight: 650;
 }

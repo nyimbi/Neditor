@@ -4761,14 +4761,30 @@ test("citation source library audit captures evidence metadata", () => {
       fit_reasons: ["government source domain", "downloadable PDF source"],
       file_exists: false,
     },
+    {
+      citation_key: "modified2026",
+      title: "Modified Evidence",
+      url: "https://example.com/source.html",
+      relative_path: "proposal.neditor-sources/source.html",
+      sha256: "11112222333344445555",
+      bytes: 1024,
+      media_type: "text/html",
+      hash_matches: false,
+      current_sha256: "99998888777766665555",
+      current_bytes: 2048,
+    },
   ]);
   ok(audit.includes("## Source Library Audit"));
-  ok(audit.includes("Saved sources: 1"));
+  ok(audit.includes("Saved sources: 2"));
   ok(audit.includes("@agency2026"));
   ok(audit.includes("AI Procurement \\| Controls"));
   ok(audit.includes("91/100 strong"));
   ok(audit.includes("missing: proposal.neditor-sources/report.pdf"));
   ok(audit.includes("local file missing"));
+  ok(audit.includes("modified: proposal.neditor-sources/source.html"));
+  ok(audit.includes("local file modified after download"));
+  ok(audit.includes("current sha256: 9999888877776666"));
+  ok(audit.includes("current bytes: 2048"));
   ok(audit.includes("abcdef1234567890"));
   ok(audit.includes("government source domain; downloadable PDF source"));
 });
@@ -6648,6 +6664,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("redownloadCitationSource"));
   ok(app.includes("force_refresh: options.forceRefresh"));
   ok(app.includes("source.file_exists === false"));
+  ok(app.includes("source.hash_matches === false"));
+  ok(app.includes("citationSourceNeedsRecovery(source)"));
   ok(app.includes("Insert Source Library Audit"));
   ok(app.includes("copyCitationSourcePath"));
   ok(app.includes("revealCitationSource"));

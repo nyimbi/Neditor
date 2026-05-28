@@ -166,6 +166,9 @@ pub(crate) fn download_citation_source(
                 .and_then(normalize_manifest_text),
             fit_reasons: normalize_fit_reasons(request.fit_reasons.as_deref()),
             file_exists: None,
+            hash_matches: None,
+            current_sha256: None,
+            current_bytes: None,
         },
     )?;
     let item = read_source_manifest(&manifest_path)?
@@ -186,7 +189,7 @@ pub(crate) fn list_citation_sources(
     let manifest_path = associated_dir.join("sources.json");
     let mut sources = read_source_manifest(&manifest_path)?;
     for source in &mut sources {
-        source.file_exists = Some(Path::new(&source.path).exists());
+        annotate_source_file_status(source);
     }
     sources.sort_by(|left, right| {
         right
@@ -411,6 +414,9 @@ fn write_source_manifest(path: &Path, item: &CitationManifestItem) -> Result<(),
     items.retain(|existing| existing.sha256 != item.sha256 && existing.url != item.url);
     let mut persisted = item.clone();
     persisted.file_exists = None;
+    persisted.hash_matches = None;
+    persisted.current_sha256 = None;
+    persisted.current_bytes = None;
     items.push(persisted);
     let text = serde_json::to_string_pretty(&items)
         .map_err(|err| format!("Could not serialize citation source manifest: {err}"))?;
@@ -450,6 +456,37 @@ pub(crate) struct CitationManifestItem {
     fit_reasons: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     file_exists: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hash_matches: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    current_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    current_bytes: Option<usize>,
+}
+
+fn annotate_source_file_status(source: &mut CitationManifestItem) {
+    match fs::read(&source.path) {
+        Ok(bytes) => {
+            let current_sha256 = sha256_hex(&bytes);
+            source.file_exists = Some(true);
+            source.hash_matches =
+                Some(current_sha256 == source.sha256 && bytes.len() == source.bytes);
+            source.current_sha256 = Some(current_sha256);
+            source.current_bytes = Some(bytes.len());
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            source.file_exists = Some(false);
+            source.hash_matches = None;
+            source.current_sha256 = None;
+            source.current_bytes = None;
+        }
+        Err(_) => {
+            source.file_exists = Some(false);
+            source.hash_matches = None;
+            source.current_sha256 = None;
+            source.current_bytes = None;
+        }
+    }
 }
 
 fn citation_download_response(
@@ -785,6 +822,9 @@ mod tests {
                 "downloadable PDF source".to_string(),
             ]),
             file_exists: Some(true),
+            hash_matches: Some(true),
+            current_sha256: Some("ignored-live-status".to_string()),
+            current_bytes: Some(999),
         };
         let second = CitationManifestItem {
             citation_key: "second".to_string(),
@@ -835,6 +875,9 @@ mod tests {
                 fit_label: Some("review".to_string()),
                 fit_reasons: Some(vec!["reviewable text source".to_string()]),
                 file_exists: None,
+                hash_matches: None,
+                current_sha256: None,
+                current_bytes: None,
             },
         )
         .expect("write older");
@@ -856,6 +899,9 @@ mod tests {
                 fit_label: Some("strong".to_string()),
                 fit_reasons: Some(vec!["downloadable PDF source".to_string()]),
                 file_exists: None,
+                hash_matches: None,
+                current_sha256: None,
+                current_bytes: None,
             },
         )
         .expect("write newer");
@@ -869,6 +915,8 @@ mod tests {
         assert_eq!(library.sources[0].source.as_deref(), Some("SearXNG"));
         assert_eq!(library.sources[0].fit_label.as_deref(), Some("strong"));
         assert_eq!(library.sources[0].file_exists, Some(true));
+        assert_eq!(library.sources[0].hash_matches, Some(true));
+        assert_eq!(library.sources[0].current_bytes, Some(5));
         assert_eq!(library.sources[1].citation_key, "older");
         let _ = fs::remove_dir_all(&dir);
     }
@@ -902,6 +950,9 @@ mod tests {
                 fit_label: Some("strong".to_string()),
                 fit_reasons: Some(vec!["downloadable PDF source".to_string()]),
                 file_exists: Some(true),
+                hash_matches: Some(true),
+                current_sha256: Some("ignored-live-status".to_string()),
+                current_bytes: Some(999),
             },
         )
         .expect("write missing");
@@ -912,9 +963,69 @@ mod tests {
         .expect("library");
         assert_eq!(library.sources.len(), 1);
         assert_eq!(library.sources[0].file_exists, Some(false));
+        assert_eq!(library.sources[0].hash_matches, None);
 
         let manifest_text = fs::read_to_string(&manifest).expect("manifest text");
         assert!(!manifest_text.contains("file_exists"));
+        assert!(!manifest_text.contains("hash_matches"));
+        assert!(!manifest_text.contains("current_sha256"));
+        assert!(!manifest_text.contains("current_bytes"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn citation_source_library_marks_modified_files_against_manifest_hash() {
+        let dir =
+            std::env::temp_dir().join(format!("neditor-citation-modified-{}", std::process::id()));
+        fs::create_dir_all(&dir).expect("temp dir");
+        let document = dir.join("proposal.md");
+        fs::write(&document, "# Proposal\n").expect("document");
+        let source_dir = associated_source_dir(&document).expect("source dir");
+        fs::create_dir_all(&source_dir).expect("source dir create");
+        let source_path = source_dir.join("source.html");
+        fs::write(&source_path, "trusted original").expect("original source");
+        let manifest = source_dir.join("sources.json");
+        write_source_manifest(
+            &manifest,
+            &CitationManifestItem {
+                citation_key: "source".to_string(),
+                title: "Source".to_string(),
+                url: "https://example.com/source.html".to_string(),
+                snippet: String::new(),
+                path: path_to_string(&source_path),
+                relative_path: relative_source_path(&document, &source_path),
+                sha256: sha256_hex(b"trusted original"),
+                bytes: "trusted original".len(),
+                downloaded_at: Some("2026-05-28T10:00:00+03:00".to_string()),
+                media_type: Some("text/html".to_string()),
+                source: Some("DuckDuckGo".to_string()),
+                fit_score: Some(70),
+                fit_label: Some("review".to_string()),
+                fit_reasons: Some(vec!["reviewable text source".to_string()]),
+                file_exists: None,
+                hash_matches: None,
+                current_sha256: None,
+                current_bytes: None,
+            },
+        )
+        .expect("write source");
+        fs::write(&source_path, "tampered source").expect("modify source");
+
+        let library = list_citation_sources(CitationSourceLibraryRequest {
+            document_path: path_to_string(&document),
+        })
+        .expect("library");
+        assert_eq!(library.sources.len(), 1);
+        assert_eq!(library.sources[0].file_exists, Some(true));
+        assert_eq!(library.sources[0].hash_matches, Some(false));
+        assert_eq!(
+            library.sources[0].current_bytes,
+            Some("tampered source".len())
+        );
+        assert_eq!(
+            library.sources[0].current_sha256.as_deref(),
+            Some(sha256_hex(b"tampered source").as_str())
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 
