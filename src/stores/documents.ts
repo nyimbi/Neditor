@@ -5,6 +5,7 @@ import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/p
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessDocuments";
+import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
 import { isAiSourceFenceOpener, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
 import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "../lib/transformTemplates";
@@ -106,12 +107,6 @@ interface TransformProbeResult {
 }
 
 const staleSaveConflictMessage = "File changed on disk since it was opened; resolve the external conflict before saving.";
-
-function exportProfileId() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `export-profile-${Date.now().toString(36)}`;
-}
 
 function parseAiAssistedMarker(line: string) {
   const content = line.match(/<!--\s*ai-assisted:(.*?)-->/)?.[1] || "";
@@ -1381,46 +1376,36 @@ export const useDocumentsStore = defineStore("documents", {
       }
     },
     saveCurrentExportProfile(name: string) {
-      const profileName = name.trim() || "Export profile";
-      const existing = this.activeExportProfileId
-        ? this.exportProfiles.find((profile) => profile.id === this.activeExportProfileId)
-        : null;
-      const profile: ExportProfile = {
-        id: existing?.id || exportProfileId(),
-        name: profileName,
+      const result = saveExportProfileState(this.exportProfiles, this.activeExportProfileId, name, {
         exportTarget: this.exportTarget,
-        exportDefaults: normalizeExportDefaults(this.exportDefaults),
-        bibliographyDefaults: normalizeBibliographyDefaults(this.bibliographyDefaults),
-        brandProfileDefaults: normalizeBrandProfileDefaults(this.brandProfileDefaults),
-      };
-      if (existing) {
-        this.exportProfiles = this.exportProfiles.map((item) => (item.id === existing.id ? profile : item));
-      } else {
-        this.exportProfiles = normalizeExportProfiles([...this.exportProfiles, profile]);
-      }
-      this.activeExportProfileId = profile.id;
-      this.statusMessage = `Saved export profile "${profile.name}"`;
+        exportDefaults: this.exportDefaults,
+        bibliographyDefaults: this.bibliographyDefaults,
+        brandProfileDefaults: this.brandProfileDefaults,
+      });
+      this.exportProfiles = result.profiles;
+      this.activeExportProfileId = result.activeExportProfileId;
+      this.statusMessage = result.statusMessage;
       void this.persistWorkspace();
-      return profile;
+      return result.profile;
     },
     async applyExportProfile(id: string) {
-      const profile = this.exportProfiles.find((item) => item.id === id);
-      if (!profile) return;
-      this.exportTarget = profile.exportTarget;
-      this.exportDefaults = normalizeExportDefaults(profile.exportDefaults);
-      this.bibliographyDefaults = normalizeBibliographyDefaults(profile.bibliographyDefaults);
-      this.brandProfileDefaults = normalizeBrandProfileDefaults(profile.brandProfileDefaults);
-      this.activeExportProfileId = profile.id;
+      const result = applyExportProfileState(this.exportProfiles, id);
+      if (!result) return;
+      this.exportTarget = result.exportTarget;
+      this.exportDefaults = result.exportDefaults;
+      this.bibliographyDefaults = result.bibliographyDefaults;
+      this.brandProfileDefaults = result.brandProfileDefaults;
+      this.activeExportProfileId = result.activeExportProfileId;
       this.exportReadiness = null;
-      this.statusMessage = `Applied export profile "${profile.name}"`;
+      this.statusMessage = result.statusMessage;
       await this.compileActive();
       await this.persistWorkspace();
     },
     deleteExportProfile(id: string) {
-      const profile = this.exportProfiles.find((item) => item.id === id);
-      this.exportProfiles = this.exportProfiles.filter((item) => item.id !== id);
-      if (this.activeExportProfileId === id) this.activeExportProfileId = "";
-      if (profile) this.statusMessage = `Deleted export profile "${profile.name}"`;
+      const result = deleteExportProfileState(this.exportProfiles, this.activeExportProfileId, id);
+      this.exportProfiles = result.profiles;
+      this.activeExportProfileId = result.activeExportProfileId;
+      if (result.statusMessage) this.statusMessage = result.statusMessage;
       void this.persistWorkspace();
     },
     exportOptionsForActive() {

@@ -85,6 +85,7 @@ import {
   exportMetadataChecklistHelp,
   formatExportMetadataChecklistSummary,
 } from "../src/lib/exportMetadataChecklist.js";
+import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../src/lib/exportProfiles.js";
 import {
   appendFrontMatterDataSource,
   parseFrontMatterDataSources,
@@ -232,6 +233,83 @@ test("command palette helpers compact metadata into searchable text", () => {
     }),
     "open proposal open document proposal.md | set: rfp compliance matrix dirty unsaved",
   );
+});
+
+test("export profile helpers save apply and delete normalized profile state", () => {
+  const exportDefaults = {
+    includeManifest: true,
+    includeStyles: true,
+    includeSyntaxHighlighting: true,
+    htmlLanguage: "en",
+    htmlDescription: "Client-ready brief",
+    canonicalUrl: "https://example.test/brief",
+    coverPage: true,
+    pageNumbers: true,
+    layoutPreset: "business" as const,
+    includeComments: true,
+    includeProvenance: true,
+    includeGlossary: true,
+    includeAgenda: true,
+  };
+  const first = saveExportProfileState(
+    [],
+    "",
+    "  Client PDF  ",
+    {
+      exportTarget: "pdf",
+      exportDefaults,
+      bibliographyDefaults: { citationStyle: "apa" },
+      brandProfileDefaults: {
+        name: "Acme",
+        color: " #006699 ",
+        logo: "",
+        font: "",
+        header: "Confidential",
+        footer: "Board",
+        watermark: "Draft",
+        legalDisclaimer: "Internal review only",
+      },
+    },
+    () => "profile-1",
+  );
+  equal(first.profile.id, "profile-1");
+  equal(first.profile.name, "Client PDF");
+  equal(first.profile.brandProfileDefaults.color, "#006699");
+  equal(first.activeExportProfileId, "profile-1");
+  equal(first.statusMessage, 'Saved export profile "Client PDF"');
+
+  const update = saveExportProfileState(
+    first.profiles,
+    "profile-1",
+    "Client HTML",
+    {
+      exportTarget: "html",
+      exportDefaults: { ...exportDefaults, includeManifest: false },
+      bibliographyDefaults: { citationStyle: "chicago" },
+      brandProfileDefaults: { ...first.profile.brandProfileDefaults, color: "teal" },
+    },
+    () => "unused",
+  );
+  equal(update.profiles.length, 1);
+  equal(update.profile.id, "profile-1");
+  equal(update.profile.exportTarget, "html");
+
+  const applied = applyExportProfileState(update.profiles, "profile-1");
+  equal(applied?.exportTarget, "html");
+  equal(applied?.exportDefaults.includeManifest, false);
+  equal(applied?.bibliographyDefaults.citationStyle, "chicago");
+  equal(applied?.brandProfileDefaults.color, "teal");
+  equal(applyExportProfileState(update.profiles, "missing"), null);
+
+  const deleted = deleteExportProfileState(update.profiles, "profile-1", "profile-1");
+  deepEqual(deleted.profiles, []);
+  equal(deleted.activeExportProfileId, "");
+  equal(deleted.statusMessage, 'Deleted export profile "Client HTML"');
+
+  const unchanged = deleteExportProfileState(update.profiles, "profile-1", "missing");
+  equal(unchanged.profiles.length, 1);
+  equal(unchanged.activeExportProfileId, "profile-1");
+  equal(unchanged.statusMessage, "");
 });
 
 test("recent item helpers deduplicate limit and forget paths", () => {
