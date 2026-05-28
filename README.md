@@ -572,7 +572,8 @@ web app.
 - Include expansion for modular master documents, with relative resolution,
   child front-matter stripping, include graph tracking, source/include hashing,
   diagnostics for missing or circular includes, and a References sidebar builder
-  for inserting include directives with previewed syntax.
+  for inserting include directives with previewed syntax or creating the child
+  Markdown file directly from the parent document.
 - Document variables, default variables, project variables, inline formulas,
   calculation blocks, table formulas, UI insertion for merged metadata
   variables, and dependency diagnostics.

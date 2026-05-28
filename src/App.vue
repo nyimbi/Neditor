@@ -1826,8 +1826,12 @@
             </label>
             <p class="sidebar-hint">{{ includeDirectiveSyntaxHelp }}</p>
             <code class="include-directive-preview">{{ includeDirectivePreview || "Enter a child document path" }}</code>
+            <p class="sidebar-hint">{{ includeChildCreateHelp }}</p>
             <div class="include-actions">
               <button type="button" :disabled="!includeDirectivePreview" @click="insertIncludeDirectiveFromBuilder">Insert include</button>
+              <button type="button" :disabled="includeChildCreateBusy || Boolean(includeChildPathResolution.error)" @click="createIncludeChildDocument">
+                {{ includeChildCreateBusy ? "Creating..." : "Create child document" }}
+              </button>
             </div>
           </section>
           <p v-if="!includeGraphItems.length" class="sidebar-hint">No included files in this document.</p>
@@ -5815,9 +5819,11 @@ import {
 } from "./lib/frontMatterManagers";
 import {
   formatIncludeDirective,
+  includeChildDocumentStarterMarkdown,
   includeDirectiveHelpText,
   includeDirectiveSyntaxOptions,
   normalizeIncludeTarget,
+  resolveIncludeTargetPath,
   type IncludeDirectiveSyntax,
 } from "./lib/documentIncludes";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
@@ -5970,6 +5976,13 @@ interface CitationDownloadResult {
   bytes: number;
   reused: boolean;
   manifest_entry_count: number;
+}
+
+interface FileMetadataResponse {
+  exists: boolean;
+  hash?: string | null;
+  modified?: string | null;
+  path?: string | null;
 }
 
 const store = useDocumentsStore();
@@ -6460,6 +6473,7 @@ const documentSetDraft = ref("");
 const documentSetRenameDraft = ref("");
 const includeTargetDraft = ref("chapters/introduction.md");
 const includeSyntaxDraft = ref<IncludeDirectiveSyntax>("bang");
+const includeChildCreateBusy = ref(false);
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const tableSourceSnapshot = ref<TableSourceSnapshot | null>(null);
@@ -7839,6 +7853,8 @@ const includeGraphItems = computed<IncludeGraphItem[]>(() => {
 });
 const includeDirectivePreview = computed(() => formatIncludeDirective(includeTargetDraft.value, includeSyntaxDraft.value));
 const includeDirectiveSyntaxHelp = computed(() => includeDirectiveHelpText(includeSyntaxDraft.value));
+const includeChildPathResolution = computed(() => resolveIncludeTargetPath(active.value.path || "", includeTargetDraft.value));
+const includeChildCreateHelp = computed(() => includeChildPathResolution.value.error || `Child file: ${displayDocumentPath(includeChildPathResolution.value.path)}`);
 const groupedDocuments = computed<DocumentTabGroup[]>(() => {
   const groups = new Map<string, DocumentTabGroup>();
   for (const document of store.documents) {
@@ -17304,6 +17320,51 @@ function insertIncludeDirectiveFromBuilder() {
   }
   insertBlock(directive);
   store.statusMessage = `Inserted include directive for ${normalizeIncludeTarget(includeTargetDraft.value)}`;
+}
+
+async function createIncludeChildDocument() {
+  const resolution = includeChildPathResolution.value;
+  if (resolution.error || !resolution.path) {
+    store.statusMessage = resolution.error || "Enter a document path to include";
+    return;
+  }
+  if (active.value.path && normalizeDocumentPath(resolution.path) === normalizeDocumentPath(active.value.path)) {
+    store.statusMessage = "Choose a child path that is different from the parent document";
+    return;
+  }
+
+  includeChildCreateBusy.value = true;
+  try {
+    const directive = includeDirectivePreview.value;
+    const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: resolution.path });
+    if (!metadata.exists) {
+      await invoke("save_file", {
+        request: {
+          path: resolution.path,
+          text: includeChildDocumentStarterMarkdown(includeTargetDraft.value),
+          expected_hash: null,
+        },
+      });
+    }
+    if (directive && !documentAlreadyContainsIncludeDirective(directive)) {
+      insertBlock(directive);
+      flushEditorTextToStore();
+    }
+    if (store.workspaceRoot) await store.refreshWorkspace();
+    await store.openPath(resolution.path);
+    store.statusMessage = metadata.exists
+      ? `Opened existing included document ${displayDocumentPath(resolution.path)}`
+      : `Created and opened included document ${displayDocumentPath(resolution.path)}`;
+  } catch (error) {
+    store.statusMessage = `Could not create included document: ${error}`;
+  } finally {
+    includeChildCreateBusy.value = false;
+  }
+}
+
+function documentAlreadyContainsIncludeDirective(directive: string) {
+  const text = editorView?.state.doc.toString() || active.value.text;
+  return text.split(/\r?\n/).some((line) => line.trim() === directive);
 }
 
 async function goToIncludeDirective(edge: IncludeGraphItem) {

@@ -108,7 +108,14 @@ import {
   upsertDocsLivePlaceholder,
 } from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
-import { formatIncludeDirective, includeDirectiveHelpText, normalizeIncludeTarget } from "../src/lib/documentIncludes.js";
+import {
+  formatIncludeDirective,
+  includeChildDocumentStarterMarkdown,
+  includeChildDocumentTitle,
+  includeDirectiveHelpText,
+  normalizeIncludeTarget,
+  resolveIncludeTargetPath,
+} from "../src/lib/documentIncludes.js";
 import {
   closeDocumentTabState,
   forgetDocumentPathState,
@@ -7104,6 +7111,20 @@ test("document include helpers normalize targets and format supported directives
   equal(formatIncludeDirective("appendices/financials.md", "comment"), "<!-- include: appendices/financials.md -->");
   equal(formatIncludeDirective("   ", "bang"), "");
   ok(includeDirectiveHelpText("comment").includes("hidden"));
+  deepEqual(resolveIncludeTargetPath("/workspace/report/root.md", "chapters/intro.md"), {
+    path: "/workspace/report/chapters/intro.md",
+    error: "",
+  });
+  deepEqual(resolveIncludeTargetPath("C:\\Docs\\root.md", "sections\\market.md"), {
+    path: "C:/Docs/sections/market.md",
+    error: "",
+  });
+  ok(resolveIncludeTargetPath("/workspace/root.md", "../outside.md").error.includes("inside the parent"));
+  ok(resolveIncludeTargetPath("/workspace/root.md", "/tmp/outside.md").error.includes("relative include path"));
+  ok(resolveIncludeTargetPath("", "chapter.md").error.includes("Save the parent"));
+  ok(resolveIncludeTargetPath("/workspace/root.md", "https://example.com/doc.md").error.includes("unsafe"));
+  equal(includeChildDocumentTitle("chapters/market-analysis.md"), "Market Analysis");
+  ok(includeChildDocumentStarterMarkdown("chapters/market-analysis.md").includes('title: "Market Analysis"'));
 });
 
 test("workbench command bar exposes icon display controls and workflow groups", () => {
@@ -7179,6 +7200,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("openIncludeBuilder"));
   ok(app.includes('id: "include", label: "Include"'));
   ok(app.includes('id: "include-document", label: "Include Document"'));
+  ok(app.includes("createIncludeChildDocument"));
+  ok(app.includes("Create child document"));
+  ok(app.includes("resolveIncludeTargetPath(active.value.path"));
   ok(app.includes("insertIncludeDirectiveFromBuilder"));
   ok(app.includes("Include paths resolve relative to the saved parent document"));
   ok(app.includes("outline section navigation"));

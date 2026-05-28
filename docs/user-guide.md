@@ -329,7 +329,10 @@ Large deliverables can be split into smaller files and compiled as one document.
 Open References and use the Include document builder when you want to
 incorporate one Markdown document inside another without memorizing directive
 syntax. Enter the child document path, choose the directive style, review the
-preview, then insert it into the parent document.
+preview, then insert it into the parent document. If the child file does not
+exist yet, choose **Create child document** to create a starter Markdown file
+beside the saved parent document, insert the include directive, and open the
+new child for editing.
 
 Use any supported include form:
 
