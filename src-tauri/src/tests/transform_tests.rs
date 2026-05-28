@@ -818,6 +818,82 @@ fn structured_data_tables_render_keyed_maps_and_scalar_settings() {
 }
 
 #[test]
+fn json_schema_transform_renders_modern_dialect_metadata_and_tuple_summaries() {
+    let artifact = run_transform(
+        "json-schema".to_string(),
+        r##"{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.test/procurement-response.json",
+  "$anchor": "procurement-response",
+  "$dynamicAnchor": "responseNode",
+  "$vocabulary": {
+    "https://json-schema.org/draft/2020-12/vocab/core": true,
+    "https://json-schema.org/draft/2020-12/vocab/applicator": false
+  },
+  "title": "Procurement Response",
+  "type": "object",
+  "required": ["id", "lineItems"],
+  "$defs": {
+    "Money": {
+      "$dynamicRef": "#responseNode",
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "properties": {
+    "id": {
+      "$comment": "Buyer-facing response identifier",
+      "type": "string"
+    },
+    "lineItems": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "string" },
+        { "$ref": "#/$defs/Money" }
+      ],
+      "items": { "type": "boolean" },
+      "minItems": 2
+    },
+    "attachments": {
+      "type": "array",
+      "contains": { "type": "object", "required": ["filename"] },
+      "additionalItems": false
+    },
+    "fallback": {
+      "$recursiveRef": "#",
+      "type": "object"
+    }
+  }
+}"##
+        .to_string(),
+    )
+    .expect("modern JSON Schema transform");
+
+    assert_eq!(artifact.output_kind, "html");
+    assert!(artifact.html.contains("Schema metadata"));
+    assert!(artifact.html.contains("draft/2020-12/schema"));
+    assert!(artifact.html.contains("procurement-response"));
+    assert!(artifact.html.contains("$dynamicAnchor"));
+    assert!(artifact.html.contains("$vocabulary"));
+    assert!(artifact.html.contains("core=required"));
+    assert!(artifact.html.contains("applicator=optional"));
+    assert!(artifact.html.contains("required: id, lineItems"));
+    assert!(artifact.html.contains("$defs: Money"));
+    assert!(artifact.html.contains("$dynamicRef: #responseNode"));
+    assert!(artifact
+        .html
+        .contains("$comment: Buyer-facing response identifier"));
+    assert!(artifact
+        .html
+        .contains("tuple&lt;string, ref Money&gt; + array&lt;boolean&gt;"));
+    assert!(artifact.html.contains("prefixItems: 2 items"));
+    assert!(artifact.html.contains("contains: object"));
+    assert!(artifact.html.contains("additionalItems: false"));
+    assert!(artifact.html.contains("$recursiveRef: #"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn chart_transform_renders_yaml_business_chart_specs() {
     let artifact = run_transform(
             "chart".to_string(),

@@ -184,6 +184,7 @@ pub(crate) fn render_json_schema_html(
             escape_html(description)
         ));
     }
+    html.push_str(&render_json_schema_metadata(&value));
     html.push_str(
         "<table class=\"transform-table json-schema\"><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th><th>Constraints</th></tr></thead><tbody>",
     );
@@ -200,6 +201,55 @@ pub(crate) fn render_json_schema_html(
     html.push_str("</tbody></table>");
     html.push_str("</section>");
     html
+}
+
+fn render_json_schema_metadata(value: &Value) -> String {
+    let mut items = Vec::new();
+    for key in [
+        "$schema",
+        "$id",
+        "$anchor",
+        "$dynamicAnchor",
+        "$recursiveAnchor",
+    ] {
+        if let Some(summary) = value.get(key).map(structured_value_summary) {
+            items.push(format!(
+                "<li><code>{}</code>: {}</li>",
+                escape_html(key),
+                escape_html(&summary)
+            ));
+        }
+    }
+    if let Some(vocabulary) = value.get("$vocabulary").and_then(Value::as_object) {
+        let summary = vocabulary
+            .iter()
+            .map(|(name, required)| {
+                format!(
+                    "{}={}",
+                    name,
+                    required
+                        .as_bool()
+                        .map(|value| if value { "required" } else { "optional" })
+                        .unwrap_or("declared")
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        if !summary.is_empty() {
+            items.push(format!(
+                "<li><code>$vocabulary</code>: {}</li>",
+                escape_html(&summary)
+            ));
+        }
+    }
+    if items.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<section class=\"schema-metadata\"><h4>Schema metadata</h4><ul>{}</ul></section>",
+            items.join("")
+        )
+    }
 }
 
 struct SchemaRow {
@@ -1242,19 +1292,55 @@ fn schema_type_summary(schema: &Value) -> String {
         );
     }
     let kind = match schema.get("type").and_then(Value::as_str) {
-        Some("array") => schema
-            .get("items")
-            .map(|items| format!("array<{}>", schema_type_summary(items)))
-            .unwrap_or_else(|| "array".to_string()),
+        Some("array") => schema_array_type_summary(schema),
         Some(kind) => kind.to_string(),
         None if schema.get("properties").is_some() => "object".to_string(),
+        None if schema.get("prefixItems").is_some() => schema_array_type_summary(schema),
         None if schema.get("items").is_some() => "array".to_string(),
+        None if schema.get("contains").is_some() => "array".to_string(),
         None if schema.get("oneOf").is_some() => "oneOf".to_string(),
         None if schema.get("anyOf").is_some() => "anyOf".to_string(),
         None if schema.get("allOf").is_some() => "allOf".to_string(),
         None => String::new(),
     };
     schema_nullable_type(append_schema_discriminator(kind, schema), schema)
+}
+
+fn schema_array_type_summary(schema: &Value) -> String {
+    let mut summary = if let Some(items) = schema.get("prefixItems").and_then(Value::as_array) {
+        let items = items
+            .iter()
+            .map(schema_type_summary)
+            .collect::<Vec<_>>()
+            .join(", ");
+        if items.is_empty() {
+            "tuple".to_string()
+        } else {
+            format!("tuple<{items}>")
+        }
+    } else if let Some(items) = schema.get("items").and_then(Value::as_array) {
+        let items = items
+            .iter()
+            .map(schema_type_summary)
+            .collect::<Vec<_>>()
+            .join(", ");
+        if items.is_empty() {
+            "tuple".to_string()
+        } else {
+            format!("tuple<{items}>")
+        }
+    } else if let Some(items) = schema.get("items") {
+        format!("array<{}>", schema_type_summary(items))
+    } else {
+        "array".to_string()
+    };
+
+    if schema.get("prefixItems").is_some() {
+        if let Some(items) = schema.get("items").filter(|items| is_schema_value(items)) {
+            summary.push_str(&format!(" + array<{}>", schema_type_summary(items)));
+        }
+    }
+    summary
 }
 
 fn schema_nullable_type(kind: String, schema: &Value) -> String {
@@ -1288,6 +1374,14 @@ fn schema_constraints(schema: &Value) -> String {
     }
     let mut constraints = Vec::new();
     for key in [
+        "$schema",
+        "$id",
+        "$anchor",
+        "$dynamicAnchor",
+        "$dynamicRef",
+        "$recursiveAnchor",
+        "$recursiveRef",
+        "$comment",
         "format",
         "pattern",
         "minimum",
@@ -1317,6 +1411,16 @@ fn schema_constraints(schema: &Value) -> String {
             constraints.push(format!("{key}: {}", structured_value_summary(value)));
         }
     }
+    if let Some(required) = schema.get("required").and_then(Value::as_array) {
+        let summary = required
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        if !summary.is_empty() {
+            constraints.push(format!("required: {summary}"));
+        }
+    }
     if let Some(items) = schema.get("enum").and_then(Value::as_array) {
         constraints.push(format!("enum: {}", value_list_summary(items)));
     }
@@ -1326,10 +1430,13 @@ fn schema_constraints(schema: &Value) -> String {
     if let Some(discriminator) = schema_discriminator_summary(schema) {
         constraints.push(discriminator);
     }
-    if let Some(additional_properties) = schema.get("additionalProperties") {
-        if additional_properties.is_boolean() {
+    for key in ["additionalProperties", "additionalItems"] {
+        if let Some(additional_properties) = schema.get(key) {
+            if !additional_properties.is_boolean() {
+                continue;
+            }
             constraints.push(format!(
-                "additionalProperties: {}",
+                "{key}: {}",
                 structured_value_summary(additional_properties)
             ));
         }
@@ -1344,6 +1451,39 @@ fn schema_constraints(schema: &Value) -> String {
             "contentSchema: {}",
             structured_value_summary(content_schema)
         ));
+    }
+    if let Some(contains) = schema.get("contains") {
+        constraints.push(format!("contains: {}", schema_type_summary(contains)));
+    }
+    if let Some(prefix_items) = schema.get("prefixItems").and_then(Value::as_array) {
+        constraints.push(format!("prefixItems: {} items", prefix_items.len()));
+    }
+    if let Some(tuple_items) = schema.get("items").and_then(Value::as_array) {
+        constraints.push(format!("items: {} tuple items", tuple_items.len()));
+    }
+    for keyword in ["allOf", "anyOf", "oneOf"] {
+        if let Some(variants) = schema.get(keyword).and_then(Value::as_array) {
+            constraints.push(format!("{keyword}: {} variants", variants.len()));
+        }
+    }
+    for keyword in [
+        "$defs",
+        "definitions",
+        "dependentSchemas",
+        "patternProperties",
+    ] {
+        if let Some(map) = schema.get(keyword).and_then(Value::as_object) {
+            let keys = map.keys().cloned().collect::<Vec<_>>().join(", ");
+            if !keys.is_empty() {
+                constraints.push(format!("{keyword}: {keys}"));
+            }
+        }
+    }
+    if let Some(vocabulary) = schema.get("$vocabulary").and_then(Value::as_object) {
+        let keys = vocabulary.keys().cloned().collect::<Vec<_>>().join(", ");
+        if !keys.is_empty() {
+            constraints.push(format!("$vocabulary: {keys}"));
+        }
     }
     if let Some(dependent_required) = schema.get("dependentRequired").and_then(Value::as_object) {
         let summary = dependent_required

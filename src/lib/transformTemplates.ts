@@ -1170,6 +1170,48 @@ LIMIT 25;
     ["schema", "api"],
   ),
   template(
+    "json-schema-modern-dialect",
+    "Data",
+    "json-schema",
+    "Modern JSON Schema",
+    "Creates a draft 2020-12 schema with metadata, anchors, tuple arrays, and reusable definitions.",
+    fenced(
+      "json-schema",
+      `{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.test/proposal-response.json",
+  "$anchor": "proposal-response",
+  "$dynamicAnchor": "responseNode",
+  "title": "Proposal Response",
+  "type": "object",
+  "required": ["id", "lineItems"],
+  "$defs": {
+    "Money": {
+      "type": "number",
+      "minimum": 0,
+      "multipleOf": 0.01
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Response identifier"
+    },
+    "lineItems": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "string", "description": "Line item code" },
+        { "$ref": "#/$defs/Money" }
+      ],
+      "items": false,
+      "minItems": 2
+    }
+  }
+}`,
+    ),
+    ["schema", "2020-12", "api", "tuple"],
+  ),
+  template(
     "openapi-endpoint",
     "Data",
     "openapi",

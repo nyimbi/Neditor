@@ -6009,6 +6009,10 @@ test("transform template library covers reusable calculations and custom templat
   if (!styledChartTemplate) throw new Error("missing styled chart template");
   ok(styledChartTemplate.body.includes("palette:"));
   ok(transformTemplateFillFields(styledChartTemplate).some((field) => field.name === "targetColor"));
+  const modernSchemaTemplate = builtinTransformTemplates.find((template) => template.id === "json-schema-modern-dialect");
+  if (!modernSchemaTemplate) throw new Error("missing modern JSON Schema template");
+  ok(modernSchemaTemplate.body.includes('"$schema": "https://json-schema.org/draft/2020-12/schema"'));
+  ok(modernSchemaTemplate.body.includes('"prefixItems"'));
   const vegaTickTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-risk-ticks");
   if (!vegaTickTemplate) throw new Error("missing Vega-Lite tick template");
   ok(vegaTickTemplate.body.includes('"type": "tick"'));
