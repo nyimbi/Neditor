@@ -469,9 +469,11 @@ web app.
   that preserves a final review handoff with evidence checks, open gaps,
   citation TODOs, and distribution cautions before the user inserts it into the
   current file or opens it as a separate editable Markdown document with
-  front-matter metadata, AI provenance, and a research evidence log. When the
-  active document has been saved, Deep Research can also preserve the source
-  documents it found in the same local source library for later review. It also
+  front-matter metadata, AI provenance, a populated CSL JSON bibliography,
+  a rendered bibliography marker, and a research evidence log. When the active
+  document has been saved, Deep Research can also preserve the source documents
+  it found in the same local source library for later review and carry the
+  source-library audit into the standalone research document. It also
   exposes front matter and merged project variables from
   `.neditor/variables.yaml` as insertable placeholders
   with filters, so repeated client, owner, budget, and source values do not

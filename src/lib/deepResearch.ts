@@ -1,4 +1,5 @@
 import type { AiProviderProfileId } from "./aiProviderPackages.js";
+import { normalizeCitationKey } from "./bibliographyManager.js";
 
 export type DeepResearchSearchProvider = "duckduckgo" | "searxng" | "tavily";
 
@@ -51,9 +52,22 @@ export interface DeepResearchRun {
   draftMarkdown: string;
 }
 
+export interface DeepResearchBibliographySource {
+  citation_key?: string;
+  title: string;
+  url: string;
+  snippet?: string;
+  source?: string;
+  relative_path?: string;
+  sha256?: string;
+  downloaded_at?: string;
+}
+
 export interface DeepResearchDocumentOptions {
   generatedAt?: string;
   savedSourceCount?: number;
+  sourceLibraryAuditMarkdown?: string;
+  bibliographySources?: DeepResearchBibliographySource[];
 }
 
 const WORDS_PER_MARKDOWN_PAGE = 500;
@@ -271,9 +285,44 @@ export function deepResearchDocumentMarkdown(
   const withProvenance = hasDeepResearchProvenance(withFrontMatter)
     ? withFrontMatter
     : insertAfterFrontMatter(withFrontMatter, deepResearchProvenanceBlock(settings, generatedAt));
-  return hasDeepResearchEvidenceLog(withProvenance)
+  const bibliography = deepResearchBibliographyMarkdown(iterations, options.bibliographySources);
+  const withBibliographyEntries = !bibliography || hasBibliographyEntries(withProvenance)
     ? withProvenance
-    : `${withProvenance.trim()}\n\n## Deep Research Evidence Log\n\n${formatDeepResearchLog(iterations)}\n`;
+    : `${withProvenance.trim()}\n\n${bibliography}`;
+  const withBibliographyMarker = hasBibliographyMarker(withBibliographyEntries)
+    ? withBibliographyEntries
+    : `${withBibliographyEntries.trim()}\n\n## Bibliography\n\n[BIBLIOGRAPHY]\n`;
+  const withEvidenceLog = hasDeepResearchEvidenceLog(withBibliographyMarker)
+    ? withBibliographyMarker
+    : `${withBibliographyMarker.trim()}\n\n## Deep Research Evidence Log\n\n${formatDeepResearchLog(iterations)}\n`;
+  const sourceLibraryAudit = normalizeSourceLibraryAudit(options.sourceLibraryAuditMarkdown);
+  return !sourceLibraryAudit || hasSourceLibraryAudit(withEvidenceLog)
+    ? withEvidenceLog
+    : `${withEvidenceLog.trim()}\n\n${sourceLibraryAudit}\n`;
+}
+
+export function deepResearchBibliographyMarkdown(
+  iterations: DeepResearchIteration[],
+  savedSources: DeepResearchBibliographySource[] = [],
+) {
+  const bibliographySources = bibliographySourcesForDocument(iterations, savedSources);
+  if (!bibliographySources.length) return "";
+  const usedKeys = new Set<string>();
+  const entries = bibliographySources.map((source, index) => {
+    const id = uniqueBibliographyKey(source, index, usedKeys);
+    const entry: Record<string, unknown> = {
+      id,
+      type: "webpage",
+      title: source.title || id,
+      URL: source.url,
+    };
+    const accessed = cslDateFromIso(source.downloaded_at);
+    if (accessed) entry.accessed = accessed;
+    const note = deepResearchBibliographyNote(source);
+    if (note) entry.note = note;
+    return entry;
+  });
+  return ["```bibliography", JSON.stringify(entries, null, 2), "```", ""].join("\n");
 }
 
 export function fallbackDeepResearchQuery(settings: DeepResearchSettings, iterations: DeepResearchIteration[]) {
@@ -512,6 +561,78 @@ function uniqueSources(iterations: DeepResearchIteration[]) {
   return Array.from(byUrl.values());
 }
 
+function bibliographySourcesForDocument(
+  iterations: DeepResearchIteration[],
+  savedSources: DeepResearchBibliographySource[],
+) {
+  const byUrl = new Map<string, DeepResearchBibliographySource>();
+  for (const source of savedSources) {
+    const url = source.url.trim();
+    if (url) byUrl.set(url, source);
+  }
+  for (const source of uniqueSources(iterations)) {
+    const url = source.url.trim();
+    if (!url || byUrl.has(url)) continue;
+    byUrl.set(url, {
+      title: source.title,
+      url,
+      snippet: source.snippet,
+      source: source.source,
+    });
+  }
+  return Array.from(byUrl.values());
+}
+
+function uniqueBibliographyKey(
+  source: DeepResearchBibliographySource,
+  index: number,
+  usedKeys: Set<string>,
+) {
+  const preferred = normalizeCitationKey(source.citation_key || bibliographyKeyBase(source) || `source-${index + 1}`);
+  const base = preferred || `source-${index + 1}`;
+  let candidate = base;
+  let suffix = 2;
+  while (usedKeys.has(candidate)) {
+    candidate = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  usedKeys.add(candidate);
+  return candidate;
+}
+
+function bibliographyKeyBase(source: DeepResearchBibliographySource) {
+  const fromTitle = source.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  if (fromTitle) return fromTitle;
+  try {
+    const parsed = new URL(source.url);
+    return parsed.hostname.replace(/^www\./, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function cslDateFromIso(value: string | undefined) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return undefined;
+  return { "date-parts": [[date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()]] };
+}
+
+function deepResearchBibliographyNote(source: DeepResearchBibliographySource) {
+  const parts = [
+    "Deep Research source",
+    source.source ? `provider: ${source.source}` : "",
+    source.relative_path ? `Downloaded source: ${source.relative_path}` : "",
+    source.sha256 ? `sha256 ${source.sha256}` : "",
+    source.snippet ? `Snippet: ${source.snippet}` : "",
+  ].filter(Boolean);
+  return parts.join(" | ");
+}
+
 function sectionText(markdown: string, heading: string) {
   const pattern = new RegExp(`^#{2,3}\\s+${heading}\\s*$`, "im");
   const match = markdown.match(pattern);
@@ -541,6 +662,26 @@ function hasDeepResearchProvenance(markdown: string) {
 
 function hasDeepResearchEvidenceLog(markdown: string) {
   return /^##\s+Deep Research Evidence Log\b/im.test(markdown);
+}
+
+function hasBibliographyEntries(markdown: string) {
+  return /^(```|~~~)(?:bibliography|bibtex|hayagriva)\b/im.test(markdown);
+}
+
+function hasBibliographyMarker(markdown: string) {
+  return /\[BIBLIOGRAPHY\]/i.test(markdown);
+}
+
+function hasSourceLibraryAudit(markdown: string) {
+  return /^##\s+Source Library Audit\b/im.test(markdown);
+}
+
+function normalizeSourceLibraryAudit(markdown: string | undefined) {
+  const trimmed = (markdown || "").trim();
+  if (!trimmed || /No saved citation sources/i.test(trimmed)) return "";
+  return /^##\s+Source Library Audit\b/im.test(trimmed)
+    ? trimmed
+    : `## Source Library Audit\n\n${trimmed}`;
 }
 
 function insertAfterFrontMatter(markdown: string, block: string) {

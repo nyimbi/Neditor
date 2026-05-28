@@ -22,6 +22,7 @@ import {
 } from "../src/lib/aiProviderPackages.js";
 import {
   assessDeepResearchSource,
+  deepResearchBibliographyMarkdown,
   deepResearchDocumentMarkdown,
   deepResearchDraftPrompt,
   deepResearchQualityAuditMarkdown,
@@ -4740,7 +4741,23 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
         ],
       },
     ],
-    { generatedAt: "2026-05-28T10:00:00.000Z", savedSourceCount: 1 },
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+      savedSourceCount: 1,
+      bibliographySources: [
+        {
+          citation_key: "agency2026",
+          title: "Policy Evidence",
+          url: "https://agency.gov/policy.pdf",
+          snippet: "Controls policy.",
+          source: "DuckDuckGo",
+          relative_path: "ai-procurement.neditor-sources/policy.pdf",
+          sha256: "abcdef123456",
+          downloaded_at: "2026-05-28T09:30:00.000Z",
+        },
+      ],
+      sourceLibraryAuditMarkdown: "## Source Library Audit\n\n| Citation | Status |\n| --- | --- |\n| @agency2026 | OK |",
+    },
   );
   ok(standalone.startsWith("---\ntitle: \"AI procurement controls\""));
   ok(standalone.includes("deepResearchTargetPages: 200"));
@@ -4748,7 +4765,34 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ok(standalone.includes("deepResearchSavedSources: 1"));
   ok(standalone.includes("provider: NEditor Deep Research"));
   ok(standalone.includes("status: needs-review"));
+  ok(standalone.includes("```bibliography"));
+  ok(standalone.includes('"id": "agency2026"'));
+  ok(standalone.includes('"accessed":'));
+  ok(standalone.includes("Downloaded source: ai-procurement.neditor-sources/policy.pdf"));
+  ok(standalone.includes("sha256 abcdef123456"));
+  ok(standalone.includes("## Bibliography"));
+  ok(standalone.includes("[BIBLIOGRAPHY]"));
   ok(standalone.includes("## Deep Research Evidence Log"));
+  ok(standalone.includes("## Source Library Audit"));
+
+  const fallbackBibliography = deepResearchBibliographyMarkdown([
+    {
+      index: 1,
+      query: "market data",
+      summary: "Initial source review.",
+      gaps: [],
+      results: [
+        {
+          title: "Market Data Source",
+          url: "https://example.com/market",
+          snippet: "Market data.",
+          source: "SearXNG",
+        },
+      ],
+    },
+  ]);
+  ok(fallbackBibliography.includes('"id": "market-data-source"'));
+  ok(fallbackBibliography.includes("Deep Research source | provider: SearXNG"));
   equal(estimateMarkdownPages("word ".repeat(1001)), 3);
 
   const response = await executeDirectAiProviderPrompt(
@@ -6406,6 +6450,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ensureDeepResearchQualityAudit"));
   ok(app.includes("openDeepResearchDraftAsDocument"));
   ok(app.includes("deepResearchDocumentMarkdown("));
+  ok(app.includes("bibliographySources: citationSourceLibrary.value"));
   ok(app.includes("store.newDocumentFromText(documentMarkdown"));
   ok(app.includes("toggleToolbarRow"));
   ok(app.includes("markdownFenceOpener(text)"));

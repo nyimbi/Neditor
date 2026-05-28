@@ -10459,7 +10459,13 @@ function openDeepResearchDraftAsDocument() {
     deepResearchSettings(),
     deepResearchDraft.value,
     deepResearchIterations.value,
-    { savedSourceCount: deepResearchSavedSourceCount.value },
+    {
+      savedSourceCount: deepResearchSavedSourceCount.value,
+      bibliographySources: citationSourceLibrary.value,
+      sourceLibraryAuditMarkdown: citationSourceLibrary.value.length
+        ? citationSourceLibraryAuditMarkdown(citationSourceLibrary.value)
+        : "",
+    },
   );
   store.newDocumentFromText(documentMarkdown, title);
   store.sidebar = "review";
