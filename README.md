@@ -471,10 +471,13 @@ web app.
   current file or opens it as a separate editable Markdown document with
   front-matter metadata, AI provenance, a populated CSL JSON bibliography,
   a source citation index with usable `[@key]` references, a rendered
-  bibliography marker, and a research evidence log. When the active document
-  has been saved, Deep Research can also preserve the source documents it found
-  in the same local source library for later review and carry the source-library
-  audit into the standalone research document. It also
+  bibliography marker, and a research evidence log. Drafting, expansion, QA,
+  and fallback generation receive the same citation-key map, preferring saved
+  local source-library keys and falling back to deterministic keys for unsaved
+  results. When the active document has been saved, Deep Research can also
+  preserve the source documents it found in the same local source library for
+  later review and carry the source-library audit into the standalone research
+  document. It also
   exposes front matter and merged project variables from
   `.neditor/variables.yaml` as insertable placeholders
   with filters, so repeated client, owner, budget, and source values do not

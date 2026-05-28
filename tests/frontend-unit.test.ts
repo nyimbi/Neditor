@@ -23,9 +23,12 @@ import {
 import {
   assessDeepResearchSource,
   deepResearchBibliographyMarkdown,
+  deepResearchCitationGuidanceMarkdown,
   deepResearchCitationIndexMarkdown,
   deepResearchDocumentMarkdown,
   deepResearchDraftPrompt,
+  deepResearchExpansionPrompt,
+  fallbackResearchDraft,
   deepResearchQualityAuditMarkdown,
   deepResearchQualityPrompt,
   estimateMarkdownPages,
@@ -4697,8 +4700,63 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   equal(expansionPassBudget(settings), 40);
   equal(pageShortfall(settings, "word ".repeat(1001)), 197);
   ok(deepResearchDraftPrompt(settings, []).includes("Target length: about 200 pages"));
+  ok(deepResearchDraftPrompt(settings, []).includes("No citation keys are available yet"));
   ok(deepResearchQualityPrompt(settings, "# Draft", [], 3).includes("Quality-assure and humanize"));
   ok(deepResearchQualityPrompt(settings, "# Draft", [], 3).includes("Quality Assurance & Review Handoff"));
+  const promptIterations = [
+    {
+      index: 1,
+      query: "AI procurement controls policy",
+      summary: "Initial source review.",
+      gaps: ["Budget evidence still missing."],
+      results: [
+        {
+          title: "Policy Evidence",
+          url: "https://agency.gov/policy.pdf",
+          snippet: "Controls policy.",
+          source: "DuckDuckGo",
+        },
+        {
+          title: "Unrelated source",
+          url: "https://example.com/other",
+          snippet: "Not part of the saved research source.",
+          source: "DuckDuckGo",
+        },
+      ],
+    },
+  ];
+  const savedPromptSources = [
+    {
+      citation_key: "agency2026abcd1234",
+      title: "Policy Evidence",
+      url: "https://agency.gov/policy.pdf",
+      snippet: "Controls policy.",
+      source: "DuckDuckGo",
+      relative_path: "ai-procurement.neditor-sources/policy.pdf",
+    },
+    {
+      citation_key: "unrelated2026",
+      title: "Unrelated library source",
+      url: "https://example.com/unrelated",
+      snippet: "Should not enter the Deep Research bibliography.",
+      source: "Saved library",
+    },
+  ];
+  const draftPrompt = deepResearchDraftPrompt(settings, promptIterations, savedPromptSources);
+  ok(draftPrompt.includes("[@agency2026abcd1234]"));
+  ok(draftPrompt.includes("[@unrelated-source]"));
+  ok(!draftPrompt.includes("[@unrelated2026]"));
+  ok(draftPrompt.includes("Do not invent citation keys"));
+  ok(deepResearchExpansionPrompt(settings, "# Draft", promptIterations, 1, 1, 2, savedPromptSources).includes("[@agency2026abcd1234]"));
+  ok(deepResearchQualityPrompt(settings, "# Draft", promptIterations, 1, savedPromptSources).includes("[@agency2026abcd1234]"));
+  const promptGuidance = deepResearchCitationGuidanceMarkdown(promptIterations, savedPromptSources);
+  ok(promptGuidance.includes("Available source citation keys"));
+  ok(promptGuidance.includes("[@agency2026abcd1234]"));
+  ok(!promptGuidance.includes("[@unrelated2026]"));
+  const fallbackDraft = fallbackResearchDraft(settings, promptIterations, savedPromptSources);
+  ok(fallbackDraft.includes("[@agency2026abcd1234] [Policy Evidence](https://agency.gov/policy.pdf)"));
+  ok(fallbackDraft.includes("[@unrelated-source] [Unrelated source](https://example.com/other)"));
+  ok(fallbackDraft.includes("Confirm every inline citation key resolves to the bibliography."));
   const qaAudit = deepResearchQualityAuditMarkdown(
     settings,
     "# Draft\n\nThis needs a citation TODO before release.",
@@ -6467,11 +6525,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('id: "deep-research", label: "Deep Research"'));
   ok(app.includes("openDeepResearch"));
   ok(app.includes("expansionPassBudget(settings)"));
-  ok(app.includes("deepResearchQualityPrompt(settings"));
+  ok(app.includes("deepResearchQualityPrompt("));
   ok(app.includes("ensureDeepResearchQualityAudit"));
   ok(app.includes("openDeepResearchDraftAsDocument"));
   ok(app.includes("deepResearchDocumentMarkdown("));
   ok(app.includes("bibliographySources: citationSourceLibrary.value"));
+  ok(app.includes("deepResearchDraftPrompt(settings, deepResearchIterations.value, citationSourceLibrary.value)"));
+  ok(app.includes("fallbackResearchDraft(settings, deepResearchIterations.value, citationSourceLibrary.value)"));
   ok(app.includes("store.newDocumentFromText(documentMarkdown"));
   ok(app.includes("toggleToolbarRow"));
   ok(app.includes("markdownFenceOpener(text)"));

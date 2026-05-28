@@ -132,13 +132,22 @@ export function deepResearchReflectionPrompt(settings: DeepResearchSettings, que
   ].join("\n");
 }
 
-export function deepResearchDraftPrompt(settings: DeepResearchSettings, iterations: DeepResearchIteration[]) {
+export function deepResearchDraftPrompt(
+  settings: DeepResearchSettings,
+  iterations: DeepResearchIteration[],
+  savedSources: DeepResearchBibliographySource[] = [],
+) {
+  const citationGuidance = deepResearchCitationGuidanceMarkdown(iterations, savedSources);
   return [
     `Create a ${settings.documentType} for ${settings.audience}.`,
     `Topic: ${settings.topic}`,
     `Target length: about ${settings.targetPages} page${settings.targetPages === 1 ? "" : "s"} (${targetWordCount(settings)} words).`,
     "",
     "Use this research log only as grounding. Keep claims cautious when snippets are limited.",
+    "Use the citation keys below for source-grounded claims, for example `[@source-key]`. Do not invent citation keys.",
+    "Mark unsupported or source-ambiguous claims as `Citation TODO:` instead of pretending they are verified.",
+    "",
+    citationGuidance,
     "",
     formatDeepResearchLog(iterations),
     "",
@@ -149,6 +158,7 @@ export function deepResearchDraftPrompt(settings: DeepResearchSettings, iteratio
     "- A findings or recommendations section when useful.",
     "- A limitations and open questions section.",
     "- A Sources section with Markdown links for every source used.",
+    "- Inline citation markers using the provided `[@key]` values where source support is clear.",
     "- Citation TODOs for claims that need source-document verification.",
     "- Enough section depth, examples, implications, and caveats to approach the target length without padding.",
   ].join("\n");
@@ -161,9 +171,11 @@ export function deepResearchExpansionPrompt(
   currentPages = estimateMarkdownPages(draftMarkdown),
   pass = 1,
   maxPasses = expansionPassBudget(settings),
+  savedSources: DeepResearchBibliographySource[] = [],
 ) {
   const remainingPages = pageShortfall(settings, draftMarkdown);
   const passTargetPages = Math.min(remainingPages, EXPANSION_PAGES_PER_PASS);
+  const citationGuidance = deepResearchCitationGuidanceMarkdown(iterations, savedSources);
   return [
     `Expand this ${settings.documentType} toward ${settings.targetPages} pages (${targetWordCount(settings)} words) for ${settings.audience}.`,
     `Topic: ${settings.topic}`,
@@ -173,6 +185,9 @@ export function deepResearchExpansionPrompt(
     "",
     "Use the research log to add substantive sections, examples, implications, constraints, and review TODOs. Do not pad with repetition.",
     "Prefer new useful sections, tables, assumptions, decision implications, risks, implementation detail, and clearly marked source-verification TODOs over repeated prose.",
+    "Use only the listed citation keys for source-grounded claims; mark unsupported claims as `Citation TODO:`.",
+    "",
+    citationGuidance,
     "",
     "Research log:",
     formatDeepResearchLog(iterations),
@@ -189,7 +204,9 @@ export function deepResearchQualityPrompt(
   draftMarkdown: string,
   iterations: DeepResearchIteration[],
   currentPages = estimateMarkdownPages(draftMarkdown),
+  savedSources: DeepResearchBibliographySource[] = [],
 ) {
+  const citationGuidance = deepResearchCitationGuidanceMarkdown(iterations, savedSources);
   return [
     `Quality-assure and humanize this ${settings.documentType} for ${settings.audience}.`,
     `Topic: ${settings.topic}`,
@@ -200,8 +217,12 @@ export function deepResearchQualityPrompt(
     "- Keep or improve the current length unless removing duplicated padding.",
     "- Remove generic AI phrasing, overclaiming, repetition, and filler.",
     "- Add source-verification TODOs for claims not directly grounded in the research log.",
+    "- Preserve valid `[@key]` citation markers and add listed keys where the research log directly supports a claim.",
+    "- Do not invent citation keys; use `Citation TODO:` for claims that need source-document verification.",
     "- Make executive summary, section headings, limitations, and recommendations concrete.",
     "- Add a final 'Quality Assurance & Review Handoff' section with evidence checks, open gaps, human-review tasks, and distribution cautions.",
+    "",
+    citationGuidance,
     "",
     "Research log:",
     formatDeepResearchLog(iterations),
@@ -333,6 +354,25 @@ export function deepResearchCitationIndexMarkdown(
   ].join("\n");
 }
 
+export function deepResearchCitationGuidanceMarkdown(
+  iterations: DeepResearchIteration[],
+  savedSources: DeepResearchBibliographySource[] = [],
+) {
+  const records = deepResearchBibliographyRecords(iterations, savedSources);
+  if (!records.length) return "No citation keys are available yet. Use Citation TODO markers for claims that need verification.";
+  return [
+    "Available source citation keys:",
+    "",
+    "| Citation | Source | Evidence cue |",
+    "| --- | --- | --- |",
+    ...records.map(({ citationKey, source }) => [
+      `[@${citationKey}]`,
+      markdownLink(source.title || citationKey, source.url),
+      tableCell(source.snippet || source.source || "Review source before release."),
+    ].join(" | ")).map((row) => `| ${row} |`),
+  ].join("\n");
+}
+
 export function fallbackDeepResearchQuery(settings: DeepResearchSettings, iterations: DeepResearchIteration[]) {
   const suffixes = ["overview evidence", "recent data sources", "risks limitations", "case studies", "implementation guidance"];
   const suffix = suffixes[iterations.length % suffixes.length];
@@ -416,8 +456,13 @@ export function parseReflection(markdown: string) {
   return { summary, gaps };
 }
 
-export function fallbackResearchDraft(settings: DeepResearchSettings, iterations: DeepResearchIteration[]) {
-  const sourceLines = uniqueSources(iterations).map((source, index) => `${index + 1}. [${source.title}](${source.url}) - ${source.snippet || source.source}`);
+export function fallbackResearchDraft(
+  settings: DeepResearchSettings,
+  iterations: DeepResearchIteration[],
+  savedSources: DeepResearchBibliographySource[] = [],
+) {
+  const sourceLines = deepResearchBibliographyRecords(iterations, savedSources)
+    .map(({ citationKey, source }, index) => `${index + 1}. [@${citationKey}] ${markdownLink(source.title || citationKey, source.url)} - ${source.snippet || source.source || "Review source before release."}`);
   return [
     `# ${settings.topic}`,
     "",
@@ -440,6 +485,7 @@ export function fallbackResearchDraft(settings: DeepResearchSettings, iterations
     "## Review TODOs",
     "",
     "- [ ] Download and inspect source documents before approving factual claims.",
+    "- [ ] Confirm every inline citation key resolves to the bibliography.",
     "- [ ] Replace broad statements with verified citations.",
   ].join("\n");
 }
@@ -573,12 +619,14 @@ function bibliographySourcesForDocument(
   iterations: DeepResearchIteration[],
   savedSources: DeepResearchBibliographySource[],
 ) {
+  const iterationSources = uniqueSources(iterations);
+  const iterationUrls = new Set(iterationSources.map((source) => source.url.trim()).filter(Boolean));
   const byUrl = new Map<string, DeepResearchBibliographySource>();
   for (const source of savedSources) {
     const url = source.url.trim();
-    if (url) byUrl.set(url, source);
+    if (url && (!iterationUrls.size || iterationUrls.has(url))) byUrl.set(url, source);
   }
-  for (const source of uniqueSources(iterations)) {
+  for (const source of iterationSources) {
     const url = source.url.trim();
     if (!url || byUrl.has(url)) continue;
     byUrl.set(url, {

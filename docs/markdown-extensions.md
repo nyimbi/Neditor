@@ -359,7 +359,10 @@ into the current file or opens it as its own editable Markdown document with
 front matter, `ai-source` provenance, populated CSL JSON bibliography entries,
 a source citation index containing usable `[@key]` references, a
 `[BIBLIOGRAPHY]` marker, a Deep Research evidence log, and the source-library
-audit when saved evidence is available.
+audit when saved evidence is available. Draft, expansion, QA, and fallback
+generation use the same citation-key guidance, preferring saved local
+source-library keys for matching URLs and falling back to deterministic keys
+for unsaved research results.
 
 ## Glossary And Index
 

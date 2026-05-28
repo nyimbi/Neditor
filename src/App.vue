@@ -10363,13 +10363,13 @@ async function runDeepResearchDocumentCreation() {
           model: settings.model,
           keyEnv: settings.keyEnv,
           systemPrompt: "You create sourced Markdown documents from research logs. Return only Markdown.",
-          userPrompt: deepResearchDraftPrompt(settings, deepResearchIterations.value),
+          userPrompt: deepResearchDraftPrompt(settings, deepResearchIterations.value, citationSourceLibrary.value),
         },
         agentProviderApiKey.value,
       );
       deepResearchDraft.value = draft.markdown;
     } catch {
-      deepResearchDraft.value = fallbackResearchDraft(settings, deepResearchIterations.value);
+      deepResearchDraft.value = fallbackResearchDraft(settings, deepResearchIterations.value, citationSourceLibrary.value);
     }
     const maxExpansionPasses = expansionPassBudget(settings);
     let stalledExpansionPasses = 0;
@@ -10386,7 +10386,15 @@ async function runDeepResearchDocumentCreation() {
             model: settings.model,
             keyEnv: settings.keyEnv,
             systemPrompt: "You expand sourced Markdown documents with substantive analysis. Return the full document only.",
-            userPrompt: deepResearchExpansionPrompt(settings, deepResearchDraft.value, deepResearchIterations.value, currentPages, pass, maxExpansionPasses),
+            userPrompt: deepResearchExpansionPrompt(
+              settings,
+              deepResearchDraft.value,
+              deepResearchIterations.value,
+              currentPages,
+              pass,
+              maxExpansionPasses,
+              citationSourceLibrary.value,
+            ),
           },
           agentProviderApiKey.value,
         );
@@ -10413,7 +10421,13 @@ async function runDeepResearchDocumentCreation() {
           model: settings.model,
           keyEnv: settings.keyEnv,
           systemPrompt: "You are a document QA editor. Return a complete, source-grounded, human-review-ready Markdown document.",
-          userPrompt: deepResearchQualityPrompt(settings, deepResearchDraft.value, deepResearchIterations.value, pagesBeforeQa),
+          userPrompt: deepResearchQualityPrompt(
+            settings,
+            deepResearchDraft.value,
+            deepResearchIterations.value,
+            pagesBeforeQa,
+            citationSourceLibrary.value,
+          ),
         },
         agentProviderApiKey.value,
       );
