@@ -357,7 +357,8 @@ draft, adding or preserving a review handoff section for source checks,
 citation TODOs, open gaps, and distribution cautions before the user inserts it
 into the current file or opens it as its own editable Markdown document with
 front matter, `ai-source` provenance, populated CSL JSON bibliography entries,
-a `[BIBLIOGRAPHY]` marker, a Deep Research evidence log, and the source-library
+a source citation index containing usable `[@key]` references, a
+`[BIBLIOGRAPHY]` marker, a Deep Research evidence log, and the source-library
 audit when saved evidence is available.
 
 ## Glossary And Index

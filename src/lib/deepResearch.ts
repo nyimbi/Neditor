@@ -289,9 +289,13 @@ export function deepResearchDocumentMarkdown(
   const withBibliographyEntries = !bibliography || hasBibliographyEntries(withProvenance)
     ? withProvenance
     : `${withProvenance.trim()}\n\n${bibliography}`;
-  const withBibliographyMarker = hasBibliographyMarker(withBibliographyEntries)
+  const citationIndex = deepResearchCitationIndexMarkdown(iterations, options.bibliographySources);
+  const withCitationIndex = !citationIndex || hasDeepResearchCitationIndex(withBibliographyEntries)
     ? withBibliographyEntries
-    : `${withBibliographyEntries.trim()}\n\n## Bibliography\n\n[BIBLIOGRAPHY]\n`;
+    : `${withBibliographyEntries.trim()}\n\n## Source Citation Index\n\n${citationIndex}`;
+  const withBibliographyMarker = hasBibliographyMarker(withCitationIndex)
+    ? withCitationIndex
+    : `${withCitationIndex.trim()}\n\n## Bibliography\n\n[BIBLIOGRAPHY]\n`;
   const withEvidenceLog = hasDeepResearchEvidenceLog(withBibliographyMarker)
     ? withBibliographyMarker
     : `${withBibliographyMarker.trim()}\n\n## Deep Research Evidence Log\n\n${formatDeepResearchLog(iterations)}\n`;
@@ -305,24 +309,28 @@ export function deepResearchBibliographyMarkdown(
   iterations: DeepResearchIteration[],
   savedSources: DeepResearchBibliographySource[] = [],
 ) {
-  const bibliographySources = bibliographySourcesForDocument(iterations, savedSources);
-  if (!bibliographySources.length) return "";
-  const usedKeys = new Set<string>();
-  const entries = bibliographySources.map((source, index) => {
-    const id = uniqueBibliographyKey(source, index, usedKeys);
-    const entry: Record<string, unknown> = {
-      id,
-      type: "webpage",
-      title: source.title || id,
-      URL: source.url,
-    };
-    const accessed = cslDateFromIso(source.downloaded_at);
-    if (accessed) entry.accessed = accessed;
-    const note = deepResearchBibliographyNote(source);
-    if (note) entry.note = note;
-    return entry;
-  });
+  const entries = deepResearchBibliographyRecords(iterations, savedSources).map((record) => record.entry);
+  if (!entries.length) return "";
   return ["```bibliography", JSON.stringify(entries, null, 2), "```", ""].join("\n");
+}
+
+export function deepResearchCitationIndexMarkdown(
+  iterations: DeepResearchIteration[],
+  savedSources: DeepResearchBibliographySource[] = [],
+) {
+  const records = deepResearchBibliographyRecords(iterations, savedSources);
+  if (!records.length) return "";
+  return [
+    "| Citation | Source | Evidence | Local copy |",
+    "| --- | --- | --- | --- |",
+    ...records.map(({ citationKey, source }) => [
+      `[@${citationKey}]`,
+      markdownLink(source.title || citationKey, source.url),
+      tableCell(source.snippet || source.source || "Review source before release."),
+      tableCell(source.relative_path || ""),
+    ].join(" | ")).map((row) => `| ${row} |`),
+    "",
+  ].join("\n");
 }
 
 export function fallbackDeepResearchQuery(settings: DeepResearchSettings, iterations: DeepResearchIteration[]) {
@@ -583,6 +591,28 @@ function bibliographySourcesForDocument(
   return Array.from(byUrl.values());
 }
 
+function deepResearchBibliographyRecords(
+  iterations: DeepResearchIteration[],
+  savedSources: DeepResearchBibliographySource[] = [],
+) {
+  const bibliographySources = bibliographySourcesForDocument(iterations, savedSources);
+  const usedKeys = new Set<string>();
+  return bibliographySources.map((source, index) => {
+    const citationKey = uniqueBibliographyKey(source, index, usedKeys);
+    const entry: Record<string, unknown> = {
+      id: citationKey,
+      type: "webpage",
+      title: source.title || citationKey,
+      URL: source.url,
+    };
+    const accessed = cslDateFromIso(source.downloaded_at);
+    if (accessed) entry.accessed = accessed;
+    const note = deepResearchBibliographyNote(source);
+    if (note) entry.note = note;
+    return { citationKey, source, entry };
+  });
+}
+
 function uniqueBibliographyKey(
   source: DeepResearchBibliographySource,
   index: number,
@@ -633,6 +663,19 @@ function deepResearchBibliographyNote(source: DeepResearchBibliographySource) {
   return parts.join(" | ");
 }
 
+function markdownLink(label: string, url: string) {
+  const safeLabel = label.replace(/[[\]|]/g, "").replace(/\s+/g, " ").trim() || url;
+  const safeUrl = url.replace(/[()\s]/g, encodeURIComponent);
+  return `[${safeLabel}](${safeUrl})`;
+}
+
+function tableCell(value: string) {
+  return (value || "-")
+    .replace(/\r?\n/g, " ")
+    .replace(/\|/g, "\\|")
+    .trim() || "-";
+}
+
 function sectionText(markdown: string, heading: string) {
   const pattern = new RegExp(`^#{2,3}\\s+${heading}\\s*$`, "im");
   const match = markdown.match(pattern);
@@ -662,6 +705,10 @@ function hasDeepResearchProvenance(markdown: string) {
 
 function hasDeepResearchEvidenceLog(markdown: string) {
   return /^##\s+Deep Research Evidence Log\b/im.test(markdown);
+}
+
+function hasDeepResearchCitationIndex(markdown: string) {
+  return /^##\s+Source Citation Index\b/im.test(markdown);
 }
 
 function hasBibliographyEntries(markdown: string) {

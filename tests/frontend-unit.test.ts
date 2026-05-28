@@ -23,6 +23,7 @@ import {
 import {
   assessDeepResearchSource,
   deepResearchBibliographyMarkdown,
+  deepResearchCitationIndexMarkdown,
   deepResearchDocumentMarkdown,
   deepResearchDraftPrompt,
   deepResearchQualityAuditMarkdown,
@@ -4770,6 +4771,8 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ok(standalone.includes('"accessed":'));
   ok(standalone.includes("Downloaded source: ai-procurement.neditor-sources/policy.pdf"));
   ok(standalone.includes("sha256 abcdef123456"));
+  ok(standalone.includes("## Source Citation Index"));
+  ok(standalone.includes("| [@agency2026] | [Policy Evidence](https://agency.gov/policy.pdf) | Controls policy. | ai-procurement.neditor-sources/policy.pdf |"));
   ok(standalone.includes("## Bibliography"));
   ok(standalone.includes("[BIBLIOGRAPHY]"));
   ok(standalone.includes("## Deep Research Evidence Log"));
@@ -4793,6 +4796,24 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ]);
   ok(fallbackBibliography.includes('"id": "market-data-source"'));
   ok(fallbackBibliography.includes("Deep Research source | provider: SearXNG"));
+  const citationIndex = deepResearchCitationIndexMarkdown([
+    {
+      index: 1,
+      query: "market data",
+      summary: "Initial source review.",
+      gaps: [],
+      results: [
+        {
+          title: "Market Data Source",
+          url: "https://example.com/market",
+          snippet: "Market | data.",
+          source: "SearXNG",
+        },
+      ],
+    },
+  ]);
+  ok(citationIndex.includes("[@market-data-source]"));
+  ok(citationIndex.includes("Market \\| data."));
   equal(estimateMarkdownPages("word ".repeat(1001)), 3);
 
   const response = await executeDirectAiProviderPrompt(
