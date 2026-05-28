@@ -1689,6 +1689,8 @@ Initial commands:
 Productization and setup commands:
 
 - `pending_cli_open_paths`
+- `cli_deploy_plan`
+- `deploy_cli`
 - `default_markdown_reader_plan`
 - `configure_default_markdown_reader`
 - `create_support_bundle`

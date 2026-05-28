@@ -21,9 +21,12 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `stop_file_watcher` | `src-tauri/src/filesystem_watch.rs` | `filesystem_watch::tests::stop_file_watcher_clears_active_watcher_state`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `rename_file` | `src-tauri/src/filesystem.rs` | `file_command_tests::file_duplicate_and_rename_commands_move_content` |
 | `duplicate_file` | `src-tauri/src/filesystem.rs` | `file_command_tests::file_duplicate_and_rename_commands_move_content` |
+| `copy_data_source_file` | `src-tauri/src/filesystem.rs` | `file_command_tests::copy_data_source_file_is_binary_safe_project_relative_and_collision_safe` |
 | `reveal_path` | `src-tauri/src/filesystem.rs` | `file_command_tests::reveal_command_for_existing_path_is_platform_specific_and_argument_safe`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `file_metadata` | `src-tauri/src/filesystem.rs` | `file_command_tests::file_duplicate_and_rename_commands_move_content`; `file_command_tests::stable_file_ipc_aliases_open_save_as_and_watch_paths` |
 | `pending_cli_open_paths` | `src-tauri/src/cli.rs` | `cli_tests::ned_cli_opens_markdown_paths_without_subcommand`; desktop launch smoke covers CLI-open path handoff |
+| `cli_deploy_plan` | `src-tauri/src/cli.rs` | `cli_tests::deploy_cli_installs_user_level_ned_launcher_without_overwriting_conflicts`; Settings and File menu expose the same guarded deployment plan |
+| `deploy_cli` | `src-tauri/src/cli.rs` | `cli_tests::deploy_cli_installs_user_level_ned_launcher_without_overwriting_conflicts`; Settings Deploy CLI button and native File -> Deploy CLI menu route to the guarded deployment command |
 | `default_markdown_reader_plan` | `src-tauri/src/cli.rs` | `cli_tests::ned_cli_doctor_reports_json_capabilities`; Settings copy uses the same default-reader plan contract |
 | `configure_default_markdown_reader` | `src-tauri/src/cli.rs` | `cli_tests::ned_cli_doctor_reports_json_capabilities`; Settings checkbox invokes the guarded platform default-reader plan |
 | `create_support_bundle` | `src-tauri/src/cli.rs` | `cli_tests::ned_cli_creates_redaction_safe_support_bundles`; Settings support-bundle action invokes the same redaction-safe JSON contract with setup, release-readiness, spec-completion, transform-engine probe, and release evidence report summaries |

@@ -3137,6 +3137,20 @@
           <section aria-label="Command line and default reader setup">
             <h3>Command line and default reader</h3>
             <p class="sidebar-hint">Use <code>ned file.md</code> to open Markdown, <code>ned open file.md --dry-run --json</code> to verify file handoff, <code>ned init . --json</code> to create a reusable <code>.neditor</code> project scaffold, <code>ned profile --workspace . --set companyName=Acme --json</code> to set reusable business identity, <code>ned profile --fields --json</code> to list identity fields and aliases, <code>ned profile --workspace . --get companyName</code> to print one value for scripts, <code>ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json</code> to analyze an RFP and write a response plus compliance matrix, <code>ned analyze-rfp - --matrix</code> to turn piped RFP text into a matrix, <code>ned templates --category Procurement --json</code> to discover filtered starters, <code>ned templates --markdown report --workspace . --fill-profile</code> to preview profile-aware starter Markdown, <code>ned transform-templates --category Business --transform calc --query ROI --json</code> to discover reusable calc/chart/diagram/data blocks, <code>ned outlines --category Procurement --query RFP --json</code> to discover reusable document outlines, <code>ned outlines --markdown business-report</code> to print an outline for the planner or Docs Live, <code>ned outlines --workspace . --save board-pack --docs-live-type board-memo --section "Decision Requested" --section "Recommendation"</code> to add a reusable workspace outline, <code>ned snippets --workspace . --markdown business-contact-block --fill-profile</code> to print profile-aware reusable document parts, <code>ned new tender.md --template tender --workspace . --fill-profile --json</code> or <code>ned new podcast.md --template podcast-script --workspace . --fill-profile --json</code> to start from business and publishing scaffolds, <code>ned inspect file.md --json</code> for no-write document inventory, <code>ned validate file.md --to pdf --json</code> for no-write readiness checks, <code>ned convert file.md --to pdf,docx,html --output-dir exports</code> for headless delivery packs, <code>ned convert - --to html --stdout</code> for pipe automation, <code>ned targets</code> or <code>ned handlers --commands-only</code> for setup discovery, <code>ned readiness --json</code> for release gap summaries, <code>ned evidence --json</code> for release evidence report status, <code>ned default-reader --status --json</code> for default Markdown reader setup, <code>ned support-bundle --output support.json</code> for help desk handoffs, <code>ned completions zsh</code> for shell setup, and <code>ned doctor --workspace . --json</code> for setup checks.</p>
+            <div class="support-bundle-actions">
+              <button type="button" :disabled="cliDeployBusy || cliDeployPlan?.supported === false" title="Install the packaged ned helper into a user-level command directory" @click="deployCliGlobally">
+                {{ cliDeployBusy ? "Deploying..." : "Deploy CLI" }}
+              </button>
+              <button type="button" :disabled="cliDeployBusy" title="Refresh the CLI deployment plan without changing files" @click="loadCliDeployPlan">Refresh</button>
+              <span>{{ cliDeployStatus || cliDeployPlan?.message || "Deploy CLI makes the packaged ned command available from new terminal windows." }}</span>
+            </div>
+            <p v-if="cliDeployPlan" class="engine-setup-status" :class="cliDeployPlan.applied && cliDeployPlan.pathReady ? 'ok' : cliDeployPlan.supported ? '' : 'failed'" role="status">
+              Target: <code>{{ cliDeployPlan.deployedPath }}</code>
+            </p>
+            <pre v-if="cliDeployPlan?.commands?.length" class="transform-installer-commands">{{ cliDeployPlan.commands.join("\n") }}</pre>
+            <ul v-if="cliDeployPlan?.manualSteps?.length" class="transform-installer-handlers">
+              <li v-for="step in cliDeployPlan.manualSteps" :key="step">{{ step }}</li>
+            </ul>
             <label>
               <input :checked="defaultMarkdownReaderEnabled" type="checkbox" :disabled="defaultMarkdownReaderBusy" @change="toggleDefaultMarkdownReader($event)" />
               Make NEditor the default Markdown reader
@@ -6285,6 +6299,19 @@ type DefaultMarkdownReaderResponse = {
   commands: string[];
   manual_steps: string[];
 };
+type CliDeployResponse = {
+  platform: string;
+  sourcePath?: string | null;
+  targetDir: string;
+  deployedPath: string;
+  applied: boolean;
+  supported: boolean;
+  pathReady: boolean;
+  installKind: string;
+  message: string;
+  commands: string[];
+  manualSteps: string[];
+};
 type SupportBundleReport = {
   schema: string;
   workspace?: string;
@@ -6545,6 +6572,9 @@ const defaultMarkdownReaderBusy = ref(false);
 const defaultMarkdownReaderStatus = ref("");
 const defaultMarkdownReaderEnabled = ref(false);
 const defaultMarkdownReaderPlan = ref<DefaultMarkdownReaderResponse | null>(null);
+const cliDeployBusy = ref(false);
+const cliDeployStatus = ref("");
+const cliDeployPlan = ref<CliDeployResponse | null>(null);
 const supportBundleBusy = ref(false);
 const supportBundleStatus = ref("");
 const supportBundleReport = ref<SupportBundleReport | null>(null);
@@ -9250,6 +9280,7 @@ const appMenus = computed<AppMenu[]>(() => [
         items: [
           { id: "open-folder", label: "Open Folder", help: "Browse a folder as a writing workspace.", run: () => openFolder() },
           { id: "save-workspace", label: "Save Workspace", help: "Persist open tabs, groups, and view state.", run: () => saveWorkspace() },
+          { id: "deploy-cli", label: "Deploy CLI", help: "Install the packaged ned helper into a user-level command directory so terminals can run ned.", disabled: cliDeployBusy.value, run: () => deployCliGlobally() },
           { id: "rename", label: "Rename", help: "Rename the active document.", run: () => renameDocument() },
           { id: "duplicate", label: "Duplicate", help: "Duplicate the active document.", run: () => duplicateDocument() },
           { id: "reveal", label: "Reveal", help: "Reveal the active file in the file manager.", run: () => store.revealActive() },
@@ -12541,6 +12572,9 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-save-workspace":
       await saveWorkspace();
       break;
+    case "neditor-deploy-cli":
+      await deployCliGlobally();
+      break;
     case "neditor-rename-document":
       await renameDocument();
       break;
@@ -12742,6 +12776,7 @@ onMounted(async () => {
   syncGoogleIntegrationFields();
   await openPendingCliPaths();
   await loadTransformHandlerInstallers();
+  await loadCliDeployPlan();
   await loadDefaultMarkdownReaderPlan();
   await hydrateTtsModelStorageLocation();
   await bindNativeMenuCommands();
@@ -16965,6 +17000,9 @@ function selectConfigurationSection(sectionId: string) {
   if (sectionId === "files" && !defaultMarkdownReaderPlan.value) {
     void loadDefaultMarkdownReaderPlan();
   }
+  if (sectionId === "files" && !cliDeployPlan.value) {
+    void loadCliDeployPlan();
+  }
 }
 
 function selectSidebarPanel(panelId: string) {
@@ -16973,6 +17011,9 @@ function selectSidebarPanel(panelId: string) {
   store.$patch({ sidebar: panelId as typeof store.sidebar });
   if (panelId === "settings" && !defaultMarkdownReaderPlan.value) {
     void loadDefaultMarkdownReaderPlan();
+  }
+  if (panelId === "settings" && !cliDeployPlan.value) {
+    void loadCliDeployPlan();
   }
 }
 
@@ -18318,6 +18359,36 @@ async function loadDefaultMarkdownReaderPlan() {
     defaultMarkdownReaderPlan.value = null;
     defaultMarkdownReaderEnabled.value = false;
     defaultMarkdownReaderStatus.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function loadCliDeployPlan() {
+  try {
+    const response = await invoke<CliDeployResponse | null>("cli_deploy_plan");
+    if (!response) throw new Error("CLI deployment plan is unavailable");
+    cliDeployPlan.value = response;
+    cliDeployStatus.value = response.message;
+  } catch (error) {
+    cliDeployPlan.value = null;
+    cliDeployStatus.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function deployCliGlobally() {
+  cliDeployBusy.value = true;
+  try {
+    const response = await invoke<CliDeployResponse>("deploy_cli", {
+      request: { overwrite: false },
+    });
+    cliDeployPlan.value = response;
+    cliDeployStatus.value = response.message;
+    store.statusMessage = response.message;
+  } catch (error) {
+    cliDeployStatus.value = error instanceof Error ? error.message : String(error);
+    store.lastError = cliDeployStatus.value;
+    store.statusMessage = "Deploy CLI failed";
+  } finally {
+    cliDeployBusy.value = false;
   }
 }
 

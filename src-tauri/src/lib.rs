@@ -63,8 +63,8 @@ use citation_discovery::{
     download_citation_source, list_citation_sources, search_citation_sources,
 };
 use cli::{
-    configure_default_markdown_reader, create_support_bundle, default_markdown_reader_plan,
-    pending_cli_open_paths,
+    cli_deploy_plan, configure_default_markdown_reader, create_support_bundle,
+    default_markdown_reader_plan, deploy_cli, pending_cli_open_paths,
 };
 #[cfg(test)]
 use compiler::compile;
@@ -174,6 +174,8 @@ pub fn run() {
             reveal_path,
             file_metadata,
             pending_cli_open_paths,
+            cli_deploy_plan,
+            deploy_cli,
             default_markdown_reader_plan,
             configure_default_markdown_reader,
             create_support_bundle,
@@ -338,6 +340,8 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .separator()
         .item(&menu_item(app, "neditor-open-folder", "Open Folder")?)
         .item(&menu_item(app, "neditor-save-workspace", "Save Workspace")?)
+        .separator()
+        .item(&menu_item(app, "neditor-deploy-cli", "Deploy CLI")?)
         .separator()
         .close_window()
         .build()?;

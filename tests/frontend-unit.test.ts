@@ -8237,6 +8237,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("openTransformInstaller"));
   ok(app.includes("Install Transform Handlers"));
   ok(app.includes("pending_cli_open_paths"));
+  ok(app.includes("cli_deploy_plan"));
+  ok(app.includes("deploy_cli"));
+  ok(app.includes("Deploy CLI"));
+  ok(app.includes("neditor-deploy-cli"));
   ok(app.includes("default_markdown_reader_plan"));
   ok(app.includes("configure_default_markdown_reader"));
   ok(app.includes("create_support_bundle"));

@@ -39,6 +39,7 @@ const SUPPORTED_EXPORT_TARGETS: &[&str] = &[
     "epub",
 ];
 const STDOUT_EXPORT_TARGETS: &[&str] = &["html", "latex"];
+const BUSINESS_DOCUMENT_SOURCE: &str = include_str!("../../src/lib/businessDocuments.ts");
 const TRANSFORM_TEMPLATE_SOURCE: &str = include_str!("../../src/lib/transformTemplates.ts");
 const NEW_DOCUMENT_TEMPLATES: &[&str] = &[
     "blank",
@@ -127,6 +128,30 @@ pub(crate) struct DefaultMarkdownReaderRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct CliDeployRequest {
+    pub(crate) target_dir: Option<String>,
+    #[serde(default)]
+    pub(crate) overwrite: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CliDeployResponse {
+    pub(crate) platform: String,
+    pub(crate) source_path: Option<String>,
+    pub(crate) target_dir: String,
+    pub(crate) deployed_path: String,
+    pub(crate) applied: bool,
+    pub(crate) supported: bool,
+    pub(crate) path_ready: bool,
+    pub(crate) install_kind: String,
+    pub(crate) message: String,
+    pub(crate) commands: Vec<String>,
+    pub(crate) manual_steps: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct SupportBundleRequest {
     pub(crate) workspace: Option<String>,
     pub(crate) readiness_report: Option<String>,
@@ -169,6 +194,7 @@ struct DocumentTemplateInfo {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct DocumentOutlineInfo {
     id: &'static str,
     label: &'static str,
@@ -1321,6 +1347,333 @@ fn run_default_reader_command(args: &[String]) -> Result<CliOutcome, String> {
         message: default_reader_message(&response),
         exit_code,
     })
+}
+
+#[tauri::command]
+pub(crate) fn cli_deploy_plan() -> Result<CliDeployResponse, String> {
+    let source = find_ned_cli_binary();
+    Ok(cli_deploy_plan_response(
+        source.as_deref(),
+        None,
+        false,
+        None,
+        None,
+    ))
+}
+
+#[tauri::command]
+pub(crate) fn deploy_cli(request: CliDeployRequest) -> Result<CliDeployResponse, String> {
+    let source = match find_ned_cli_binary() {
+        Some(source) => source,
+        None => {
+            let target_dir = request
+                .target_dir
+                .as_deref()
+                .map(|value| normalize_cli_deploy_dir(Some(value)));
+            return Ok(cli_deploy_plan_response(
+                None,
+                target_dir.as_deref(),
+                false,
+                Some(false),
+                Some(
+                    "The packaged ned helper was not found next to the app. Reinstall NEditor or rebuild the sidecar before deploying the CLI."
+                        .to_string(),
+                ),
+            ))
+        }
+    };
+    deploy_cli_from_source(&source, request.target_dir.as_deref(), request.overwrite)
+}
+
+fn cli_deploy_plan_response(
+    source: Option<&Path>,
+    target_dir: Option<&Path>,
+    applied: bool,
+    supported_override: Option<bool>,
+    message_override: Option<String>,
+) -> CliDeployResponse {
+    let target_dir = target_dir
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| normalize_cli_deploy_dir(None));
+    let deployed_path = target_dir.join(executable_name("ned"));
+    let path_ready = path_contains_directory(&target_dir);
+    let supported = supported_override.unwrap_or_else(|| source.is_some());
+    let commands = cli_deploy_commands(&target_dir);
+    let manual_steps = cli_deploy_manual_steps(&target_dir, path_ready);
+    let message = message_override.unwrap_or_else(|| {
+        if applied && path_ready {
+            format!("Deployed ned to {}.", deployed_path.display())
+        } else if applied {
+            format!(
+                "Deployed ned to {}; add {} to PATH before opening a new terminal.",
+                deployed_path.display(),
+                target_dir.display()
+            )
+        } else if source.is_some() {
+            format!(
+                "Ready to deploy ned to {} for the current user.",
+                deployed_path.display()
+            )
+        } else {
+            "Packaged ned helper was not found; deploy is unavailable in this build.".to_string()
+        }
+    });
+    CliDeployResponse {
+        platform: env::consts::OS.to_string(),
+        source_path: source.map(path_to_display),
+        target_dir: path_to_display(&target_dir),
+        deployed_path: path_to_display(&deployed_path),
+        applied,
+        supported,
+        path_ready,
+        install_kind: if cfg!(windows) { "copy" } else { "symlink" }.to_string(),
+        message,
+        commands,
+        manual_steps,
+    }
+}
+
+pub(crate) fn deploy_cli_from_source(
+    source: &Path,
+    target_dir: Option<&str>,
+    overwrite: bool,
+) -> Result<CliDeployResponse, String> {
+    let source = source
+        .canonicalize()
+        .map_err(|err| format!("Could not resolve ned helper at {}: {err}", source.display()))?;
+    if !source.is_file() {
+        return Err(format!("ned helper is not a file: {}", source.display()));
+    }
+    let target_dir = normalize_cli_deploy_dir(target_dir);
+    let deployed_path = target_dir.join(executable_name("ned"));
+    fs::create_dir_all(&target_dir)
+        .map_err(|err| format!("Could not create CLI deploy directory {}: {err}", target_dir.display()))?;
+
+    if deployed_path.exists() || fs::symlink_metadata(&deployed_path).is_ok() {
+        if deployed_cli_points_to_source(&deployed_path, &source) {
+            return Ok(cli_deploy_plan_response(
+                Some(&source),
+                Some(&target_dir),
+                true,
+                Some(true),
+                Some(format!("ned is already deployed at {}.", deployed_path.display())),
+            ));
+        }
+        if !overwrite {
+            return Ok(cli_deploy_plan_response(
+                Some(&source),
+                Some(&target_dir),
+                false,
+                Some(false),
+                Some(format!(
+                    "{} already exists and does not point to this NEditor build; it was not overwritten.",
+                    deployed_path.display()
+                )),
+            ));
+        }
+        fs::remove_file(&deployed_path)
+            .map_err(|err| format!("Could not replace existing {}: {err}", deployed_path.display()))?;
+    }
+
+    deploy_cli_link_or_copy(&source, &deployed_path)?;
+    Ok(cli_deploy_plan_response(
+        Some(&source),
+        Some(&target_dir),
+        true,
+        Some(true),
+        None,
+    ))
+}
+
+fn find_ned_cli_binary() -> Option<PathBuf> {
+    if let Some(path) = env::var_os("NEDITOR_CLI_BINARY").map(PathBuf::from) {
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    let current = env::current_exe().ok()?;
+    if current
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name == "ned" || name.starts_with("ned-"))
+    {
+        return Some(current);
+    }
+    let directory = current.parent()?;
+    for candidate in cli_binary_candidates(directory) {
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for directory in [
+        manifest_dir.join("target").join("debug"),
+        manifest_dir.join("target").join("release"),
+        manifest_dir.join("binaries"),
+    ] {
+        for candidate in cli_binary_candidates(&directory) {
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+fn cli_binary_candidates(directory: &Path) -> Vec<PathBuf> {
+    let mut candidates = vec![directory.join(executable_name("ned"))];
+    if let Ok(entries) = fs::read_dir(directory) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            if name.starts_with("ned-") && name.ends_with(env::consts::EXE_SUFFIX) {
+                candidates.push(path);
+            }
+        }
+    }
+    candidates
+}
+
+fn normalize_cli_deploy_dir(target_dir: Option<&str>) -> PathBuf {
+    target_dir
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(expand_home_path)
+        .or_else(|| env::var_os("NEDITOR_CLI_DEPLOY_DIR").map(PathBuf::from))
+        .unwrap_or_else(default_cli_deploy_dir)
+}
+
+fn default_cli_deploy_dir() -> PathBuf {
+    if cfg!(windows) {
+        return env::var_os("LOCALAPPDATA")
+            .map(PathBuf::from)
+            .or_else(|| env::var_os("USERPROFILE").map(PathBuf::from))
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("NEditor")
+            .join("bin");
+    }
+    user_home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".local")
+        .join("bin")
+}
+
+fn user_home_dir() -> Option<PathBuf> {
+    env::var_os("HOME")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("USERPROFILE").map(PathBuf::from))
+}
+
+fn expand_home_path(value: &str) -> PathBuf {
+    if value == "~" {
+        return user_home_dir().unwrap_or_else(|| PathBuf::from(value));
+    }
+    if let Some(rest) = value.strip_prefix("~/") {
+        if let Some(home) = user_home_dir() {
+            return home.join(rest);
+        }
+    }
+    PathBuf::from(value)
+}
+
+fn deployed_cli_points_to_source(path: &Path, source: &Path) -> bool {
+    if let Ok(target) = fs::read_link(path) {
+        let absolute_target = if target.is_absolute() {
+            target
+        } else {
+            path.parent().unwrap_or_else(|| Path::new(".")).join(target)
+        };
+        if absolute_target
+            .canonicalize()
+            .ok()
+            .as_deref()
+            .is_some_and(|target| target == source)
+        {
+            return true;
+        }
+    }
+    path.canonicalize()
+        .ok()
+        .as_deref()
+        .is_some_and(|target| target == source)
+}
+
+fn deploy_cli_link_or_copy(source: &Path, target: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(source, target)
+            .or_else(|_| fs::copy(source, target).map(|_| ()))
+            .map_err(|err| format!("Could not deploy ned to {}: {err}", target.display()))?;
+        use std::os::unix::fs::PermissionsExt;
+        if !fs::symlink_metadata(target)
+            .map(|metadata| metadata.file_type().is_symlink())
+            .unwrap_or(false)
+        {
+            let mut permissions = fs::metadata(target)
+                .map_err(|err| format!("Could not inspect deployed ned at {}: {err}", target.display()))?
+                .permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(target, permissions).map_err(|err| {
+                format!("Could not mark deployed ned executable at {}: {err}", target.display())
+            })?;
+        }
+    }
+    #[cfg(windows)]
+    {
+        fs::copy(source, target)
+            .map(|_| ())
+            .map_err(|err| format!("Could not deploy ned to {}: {err}", target.display()))?;
+    }
+    Ok(())
+}
+
+fn path_contains_directory(directory: &Path) -> bool {
+    env::var_os("PATH")
+        .map(|path| env::split_paths(&path).any(|entry| paths_equivalent(&entry, directory)))
+        .unwrap_or(false)
+}
+
+fn paths_equivalent(left: &Path, right: &Path) -> bool {
+    if left == right {
+        return true;
+    }
+    match (left.canonicalize(), right.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
+fn cli_deploy_commands(target_dir: &Path) -> Vec<String> {
+    let dir = path_to_display(target_dir);
+    if cfg!(windows) {
+        vec![
+            format!("mkdir \"{dir}\""),
+            format!("setx PATH \"%PATH%;{dir}\""),
+            "ned doctor --json".to_string(),
+        ]
+    } else {
+        vec![
+            format!("mkdir -p \"{dir}\""),
+            format!("export PATH=\"{dir}:$PATH\""),
+            "ned doctor --json".to_string(),
+        ]
+    }
+}
+
+fn cli_deploy_manual_steps(target_dir: &Path, path_ready: bool) -> Vec<String> {
+    let mut steps = vec![
+        format!("Deploy writes a user-level `ned` launcher to {}.", target_dir.display()),
+        "Open a new terminal after deployment and run `ned doctor --json`.".to_string(),
+    ];
+    if !path_ready {
+        steps.push(format!(
+            "Add {} to PATH if `ned` is not found in new terminals.",
+            target_dir.display()
+        ));
+    }
+    steps
 }
 
 fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
@@ -4363,18 +4716,35 @@ fn find_outline_by_id_or_alias(
     if normalized.is_empty() {
         return None;
     }
-    if let Some(outline) = catalog.iter().find(|outline| outline.id == normalized) {
-        return Some(outline.clone());
+    for candidate in outline_lookup_candidates(&normalized) {
+        if let Some(outline) = catalog.iter().find(|outline| outline.id == candidate) {
+            return Some(outline.clone());
+        }
     }
-    let builtin_alias = normalized
-        .strip_prefix("business-")
-        .or_else(|| normalized.strip_prefix("outline-"))?;
-    catalog
-        .iter()
-        .find(|outline| outline.source == "builtin" && outline.id == builtin_alias)
-        .cloned()
+    None
 }
 
+fn outline_lookup_candidates(normalized: &str) -> Vec<String> {
+    let mut candidates = vec![normalized.to_string()];
+    if let Some(unprefixed) = normalized.strip_prefix("business-") {
+        candidates.push(unprefixed.to_string());
+    } else {
+        candidates.push(format!("business-{normalized}"));
+    }
+    if let Some(unprefixed) = normalized.strip_prefix("outline-") {
+        candidates.push(unprefixed.to_string());
+    } else {
+        candidates.push(format!("outline-{normalized}"));
+    }
+    match normalized {
+        "rfq-response" => candidates.push("business-rfq".to_string()),
+        "tender-response" => candidates.push("business-tender".to_string()),
+        _ => {}
+    }
+    candidates
+}
+
+#[allow(dead_code)]
 fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
     vec![
         DocumentOutlineInfo {
@@ -4740,6 +5110,227 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
     ]
 }
 
+fn app_document_outline_catalog() -> Result<Vec<DocumentOutlineEntry>, String> {
+    let mut outlines = business_document_outline_catalog()?;
+    outlines.extend(specialist_document_outline_catalog()?);
+    if outlines.is_empty() {
+        return Err("No built-in document outlines could be parsed.".to_string());
+    }
+    Ok(outlines)
+}
+
+fn business_document_outline_catalog() -> Result<Vec<DocumentOutlineEntry>, String> {
+    let outlines = parse_ts_exported_array_objects(
+        BUSINESS_DOCUMENT_SOURCE,
+        "export const businessDocumentTemplates",
+    )?
+    .into_iter()
+    .filter_map(|object| {
+        let source_id = parse_ts_object_string_property(object, "id")?;
+        let label = parse_ts_object_string_property(object, "label")?;
+        let summary = parse_ts_object_string_property(object, "summary")?;
+        let docs_live_type = parse_ts_object_string_property(object, "docsLiveType")?;
+        let best_for = parse_ts_object_array_property(object, "bestFor");
+        let outline = parse_ts_object_array_property(object, "outline");
+        if outline.is_empty() {
+            return None;
+        }
+        let mut tags = vec![source_id.clone(), docs_live_type.clone()];
+        tags.extend(best_for.iter().cloned());
+        Some(DocumentOutlineEntry {
+            id: format!("business-{source_id}"),
+            label,
+            category: business_document_outline_category(&source_id).to_string(),
+            summary,
+            docs_live_type,
+            best_for,
+            outline,
+            tags: tags
+                .into_iter()
+                .map(|tag| normalize_outline_tag(&tag))
+                .collect(),
+            source: "builtin".to_string(),
+        })
+    })
+    .collect::<Vec<_>>();
+    nonempty_vec(outlines, "No business document outlines could be parsed.")
+}
+
+fn specialist_document_outline_catalog() -> Result<Vec<DocumentOutlineEntry>, String> {
+    let outlines = parse_ts_exported_array_objects(
+        BUSINESS_DOCUMENT_SOURCE,
+        "const specialistDocumentOutlineTemplates",
+    )?
+    .into_iter()
+    .filter_map(|object| {
+        let id = parse_ts_object_string_property(object, "id")?;
+        let label = parse_ts_object_string_property(object, "name")?;
+        let category = parse_ts_object_string_property(object, "category")?;
+        let summary = parse_ts_object_string_property(object, "summary")?;
+        let docs_live_type = parse_ts_object_string_property(object, "docsLiveType")?;
+        let best_for = parse_ts_object_array_property(object, "bestFor");
+        let outline = parse_ts_object_array_property(object, "outline");
+        let tags = parse_ts_object_array_property(object, "tags");
+        if outline.is_empty() {
+            return None;
+        }
+        Some(DocumentOutlineEntry {
+            id,
+            label,
+            category,
+            summary,
+            docs_live_type,
+            best_for,
+            outline,
+            tags,
+            source: "builtin".to_string(),
+        })
+    })
+    .collect::<Vec<_>>();
+    nonempty_vec(outlines, "No specialist document outlines could be parsed.")
+}
+
+fn nonempty_vec<T>(items: Vec<T>, message: &str) -> Result<Vec<T>, String> {
+    if items.is_empty() {
+        Err(message.to_string())
+    } else {
+        Ok(items)
+    }
+}
+
+fn business_document_outline_category(id: &str) -> &'static str {
+    if matches!(id, "rfp" | "rfq" | "tender") {
+        return "Procurement";
+    }
+    if matches!(
+        id,
+        "tutorial" | "lesson-plan" | "lesson-content" | "technical-textbook"
+    ) {
+        return "Learning";
+    }
+    if matches!(id, "novel" | "podcast-script" | "movie-script") {
+        return "Creative";
+    }
+    if matches!(
+        id,
+        "proposal" | "sow" | "capability-statement" | "case-study"
+    ) {
+        return "Business Development";
+    }
+    if matches!(id, "business-case" | "executive-brief") {
+        return "Executive";
+    }
+    "General"
+}
+
+fn normalize_outline_tag(value: &str) -> String {
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+fn parse_ts_exported_array_objects<'a>(
+    source: &'a str,
+    marker: &str,
+) -> Result<Vec<&'a str>, String> {
+    let start = source
+        .find(marker)
+        .ok_or_else(|| format!("Could not find TypeScript array marker '{marker}'."))?;
+    let initializer = source[start..]
+        .find('=')
+        .map(|index| start + index)
+        .ok_or_else(|| format!("Could not find initializer for '{marker}'."))?;
+    let array_open = source[initializer..]
+        .find('[')
+        .map(|index| initializer + index)
+        .ok_or_else(|| format!("Could not find array for '{marker}'."))?;
+    let array_close = find_matching_delimiter(source, array_open, '[', ']')
+        .ok_or_else(|| format!("Could not parse array for '{marker}'."))?;
+    let mut objects = Vec::new();
+    let mut cursor = array_open + 1;
+    while let Some(relative) = source[cursor..array_close].find('{') {
+        let object_open = cursor + relative;
+        let Some(object_close) = find_matching_delimiter(source, object_open, '{', '}') else {
+            break;
+        };
+        if object_close > array_close {
+            break;
+        }
+        objects.push(&source[object_open..=object_close]);
+        cursor = object_close + 1;
+    }
+    if objects.is_empty() {
+        return Err(format!("No objects found for TypeScript array '{marker}'."));
+    }
+    Ok(objects)
+}
+
+fn parse_ts_object_string_property(object: &str, key: &str) -> Option<String> {
+    parse_ts_object_property_value(object, key).and_then(parse_js_string)
+}
+
+fn parse_ts_object_array_property(object: &str, key: &str) -> Vec<String> {
+    parse_ts_object_property_value(object, key)
+        .map(parse_js_string_array)
+        .unwrap_or_default()
+}
+
+fn parse_ts_object_property_value<'a>(object: &'a str, key: &str) -> Option<&'a str> {
+    let body = object.trim().trim_start_matches('{').trim_end_matches('}');
+    for property in split_top_level_arguments(body) {
+        let colon = find_top_level_colon(property)?;
+        let name = property[..colon]
+            .trim()
+            .trim_matches('"')
+            .trim_matches('\'');
+        if name == key {
+            return Some(property[colon + 1..].trim());
+        }
+    }
+    None
+}
+
+fn find_top_level_colon(source: &str) -> Option<usize> {
+    let mut bracket_depth = 0usize;
+    let mut brace_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    for (index, ch) in source.char_indices() {
+        if let Some(quote_char) = quote {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == quote_char {
+                quote = None;
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' | '`' => quote = Some(ch),
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '{' => brace_depth += 1,
+            '}' => brace_depth = brace_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            ':' if bracket_depth == 0 && brace_depth == 0 && paren_depth == 0 => {
+                return Some(index);
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 struct WorkspaceOutlineSaveInput {
     id: String,
     label: Option<String>,
@@ -4753,10 +5344,7 @@ struct WorkspaceOutlineSaveInput {
 }
 
 fn document_outline_catalog_entries(workspace: &Path) -> Result<Vec<DocumentOutlineEntry>, String> {
-    let mut outlines = document_outline_catalog()
-        .into_iter()
-        .map(built_in_outline_entry)
-        .collect::<Vec<_>>();
+    let mut outlines = app_document_outline_catalog()?;
     outlines.extend(
         read_workspace_outline_library(workspace)?
             .outlines
@@ -4766,6 +5354,7 @@ fn document_outline_catalog_entries(workspace: &Path) -> Result<Vec<DocumentOutl
     Ok(outlines)
 }
 
+#[allow(dead_code)]
 fn built_in_outline_entry(outline: DocumentOutlineInfo) -> DocumentOutlineEntry {
     DocumentOutlineEntry {
         id: outline.id.to_string(),
@@ -9203,7 +9792,7 @@ fn help_text() -> String {
         "  ned --version".to_string(),
         "".to_string(),
         format!("Templates: {}", NEW_DOCUMENT_TEMPLATES.join(", ")),
-        "Outlines: proposal, rfp, rfq, tender, report, sow, capability-statement, case-study, rfp-response, rfp-technical-proposal, grant-application, standard-operating-procedure, product-requirements-document, project-charter, and more.".to_string(),
+        "Outlines: business-proposal, business-rfp, business-rfq, business-tender, business-report, business-textbook, business-rfp-response, outline-rfp-technical-proposal, outline-rfp-compliance-review, outline-contract-review-brief, and more.".to_string(),
         format!(
             "Targets: {}, or all. Use comma-separated targets for delivery packs.",
             SUPPORTED_EXPORT_TARGETS.join(", ")

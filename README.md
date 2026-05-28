@@ -120,6 +120,12 @@ ned doctor --workspace . --json
 ned default-reader --status --json
 ```
 
+Use **File -> Deploy CLI** in NEditor when you want the packaged `ned` helper
+made available from normal terminal windows. The same action is available in
+**Settings -> Files -> Command line and default reader**; it installs a
+user-level launcher, reports the exact target path, and shows the PATH command
+to run if your shell cannot see the target directory yet.
+
 `ned file.md` and `ned open` launch NEditor with one or more Markdown files;
 use `ned open file.md --dry-run --json` when a setup script needs to verify the
 paths that would be handed to the app without opening a window.
@@ -177,7 +183,7 @@ with `ned` are selectable in the app, and app-saved custom outlines remain
 available to CLI scripts;
 use
 `ned outlines --category Procurement --query RFP --json` for filtered discovery
-or `ned outlines --markdown rfp-technical-proposal` to print a copyable outline
+or `ned outlines --markdown outline-rfp-technical-proposal` to print a copyable outline
 for the Outline planner, Docs Live, or another writing tool. Use
 `ned outlines --workspace . --save board-pack --name "Board Pack" --docs-live-type board-memo --section "Decision Requested" --section "Recommendation" --json`
 to create or replace a workspace outline, `ned outlines --workspace . --markdown board-pack`
@@ -192,15 +198,14 @@ studies, board memos, policy briefs, research reports, grant applications, SOPs,
 PRDs, project charters, QBRs, due-diligence memos, contract review briefs,
 implementation playbooks, incident postmortems, meeting decision packs, and
 market research reports.
-Specialist built-in outlines cover buyer-side RFPs, RFQs, tenders, business
-reports, lesson content, statements of work, capability statements, case
-studies, executive briefs, RFP technical proposals, compliance reviews, grant
-applications, SOPs, PRDs, project charters, QBRs, due-diligence memos, incident
-postmortems, meeting decision packs, market research, contract review briefs,
-board memos, policy briefs, research reports, and implementation playbooks. The
-CLI also accepts app-style built-in outline IDs such as `business-report` and
-`outline-rfp-technical-proposal` when printing Markdown, which keeps GUI
-selections and support scripts compatible. `ned snippets`
+Built-in outlines are now sourced from the same app catalog that powers the
+visual Outline Library: 34 business-document outlines use IDs such as
+`business-report`, `business-textbook`, and `business-rfp-response`, while 16
+specialist outlines use IDs such as `outline-rfp-technical-proposal`,
+`outline-rfp-compliance-review`, and `outline-contract-review-brief`. The CLI
+still accepts older unprefixed aliases such as `report` or
+`rfp-technical-proposal` when printing Markdown, which keeps existing support
+scripts compatible. `ned snippets`
 explains reusable standard document parts
 such as contact blocks, company overview, scope, pricing assumptions, compliance
 matrix, risk register, tender checklist, tutorial step, and review handoff; use

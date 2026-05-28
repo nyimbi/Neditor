@@ -1208,31 +1208,34 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     let outline_report: serde_json::Value =
         serde_json::from_str(&outlines.message).expect("outlines json");
     assert_eq!(outline_report["schema"], "neditor.ned-outlines.v1");
-    assert!(outline_report["count"].as_u64().expect("outline count") >= 36);
+    assert_eq!(outline_report["count"], 50);
     assert!(outline_report["outlines"]
         .as_array()
         .expect("outlines")
-        .contains(&serde_json::json!("rfp-technical-proposal")));
+        .contains(&serde_json::json!("outline-rfp-technical-proposal")));
     for id in [
-        "rfp",
-        "rfq",
-        "tender",
-        "sow",
-        "capability-statement",
-        "case-study",
-        "report",
-        "lesson-content",
-        "executive-brief",
-        "grant-application",
-        "standard-operating-procedure",
-        "product-requirements-document",
-        "project-charter",
-        "quarterly-business-review",
-        "due-diligence-memo",
-        "incident-postmortem",
-        "meeting-decision-pack",
-        "market-research-report",
-        "contract-review-brief",
+        "business-blank",
+        "business-rfp",
+        "business-rfq",
+        "business-tender",
+        "business-sow",
+        "business-capability-statement",
+        "business-case-study",
+        "business-report",
+        "business-textbook",
+        "business-lesson-content",
+        "business-executive-brief",
+        "business-grant-application",
+        "business-standard-operating-procedure",
+        "business-product-requirements-document",
+        "business-project-charter",
+        "business-quarterly-business-review",
+        "business-due-diligence-memo",
+        "business-incident-postmortem",
+        "business-meeting-decision-pack",
+        "business-market-research-report",
+        "business-contract-review-brief",
+        "outline-contract-review-brief",
     ] {
         assert!(
             outline_report["outlines"]
@@ -1246,7 +1249,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         .as_array()
         .expect("outline details")
         .iter()
-        .any(|outline| outline["id"] == "rfp-technical-proposal"
+        .any(|outline| outline["id"] == "outline-rfp-technical-proposal"
             && outline["category"] == "Procurement"
             && outline["outline"]
                 .as_array()
@@ -1256,7 +1259,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         .as_array()
         .expect("outline details")
         .iter()
-        .any(|outline| outline["id"] == "rfp"
+        .any(|outline| outline["id"] == "business-rfp"
             && outline["category"] == "Procurement"
             && outline["outline"]
                 .as_array()
@@ -1273,7 +1276,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "--ids-only".to_string(),
     ])
     .expect("filtered outline ids");
-    assert_eq!(filtered_outlines.message, "research-report");
+    assert_eq!(filtered_outlines.message, "outline-research-report");
 
     let learning_outlines = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1285,7 +1288,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "--ids-only".to_string(),
     ])
     .expect("learning outline ids");
-    assert_eq!(learning_outlines.message, "lesson-content");
+    assert_eq!(learning_outlines.message, "business-lesson-content");
 
     let case_study_outlines = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1293,11 +1296,11 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "--category".to_string(),
         "Business Development".to_string(),
         "--query".to_string(),
-        "customer proof".to_string(),
+        "customer challenge".to_string(),
         "--ids-only".to_string(),
     ])
     .expect("case study outline ids");
-    assert_eq!(case_study_outlines.message, "case-study");
+    assert_eq!(case_study_outlines.message, "business-case-study");
 
     let buyer_rfp_outlines = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1309,7 +1312,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "--ids-only".to_string(),
     ])
     .expect("buyer rfp outline ids");
-    assert_eq!(buyer_rfp_outlines.message, "rfp");
+    assert_eq!(buyer_rfp_outlines.message, "business-rfp");
 
     let legal_outlines = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1325,7 +1328,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         .as_array()
         .expect("legal outline details")
         .iter()
-        .any(|outline| outline["id"] == "contract-review-brief"
+        .any(|outline| outline["id"] == "outline-contract-review-brief"
             && outline["docsLiveType"] == "contract-brief"
             && outline["outline"]
                 .as_array()
@@ -1352,7 +1355,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     .expect("app-prefixed outline markdown");
     let app_prefixed_report: serde_json::Value =
         serde_json::from_str(&app_prefixed_outline.message).expect("app-prefixed outline json");
-    assert_eq!(app_prefixed_report["outline"], "report");
+    assert_eq!(app_prefixed_report["outline"], "business-report");
     assert!(app_prefixed_report["markdown"]
         .as_str()
         .expect("app-prefixed markdown")
@@ -2464,6 +2467,62 @@ fn ned_cli_reports_default_reader_setup_as_json() {
     ])
     .expect_err("unsupported default reader option");
     assert!(error.contains("Unsupported default-reader option"));
+}
+
+#[test]
+fn deploy_cli_installs_user_level_ned_launcher_without_overwriting_conflicts() {
+    let source_dir = temp_workspace_path("cli-deploy-source");
+    let target_dir = temp_workspace_path("cli-deploy-target");
+    fs::create_dir_all(&source_dir).expect("create source dir");
+    fs::create_dir_all(&target_dir).expect("create target dir");
+    let source = source_dir.join(format!("ned{}", std::env::consts::EXE_SUFFIX));
+    fs::write(&source, "fake ned helper").expect("write fake ned");
+
+    let deployed = crate::cli::deploy_cli_from_source(
+        &source,
+        Some(target_dir.to_string_lossy().as_ref()),
+        false,
+    )
+    .expect("deploy cli");
+    assert!(deployed.applied);
+    assert!(deployed.supported);
+    assert!(deployed
+        .deployed_path
+        .ends_with(&format!("ned{}", std::env::consts::EXE_SUFFIX)));
+    assert!(target_dir
+        .join(format!("ned{}", std::env::consts::EXE_SUFFIX))
+        .exists());
+    assert!(deployed
+        .manual_steps
+        .iter()
+        .any(|step| step.contains("ned doctor --json")));
+
+    let idempotent = crate::cli::deploy_cli_from_source(
+        &source,
+        Some(target_dir.to_string_lossy().as_ref()),
+        false,
+    )
+    .expect("idempotent deploy cli");
+    assert!(idempotent.applied);
+    assert!(idempotent.message.contains("already deployed"));
+
+    let conflict_dir = temp_workspace_path("cli-deploy-conflict");
+    fs::create_dir_all(&conflict_dir).expect("create conflict dir");
+    let conflict_path = conflict_dir.join(format!("ned{}", std::env::consts::EXE_SUFFIX));
+    fs::write(&conflict_path, "different ned").expect("write existing ned");
+    let conflict = crate::cli::deploy_cli_from_source(
+        &source,
+        Some(conflict_dir.to_string_lossy().as_ref()),
+        false,
+    )
+    .expect("conflict deploy cli");
+    assert!(!conflict.applied);
+    assert!(!conflict.supported);
+    assert!(conflict.message.contains("was not overwritten"));
+    assert_eq!(
+        fs::read_to_string(conflict_path).expect("conflict file"),
+        "different ned"
+    );
 }
 
 #[test]

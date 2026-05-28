@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-28
+Updated: 2026-05-29
 
 ## Active Goal
 
@@ -26,6 +26,68 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-29 CLI Outline Catalog Parity
+
+The CLI outline library now reads the same built-in outline catalog as the app's
+visual Outline Library instead of maintaining a shorter hand-copied list.
+`ned outlines --json` exposes 50 built-in outlines: 34 business-document
+outlines with `business-*` IDs and 16 specialist outlines with `outline-*` IDs.
+Older unprefixed IDs such as `report`, `sow`, and `rfp-technical-proposal`
+remain accepted as Markdown lookup aliases so existing support scripts do not
+break.
+
+This closes the previously identified CLI/UI template-library parity gap for
+outline discovery. It does not close broader release readiness; external
+release evidence and platform-signing gates remain tracked separately.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked ned_cli_lists_templates_and_targets_for_terminal_discovery --lib` | Pass | Verifies 50 outline entries, app-style IDs, legacy alias lookup, filtered discovery, snippets, templates, and transform-template discovery. |
+
+## 2026-05-29 Deploy CLI Menu Action
+
+NEditor now exposes a first-class **Deploy CLI** action in the File menu and in
+the Settings command-line setup panel. The action locates the packaged `ned`
+sidecar, deploys a guarded user-level launcher, reports the exact target path,
+shows PATH setup commands, and refuses to overwrite an unrelated existing `ned`
+without an explicit replacement path.
+
+This improves business-user setup and Homebrew/package readiness because users
+can make `ned` globally available from the app instead of manually finding
+bundle internals.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked deploy_cli_installs_user_level_ned_launcher_without_overwriting_conflicts --lib` | Pass | Verifies deployment, idempotency, and existing-command conflict protection. |
+| `cargo test --locked spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | Verifies `cli_deploy_plan` and `deploy_cli` are registered and covered in the IPC command ledger. |
+
+## 2026-05-29 Release Evidence Kit Freshness
+
+The release evidence kit handoff is now current for the latest source commit.
+All locally generated evidence templates were refreshed after the spec work-order
+runbooks were made durable, and the regenerated kit now reports zero missing
+templates, zero stale templates, and zero missing spec-completion runbooks.
+
+This does not close the remaining external release gaps. `check:release-readiness`
+still correctly reports `current-host-ready-with-external-gaps`, and
+`check:spec-completion` still correctly reports `partial-with-release-risks`.
+The improvement is that the evidence packet sent to release owners and external
+reviewers is current, self-contained, and validator-accepted.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:platform-evidence` | Pass with expected pending state | Refreshed Windows/Linux platform evidence templates at the current source commit while preserving `pending-external-evidence`. |
+| `pnpm run check:release-signing` | Pass with expected pending state | Refreshed macOS/Windows/Linux signing evidence templates at the current source commit while preserving `pending-release-credentials`. |
+| `pnpm run check:ai-provider` / `pnpm run check:ai-runtime` | Pass with expected pending state | Refreshed live-provider and real-device AI evidence templates at the current source commit. |
+| `pnpm run check:security-review` / `pnpm run check:performance-profile` | Pass with expected pending state | Refreshed independent security-review and release-device performance-profile evidence templates at the current source commit. |
+| `pnpm run check:tables:manual` / `pnpm run check:a11y:manual` | Pass with expected pending state | Refreshed table-editor and accessibility manual-review templates at the current source commit. |
+| `pnpm run test:rendered-exports` | Pass | Refreshed rendered export artifacts and visual-review sign-off template at the current source commit. |
+| `pnpm run check:google-docs-import` | Pass with expected pending state | Refreshed the Google Docs import/readback evidence template while preserving `pending-google-drive-authorization`. |
+| `pnpm run collect:evidence-kit` | Pass | Regenerated `.tmp/release-evidence-kit` with 17 copied templates, 8 spec-completion runbooks, 0 missing templates, 0 stale templates, and 0 missing spec runbooks. |
+| `pnpm run check:evidence-kit` | Pass | Accepted the current release evidence kit manifest and packaged spec-completion runbook coverage. |
+| `pnpm run check:release-readiness` | Pass with external gaps | Wrote `.tmp/release-readiness/report.json` with status `current-host-ready-with-external-gaps`. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks`. |
 
 ## 2026-05-28 Include Diagnostic Range Tightening
 
