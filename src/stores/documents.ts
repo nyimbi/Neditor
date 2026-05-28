@@ -89,6 +89,7 @@ import {
   resetGuidedDemoProgressState,
 } from "../lib/workflowHistory";
 import {
+  applyDuplicatedWorkspaceDocumentState,
   applyOpenedWorkspaceDocumentState,
   applyOpenRecentWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderFailureState,
@@ -773,10 +774,11 @@ export const useDocumentsStore = defineStore("documents", {
         request: { from: source, to: path },
       });
       const duplicate = createDuplicateDocumentState(response, () => crypto.randomUUID());
-      this.documents.push(duplicate);
-      this.activeId = duplicate.id;
-      this.statusMessage = `Duplicated ${duplicate.title}`;
-      this.rememberFile(duplicate.path);
+      const duplicated = applyDuplicatedWorkspaceDocumentState(this.documents, this.recentFiles, duplicate);
+      this.documents = duplicated.documents;
+      this.activeId = duplicated.activeId;
+      this.recentFiles = duplicated.recentFiles;
+      this.statusMessage = duplicated.statusMessage;
       if (this.workspaceRoot) await this.refreshWorkspace();
       await this.compileActive();
       await this.persistWorkspace();

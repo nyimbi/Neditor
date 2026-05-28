@@ -47,6 +47,13 @@ export interface OpenedWorkspaceDocumentStateResult {
   statusMessage: string;
 }
 
+export interface DuplicatedWorkspaceDocumentStateResult {
+  documents: OpenDocument[];
+  activeId: string;
+  recentFiles: string[];
+  statusMessage: string;
+}
+
 export interface OpenWorkspaceFolderSuccessStateResult {
   recentFolders: string[];
   sidebar: "files";
@@ -231,5 +238,18 @@ export function applyOpenedWorkspaceDocumentState(
     recentlyClosed: forgetRecentItem(recentlyClosed, document.path),
     missingWorkspaceFiles: missingWorkspaceFiles.filter((missing) => missing !== document.path),
     statusMessage: `Opened ${document.title}`,
+  };
+}
+
+export function applyDuplicatedWorkspaceDocumentState(
+  documents: OpenDocument[],
+  recentFiles: string[],
+  document: OpenDocument,
+): DuplicatedWorkspaceDocumentStateResult {
+  return {
+    documents: [...documents, document],
+    activeId: document.id,
+    recentFiles: rememberRecentItem(recentFiles, document.path, 20),
+    statusMessage: `Duplicated ${document.title}`,
   };
 }

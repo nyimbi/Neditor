@@ -237,6 +237,7 @@ import {
   resetGuidedDemoProgressState,
 } from "../src/lib/workflowHistory.js";
 import {
+  applyDuplicatedWorkspaceDocumentState,
   applyOpenedWorkspaceDocumentState,
   applyOpenRecentWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderFailureState,
@@ -901,6 +902,23 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   deepEqual(opened.recentlyClosed, ["/old.md"]);
   deepEqual(opened.missingWorkspaceFiles, ["/missing.md"]);
   equal(opened.statusMessage, "Opened c.md");
+
+  const duplicated = applyDuplicatedWorkspaceDocumentState(
+    [restored],
+    ["/old.md", "/workspace/copy.md"],
+    {
+      id: "copy-1",
+      path: "/workspace/copy.md",
+      title: "copy.md",
+      text: "# Copy",
+      savedHash: "hash-copy",
+      dirty: false,
+    },
+  );
+  equal(duplicated.activeId, "copy-1");
+  deepEqual(duplicated.documents.map((document) => document.id), ["restored-1", "copy-1"]);
+  deepEqual(duplicated.recentFiles, ["/workspace/copy.md", "/old.md"]);
+  equal(duplicated.statusMessage, "Duplicated copy.md");
 });
 
 test("file lifecycle helpers update document state for rich file operations", () => {
