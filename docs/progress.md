@@ -43,6 +43,21 @@ workflow smoke evidence for launched-webview multi-selection editing.
 | `pnpm run check:docs` | Pass | Markdown links resolved after closing the multi-cursor evidence row. |
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json`; open rows dropped to 98 while remaining gaps are external/manual/distribution evidence or separately tracked local proof. |
 
+## 2026-05-28 Preview Navigation Evidence Closure
+
+`6.4 Preview | Scroll sync and click-to-source` is now marked complete in
+`docs/spec-completion-matrix.md`. The closure is based on exact scroll-sync
+handlers and source-map click routing in `src/App.vue`, focused browser proof
+for both scroll directions, heading click-through, and anchored figure/table/
+equation click-through, plus launched-webview native smoke evidence for mapped
+table/equation source jumps.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "syncs editor and preview scrolling" --project chromium` | Pass | Focused Chromium workflow passed on 2026-05-28, proving editor-to-preview sync, preview-to-editor sync, preview heading click-through, and source jumps from anchored figure, table, and equation artifacts. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after closing the preview scroll/click-to-source evidence row. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json`; open rows dropped to 97 while remaining gaps are external/manual/distribution evidence or separately tracked local proof. |
+
 ## 2026-05-28 Verification Update
 
 Table cursor-follow source editing verification:
