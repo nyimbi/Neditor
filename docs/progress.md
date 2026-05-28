@@ -58,6 +58,25 @@ table/equation source jumps.
 | `pnpm run check:docs` | Pass | Markdown links resolved after closing the preview scroll/click-to-source evidence row. |
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json`; open rows dropped to 97 while remaining gaps are external/manual/distribution evidence or separately tracked local proof. |
 
+## 2026-05-28 Git Versioning Evidence Closure
+
+`9.1 Git versioning | Detect repo, branch/dirty, commit, history, diff, restore,
+tag` is now marked complete in `docs/spec-completion-matrix.md`. The closure is
+based on real temporary-repository Rust proof for the full Git command chain,
+Git ref/path safety regressions, and focused browser proof for release tagging,
+Git status refresh, Git-history restore, and the pre-restore safety snapshot.
+Git-free snapshot UX remains tracked separately by the `9.1 Git-free snapshots`
+row.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked git_history_diff_commit_tag_and_restore_workflow --lib` | Pass | Real temporary-repository workflow proved status, dirty summary, diff, commit, history, release tag, and revision restore through the native Git command helpers. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked git_restore_and_tag_reject_option_shaped_refs --lib` | Pass | Git tag/revision option-injection and unsupported reflog syntax are rejected before Git execution. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked git_restore_refuses_symlink_targets --lib` | Pass | Git restore refuses symlink worktree targets before replacing the file. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs snapshot restore and release tagging workflows" --project chromium` | Pass | Focused Chromium workflow proved Versioning-panel status/diff rendering, release tag `v2.0.0`, Git status refresh, Git-history restore, and `pre-git-restore` snapshot creation. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after closing the Git versioning evidence row. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json`; open rows dropped to 96 while remaining gaps are external/manual/distribution evidence or separately tracked local proof. |
+
 ## 2026-05-28 Verification Update
 
 Table cursor-follow source editing verification:
