@@ -88,7 +88,9 @@ import {
   resetGuidedDemoProgressState,
 } from "../lib/workflowHistory";
 import {
+  applyActiveWorkspaceDocumentState,
   applyDuplicatedWorkspaceDocumentState,
+  applyNewWorkspaceDocumentState,
   applyOpenedWorkspaceDocumentState,
   applyOpenRecentWorkspaceFileFailureState,
   applyOpenRecentWorkspaceFolderFailureState,
@@ -446,14 +448,13 @@ export const useDocumentsStore = defineStore("documents", {
       }
     },
     setActiveDocument(id: string) {
-      if (this.documents.some((document) => document.id === id)) {
-        this.activeId = id;
-      }
+      const active = applyActiveWorkspaceDocumentState(this.documents, this.activeId, id);
+      this.activeId = active.activeId;
     },
     async activateDocument(id: string) {
-      if (!this.documents.some((document) => document.id === id)) return;
-      if (this.activeId === id) return;
-      this.setActiveDocument(id);
+      const active = applyActiveWorkspaceDocumentState(this.documents, this.activeId, id);
+      if (!active.changed) return;
+      this.activeId = active.activeId;
       await this.compileActive();
       await this.refreshGitStatus();
       await this.persistWorkspace();
@@ -582,8 +583,9 @@ export const useDocumentsStore = defineStore("documents", {
     },
     newDocument() {
       const document = createUntitledDocumentState(starterDocument, fallbackHash(starterDocument), () => crypto.randomUUID());
-      this.documents.push(document);
-      this.activeId = document.id;
+      const created = applyNewWorkspaceDocumentState(this.documents, document);
+      this.documents = created.documents;
+      this.activeId = created.activeId;
       void this.compileActive();
     },
     async openPath(path: string) {

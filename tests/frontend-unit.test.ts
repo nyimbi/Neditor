@@ -238,7 +238,9 @@ import {
   resetGuidedDemoProgressState,
 } from "../src/lib/workflowHistory.js";
 import {
+  applyActiveWorkspaceDocumentState,
   applyDuplicatedWorkspaceDocumentState,
+  applyNewWorkspaceDocumentState,
   applyOpenedWorkspaceDocumentState,
   applyOpenRecentWorkspaceFileFailureState,
   applyOpenRecentWorkspaceFolderFailureState,
@@ -854,6 +856,20 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   equal(restored.pinned, true);
   equal(restored.editorScrollRatio, 1);
   equal(restored.previewScrollRatio, 0);
+
+  const newWorkspace = applyNewWorkspaceDocumentState(
+    [{ id: "old", path: "/old.md", title: "Old", text: "", savedHash: "old", dirty: false }],
+    restored,
+  );
+  deepEqual(newWorkspace.documents.map((document) => document.id), ["old", "restored-1"]);
+  equal(newWorkspace.activeId, "restored-1");
+
+  const activeWorkspace = applyActiveWorkspaceDocumentState(newWorkspace.documents, "old", "restored-1");
+  equal(activeWorkspace.activeId, "restored-1");
+  equal(activeWorkspace.changed, true);
+  const unchangedWorkspace = applyActiveWorkspaceDocumentState(newWorkspace.documents, "restored-1", "missing");
+  equal(unchangedWorkspace.activeId, "restored-1");
+  equal(unchangedWorkspace.changed, false);
 
   const restoreResult = applyWorkspaceRestoreState(
     [{ id: "old", path: "/old.md", title: "Old", text: "", savedHash: "old", dirty: false }],

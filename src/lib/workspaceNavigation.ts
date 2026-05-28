@@ -45,6 +45,16 @@ export interface WorkspaceRestoreStateResult {
   persistRequired: boolean;
 }
 
+export interface ActiveWorkspaceDocumentStateResult {
+  activeId: string;
+  changed: boolean;
+}
+
+export interface NewWorkspaceDocumentStateResult {
+  documents: OpenDocument[];
+  activeId: string;
+}
+
 export interface OpenedWorkspaceDocumentStateResult {
   documents: OpenDocument[];
   activeId: string;
@@ -250,6 +260,27 @@ export function applyWorkspaceRestoreState(
     missingWorkspaceFiles: missing,
     statusMessage: missingStatus,
     persistRequired: Boolean(missing.length),
+  };
+}
+
+export function applyActiveWorkspaceDocumentState(
+  documents: OpenDocument[],
+  activeId: string,
+  id: string,
+): ActiveWorkspaceDocumentStateResult {
+  if (activeId === id || !documents.some((document) => document.id === id)) {
+    return { activeId, changed: false };
+  }
+  return { activeId: id, changed: true };
+}
+
+export function applyNewWorkspaceDocumentState(
+  documents: OpenDocument[],
+  document: OpenDocument,
+): NewWorkspaceDocumentStateResult {
+  return {
+    documents: [...documents, document],
+    activeId: document.id,
   };
 }
 
