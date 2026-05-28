@@ -13,7 +13,8 @@ export function recordAgentRunHistoryState(
 }
 
 export function removeAgentRunHistoryState(history: AgentRunHistoryItem[], runId: string): AgentRunHistoryItem[] {
-  return history.filter((entry) => entry.runId !== runId);
+  const nextHistory = history.filter((entry) => entry.runId !== runId);
+  return nextHistory.length === history.length ? history : nextHistory;
 }
 
 export function clearAgentRunHistoryState(history: AgentRunHistoryItem[]) {
@@ -31,7 +32,8 @@ export function removeDocsLiveDraftHistoryState(
   history: DocsLiveDraftHistoryItem[],
   draftId: string,
 ): DocsLiveDraftHistoryItem[] {
-  return history.filter((entry) => entry.draftId !== draftId);
+  const nextHistory = history.filter((entry) => entry.draftId !== draftId);
+  return nextHistory.length === history.length ? history : nextHistory;
 }
 
 export function clearDocsLiveDraftHistoryState(history: DocsLiveDraftHistoryItem[]) {

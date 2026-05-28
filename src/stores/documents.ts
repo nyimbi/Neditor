@@ -488,7 +488,9 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     removeAgentRunHistory(runId: string) {
-      this.agentRunHistory = removeAgentRunHistoryState(this.agentRunHistory, runId);
+      const next = removeAgentRunHistoryState(this.agentRunHistory, runId);
+      if (next === this.agentRunHistory) return;
+      this.agentRunHistory = next;
       void this.persistWorkspace();
     },
     clearAgentRunHistory() {
@@ -502,7 +504,9 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     removeDocsLiveDraftHistory(draftId: string) {
-      this.docsLiveDraftHistory = removeDocsLiveDraftHistoryState(this.docsLiveDraftHistory, draftId);
+      const next = removeDocsLiveDraftHistoryState(this.docsLiveDraftHistory, draftId);
+      if (next === this.docsLiveDraftHistory) return;
+      this.docsLiveDraftHistory = next;
       void this.persistWorkspace();
     },
     clearDocsLiveDraftHistory() {

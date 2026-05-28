@@ -668,6 +668,7 @@ test("workflow history helpers deduplicate runs drafts and guided demo progress"
     ["run-1:Updated board packet:applied", "run-2:RFP response:generated"],
   );
   deepEqual(removeAgentRunHistoryState(runHistory, "run-2").map((item) => item.runId), ["run-1"]);
+  equal(removeAgentRunHistoryState(runHistory, "missing"), runHistory);
   deepEqual(clearAgentRunHistoryState(runHistory), []);
   const emptyRunHistory: typeof runHistory = [];
   equal(clearAgentRunHistoryState(emptyRunHistory), emptyRunHistory);
@@ -691,6 +692,7 @@ test("workflow history helpers deduplicate runs drafts and guided demo progress"
     ["draft-1:Updated market plan", "draft-2:Lesson plan"],
   );
   deepEqual(removeDocsLiveDraftHistoryState(draftHistory, "draft-2").map((item) => item.draftId), ["draft-1"]);
+  equal(removeDocsLiveDraftHistoryState(draftHistory, "missing"), draftHistory);
   deepEqual(clearDocsLiveDraftHistoryState(draftHistory), []);
   const emptyDraftHistory: typeof draftHistory = [];
   equal(clearDocsLiveDraftHistoryState(emptyDraftHistory), emptyDraftHistory);
