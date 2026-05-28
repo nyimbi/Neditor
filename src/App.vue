@@ -1801,10 +1801,25 @@
             <header>
               <div>
                 <h3>Publish and distribute</h3>
-                <span>{{ publishingTargetHelpText }}</span>
+                <span>{{ publishingTargetHelpText }} Uses dry-run previews and session-only endpoint tokens.</span>
               </div>
               <button type="button" :disabled="store.exportBusy" @click="preparePublishingHandoff">Prepare</button>
             </header>
+            <div class="publishing-profile-row">
+              <label>
+                Saved destination
+                <select :value="store.activePublishingDestinationId" @change="selectPublishingDestination(inputValue($event))">
+                  <option value="">Current destination</option>
+                  <option v-for="profile in store.publishingDestinationProfiles" :key="profile.id" :value="profile.id">{{ profile.name }}</option>
+                </select>
+              </label>
+              <label>
+                Destination name
+                <input v-model="publishingDestinationName" type="text" />
+              </label>
+              <button type="button" @click="savePublishingDestinationProfile">Save destination</button>
+              <button type="button" :disabled="!activePublishingDestination" @click="deleteActivePublishingDestination">Delete</button>
+            </div>
             <div class="publishing-grid">
               <label>
                 Destination
@@ -5474,6 +5489,7 @@ import {
   publishingTargetHelp,
   publishingTargetLabels,
   type PublishingContentFormat,
+  type PublishingDestinationProfile,
   type PublishingTargetKind,
 } from "./lib/publishingWorkflow";
 import {
@@ -6136,6 +6152,7 @@ const rfpImportMessage = ref("");
 const draggedTabId = ref("");
 const exportProfileName = ref("Client delivery");
 const exportReadinessNotes = ref("");
+const publishingDestinationName = ref("CMS publishing bridge");
 const publishingTargetKind = ref<PublishingTargetKind>("generic-webhook");
 const publishingContentFormat = ref<PublishingContentFormat>("html");
 const publishingEndpointUrl = ref("");
@@ -7040,6 +7057,9 @@ const publishingRequestPreview = computed(() =>
   }),
 );
 const publishingTargetHelpText = computed(() => publishingTargetHelp(publishingTargetKind.value));
+const activePublishingDestination = computed(() =>
+  store.publishingDestinationProfiles.find((profile) => profile.id === store.activePublishingDestinationId) || null,
+);
 const transformPreviewItems = computed<TransformPreviewItem[]>(() =>
   (active.value.compile?.transform_artifacts || []).map((artifact, index) => {
     const locationLabel = artifact.source_line
@@ -16869,6 +16889,63 @@ async function preparePublishingHandoff() {
   store.statusMessage = `Prepared ${publishingTargetLabels[publishingTargetKind.value]} publishing packet`;
 }
 
+function selectPublishingDestination(id: string) {
+  const profile = store.publishingDestinationProfiles.find((item) => item.id === id);
+  store.activePublishingDestinationId = profile?.id || "";
+  if (!profile) {
+    void store.persistWorkspace();
+    return;
+  }
+  publishingDestinationName.value = profile.name;
+  publishingTargetKind.value = profile.targetKind;
+  publishingEndpointUrl.value = profile.endpointUrl;
+  publishingContentFormat.value = profile.contentFormat;
+  publishingAuthHeaderName.value = profile.authHeaderName || "Authorization";
+  void store.persistWorkspace();
+  store.statusMessage = `Loaded publishing destination ${profile.name}`;
+}
+
+function savePublishingDestinationProfile() {
+  const name = publishingDestinationName.value.trim() || publishingDestinationNameFromEndpoint(publishingEndpointUrl.value);
+  const existingId = store.activePublishingDestinationId;
+  const id = existingId || `publish-${Date.now().toString(36)}`;
+  const profile: PublishingDestinationProfile = {
+    id,
+    name,
+    targetKind: publishingTargetKind.value,
+    endpointUrl: publishingEndpointUrl.value.trim(),
+    contentFormat: publishingContentFormat.value,
+    authHeaderName: publishingAuthHeaderName.value.trim() || "Authorization",
+  };
+  store.publishingDestinationProfiles = [
+    profile,
+    ...store.publishingDestinationProfiles.filter((item) => item.id !== id),
+  ].slice(0, 20);
+  store.activePublishingDestinationId = id;
+  publishingDestinationName.value = name;
+  void store.persistWorkspace();
+  store.statusMessage = `Saved publishing destination ${name} without storing a token`;
+}
+
+function deleteActivePublishingDestination() {
+  const id = store.activePublishingDestinationId;
+  if (!id) return;
+  const deleted = store.publishingDestinationProfiles.find((profile) => profile.id === id);
+  store.publishingDestinationProfiles = store.publishingDestinationProfiles.filter((profile) => profile.id !== id);
+  store.activePublishingDestinationId = "";
+  void store.persistWorkspace();
+  store.statusMessage = deleted ? `Deleted publishing destination ${deleted.name}` : "Deleted publishing destination";
+}
+
+function publishingDestinationNameFromEndpoint(endpoint: string) {
+  try {
+    const url = new URL(endpoint);
+    return url.hostname ? `${url.hostname} publisher` : "Publishing destination";
+  } catch {
+    return "Publishing destination";
+  }
+}
+
 async function copyPublishingPayload() {
   const payload = publishingRequestPreview.value.bodyText;
   try {
@@ -20796,6 +20873,18 @@ select:hover {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.publishing-profile-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) auto auto;
+  align-items: end;
+}
+
+.publishing-profile-row label {
+  display: grid;
+  gap: 4px;
 }
 
 .publishing-grid label,

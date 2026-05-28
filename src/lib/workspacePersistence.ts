@@ -2,6 +2,7 @@ import type { AiCleanupOptions } from "../types.js";
 import type { AiProviderProfileId } from "./aiProviderPackages.js";
 import { normalizeBusinessProfile, type BusinessProfile } from "./businessDocuments.js";
 import { normalizeGoogleIntegrationPreferences, type GoogleIntegrationPreferences } from "./googleAuth.js";
+import type { PublishingContentFormat, PublishingDestinationProfile, PublishingTargetKind } from "./publishingWorkflow.js";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "./transformTemplates.js";
 
 export const WORKSPACE_SCHEMA_VERSION = 2;
@@ -407,6 +408,8 @@ export interface PersistedWorkspace {
   ttsPreferences?: Partial<TtsPreferences>;
   exportProfiles?: Partial<ExportProfile>[];
   activeExportProfileId?: string;
+  publishingDestinationProfiles?: Partial<PublishingDestinationProfile>[];
+  activePublishingDestinationId?: string;
   gitIntegration?: Partial<GitIntegrationPreferences>;
   recentFiles?: string[];
   recentFolders?: string[];
@@ -611,6 +614,38 @@ export function normalizeExportProfiles(value: unknown): ExportProfile[] {
   const profiles: ExportProfile[] = [];
   for (const item of value) {
     const profile = normalizeExportProfile(item, profiles.length);
+    if (!profile || seen.has(profile.id)) continue;
+    seen.add(profile.id);
+    profiles.push(profile);
+    if (profiles.length >= 20) break;
+  }
+  return profiles;
+}
+
+function normalizePublishingDestinationProfile(profile: unknown, index: number): PublishingDestinationProfile | null {
+  if (!isRecord(profile)) return null;
+  const id = stringValue(profile.id)?.trim() || `publishing-destination-${index + 1}`;
+  const name = stringValue(profile.name)?.trim() || `Publishing destination ${index + 1}`;
+  const targetKind =
+    enumValue(profile.targetKind, ["generic-webhook", "wordpress-rest", "ghost-admin", "substack-manual"] as const) ||
+    ("generic-webhook" satisfies PublishingTargetKind);
+  const contentFormat = enumValue(profile.contentFormat, ["html", "markdown", "text"] as const) || ("html" satisfies PublishingContentFormat);
+  return {
+    id,
+    name,
+    targetKind,
+    endpointUrl: stringValue(profile.endpointUrl)?.trim() || "",
+    contentFormat,
+    authHeaderName: stringValue(profile.authHeaderName)?.trim() || "Authorization",
+  };
+}
+
+export function normalizePublishingDestinationProfiles(value: unknown): PublishingDestinationProfile[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const profiles: PublishingDestinationProfile[] = [];
+  for (const item of value) {
+    const profile = normalizePublishingDestinationProfile(item, profiles.length);
     if (!profile || seen.has(profile.id)) continue;
     seen.add(profile.id);
     profiles.push(profile);
@@ -1192,6 +1227,14 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
     const activeExportProfileId = stringValue(raw.activeExportProfileId);
     if (activeExportProfileId && exportProfiles.some((profile) => profile.id === activeExportProfileId)) {
       migrated.activeExportProfileId = activeExportProfileId;
+    }
+  }
+  const publishingDestinationProfiles = normalizePublishingDestinationProfiles(raw.publishingDestinationProfiles);
+  if (publishingDestinationProfiles.length) {
+    migrated.publishingDestinationProfiles = publishingDestinationProfiles;
+    const activePublishingDestinationId = stringValue(raw.activePublishingDestinationId);
+    if (activePublishingDestinationId && publishingDestinationProfiles.some((profile) => profile.id === activePublishingDestinationId)) {
+      migrated.activePublishingDestinationId = activePublishingDestinationId;
     }
   }
   if (isRecord(raw.gitIntegration)) migrated.gitIntegration = normalizeGitIntegrationPreferences(raw.gitIntegration);

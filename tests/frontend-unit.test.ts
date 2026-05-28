@@ -283,6 +283,7 @@ import {
   normalizeAiProviderDefaults,
   normalizeCitationStyle,
   normalizeDocsLiveDraftHistory,
+  normalizePublishingDestinationProfiles,
   normalizeTtsPreferences,
   WORKSPACE_SCHEMA_VERSION,
 } from "../src/lib/workspacePersistence.js";
@@ -3801,6 +3802,29 @@ test("export metadata checklist validates publishing and ebook handoff readiness
 });
 
 test("publishing workflow builds endpoint payloads without persisting secrets", () => {
+  const normalizedProfiles = normalizePublishingDestinationProfiles([
+    {
+      id: "cms",
+      name: " CMS ",
+      targetKind: "ghost-admin",
+      endpointUrl: " https://cms.example.com/ghost ",
+      contentFormat: "text",
+      authHeaderName: " X-CMS-Token ",
+      authToken: "do-not-keep",
+    },
+  ]);
+  deepEqual(normalizedProfiles, [
+    {
+      id: "cms",
+      name: "CMS",
+      targetKind: "ghost-admin",
+      endpointUrl: "https://cms.example.com/ghost",
+      contentFormat: "text",
+      authHeaderName: "X-CMS-Token",
+    },
+  ]);
+  equal(JSON.stringify(normalizedProfiles).includes("do-not-keep"), false);
+
   const handoff = buildPublishingHandoff({
     title: "Quarterly Launch Note",
     compiledMarkdown: [
@@ -5068,6 +5092,29 @@ test("workspace persistence migration versions and normalizes saved settings", (
         exportTarget: "html",
       },
     ],
+    activePublishingDestinationId: "cms-bridge",
+    publishingDestinationProfiles: [
+      {
+        id: "cms-bridge",
+        name: " Approved CMS Bridge ",
+        targetKind: "wordpress-rest",
+        endpointUrl: " https://cms.example.com/wp-json/wp/v2/posts ",
+        contentFormat: "markdown",
+        authHeaderName: " X-CMS-Token ",
+        authToken: "must-not-persist",
+      },
+      {
+        id: "cms-bridge",
+        name: "Duplicate ignored",
+      },
+      {
+        id: "substack-copy",
+        name: "",
+        targetKind: "substack-manual",
+        endpointUrl: "http://not-used.example",
+        contentFormat: "html",
+      },
+    ],
     gitIntegration: { enabled: false },
     aiProviderDefaults: {
       profileId: "openai-compatible",
@@ -5417,6 +5464,26 @@ test("workspace persistence migration versions and normalizes saved settings", (
     },
   });
   equal(migrated.exportProfiles?.[1]?.name, "Export profile 2");
+  equal(migrated.activePublishingDestinationId, "cms-bridge");
+  deepEqual(migrated.publishingDestinationProfiles, [
+    {
+      id: "cms-bridge",
+      name: "Approved CMS Bridge",
+      targetKind: "wordpress-rest",
+      endpointUrl: "https://cms.example.com/wp-json/wp/v2/posts",
+      contentFormat: "markdown",
+      authHeaderName: "X-CMS-Token",
+    },
+    {
+      id: "substack-copy",
+      name: "Publishing destination 2",
+      targetKind: "substack-manual",
+      endpointUrl: "http://not-used.example",
+      contentFormat: "html",
+      authHeaderName: "Authorization",
+    },
+  ]);
+  equal(JSON.stringify(migrated.publishingDestinationProfiles).includes("must-not-persist"), false);
   deepEqual(migrated.gitIntegration, { enabled: false, warnOnDirtyExport: true });
   deepEqual(migrated.aiProviderDefaults, {
     profileId: "openai-compatible",
@@ -5739,6 +5806,17 @@ test("workspace persistence state helper builds normalized store snapshots", () 
     ttsPreferences: normalizeTtsPreferences({ engine: "macos-say", voice: "Samantha" }),
     exportProfiles: [],
     activeExportProfileId: "profile-missing",
+    publishingDestinationProfiles: [
+      {
+        id: "cms",
+        name: "CMS",
+        targetKind: "generic-webhook",
+        endpointUrl: "https://cms.example.com/hook",
+        contentFormat: "html",
+        authHeaderName: "Authorization",
+      },
+    ],
+    activePublishingDestinationId: "cms",
     gitIntegration: { enabled: true },
     aiCleanupDefaults: { preserveHeadings: true },
     agentRunHistory: [],
@@ -5771,6 +5849,8 @@ test("workspace persistence state helper builds normalized store snapshots", () 
   equal(workspace.recentFiles?.length, 20);
   equal(workspace.recentFolders?.length, 12);
   equal(workspace.recentlyClosed?.length, 20);
+  equal(workspace.activePublishingDestinationId, "cms");
+  equal(workspace.publishingDestinationProfiles?.[0]?.endpointUrl, "https://cms.example.com/hook");
   equal(workspace.transformTimeoutMs, 30_000);
   deepEqual(workspace.transformInputModes, { dot: "file" });
   deepEqual(workspace.transformEnginePaths, { dot: "/usr/bin/dot" });
@@ -5814,6 +5894,8 @@ test("workspace persistence state helper applies persisted preferences and resto
     ttsPreferences: normalizeTtsPreferences({ engine: "off" }),
     exportProfiles: [],
     activeExportProfileId: "",
+    publishingDestinationProfiles: [],
+    activePublishingDestinationId: "",
     gitIntegration: { enabled: true },
     aiCleanupDefaults: { preserveHeadings: false },
     agentRunHistory: [],
@@ -5842,6 +5924,8 @@ test("workspace persistence state helper applies persisted preferences and resto
       exportTarget: "pdf",
       exportProfiles: [{ id: "board-pdf", name: "Board PDF", exportTarget: "pdf" }],
       activeExportProfileId: "board-pdf",
+      publishingDestinationProfiles: [{ id: "cms", name: "CMS", targetKind: "ghost-admin", endpointUrl: "https://cms.example.com/ghost", contentFormat: "html" }],
+      activePublishingDestinationId: "cms",
       businessProfile: { companyName: " Loaded Co ", email: " team@example.com " },
       aiProviderDefaults: { profileId: "openai-compatible", model: " gpt-4.1 " },
       googleIntegration: { clientId: " desktop-client ", scopes: ["https://www.googleapis.com/auth/documents"], accountHint: " user@example.com " },
@@ -5871,6 +5955,8 @@ test("workspace persistence state helper applies persisted preferences and resto
   deepEqual(result.state.toolbarCollapsedRows, ["file", "view"]);
   equal(result.state.exportTarget, "pdf");
   equal(result.state.activeExportProfileId, "board-pdf");
+  equal(result.state.activePublishingDestinationId, "cms");
+  equal(result.state.publishingDestinationProfiles[0]?.targetKind, "ghost-admin");
   equal(result.state.businessProfile.companyName, "Loaded Co");
   equal(result.state.aiProviderDefaults.model, "gpt-4.1");
   equal(result.state.googleIntegration.clientId, "desktop-client");
@@ -6920,6 +7006,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Public export metadata options"'));
   ok(app.includes('aria-label="Distribution metadata checklist"'));
   ok(app.includes('aria-label="AI export readiness assistance"'));
+  ok(app.includes('aria-label="Publishing handoff"'));
+  ok(app.includes("Save destination"));
+  ok(app.includes("session-only endpoint tokens"));
+  ok(app.includes("publishingDestinationProfiles"));
   ok(app.includes('aria-label="Export readiness notes"'));
   ok(app.includes("exportStepAssistance"));
   ok(app.includes("appendExportStepAssistance"));

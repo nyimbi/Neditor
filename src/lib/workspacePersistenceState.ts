@@ -15,6 +15,7 @@ import {
   normalizeExportProfiles,
   normalizeGitIntegrationPreferences,
   normalizePersistedWorkspaceForSave,
+  normalizePublishingDestinationProfiles,
   normalizeTtsPreferences,
   type PersistedScrollPosition,
   type PersistedWorkspace,
@@ -60,6 +61,8 @@ export interface WorkspacePersistenceStateInput {
   ttsPreferences: RequiredPersistedValue<"ttsPreferences">;
   exportProfiles: RequiredPersistedValue<"exportProfiles">;
   activeExportProfileId: string;
+  publishingDestinationProfiles: RequiredPersistedValue<"publishingDestinationProfiles">;
+  activePublishingDestinationId: string;
   gitIntegration: RequiredPersistedValue<"gitIntegration">;
   aiCleanupDefaults: RequiredPersistedValue<"aiCleanupDefaults">;
   agentRunHistory: RequiredPersistedValue<"agentRunHistory">;
@@ -98,6 +101,7 @@ export function applyPersistedWorkspacePreferenceState(
   persisted: PersistedWorkspace,
 ): PersistedWorkspacePreferenceResult {
   const exportProfiles = normalizeExportProfiles(persisted.exportProfiles);
+  const publishingDestinationProfiles = normalizePublishingDestinationProfiles(persisted.publishingDestinationProfiles);
   const state: WorkspacePreferenceStateInput = {
     ...current,
     ...applyPersistedUiPreferences(current, persisted),
@@ -112,6 +116,12 @@ export function applyPersistedWorkspacePreferenceState(
     activeExportProfileId:
       persisted.activeExportProfileId && exportProfiles.some((profile) => profile.id === persisted.activeExportProfileId)
         ? persisted.activeExportProfileId
+        : "",
+    publishingDestinationProfiles,
+    activePublishingDestinationId:
+      persisted.activePublishingDestinationId &&
+      publishingDestinationProfiles.some((profile) => profile.id === persisted.activePublishingDestinationId)
+        ? persisted.activePublishingDestinationId
         : "",
     gitIntegration: persisted.gitIntegration ? normalizeGitIntegrationPreferences(persisted.gitIntegration) : current.gitIntegration,
     aiCleanupDefaults: persisted.aiCleanupDefaults ? normalizeAiCleanupDefaults(persisted.aiCleanupDefaults) : current.aiCleanupDefaults,
@@ -181,6 +191,8 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     ttsPreferences: state.ttsPreferences,
     exportProfiles: state.exportProfiles,
     activeExportProfileId: state.activeExportProfileId,
+    publishingDestinationProfiles: state.publishingDestinationProfiles,
+    activePublishingDestinationId: state.activePublishingDestinationId,
     gitIntegration: state.gitIntegration,
     aiCleanupDefaults: state.aiCleanupDefaults,
     agentRunHistory: state.agentRunHistory,

@@ -112,6 +112,7 @@ import {
   setDocumentScrollState,
 } from "../lib/workspaceNavigation";
 import { applyPersistedWorkspacePreferenceState, buildPersistedWorkspaceState } from "../lib/workspacePersistenceState";
+import type { PublishingDestinationProfile } from "../lib/publishingWorkflow";
 import {
   clampPaneRatio,
   migratePersistedWorkspace,
@@ -378,6 +379,8 @@ export const useDocumentsStore = defineStore("documents", {
     ttsPreferences: normalizeTtsPreferences({}) as TtsPreferences,
     exportProfiles: [] as ExportProfile[],
     activeExportProfileId: "",
+    publishingDestinationProfiles: [] as PublishingDestinationProfile[],
+    activePublishingDestinationId: "",
     gitIntegration: normalizeGitIntegrationPreferences({}),
     aiCleanupDefaults: normalizeAiCleanupDefaults({}),
     agentRunHistory: [] as AgentRunHistoryItem[],

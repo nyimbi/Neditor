@@ -1,6 +1,15 @@
 export type PublishingTargetKind = "generic-webhook" | "wordpress-rest" | "ghost-admin" | "substack-manual";
 export type PublishingContentFormat = "html" | "markdown" | "text";
 
+export interface PublishingDestinationProfile {
+  id: string;
+  name: string;
+  targetKind: PublishingTargetKind;
+  endpointUrl: string;
+  contentFormat: PublishingContentFormat;
+  authHeaderName: string;
+}
+
 export interface PublishingHandoffInput {
   title: string;
   compiledMarkdown: string;
