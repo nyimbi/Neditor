@@ -14,6 +14,7 @@ import {
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
 import { isAiSourceFenceOpener, rewriteAiAssistedMarker, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
 import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
+import { appendChangeNoteMarker, appendReviewCommentMarker, resolveReviewCommentAtLine } from "../lib/reviewMarkers";
 import {
   clampTransformTimeout,
   setTransformBooleanFlag,
@@ -1581,23 +1582,19 @@ export const useDocumentsStore = defineStore("documents", {
       this.insertAiPaste(response, mode);
     },
     insertReviewComment(text: string) {
-      const comment = (text.trim() || "Review comment").replace(/-->/g, "->");
       const createdAt = new Date().toISOString();
-      this.updateText(`${this.activeDocument.text}\n\n<!-- comment: unresolved | author: local | at: ${createdAt} | ${comment} -->\n`);
+      this.updateText(appendReviewCommentMarker(this.activeDocument.text, text, createdAt));
       this.statusMessage = "Inserted review comment";
     },
     insertChangeNote(text: string) {
-      const note = (text.trim() || "Change note").replace(/-->/g, "->");
       const createdAt = new Date().toISOString();
-      this.updateText(`${this.activeDocument.text}\n\n<!-- change: author: local | at: ${createdAt} | ${note} -->\n`);
+      this.updateText(appendChangeNoteMarker(this.activeDocument.text, text, createdAt));
       this.statusMessage = "Inserted change note";
     },
     resolveReviewComment(line: number) {
-      const lines = this.activeDocument.text.split("\n");
-      const index = Math.max(0, line - 1);
-      if (!lines[index]?.includes("<!-- comment:")) return;
-      lines[index] = lines[index].replace("unresolved", "resolved");
-      this.updateText(lines.join("\n"));
+      const resolved = resolveReviewCommentAtLine(this.activeDocument.text, line);
+      if (!resolved) return;
+      this.updateText(resolved);
       this.statusMessage = "Resolved review comment";
     },
     setAiAssistedSectionReviewed(line: number, reviewed: boolean) {

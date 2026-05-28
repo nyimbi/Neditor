@@ -127,6 +127,13 @@ import {
 } from "../src/lib/provenanceReview.js";
 import { forgetRecentItem, rememberRecentItem } from "../src/lib/recentItems.js";
 import {
+  appendChangeNoteMarker,
+  appendReviewCommentMarker,
+  changeNoteMarker,
+  resolveReviewCommentAtLine,
+  reviewCommentMarker,
+} from "../src/lib/reviewMarkers.js";
+import {
   buildReleaseReadinessChecklist,
   formatReleaseChecklistSummary,
   releaseChecklistHelp,
@@ -484,6 +491,35 @@ test("document tab helpers close pin move and forget file state", () => {
       missingWorkspaceFiles: [],
     },
   );
+});
+
+test("review marker helpers append and resolve review workflow comments", () => {
+  const createdAt = "2026-05-28T10:00:00.000Z";
+  equal(
+    reviewCommentMarker(" Confirm budget --> owner. ", createdAt),
+    "<!-- comment: unresolved | author: local | at: 2026-05-28T10:00:00.000Z | Confirm budget -> owner. -->",
+  );
+  equal(
+    changeNoteMarker("", createdAt),
+    "<!-- change: author: local | at: 2026-05-28T10:00:00.000Z | Change note -->",
+  );
+
+  const commented = appendReviewCommentMarker("# Plan", "Needs legal approval", createdAt);
+  equal(
+    commented,
+    "# Plan\n\n<!-- comment: unresolved | author: local | at: 2026-05-28T10:00:00.000Z | Needs legal approval -->\n",
+  );
+  equal(
+    appendChangeNoteMarker("# Plan", "Updated scope", createdAt),
+    "# Plan\n\n<!-- change: author: local | at: 2026-05-28T10:00:00.000Z | Updated scope -->\n",
+  );
+
+  equal(
+    resolveReviewCommentAtLine(commented, 3),
+    "# Plan\n\n<!-- comment: resolved | author: local | at: 2026-05-28T10:00:00.000Z | Needs legal approval -->\n",
+  );
+  equal(resolveReviewCommentAtLine("# Plan\n\nNo review marker", 3), null);
+  equal(resolveReviewCommentAtLine("<!-- comment: resolved | author: local | at: now | Done -->", 1), null);
 });
 
 test("recent item helpers deduplicate limit and forget paths", () => {
