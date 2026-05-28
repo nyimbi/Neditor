@@ -434,6 +434,38 @@ Reviewed content.
     assert!(!html_without_appendix.contains("data-kind=\"source\""));
     assert!(!html_without_appendix.contains("AI-assisted section: Executive Summary"));
 
+    let pdf = String::from_utf8_lossy(&render_pdf_bytes(&response, &included)).into_owned();
+    assert!(pdf.contains("AI Provenance"));
+    assert!(pdf.contains("AI source: OpenAI / gpt-5.4 generated 2026-05-27"));
+    assert!(pdf.contains("AI-assisted section 'Executive Summary'"));
+    let pdf_without_appendix =
+        String::from_utf8_lossy(&render_pdf_bytes(&response, &omitted)).into_owned();
+    assert!(!pdf_without_appendix.contains("AI Provenance"));
+
+    let docx = render_docx_bytes(&response, &included).expect("docx provenance bytes");
+    let docx_document = zip_entry_text(&docx, "word/document.xml");
+    assert!(docx_document.contains("AI Provenance"));
+    assert!(docx_document.contains("AI source: OpenAI / gpt-5.4 generated 2026-05-27"));
+    assert!(docx_document.contains("AI-assisted section"));
+    assert!(docx_document.contains("Executive Summary"));
+    let docx_without_appendix =
+        render_docx_bytes(&response, &omitted).expect("docx without provenance bytes");
+    assert!(!zip_entry_text(&docx_without_appendix, "word/document.xml").contains("AI Provenance"));
+
+    let pptx = render_pptx_bytes(&response, &included).expect("pptx provenance bytes");
+    let pptx_slides = zip_entry_texts_with_prefix(&pptx, "ppt/slides/").join("\n");
+    assert!(pptx_slides.contains("AI Provenance"));
+    assert!(pptx_slides.contains("AI source: OpenAI / gpt-5.4 generated 2026-05-27"));
+    assert!(pptx_slides.contains("AI-assisted section"));
+    assert!(pptx_slides.contains("Executive Summary"));
+    let pptx_without_appendix =
+        render_pptx_bytes(&response, &omitted).expect("pptx without provenance bytes");
+    assert!(
+        !zip_entry_texts_with_prefix(&pptx_without_appendix, "ppt/slides/")
+            .join("\n")
+            .contains("AI Provenance")
+    );
+
     let exported_text = export::export_text(&response, &included);
     assert!(exported_text.contains("AI Provenance"));
     assert!(exported_text.contains("AI source: OpenAI / gpt-5.4 generated 2026-05-27"));
@@ -443,6 +475,54 @@ Reviewed content.
     let exported_text_without_appendix = export::export_text(&response, &omitted);
     assert!(!exported_text_without_appendix.contains("AI Provenance"));
     assert!(!exported_text_without_appendix.contains("AI-assisted section 'Executive Summary'"));
+
+    let mut blog_manifest = response.export_manifest.clone();
+    blog_manifest.export_target = "blog".to_string();
+    blog_manifest.export_options = included.clone();
+    let blog = render_blog_publish_package_bytes(&response, &blog_manifest)
+        .expect("blog provenance package");
+    assert!(zip_entry_text(&blog, "post.html").contains("class=\"export-provenance\""));
+    assert!(zip_entry_text(&blog, "post.html").contains("AI-assisted section: Executive Summary"));
+    assert!(zip_entry_text(&blog, "substack-copy.html").contains("class=\"export-provenance\""));
+    assert!(zip_entry_text(&blog, "post.txt").contains("AI Provenance"));
+
+    let mut blog_omitted_manifest = response.export_manifest.clone();
+    blog_omitted_manifest.export_target = "blog".to_string();
+    blog_omitted_manifest.export_options = omitted.clone();
+    let blog_without_appendix =
+        render_blog_publish_package_bytes(&response, &blog_omitted_manifest)
+            .expect("blog without provenance package");
+    assert!(!zip_entry_text(&blog_without_appendix, "post.html")
+        .contains("class=\"export-provenance\""));
+    assert!(
+        !zip_entry_text(&blog_without_appendix, "substack-copy.html")
+            .contains("class=\"export-provenance\"")
+    );
+
+    let mut google_docs_manifest = response.export_manifest.clone();
+    google_docs_manifest.export_target = "google-docs".to_string();
+    google_docs_manifest.export_options = included.clone();
+    let google_docs = render_google_docs_package_bytes(&response, &google_docs_manifest)
+        .expect("google docs provenance package");
+    assert!(zip_entry_text(&google_docs, "document.html").contains("class=\"export-provenance\""));
+    assert!(zip_entry_text(&google_docs, "document.txt").contains("AI Provenance"));
+
+    let mut epub_manifest = response.export_manifest.clone();
+    epub_manifest.export_target = "epub".to_string();
+    epub_manifest.export_options = included;
+    let epub = render_epub_bytes(&response, &epub_manifest).expect("epub provenance package");
+    assert!(zip_entry_text(&epub, "OEBPS/document.xhtml").contains("class=\"export-provenance\""));
+    assert!(zip_entry_text(&epub, "OEBPS/metadata/document.txt").contains("AI Provenance"));
+
+    let mut epub_omitted_manifest = response.export_manifest.clone();
+    epub_omitted_manifest.export_target = "epub".to_string();
+    epub_omitted_manifest.export_options = omitted;
+    let epub_without_appendix =
+        render_epub_bytes(&response, &epub_omitted_manifest).expect("epub without provenance");
+    assert!(
+        !zip_entry_text(&epub_without_appendix, "OEBPS/document.xhtml")
+            .contains("class=\"export-provenance\"")
+    );
 }
 
 #[test]

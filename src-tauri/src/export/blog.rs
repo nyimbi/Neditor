@@ -123,6 +123,7 @@ fn render_blog_html(response: &CompileResponse, manifest: &ExportManifest) -> St
     let canonical = publish_canonical_url(response, manifest)
         .map(|value| format!(r#"<link rel="canonical" href="{}">"#, escape_html(&value)))
         .unwrap_or_default();
+    let appendix_sections = html_appendix_sections(response, &manifest.export_options);
     format!(
         "<!doctype html><html lang=\"{}\"><head><meta charset=\"utf-8\"><title>{}</title><meta name=\"generator\" content=\"NEditor\"><meta name=\"neditor-source-hash\" content=\"{}\">{}{}<style>{}</style></head><body><article><header><h1>{}</h1>{}<p class=\"byline\">{}{}</p><p class=\"tags\">{}</p></header>{}</article></body></html>",
         escape_html(&language),
@@ -136,7 +137,7 @@ fn render_blog_html(response: &CompileResponse, manifest: &ExportManifest) -> St
         author,
         date,
         tags,
-        response.html
+        format!("{}{}", response.html, appendix_sections)
     )
 }
 
@@ -145,11 +146,12 @@ fn render_substack_copy_html(response: &CompileResponse, manifest: &ExportManife
         .filter(|value| !value.trim().is_empty())
         .map(|value| format!("<p>{}</p>", escape_html(&value)))
         .unwrap_or_default();
+    let appendix_sections = html_appendix_sections(response, &manifest.export_options);
     format!(
         "<article><h1>{}</h1>{}{}</article>",
         escape_html(&response.semantic.title),
         subtitle,
-        response.html
+        format!("{}{}", response.html, appendix_sections)
     )
 }
 

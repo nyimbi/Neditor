@@ -399,7 +399,7 @@ fn push_span(output: &mut String, class_name: &str, text: &str) {
     output.push_str("</span>");
 }
 
-fn html_appendix_sections(response: &CompileResponse, options: &Value) -> String {
+pub(crate) fn html_appendix_sections(response: &CompileResponse, options: &Value) -> String {
     [
         html_glossary_section(response, options),
         html_comments_section(response, options),

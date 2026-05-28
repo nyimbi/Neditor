@@ -27,7 +27,7 @@ pub(crate) use shared::export_text;
 use shared::*;
 
 mod html;
-pub(crate) use html::render_full_html;
+pub(crate) use html::{html_appendix_sections, render_full_html};
 
 mod pdf;
 pub(crate) use pdf::render_pdf_bytes;

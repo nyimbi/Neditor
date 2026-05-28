@@ -137,7 +137,7 @@ fn epub_document_xhtml(
     manifest: &ExportManifest,
     media: &[ExportMedia],
 ) -> String {
-    let body_html = epub_body_html(response, media);
+    let body_html = epub_body_html(response, manifest, media);
     let language = epub_language(response, manifest);
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{}"><head><title>{}</title><link rel="stylesheet" type="text/css" href="styles/neditor.css"/></head><body><section epub:type="titlepage" class="cover"><h1>{}</h1><p>Status: {}</p><p>Source hash: {}</p></section><main>{}</main></body></html>"#,
@@ -172,8 +172,16 @@ fn epub_language(response: &CompileResponse, manifest: &ExportManifest) -> Strin
         .unwrap_or_else(|| "en".to_string())
 }
 
-fn epub_body_html(response: &CompileResponse, media: &[ExportMedia]) -> String {
-    let mut body = response.html.clone();
+fn epub_body_html(
+    response: &CompileResponse,
+    manifest: &ExportManifest,
+    media: &[ExportMedia],
+) -> String {
+    let mut body = format!(
+        "{}{}",
+        response.html,
+        html_appendix_sections(response, &manifest.export_options)
+    );
     for item in media {
         body = body.replace(
             &format!(r#"src="{}""#, escape_html(&item.source)),
