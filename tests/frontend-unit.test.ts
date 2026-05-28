@@ -185,6 +185,7 @@ import {
   removeAgentRunHistoryState,
   removeDocsLiveDraftHistoryState,
 } from "../src/lib/workflowHistory.js";
+import { forgetWorkspaceFolderState, setDocumentScrollState } from "../src/lib/workspaceNavigation.js";
 import {
   migratePersistedWorkspace,
   normalizeAgentRunHistory,
@@ -494,6 +495,42 @@ test("document tab helpers close pin move and forget file state", () => {
       missingWorkspaceFiles: [],
     },
   );
+});
+
+test("workspace navigation helpers preserve scroll ratios and recent folders", () => {
+  const documents = [
+    { id: "a", title: "Alpha", editorScrollRatio: 0.2, previewScrollRatio: 0.3 },
+    { id: "b", title: "Beta", editorScrollRatio: 0.4, previewScrollRatio: 0.5 },
+  ];
+  const scrolled = setDocumentScrollState(documents, "b", { editor: 1.5, preview: -2 });
+  equal(scrolled.changed, true);
+  equal(scrolled.documents[1].editorScrollRatio, 1);
+  equal(scrolled.documents[1].previewScrollRatio, 0);
+  equal(scrolled.documents[0], documents[0]);
+
+  const missingScroll = setDocumentScrollState(scrolled.documents, "missing", { editor: 0.8 });
+  equal(missingScroll.changed, false);
+  equal(missingScroll.documents, scrolled.documents);
+  const unchangedScroll = setDocumentScrollState(scrolled.documents, "b", { editor: 1, preview: 0 });
+  equal(unchangedScroll.changed, false);
+  equal(unchangedScroll.documents, scrolled.documents);
+
+  const forgottenActive = forgetWorkspaceFolderState(["/workspace", "/other"], "/workspace", [{ path: "/workspace/a.md" }], "/workspace");
+  equal(forgottenActive.changed, true);
+  deepEqual(forgottenActive.recentFolders, ["/other"]);
+  equal(forgottenActive.workspaceRoot, null);
+  deepEqual(forgottenActive.workspaceFiles, []);
+
+  const forgottenInactive = forgetWorkspaceFolderState(["/workspace", "/other"], "/other", [{ path: "/other/a.md" }], "/workspace");
+  equal(forgottenInactive.changed, true);
+  deepEqual(forgottenInactive.recentFolders, ["/other"]);
+  equal(forgottenInactive.workspaceRoot, "/other");
+  deepEqual(forgottenInactive.workspaceFiles, [{ path: "/other/a.md" }]);
+
+  const missingFolder = forgetWorkspaceFolderState(["/other"], "/other", [{ path: "/other/a.md" }], "/missing");
+  equal(missingFolder.changed, false);
+  deepEqual(missingFolder.recentFolders, ["/other"]);
+  equal(missingFolder.workspaceRoot, "/other");
 });
 
 test("review marker helpers append and resolve review workflow comments", () => {

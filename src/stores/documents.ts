@@ -37,6 +37,7 @@ import {
   removeAgentRunHistoryState,
   removeDocsLiveDraftHistoryState,
 } from "../lib/workflowHistory";
+import { forgetWorkspaceFolderState, setDocumentScrollState } from "../lib/workspaceNavigation";
 import {
   clampPaneRatio,
   clampScrollRatio,
@@ -724,10 +725,9 @@ export const useDocumentsStore = defineStore("documents", {
       }
     },
     setDocumentScroll(id: string, scroll: { editor?: number; preview?: number }, persist = false) {
-      const document = this.documents.find((item) => item.id === id);
-      if (!document) return;
-      if (typeof scroll.editor === "number") document.editorScrollRatio = clampScrollRatio(scroll.editor);
-      if (typeof scroll.preview === "number") document.previewScrollRatio = clampScrollRatio(scroll.preview);
+      const result = setDocumentScrollState(this.documents, id, scroll);
+      if (!result.changed) return;
+      this.documents = result.documents;
       if (persist) void this.persistWorkspace();
     },
     async openFolder(path: string) {
@@ -1728,12 +1728,11 @@ export const useDocumentsStore = defineStore("documents", {
       this.recentFolders = rememberRecentItem(this.recentFolders, path, 12);
     },
     forgetFolderPath(path: string | null) {
-      if (!path) return;
-      this.recentFolders = forgetRecentItem(this.recentFolders, path);
-      if (this.workspaceRoot === path) {
-        this.workspaceRoot = null;
-        this.workspaceFiles = [];
-      }
+      const result = forgetWorkspaceFolderState(this.recentFolders, this.workspaceRoot, this.workspaceFiles, path);
+      if (!result.changed) return;
+      this.recentFolders = result.recentFolders;
+      this.workspaceRoot = result.workspaceRoot;
+      this.workspaceFiles = result.workspaceFiles;
     },
   },
 });
