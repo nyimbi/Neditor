@@ -8793,6 +8793,9 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("staleTemplates"));
   ok(evidenceKitCollector.includes("inspectTemplateFreshness"));
   ok(evidenceKitCollector.includes("sourceCommit"));
+  ok(evidenceKitCollector.includes("neditor.release-evidence-kit-report.v1"));
+  ok(evidenceKitCollector.includes("writeEvidenceKitReport"));
+  ok(evidenceKitCollector.includes('join(outputDir, "report.json")'));
   ok(evidenceKitCollector.includes("Optional CI path: gh workflow run neditor-release-evidence.yml"));
   ok(evidenceKitCollector.includes("provider-evidence.template.json"));
   ok(evidenceKitCollector.includes("runtime-evidence.template.json"));

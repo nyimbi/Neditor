@@ -894,9 +894,11 @@ commands, ingest commands, and final release-readiness commands for platform
 evidence, signing, live AI provider/runtime proof, independent security review,
 Google Docs import, release-device performance profiling, human review sign-offs,
 optional external engines such as Pikchr, and spec-completion closure work. It
-also embeds the current spec-completion work-order JSON and Markdown packet so
-manual reviewers and supported-host owners can work from the same row-level
-assignments that `pnpm run check:spec-completion` generated. The kit contract now
+also writes both `.tmp/release-evidence-kit/manifest.json` and
+`.tmp/release-evidence-kit/report.json`, then embeds the current spec-completion
+work-order JSON and Markdown packet so manual reviewers and supported-host
+owners can work from the same row-level assignments that
+`pnpm run check:spec-completion` generated. The kit contract now
 fails if a readiness gap cannot be closed from a generated work item with at
 least one runbook, returned evidence path, validator command, and
 `pnpm run check:release-readiness` handoff, or if the spec-completion work-order

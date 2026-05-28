@@ -336,6 +336,7 @@ const manifest = {
 writeRunbooks();
 writeFileSync(join(outputDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 writeFileSync(join(outputDir, "README.md"), readme(manifest));
+writeEvidenceKitReport(manifest);
 
 console.log(`Release evidence kit written to ${relative(outputDir)}.`);
 if (!sourceTreeClean) {
@@ -346,6 +347,50 @@ if (manifest.missingTemplates.length > 0) {
 }
 if (manifest.staleTemplates.length > 0) {
   console.log(`Stale ${manifest.staleTemplates.length} template(s); rerun prerequisite checks from the current clean source and regenerate the kit.`);
+}
+
+function writeEvidenceKitReport(manifest) {
+  const reportIssues = [];
+  if (!sourceTreeClean) reportIssues.push("source-tree-not-clean");
+  if (manifest.missingTemplates.length > 0) reportIssues.push(`missing-templates=${manifest.missingTemplates.length}`);
+  if (manifest.staleTemplates.length > 0) reportIssues.push(`stale-templates=${manifest.staleTemplates.length}`);
+  if (copiedSpecWorkOrders.total !== copiedSpecWorkOrders.readyToSend) {
+    reportIssues.push(`spec-work-orders-not-ready=${copiedSpecWorkOrders.total - copiedSpecWorkOrders.readyToSend}`);
+  }
+  writeFileSync(
+    join(outputDir, "report.json"),
+    `${JSON.stringify(
+      {
+        schema: "neditor.release-evidence-kit-report.v1",
+        generatedAt: new Date().toISOString(),
+        status: reportIssues.length === 0 ? "passed" : "failed",
+        manifestPath: relative(join(outputDir, "manifest.json")),
+        releaseReadinessReport: relative(join(root, ".tmp", "release-readiness", "report.json")),
+        sourceCommit,
+        currentSourceCommit: sourceCommit,
+        sourceTreeClean,
+        currentSourceTreeClean: sourceTreeClean,
+        appVersion: packageJson.version,
+        currentAppVersion: packageJson.version,
+        readinessStatus,
+        currentReadinessStatus: readinessStatus,
+        summary: {
+          gaps: manifest.gaps.length,
+          copiedTemplates: manifest.copiedTemplates.length,
+          missingTemplates: manifest.missingTemplates.length,
+          staleTemplates: manifest.staleTemplates.length,
+          runbooks: manifest.runbooks.length,
+          specWorkOrders: copiedSpecWorkOrders.total,
+          specWorkOrdersReady: copiedSpecWorkOrders.readyToSend,
+          issues: reportIssues.length,
+        },
+        gapIds: manifest.gaps.map((gap) => gap.id),
+        issues: reportIssues,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 function copyTemplates() {
