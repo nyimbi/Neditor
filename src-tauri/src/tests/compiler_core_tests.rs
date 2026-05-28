@@ -620,7 +620,9 @@ fn compiler_loads_front_matter_json_and_yaml_data_sources() {
     assert!(response.html.contains("<dt>region</dt>"));
     assert!(response.html.contains("Data Source: targets"));
     assert!(response.html.contains("<td>ARR</td>"));
-    assert!(response.html.contains("<td>300</td>"));
+    assert!(response
+        .html
+        .contains("class=\"numeric\" data-format=\"number\" data-value=\"300\">300</td>"));
     assert!(response
         .transform_artifacts
         .iter()

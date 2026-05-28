@@ -27,6 +27,23 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 JSON/YAML Structured Transform Closure
+
+`10.4.11 JSON | Structured rendering` and `10.4.12 YAML | Structured
+rendering` are now marked complete in `docs/spec-completion-matrix.md`. The
+closure is based on the Rust structured-data renderer, focused transform tests
+for table/tree rendering, nested business-row flattening, keyed/scalar setting
+tables, front matter data-source loading, cross-target export persistence, and
+local data-source path-safety proof. The data-source test now asserts the
+current export-safe numeric metadata shape for TSV aliases instead of the older
+plain cell HTML.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked structured_data --lib` | Pass | Three transform tests passed, proving JSON/YAML table and tree rendering, nested row flattening, keyed maps, scalar settings tables, and mixed hierarchical tree fallback. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_loads_front_matter_json_and_yaml_data_sources --lib` | Pass | Front matter JSON/YAML data-source proof passed after tightening the TSV alias numeric-cell assertion to the export-safe `data-format`/`data-value` markup. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked front_matter_data_sources_survive_cross_target_exports --lib` | Pass | Cross-target data-source export proof passed for HTML, PDF, DOCX, PPTX, Markdown bundle text, and manifest evidence. |
+
 ## 2026-05-28 CSV/TSV Transform Closure
 
 `10.4.9 CSV | Tables and formulas` and `10.4.10 TSV | Tables and formulas`
