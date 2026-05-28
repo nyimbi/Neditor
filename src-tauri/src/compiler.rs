@@ -161,6 +161,8 @@ fn compile_inner(request: CompileRequest, options: Option<&Value>) -> CompileRes
         &interpolated,
         &metadata,
         root_path.as_deref(),
+        Some(&source),
+        Some(&root_file),
         &mut diagnostics,
     );
     let duplicate_bibliography_keys = duplicate_bibliography_keys(&bibliography);

@@ -1,7 +1,6 @@
-use crate::diagnostics::DocumentDiagnostic;
 use crate::{
     compiler_support::{collect_fence_bodies_with_lines, fenced_code_marker},
-    diagnostics::diag,
+    diagnostics::{diag, with_range, DocumentDiagnostic},
     escape_html, path_to_string,
 };
 use serde::Serialize;
@@ -43,6 +42,8 @@ pub(crate) fn collect_bibliography(
     text: &str,
     metadata: &Value,
     root_path: Option<&Path>,
+    source_text: Option<&str>,
+    root_file: Option<&str>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> Vec<BibliographyEntry> {
     let mut sources = collect_fence_bodies_with_lines(text, "bibtex")
@@ -83,15 +84,12 @@ pub(crate) fn collect_bibliography(
                 source_file: Some(path_to_string(&bibliography_path)),
                 start_line: 1,
             }),
-            Err(err) => diagnostics.push(diag(
-                "error",
-                format!(
-                    "Missing bibliography file {}: {err}",
-                    bibliography_path.display()
-                ),
-                Some(path_to_string(&bibliography_path)),
-                None,
-                Some("Create the bibliography file or update front matter bibliography paths."),
+            Err(err) => diagnostics.push(missing_bibliography_file_diagnostic(
+                path,
+                &bibliography_path,
+                &err,
+                source_text,
+                root_file,
             )),
         }
     }
@@ -106,6 +104,56 @@ pub(crate) fn collect_bibliography(
             )
         })
         .collect()
+}
+
+fn missing_bibliography_file_diagnostic(
+    requested_path: &str,
+    resolved_path: &Path,
+    err: &std::io::Error,
+    source_text: Option<&str>,
+    root_file: Option<&str>,
+) -> DocumentDiagnostic {
+    let mut diagnostic = diag(
+        "error",
+        format!(
+            "Missing bibliography file {}: {err}",
+            resolved_path.display()
+        ),
+        root_file
+            .map(ToString::to_string)
+            .or_else(|| Some(path_to_string(resolved_path))),
+        None,
+        Some("Create the bibliography file or update front matter bibliography paths."),
+    );
+    diagnostic
+        .related
+        .push(format!("bibliography_path: {requested_path}"));
+    diagnostic
+        .related
+        .push(format!("resolved_path: {}", resolved_path.display()));
+    if let Some((line, column, end_column)) =
+        source_text.and_then(|text| front_matter_value_range(text, requested_path))
+    {
+        diagnostic.line = Some(line);
+        diagnostic = with_range(diagnostic, column, Some(line), end_column);
+    }
+    diagnostic
+}
+
+fn front_matter_value_range(text: &str, value: &str) -> Option<(usize, usize, usize)> {
+    if value.is_empty() || !text.starts_with("---\n") {
+        return None;
+    }
+    for (line_index, line) in text.lines().enumerate().skip(1) {
+        if line.trim() == "---" {
+            break;
+        }
+        if let Some(column_index) = line.find(value) {
+            let column = column_index + 1;
+            return Some((line_index + 1, column, column + value.len()));
+        }
+    }
+    None
 }
 
 fn bibliography_source_paths(metadata: &Value) -> Vec<&str> {

@@ -76,6 +76,49 @@ fn compiler_loads_external_bibliography_and_validates_cross_refs() {
 }
 
 #[test]
+fn compiler_reports_missing_bibliography_file_with_front_matter_range() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-missing-bib-test-{unique}"));
+    fs::create_dir_all(&root).expect("create missing bib test dir");
+
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Missing Bibliography\nstatus: approved\napprovedBy: QA\nbibliography: refs/missing.bib\n---\n# Missing Bibliography\nClaim [@missing2026].\n".to_string(),
+            file_path: Some(path_to_string(&root.join("root.md"))),
+        });
+
+    let diagnostic = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("Missing bibliography file"))
+        .expect("missing bibliography diagnostic");
+    assert_eq!(
+        diagnostic.source_file.as_deref(),
+        Some(path_to_string(&root.join("root.md")).as_str())
+    );
+    assert_eq!(diagnostic.line, Some(5));
+    assert_eq!(diagnostic.end_line, Some(5));
+    assert_eq!(diagnostic.column, Some(15));
+    assert_eq!(diagnostic.end_column, Some(31));
+    assert!(diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("Create the bibliography file")));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "bibliography_path: refs/missing.bib"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related.contains("refs/missing.bib")));
+
+    fs::remove_dir_all(root).expect("clean missing bib test dir");
+}
+
+#[test]
 fn citation_references_ignore_fenced_examples() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Fenced Citations\nstatus: approved\napprovedBy: QA\n---\n# Fenced Citations\nClaim [@real2026].\n\n```md\nExample [@not-real] should stay literal.\n```\n\n```bibtex\n@article{real2026,\n title={Real Evidence},\n author={Doe},\n year={2026}\n}\n```\n"

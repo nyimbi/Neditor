@@ -5356,6 +5356,13 @@ Unknown transform diagnostic tightening:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked unknown_transform_attempts_report_source_ranged_diagnostics --lib` | Pass | Focused Rust proof now warns on explicit unsupported transform attempts such as `notebook output=html`, ranges the unknown fence name in `untitled.md`, preserves the fence as Markdown source, and avoids false warnings for ordinary `python` code fences. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked transform_diagnostics_resolve_to_source_fence_ranges --lib` | Pass | Existing transform diagnostic source-range proof still passes after adding the unknown-transform warning path. |
 
+Missing bibliography diagnostic tightening:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_reports_missing_bibliography_file_with_front_matter_range --lib` | Pass | Focused Rust proof now reports missing external bibliography files at the front matter `bibliography` path in the root Markdown file, including exact line and column range plus requested and resolved path context. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_loads_external_bibliography_and_validates_cross_refs --lib` | Pass | Existing external bibliography loading and cross-reference validation still pass after threading source text into bibliography diagnostics. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
