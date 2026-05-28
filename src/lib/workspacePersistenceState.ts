@@ -1,7 +1,21 @@
 import { activeDocumentState } from "./documentSelectors.js";
+import { normalizeBusinessProfile } from "./businessDocuments.js";
+import { normalizeCustomTransformTemplates } from "./transformTemplates.js";
+import { applyPersistedUiPreferences } from "./uiPreferences.js";
 import {
   clampScrollRatio,
+  normalizeAgentRunHistory,
+  normalizeAiCleanupDefaults,
+  normalizeAiProviderDefaults,
+  normalizeBibliographyDefaults,
+  normalizeBrandProfileDefaults,
+  normalizeDocsLiveDraftHistory,
+  normalizeExportDefaults,
+  normalizeExportProfiles,
+  normalizeGitIntegrationPreferences,
   normalizePersistedWorkspaceForSave,
+  normalizeTtsPreferences,
+  type PersistedScrollPosition,
   type PersistedWorkspace,
 } from "./workspacePersistence.js";
 import type { OpenDocument } from "../types.js";
@@ -61,6 +75,70 @@ export interface WorkspacePersistenceStateInput {
   transformInputModes: RequiredPersistedValue<"transformInputModes">;
   transformTimeoutMs: number;
   customTransformTemplates: RequiredPersistedValue<"customTransformTemplates">;
+}
+
+export type WorkspacePreferenceStateInput = Omit<WorkspacePersistenceStateInput, "documents" | "activeId">;
+
+export interface WorkspaceRestoreRequest {
+  openFiles: string[];
+  activePath: string | null;
+  pinnedFiles: string[];
+  scrollPositions: Record<string, PersistedScrollPosition>;
+}
+
+export interface PersistedWorkspacePreferenceResult {
+  state: WorkspacePreferenceStateInput;
+  restoreRequest: WorkspaceRestoreRequest | null;
+}
+
+export function applyPersistedWorkspacePreferenceState(
+  current: WorkspacePreferenceStateInput,
+  persisted: PersistedWorkspace,
+): PersistedWorkspacePreferenceResult {
+  const exportProfiles = normalizeExportProfiles(persisted.exportProfiles);
+  const state: WorkspacePreferenceStateInput = {
+    ...current,
+    ...applyPersistedUiPreferences(current, persisted),
+    exportTarget: persisted.exportTarget || current.exportTarget,
+    exportDefaults: persisted.exportDefaults ? normalizeExportDefaults(persisted.exportDefaults) : current.exportDefaults,
+    bibliographyDefaults: persisted.bibliographyDefaults
+      ? normalizeBibliographyDefaults(persisted.bibliographyDefaults)
+      : current.bibliographyDefaults,
+    brandProfileDefaults: persisted.brandProfileDefaults ? normalizeBrandProfileDefaults(persisted.brandProfileDefaults) : current.brandProfileDefaults,
+    businessProfile: normalizeBusinessProfile(persisted.businessProfile),
+    exportProfiles,
+    activeExportProfileId:
+      persisted.activeExportProfileId && exportProfiles.some((profile) => profile.id === persisted.activeExportProfileId)
+        ? persisted.activeExportProfileId
+        : "",
+    gitIntegration: persisted.gitIntegration ? normalizeGitIntegrationPreferences(persisted.gitIntegration) : current.gitIntegration,
+    aiCleanupDefaults: persisted.aiCleanupDefaults ? normalizeAiCleanupDefaults(persisted.aiCleanupDefaults) : current.aiCleanupDefaults,
+    aiProviderDefaults: normalizeAiProviderDefaults(persisted.aiProviderDefaults),
+    ttsPreferences: normalizeTtsPreferences(persisted.ttsPreferences),
+    agentRunHistory: normalizeAgentRunHistory(persisted.agentRunHistory),
+    docsLiveDraftHistory: normalizeDocsLiveDraftHistory(persisted.docsLiveDraftHistory),
+    guidedDemoCompletedStepIds: persisted.guidedDemoCompletedStepIds || [],
+    recentFiles: persisted.recentFiles || [],
+    recentFolders: persisted.recentFolders || [],
+    recentlyClosed: persisted.recentlyClosed || [],
+    workspaceRoot: persisted.workspaceRoot || null,
+    transformEnginePaths: persisted.transformEnginePaths || {},
+    trustedTransformEngines: persisted.trustedTransformEngines || {},
+    disabledTransformEngines: persisted.disabledTransformEngines || {},
+    transformInputModes: persisted.transformInputModes || {},
+    transformTimeoutMs:
+      typeof persisted.transformTimeoutMs === "number" ? Math.min(Math.max(persisted.transformTimeoutMs, 1), 30000) : current.transformTimeoutMs,
+    customTransformTemplates: normalizeCustomTransformTemplates(persisted.customTransformTemplates),
+  };
+  const restoreRequest = persisted.openFiles?.length
+    ? {
+        openFiles: persisted.openFiles,
+        activePath: persisted.activePath || null,
+        pinnedFiles: persisted.pinnedFiles || [],
+        scrollPositions: persisted.scrollPositions || {},
+      }
+    : null;
+  return { state, restoreRequest };
 }
 
 export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInput): PersistedWorkspace {

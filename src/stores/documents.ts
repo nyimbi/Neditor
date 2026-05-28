@@ -63,7 +63,6 @@ import {
 } from "../lib/versioningState";
 import {
   deleteCustomTransformTemplateState,
-  normalizeCustomTransformTemplates,
   saveCustomTransformTemplateState,
   type CustomTransformTemplate,
 } from "../lib/transformTemplates";
@@ -89,19 +88,15 @@ import {
   resetGuidedDemoProgressState,
 } from "../lib/workflowHistory";
 import { forgetWorkspaceFolderState, setDocumentScrollState } from "../lib/workspaceNavigation";
-import { buildPersistedWorkspaceState } from "../lib/workspacePersistenceState";
+import { applyPersistedWorkspacePreferenceState, buildPersistedWorkspaceState } from "../lib/workspacePersistenceState";
 import {
   clampPaneRatio,
   clampScrollRatio,
   migratePersistedWorkspace,
-  normalizeAgentRunHistory,
   normalizeAiCleanupDefaults,
   normalizeAiProviderDefaults,
   normalizeBibliographyDefaults,
   normalizeBrandProfileDefaults,
-  normalizeDocsLiveDraftHistory,
-  normalizeExportDefaults,
-  normalizeExportProfiles,
   normalizeGitIntegrationPreferences,
   normalizeTtsPreferences,
   type DocsLiveDraftHistoryItem,
@@ -117,7 +112,6 @@ import {
   type ToolbarDisplay,
   type TtsPreferences,
 } from "../lib/workspacePersistence";
-import { applyPersistedUiPreferences } from "../lib/uiPreferences";
 import type {
   AiCleanupResponse,
   AiCleanupOptions,
@@ -453,71 +447,15 @@ export const useDocumentsStore = defineStore("documents", {
       try {
         preferencesStore = await Store.load("settings.json");
         const persisted = migratePersistedWorkspace(await preferencesStore.get<unknown>("workspace"));
-        Object.assign(
-          this,
-          applyPersistedUiPreferences(
-            {
-              theme: this.theme,
-              previewTheme: this.previewTheme,
-              toolbarDisplay: this.toolbarDisplay,
-              toolbarTextSize: this.toolbarTextSize,
-              toolbarCollapsedRows: this.toolbarCollapsedRows,
-              editorPaneRatio: this.editorPaneRatio,
-              splitSourcePanes: this.splitSourcePanes,
-              editorKeymapMode: this.editorKeymapMode,
-              wordWrap: this.wordWrap,
-              lineNumbers: this.lineNumbers,
-              codeFolding: this.codeFolding,
-              highContrast: this.highContrast,
-              reducedMotion: this.reducedMotion,
-              autosave: this.autosave,
-              autosaveDelayMs: this.autosaveDelayMs,
-              autoSnapshot: this.autoSnapshot,
-              snapshotIntervalMs: this.snapshotIntervalMs,
-              snapshotStorage: this.snapshotStorage,
-              editorFont: this.editorFont,
-              previewFont: this.previewFont,
-              editorFontSize: this.editorFontSize,
-              previewFontSize: this.previewFontSize,
-              editorLineHeight: this.editorLineHeight,
-              previewLineHeight: this.previewLineHeight,
-              mode: this.mode,
-              sidebar: this.sidebar,
-            },
-            persisted,
-          ),
-        );
-        if (persisted.exportTarget) this.exportTarget = persisted.exportTarget;
-        if (persisted.exportDefaults) this.exportDefaults = normalizeExportDefaults(persisted.exportDefaults);
-        if (persisted.bibliographyDefaults) this.bibliographyDefaults = normalizeBibliographyDefaults(persisted.bibliographyDefaults);
-        if (persisted.brandProfileDefaults) this.brandProfileDefaults = normalizeBrandProfileDefaults(persisted.brandProfileDefaults);
-        this.businessProfile = normalizeBusinessProfile(persisted.businessProfile);
-        this.exportProfiles = normalizeExportProfiles(persisted.exportProfiles);
-        this.activeExportProfileId =
-          persisted.activeExportProfileId && this.exportProfiles.some((profile) => profile.id === persisted.activeExportProfileId)
-            ? persisted.activeExportProfileId
-            : "";
-        if (persisted.gitIntegration) this.gitIntegration = normalizeGitIntegrationPreferences(persisted.gitIntegration);
-        if (persisted.aiCleanupDefaults) this.aiCleanupDefaults = normalizeAiCleanupDefaults(persisted.aiCleanupDefaults);
-        this.aiProviderDefaults = normalizeAiProviderDefaults(persisted.aiProviderDefaults);
-        this.ttsPreferences = normalizeTtsPreferences(persisted.ttsPreferences);
-        this.agentRunHistory = normalizeAgentRunHistory(persisted.agentRunHistory);
-        this.docsLiveDraftHistory = normalizeDocsLiveDraftHistory(persisted.docsLiveDraftHistory);
-        this.guidedDemoCompletedStepIds = persisted.guidedDemoCompletedStepIds || [];
-        this.recentFiles = persisted.recentFiles || [];
-        this.recentFolders = persisted.recentFolders || [];
-        this.recentlyClosed = persisted.recentlyClosed || [];
-        this.workspaceRoot = persisted.workspaceRoot || null;
-        this.transformEnginePaths = persisted.transformEnginePaths || {};
-        this.trustedTransformEngines = persisted.trustedTransformEngines || {};
-        this.disabledTransformEngines = persisted.disabledTransformEngines || {};
-        this.transformInputModes = persisted.transformInputModes || {};
-        if (typeof persisted.transformTimeoutMs === "number") {
-          this.transformTimeoutMs = Math.min(Math.max(persisted.transformTimeoutMs, 1), 30000);
-        }
-        this.customTransformTemplates = normalizeCustomTransformTemplates(persisted.customTransformTemplates);
-        if (persisted.openFiles?.length) {
-          await this.restoreWorkspace(persisted.openFiles, persisted.activePath || null, persisted.pinnedFiles || [], persisted.scrollPositions || {});
+        const loaded = applyPersistedWorkspacePreferenceState(this, persisted);
+        Object.assign(this, loaded.state);
+        if (loaded.restoreRequest) {
+          await this.restoreWorkspace(
+            loaded.restoreRequest.openFiles,
+            loaded.restoreRequest.activePath,
+            loaded.restoreRequest.pinnedFiles,
+            loaded.restoreRequest.scrollPositions,
+          );
         }
       } catch (error) {
         this.lastError = isMissingTauriBackendError(error) ? "" : errorText(error);

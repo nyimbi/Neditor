@@ -236,7 +236,7 @@ import {
   resetGuidedDemoProgressState,
 } from "../src/lib/workflowHistory.js";
 import { forgetWorkspaceFolderState, setDocumentScrollState } from "../src/lib/workspaceNavigation.js";
-import { buildPersistedWorkspaceState } from "../src/lib/workspacePersistenceState.js";
+import { applyPersistedWorkspacePreferenceState, buildPersistedWorkspaceState } from "../src/lib/workspacePersistenceState.js";
 import {
   migratePersistedWorkspace,
   normalizeAgentRunHistory,
@@ -5347,6 +5347,116 @@ test("workspace persistence state helper builds normalized store snapshots", () 
   deepEqual(workspace.guidedDemoCompletedStepIds, ["intro", "ai-create"]);
 });
 
+test("workspace persistence state helper applies persisted preferences and restore inputs", () => {
+  const current = {
+    theme: "system",
+    previewTheme: "match",
+    toolbarDisplay: "both",
+    toolbarTextSize: 10,
+    toolbarCollapsedRows: [],
+    editorPaneRatio: 0.5,
+    splitSourcePanes: false,
+    editorKeymapMode: "default",
+    wordWrap: true,
+    lineNumbers: true,
+    codeFolding: true,
+    highContrast: false,
+    reducedMotion: false,
+    autosave: false,
+    autosaveDelayMs: 1500,
+    autoSnapshot: false,
+    snapshotIntervalMs: 300_000,
+    snapshotStorage: "app-data",
+    editorFont: "Menlo",
+    previewFont: "Inter",
+    editorFontSize: 14,
+    previewFontSize: 14,
+    editorLineHeight: 1.55,
+    previewLineHeight: 1.65,
+    exportTarget: "html",
+    exportDefaults: { includeManifest: true, layoutPreset: "business" },
+    bibliographyDefaults: { citationStyle: "apa" },
+    brandProfileDefaults: { name: "Current", color: "#000000" },
+    businessProfile: normalizeBusinessProfile({ companyName: "Current Co" }),
+    aiProviderDefaults: normalizeAiProviderDefaults({ profileId: "none" }),
+    ttsPreferences: normalizeTtsPreferences({ engine: "off" }),
+    exportProfiles: [],
+    activeExportProfileId: "",
+    gitIntegration: { enabled: true },
+    aiCleanupDefaults: { preserveHeadings: false },
+    agentRunHistory: [],
+    docsLiveDraftHistory: [],
+    guidedDemoCompletedStepIds: [],
+    recentFiles: [],
+    recentFolders: [],
+    recentlyClosed: [],
+    workspaceRoot: null,
+    mode: "split",
+    sidebar: "outline",
+    transformEnginePaths: {},
+    trustedTransformEngines: {},
+    disabledTransformEngines: {},
+    transformInputModes: {},
+    transformTimeoutMs: 5000,
+    customTransformTemplates: [],
+  } satisfies Parameters<typeof applyPersistedWorkspacePreferenceState>[0];
+
+  const result = applyPersistedWorkspacePreferenceState(
+    current,
+    migratePersistedWorkspace({
+      theme: "light",
+      toolbarTextSize: 3,
+      toolbarCollapsedRows: ["file", "view", "file"],
+      exportTarget: "pdf",
+      exportProfiles: [{ id: "board-pdf", name: "Board PDF", exportTarget: "pdf" }],
+      activeExportProfileId: "board-pdf",
+      businessProfile: { companyName: " Loaded Co ", email: " team@example.com " },
+      aiProviderDefaults: { profileId: "openai-compatible", model: " gpt-4.1 " },
+      ttsPreferences: { engine: "macos-say", voice: " Samantha " },
+      aiCleanupDefaults: { preserveHeadings: true },
+      recentFiles: ["/a.md", "/b.md"],
+      recentFolders: ["/workspace"],
+      recentlyClosed: ["/closed.md"],
+      workspaceRoot: "/workspace",
+      openFiles: ["/a.md", "/b.md"],
+      activePath: "/b.md",
+      pinnedFiles: ["/b.md"],
+      scrollPositions: { "/b.md": { editor: 0.2, preview: 0.8 } },
+      mode: "review",
+      sidebar: "settings",
+      transformEnginePaths: { dot: "/usr/bin/dot" },
+      trustedTransformEngines: { dot: true },
+      disabledTransformEngines: { plantuml: true },
+      transformInputModes: { dot: "file" },
+      transformTimeoutMs: 45_000,
+      guidedDemoCompletedStepIds: ["ai-create"],
+    }),
+  );
+
+  equal(result.state.theme, "light");
+  equal(result.state.toolbarTextSize, 9);
+  deepEqual(result.state.toolbarCollapsedRows, ["file", "view"]);
+  equal(result.state.exportTarget, "pdf");
+  equal(result.state.activeExportProfileId, "board-pdf");
+  equal(result.state.businessProfile.companyName, "Loaded Co");
+  equal(result.state.aiProviderDefaults.model, "gpt-4.1");
+  equal(result.state.ttsPreferences.voice, "Samantha");
+  equal(result.state.aiCleanupDefaults.preserveHeadings, true);
+  deepEqual(result.state.recentFiles, ["/a.md", "/b.md"]);
+  equal(result.state.workspaceRoot, "/workspace");
+  equal(result.state.mode, "review");
+  equal(result.state.sidebar, "settings");
+  equal(result.state.transformTimeoutMs, 30_000);
+  deepEqual(result.state.transformInputModes, { dot: "file" });
+  deepEqual(result.state.guidedDemoCompletedStepIds, ["ai-create"]);
+  deepEqual(result.restoreRequest, {
+    openFiles: ["/a.md", "/b.md"],
+    activePath: "/b.md",
+    pinnedFiles: ["/b.md"],
+    scrollPositions: { "/b.md": { editor: 0.2, preview: 0.8 } },
+  });
+});
+
 test("transform template library covers reusable calculations and custom template normalization", () => {
   const calcTemplates = builtinTransformTemplates.filter((template) => template.transform === "calc");
   const businessTemplates = calcTemplates.filter((template) => template.category === "Business");
@@ -5500,6 +5610,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const configurationSetup = readFileSync("src/lib/configurationSetup.ts", "utf8");
   const docsLive = readFileSync("src/lib/docsLive.ts", "utf8");
   const frontMatterManagers = readFileSync("src/lib/frontMatterManagers.ts", "utf8");
+  const workspacePersistenceState = readFileSync("src/lib/workspacePersistenceState.ts", "utf8");
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
   const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
   const vimKeybindings = readFileSync("src/lib/vimKeybindings.ts", "utf8");
@@ -6381,7 +6492,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(store.includes("clearDocsLiveDraftHistory"));
   ok(store.includes("removeAgentRunHistory"));
   ok(store.includes("clearAgentRunHistory"));
-  ok(store.includes("normalizeDocsLiveDraftHistory"));
+  ok(workspacePersistenceState.includes("normalizeDocsLiveDraftHistory"));
   ok(app.includes('listen<string>("neditor-menu-command"'));
   ok(app.includes('"neditor-export-html": "html"'));
   ok(app.includes('"neditor-export-epub": "epub"'));
