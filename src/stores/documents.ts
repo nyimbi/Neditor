@@ -23,6 +23,15 @@ import { buildDocumentCompileOptions, buildDocumentExportOptions } from "../lib/
 import { activeDocumentState, externalTransformEnginesState, windowTitleState } from "../lib/documentSelectors";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
 import {
+  applyExportFailureState,
+  applyExportReadinessState,
+  applyExportSuccessState,
+  beginExportReadinessState,
+  beginExportWorkflowState,
+  exportProgressState,
+  finishExportWorkflowState,
+} from "../lib/exportWorkflowState";
+import {
   applyRenamedDocumentState,
   applyRevertedDocumentState,
   applySavedDocumentState,
@@ -1252,16 +1261,11 @@ export const useDocumentsStore = defineStore("documents", {
     async exportActive(path: string) {
       if (this.exportBusy) return;
       const doc = this.activeDocument;
-      this.exportBusy = true;
-      this.lastExportOutputPath = "";
-      this.lastExportManifestPath = "";
-      this.lastExportDiagnostics = [];
-      this.lastExportProgressSteps = [];
-      this.lastError = "";
+      Object.assign(this, beginExportWorkflowState());
       try {
-        this.exportProgress = "Creating pre-export snapshot";
+        Object.assign(this, exportProgressState("Creating pre-export snapshot"));
         await this.createSnapshot("pre-export");
-        this.exportProgress = `Writing ${this.exportTarget.toUpperCase()} export`;
+        Object.assign(this, exportProgressState(`Writing ${this.exportTarget.toUpperCase()} export`));
         const response = await invoke<{
           output_path: string;
           manifest_path?: string | null;
@@ -1276,33 +1280,13 @@ export const useDocumentsStore = defineStore("documents", {
             options: this.exportOptionsForActive(),
           },
         });
-        this.lastExportOutputPath = response.output_path;
-        this.lastExportManifestPath = response.manifest_path || "";
-        this.lastExportDiagnostics = response.diagnostics || [];
-        this.lastExportProgressSteps = response.progress_steps || [];
-        this.statusMessage = `Exported ${response.output_path}${response.manifest_path ? ` with manifest ${response.manifest_path}` : ""}`;
-        this.exportProgress = "Refreshing export snapshots";
+        Object.assign(this, applyExportSuccessState(response));
+        Object.assign(this, exportProgressState("Refreshing export snapshots"));
         await this.listSnapshots();
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.lastError = message;
-        this.lastExportDiagnostics = [
-          {
-            severity: "error",
-            message,
-            source_file: doc.path,
-            line: null,
-            column: null,
-            end_line: null,
-            end_column: null,
-            suggestion: "Review export readiness diagnostics and target settings before retrying.",
-            related: [this.exportTarget],
-          },
-        ];
-        this.statusMessage = `Export failed: ${message}`;
+        Object.assign(this, applyExportFailureState(error, doc.path, this.exportTarget));
       } finally {
-        this.exportProgress = "";
-        this.exportBusy = false;
+        Object.assign(this, finishExportWorkflowState());
       }
     },
     saveCurrentExportProfile(name: string) {
@@ -1403,11 +1387,9 @@ export const useDocumentsStore = defineStore("documents", {
     async prepareForExport() {
       if (this.exportBusy) return;
       const doc = this.activeDocument;
-      this.exportBusy = true;
-      this.lastError = "";
+      Object.assign(this, beginExportReadinessState());
       try {
-        this.exportProgress = "Checking export readiness";
-        this.exportReadiness = await invoke<ExportReadinessReport>("prepare_for_export", {
+        const exportReadiness = await invoke<ExportReadinessReport>("prepare_for_export", {
           request: {
             text: doc.text,
             file_path: doc.path,
@@ -1415,12 +1397,9 @@ export const useDocumentsStore = defineStore("documents", {
             options: this.exportOptionsForActive(),
           },
         });
-        this.statusMessage = this.exportReadiness.ready
-          ? "Document is ready for export"
-          : `${this.exportReadiness.error_count} errors, ${this.exportReadiness.warning_count} warnings before export`;
+        Object.assign(this, applyExportReadinessState(exportReadiness));
       } finally {
-        this.exportProgress = "";
-        this.exportBusy = false;
+        Object.assign(this, finishExportWorkflowState());
       }
     },
     async setTransformEnginePath(name: string, path: string) {

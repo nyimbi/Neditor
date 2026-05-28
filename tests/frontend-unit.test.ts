@@ -100,6 +100,15 @@ import {
   formatExportMetadataChecklistSummary,
 } from "../src/lib/exportMetadataChecklist.js";
 import { buildDocumentCompileOptions, buildDocumentExportOptions } from "../src/lib/documentExportOptions.js";
+import {
+  applyExportFailureState,
+  applyExportReadinessState,
+  applyExportSuccessState,
+  beginExportReadinessState,
+  beginExportWorkflowState,
+  exportProgressState,
+  finishExportWorkflowState,
+} from "../src/lib/exportWorkflowState.js";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../src/lib/exportProfiles.js";
 import {
   applyRenamedDocumentState,
@@ -449,6 +458,48 @@ test("document export option helpers normalize compile export and transform sett
   });
   equal(reviewedExportOptions.warnOnDirtyGit, false);
   equal(reviewedExportOptions.watermark, "Confidential");
+});
+
+test("export workflow state helpers preserve progress success failure and readiness state", () => {
+  deepEqual(beginExportWorkflowState(), {
+    exportBusy: true,
+    lastExportOutputPath: "",
+    lastExportManifestPath: "",
+    lastExportDiagnostics: [],
+    lastExportProgressSteps: [],
+    lastError: "",
+  });
+  deepEqual(finishExportWorkflowState(), { exportBusy: false, exportProgress: "" });
+  deepEqual(exportProgressState("Writing HTML export"), { exportProgress: "Writing HTML export" });
+
+  const success = applyExportSuccessState({
+    output_path: "/exports/report.html",
+    manifest_path: "/exports/report.neditor-manifest.json",
+    diagnostics: [{ severity: "info", message: "ok", line: null, column: null, end_line: null, end_column: null, related: [] }],
+    progress_steps: [{ id: "write", label: "Write", state: "complete", detail: "Done", work_units: 1 }],
+  });
+  equal(success.lastExportOutputPath, "/exports/report.html");
+  equal(success.lastExportManifestPath, "/exports/report.neditor-manifest.json");
+  equal(success.lastExportDiagnostics.length, 1);
+  equal(success.lastExportProgressSteps.length, 1);
+  equal(success.statusMessage, "Exported /exports/report.html with manifest /exports/report.neditor-manifest.json");
+
+  const failure = applyExportFailureState(new Error("Missing metadata"), "/workspace/report.md", "pdf");
+  equal(failure.lastError, "Missing metadata");
+  equal(failure.statusMessage, "Export failed: Missing metadata");
+  equal(failure.lastExportDiagnostics[0].severity, "error");
+  equal(failure.lastExportDiagnostics[0].source_file, "/workspace/report.md");
+  deepEqual(failure.lastExportDiagnostics[0].related, ["pdf"]);
+
+  deepEqual(beginExportReadinessState(), {
+    exportBusy: true,
+    lastError: "",
+    exportProgress: "Checking export readiness",
+  });
+  const readyReport = { ready: true, error_count: 0, warning_count: 0 } as never;
+  const blockedReport = { ready: false, error_count: 2, warning_count: 3 } as never;
+  equal(applyExportReadinessState(readyReport).statusMessage, "Document is ready for export");
+  equal(applyExportReadinessState(blockedReport).statusMessage, "2 errors, 3 warnings before export");
 });
 
 test("versioning state helpers preserve snapshot and git restore semantics", () => {
