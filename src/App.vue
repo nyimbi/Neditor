@@ -12638,7 +12638,7 @@ async function runNativeMenuCommand(command: string) {
       startBusinessDocumentWizard(businessTemplateById("proposal"));
       break;
     case "neditor-wizard-rfp-response":
-      startBusinessDocumentWizard(businessTemplateById("rfp"));
+      startBusinessDocumentWizard(businessTemplateById("rfp-response"));
       break;
     case "neditor-wizard-tender-response":
       startBusinessDocumentWizard(businessTemplateById("tender"));
@@ -17243,7 +17243,7 @@ function sendRfpResponseToDocsLive() {
   docsLiveTitle.value = `RFP response for ${store.businessProfile.defaultClientName || analysis.source.title || "Client"}`;
   docsLiveOutlineText.value = rfpProposalOutlineBullets(analysis);
   docsLiveContext.value = [
-    businessWizardContext(businessDocumentTemplates.find((template) => template.id === "rfp") || businessDocumentTemplates[0], store.businessProfile),
+    businessWizardContext(businessDocumentTemplates.find((template) => template.id === "rfp-response") || businessDocumentTemplates[0], store.businessProfile),
     "",
     "Proposal outline:",
     rfpProposalOutlineMarkdown(analysis, store.businessProfile, rfpResponseContextNotes.value),

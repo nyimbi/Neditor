@@ -3381,8 +3381,14 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(proposal);
   ok(tender);
   ok(contact);
-  ok(businessDocumentTemplates.some((template) => template.id === "rfp"));
+  const buyerRfp = businessDocumentTemplates.find((template) => template.id === "rfp")!;
+  const rfpResponse = businessDocumentTemplates.find((template) => template.id === "rfp-response")!;
+  ok(buyerRfp);
+  ok(rfpResponse);
+  equal(buyerRfp.label, "Request for proposal");
+  equal(rfpResponse.docsLiveType, "rfp-response");
   ok(businessDocumentTemplates.some((template) => template.id === "rfq"));
+  ok(businessDocumentTemplates.some((template) => template.id === "report"));
   ok(businessDocumentTemplates.some((template) => template.id === "tutorial"));
   ok(businessDocumentTemplates.some((template) => template.id === "lesson-plan"));
   ok(businessDocumentTemplates.some((template) => template.id === "lesson-content"));
@@ -3420,6 +3426,11 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(markdown.includes("## AI Drafting Brief"));
   ok(markdown.includes("Create a proposal that is client-centered"));
   ok(!markdown.includes("{{companyName}}"));
+
+  const report = businessDocumentTemplates.find((template) => template.id === "report")!;
+  const reportMarkdown = businessTemplateMarkdown(report, profile);
+  ok(reportMarkdown.includes("## Analysis"));
+  ok(reportMarkdown.includes("Create a business report"));
 
   const prd = businessDocumentTemplates.find((template) => template.id === "product-requirements-document")!;
   const prdMarkdown = businessTemplateMarkdown(prd, profile);

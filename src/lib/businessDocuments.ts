@@ -27,11 +27,13 @@ export type BusinessDocumentKind =
   | "movie-script"
   | "proposal"
   | "rfp"
+  | "rfp-response"
   | "rfq"
   | "tender"
   | "sow"
   | "capability-statement"
   | "case-study"
+  | "report"
   | "business-case"
   | "executive-brief"
   | "board-decision-memo"
@@ -389,6 +391,15 @@ export const businessDocumentTemplates: BusinessDocumentTemplate[] = [
   },
   {
     id: "rfp",
+    label: "Request for proposal",
+    summary: "Creates a buyer-side RFP package with scope, vendor instructions, evaluation criteria, and response matrix.",
+    docsLiveType: "project-plan",
+    bestFor: ["Procurement packages", "Vendor selection", "Formal buyer requirements"],
+    aiPrompt: "Create a buyer-side request for proposal that clearly defines the opportunity, scope, vendor instructions, evaluation method, and required response matrix.",
+    outline: ["Opportunity Summary", "Scope of Work", "Vendor Instructions", "Evaluation Criteria", "Required Response Matrix", "Submission Checklist", "Clarification Process"],
+  },
+  {
+    id: "rfp-response",
     label: "RFP response",
     summary: "Structures a response to a request for proposal with compliance, solution, team, and evaluation evidence.",
     docsLiveType: "rfp-response",
@@ -440,6 +451,15 @@ export const businessDocumentTemplates: BusinessDocumentTemplate[] = [
     bestFor: ["Sales proof", "Marketing collateral", "Client success stories"],
     aiPrompt: "Draft a case study that separates verified facts from placeholders and leaves quotes/results ready for approval.",
     outline: ["Customer Snapshot", "Challenge", "Solution", "Implementation", "Results", "Quote Prompts", "Review Approvals"],
+  },
+  {
+    id: "report",
+    label: "Business report",
+    summary: "Creates a decision report with executive summary, evidence, analysis, recommendations, risks, and next steps.",
+    docsLiveType: "business-brief",
+    bestFor: ["Management reports", "Analysis memos", "Decision support"],
+    aiPrompt: "Create a business report that turns evidence and analysis into clear findings, recommendations, risks, and accountable next steps.",
+    outline: ["Executive Summary", "Situation", "Evidence Base", "Analysis", "Recommendations", "Risks and Next Steps", "Review Handoff"],
   },
   {
     id: "business-case",
