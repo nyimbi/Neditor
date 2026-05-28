@@ -78,6 +78,9 @@ import {
   documentOutlineTemplateToPlannerText,
   saveCustomDocumentOutlineTemplateState,
   deleteCustomDocumentOutlineTemplateState,
+  workspaceDocumentOutlineLibraryJson,
+  workspaceDocumentOutlineTemplatesFromJson,
+  workspaceOutlineLibraryPath,
   buildBusinessWizardStepAssistance,
   buildRfpWizardStepAssistance,
   businessSnippetMarkdown,
@@ -2905,6 +2908,30 @@ test("document outline library exposes built-ins and managed custom outlines", (
   const deleted = deleteCustomDocumentOutlineTemplateState(updated.templates, "custom-qbr");
   equal(deleted.changed, true);
   equal(deleted.templates.length, 0);
+
+  const workspaceJson = workspaceDocumentOutlineLibraryJson(updated.templates);
+  ok(workspaceJson.includes("neditor.workspace-outlines.v1"));
+  ok(workspaceJson.includes('"label": "Quarterly business review"'));
+  const imported = workspaceDocumentOutlineTemplatesFromJson(
+    JSON.stringify({
+      schema: "neditor.workspace-outlines.v1",
+      outlines: [
+        {
+          id: "quarterly-review",
+          label: "Quarterly Review",
+          category: "Business",
+          summary: "CLI-managed outline.",
+          bestFor: ["Client reviews"],
+          outline: ["Executive Summary", "  Revenue Review", "Decision Log"],
+          tags: ["qbr"],
+        },
+      ],
+    }),
+  );
+  equal(imported[0].name, "Quarterly Review");
+  equal(imported[0].bestFor[0], "Client reviews");
+  ok(documentOutlineTemplateToPlannerText({ outline: imported[0].outline }).includes("  - Revenue Review"));
+  equal(workspaceOutlineLibraryPath("/workspace/project/"), "/workspace/project/.neditor/outlines.json");
 });
 
 test("Docs Live turns outline, voice context, and placeholders into a reviewable draft", () => {
@@ -8095,6 +8122,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned outlines --category Procurement --query RFP --json"));
   ok(app.includes("ned outlines --markdown rfp-technical-proposal"));
   ok(app.includes('ned outlines --workspace . --save board-pack --section "Decision Requested" --section "Recommendation"'));
+  ok(app.includes("Sync workspace outlines"));
+  ok(app.includes("workspaceOutlineSyncStatus"));
   ok(app.includes("customOutlineBestFor"));
   ok(app.includes("docsLiveTypeForOutlineTemplate"));
   ok(app.includes("normalizeDocsLiveDocumentType(signals)"));
@@ -8120,6 +8149,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(cli.includes("neditor.ned-outline-delete.v1"));
   ok(cli.includes("outlineDetails"));
   ok(cli.includes("run_outlines_command"));
+  ok(store.includes("loadWorkspaceDocumentOutlineTemplates"));
+  ok(store.includes("workspaceDocumentOutlineTemplatesFromJson"));
+  ok(store.includes("workspaceDocumentOutlineLibraryJson"));
   ok(cli.includes("snippetDetails"));
   ok(cli.includes("neditor.ned-snippets.v1"));
   ok(cli.includes("neditor.ned-profile.v1"));

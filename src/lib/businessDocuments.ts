@@ -839,6 +839,55 @@ export function normalizeCustomDocumentOutlineTemplates(value: unknown): CustomD
   return templates.slice(0, 100);
 }
 
+export function workspaceOutlineLibraryPath(root: string) {
+  const normalizedRoot = root.trim().replace(/[\\/]+$/g, "");
+  return normalizedRoot ? `${normalizedRoot}/.neditor/outlines.json` : ".neditor/outlines.json";
+}
+
+export function workspaceDocumentOutlineTemplatesFromJson(text: string): CustomDocumentOutlineTemplate[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  let outlines: unknown[] = [];
+  if (Array.isArray(value)) {
+    outlines = value;
+  } else if (typeof value === "object" && value !== null) {
+    const record = value as Record<string, unknown>;
+    outlines = Array.isArray(record.outlines) ? record.outlines : [];
+  }
+  return normalizeCustomDocumentOutlineTemplates(
+    outlines.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const record = item as Record<string, unknown>;
+      return {
+        id: record.id,
+        name: record.name ?? record.label,
+        category: record.category,
+        summary: record.summary,
+        outline: record.outline,
+        tags: record.tags,
+        bestFor: record.bestFor,
+      };
+    }),
+  );
+}
+
+export function workspaceDocumentOutlineLibraryJson(templates: CustomDocumentOutlineTemplate[]) {
+  const outlines = normalizeCustomDocumentOutlineTemplates(templates).map((template) => ({
+    id: template.id,
+    label: template.name,
+    category: template.category,
+    summary: template.summary,
+    bestFor: template.bestFor,
+    outline: template.outline,
+    tags: template.tags,
+  }));
+  return `${JSON.stringify({ schema: "neditor.workspace-outlines.v1", outlines }, null, 2)}\n`;
+}
+
 export interface SaveCustomDocumentOutlineTemplateStateResult {
   templates: CustomDocumentOutlineTemplate[];
   template: CustomDocumentOutlineTemplate | null;

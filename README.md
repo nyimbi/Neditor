@@ -153,6 +153,9 @@ template discovery. `ned outlines` explains reusable document outlines for
 proposal planning before body text is drafted. Built-in outlines are always
 available, and workspace outlines live in `.neditor/outlines.json` so teams can
 save their own board packs, operating reviews, reports, and proposal skeletons;
+the Outline Library panel can sync that same workspace file so outlines created
+with `ned` are selectable in the app, and app-saved custom outlines remain
+available to CLI scripts;
 use
 `ned outlines --category Procurement --query RFP --json` for filtered discovery
 or `ned outlines --markdown rfp-technical-proposal` to print a copyable outline

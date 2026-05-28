@@ -516,7 +516,11 @@
             <div class="outline-library-actions">
               <button type="button" :disabled="!outlineDraftItems.length" @click="saveCurrentOutlineTemplate">Save planner outline</button>
               <button type="button" @click="resetCustomOutlineDraft">New custom outline</button>
+              <button type="button" :disabled="!store.workspaceRoot || workspaceOutlineSyncBusy" @click="syncWorkspaceOutlines">
+                {{ workspaceOutlineSyncBusy ? "Syncing..." : "Sync workspace outlines" }}
+              </button>
             </div>
+            <p class="sidebar-hint">{{ workspaceOutlineSyncStatus || (store.workspaceRoot ? "Workspace outlines sync with .neditor/outlines.json for CLI and app reuse." : "Open a workspace folder to sync outlines with .neditor/outlines.json.") }}</p>
             <label>
               Custom outline name
               <input v-model="customOutlineDraft.name" placeholder="Quarterly business review" />
@@ -6579,6 +6583,8 @@ const outlineLibraryQuery = ref("");
 const outlineLibraryCategory = ref("all");
 const customOutlineDraft = ref<CustomDocumentOutlineTemplate>(blankCustomDocumentOutlineTemplate());
 const editingCustomOutlineId = ref("");
+const workspaceOutlineSyncBusy = ref(false);
+const workspaceOutlineSyncStatus = ref("");
 const outlineModeNewTitle = ref("New chapter");
 const outlineModeNewLevel = ref(1);
 const documentSetDraft = ref("");
@@ -16715,7 +16721,26 @@ async function saveCurrentOutlineTemplate() {
   await store.saveCustomDocumentOutlineTemplate(template);
   customOutlineDraft.value = template;
   editingCustomOutlineId.value = template.id;
-  store.statusMessage = `Saved ${template.name} to the outline library`;
+  workspaceOutlineSyncStatus.value = store.workspaceRoot
+    ? `Saved ${template.name} to the outline library and .neditor/outlines.json`
+    : `Saved ${template.name} to the outline library`;
+  store.statusMessage = workspaceOutlineSyncStatus.value;
+}
+
+async function syncWorkspaceOutlines() {
+  workspaceOutlineSyncBusy.value = true;
+  try {
+    const loaded = await store.loadWorkspaceDocumentOutlineTemplates();
+    workspaceOutlineSyncStatus.value = loaded
+      ? "Workspace outline library synced from .neditor/outlines.json"
+      : "Open a workspace with .neditor/outlines.json to sync reusable outlines";
+    store.statusMessage = workspaceOutlineSyncStatus.value;
+  } catch (error) {
+    workspaceOutlineSyncStatus.value = error instanceof Error ? error.message : String(error);
+    store.lastError = workspaceOutlineSyncStatus.value;
+  } finally {
+    workspaceOutlineSyncBusy.value = false;
+  }
 }
 
 function openDocsLiveFromOutline() {

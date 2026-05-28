@@ -8,6 +8,9 @@ import {
   deleteCustomDocumentOutlineTemplateState,
   normalizeBusinessProfile,
   saveCustomDocumentOutlineTemplateState,
+  workspaceDocumentOutlineLibraryJson,
+  workspaceDocumentOutlineTemplatesFromJson,
+  workspaceOutlineLibraryPath,
   type BusinessProfile,
   type CustomDocumentOutlineTemplate,
 } from "../lib/businessDocuments";
@@ -457,6 +460,7 @@ export const useDocumentsStore = defineStore("documents", {
       this.activeId = ensureActiveWorkspaceDocumentState(this.documents, this.activeId).activeId;
       await this.compileActive();
       await this.refreshWorkspace();
+      await this.loadWorkspaceDocumentOutlineTemplates();
       await this.refreshGitStatus();
       await this.listSnapshots();
       try {
@@ -697,6 +701,7 @@ export const useDocumentsStore = defineStore("documents", {
       this.recentFolders = succeeded.recentFolders;
       this.sidebar = succeeded.sidebar;
       this.statusMessage = succeeded.statusMessage;
+      await this.loadWorkspaceDocumentOutlineTemplates();
       await this.persistWorkspace();
       return true;
     },
@@ -1374,13 +1379,92 @@ export const useDocumentsStore = defineStore("documents", {
       const next = saveCustomDocumentOutlineTemplateState(this.customDocumentOutlineTemplates, template);
       if (!next.changed) return;
       this.customDocumentOutlineTemplates = next.templates;
+      if (this.workspaceRoot && next.template) await this.saveWorkspaceDocumentOutlineTemplate(next.template);
       await this.persistWorkspace();
     },
     async deleteCustomDocumentOutlineTemplate(id: string) {
       const next = deleteCustomDocumentOutlineTemplateState(this.customDocumentOutlineTemplates, id);
       if (!next.changed) return;
       this.customDocumentOutlineTemplates = next.templates;
+      if (this.workspaceRoot) await this.deleteWorkspaceDocumentOutlineTemplate(id);
+      this.statusMessage = "Deleted custom outline from the app library and workspace outline file";
       await this.persistWorkspace();
+    },
+    async loadWorkspaceDocumentOutlineTemplates() {
+      if (!this.workspaceRoot) return false;
+      try {
+        const path = workspaceOutlineLibraryPath(this.workspaceRoot);
+        const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
+        const workspaceTemplates = workspaceDocumentOutlineTemplatesFromJson(response.text);
+        if (!workspaceTemplates.length) return true;
+        let nextTemplates = this.customDocumentOutlineTemplates;
+        let imported = 0;
+        for (const template of workspaceTemplates) {
+          const next = saveCustomDocumentOutlineTemplateState(nextTemplates, template);
+          nextTemplates = next.templates;
+          if (next.changed) imported += 1;
+        }
+        if (imported) {
+          this.customDocumentOutlineTemplates = nextTemplates;
+          this.statusMessage = `Loaded ${workspaceTemplates.length} workspace outline${workspaceTemplates.length === 1 ? "" : "s"} from .neditor/outlines.json`;
+          await this.persistWorkspace();
+        }
+        return true;
+      } catch (error) {
+        const message = errorText(error);
+        if (!message.toLowerCase().includes("no such file") && !message.toLowerCase().includes("not found")) {
+          this.lastError = message;
+        }
+        return false;
+      }
+    },
+    async saveWorkspaceDocumentOutlineTemplate(template: CustomDocumentOutlineTemplate) {
+      if (!this.workspaceRoot) return false;
+      const path = workspaceOutlineLibraryPath(this.workspaceRoot);
+      let workspaceTemplates: CustomDocumentOutlineTemplate[] = [];
+      try {
+        const existing = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
+        workspaceTemplates = workspaceDocumentOutlineTemplatesFromJson(existing.text);
+      } catch (error) {
+        const message = errorText(error);
+        if (!message.toLowerCase().includes("no such file") && !message.toLowerCase().includes("not found")) {
+          this.lastError = message;
+        }
+      }
+      const next = saveCustomDocumentOutlineTemplateState(workspaceTemplates, template);
+      if (!next.template) return false;
+      await invoke("save_file", {
+        request: {
+          path,
+          text: workspaceDocumentOutlineLibraryJson(next.templates),
+          expected_hash: null,
+        },
+      });
+      return true;
+    },
+    async deleteWorkspaceDocumentOutlineTemplate(id: string) {
+      if (!this.workspaceRoot) return false;
+      const path = workspaceOutlineLibraryPath(this.workspaceRoot);
+      try {
+        const existing = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
+        const workspaceTemplates = workspaceDocumentOutlineTemplatesFromJson(existing.text);
+        const next = deleteCustomDocumentOutlineTemplateState(workspaceTemplates, id);
+        if (!next.changed) return true;
+        await invoke("save_file", {
+          request: {
+            path,
+            text: workspaceDocumentOutlineLibraryJson(next.templates),
+            expected_hash: null,
+          },
+        });
+        return true;
+      } catch (error) {
+        const message = errorText(error);
+        if (!message.toLowerCase().includes("no such file") && !message.toLowerCase().includes("not found")) {
+          this.lastError = message;
+        }
+        return false;
+      }
     },
     setEditorPaneRatio(value: number, persist = true) {
       this.editorPaneRatio = clampPaneRatio(value);
