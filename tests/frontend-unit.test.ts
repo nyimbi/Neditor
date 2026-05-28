@@ -94,6 +94,16 @@ import {
 } from "../src/lib/exportMetadataChecklist.js";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../src/lib/exportProfiles.js";
 import {
+  applyRenamedDocumentState,
+  applyRevertedDocumentState,
+  applySavedDocumentState,
+  applyUntitledRevertState,
+  createDuplicateDocumentState,
+  createUntitledDocumentState,
+  folderFromPath,
+  titleFromPath,
+} from "../src/lib/fileLifecycle.js";
+import {
   appendFrontMatterDataSource,
   parseFrontMatterDataSources,
   parseFrontMatterVariables,
@@ -544,6 +554,68 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   equal(missingFolder.changed, false);
   deepEqual(missingFolder.recentFolders, ["/other"]);
   equal(missingFolder.workspaceRoot, "/other");
+});
+
+test("file lifecycle helpers update document state for rich file operations", () => {
+  let sequence = 0;
+  const createId = () => `doc-${(sequence += 1).toString()}`;
+  const untitled = createUntitledDocumentState("# Starter", "hash-starter", createId);
+  equal(untitled.id, "doc-1");
+  equal(untitled.title, "Untitled");
+  equal(untitled.dirty, true);
+  equal(untitled.savedText, "# Starter");
+
+  const saved = applySavedDocumentState(untitled, {
+    path: "/workspace/Reports/Board.md",
+    text: "# Board",
+    hash: "hash-board",
+    modified: "2026-05-28T10:00:00.000Z",
+  });
+  equal(saved.document.path, "/workspace/Reports/Board.md");
+  equal(saved.document.title, "Board.md");
+  equal(saved.document.dirty, false);
+  equal(saved.document.savedText, "# Board");
+  equal(saved.statusMessage, "Saved Board.md");
+  equal(folderFromPath(saved.document.path), "/workspace/Reports");
+  equal(titleFromPath("C:\\Docs\\Proposal.md"), "Proposal.md");
+
+  const renamed = applyRenamedDocumentState(
+    { ...saved.document, dirty: true, savedHash: "hash-board" },
+    { path: "/workspace/Reports/Board-final.md", modified: "2026-05-28T10:05:00.000Z" },
+  );
+  equal(renamed.document.title, "Board-final.md");
+  equal(renamed.document.savedHash, "hash-board");
+  equal(renamed.document.dirty, true);
+  equal(renamed.statusMessage, "Renamed Board-final.md");
+
+  const reverted = applyRevertedDocumentState(renamed.document, {
+    path: "/workspace/Reports/Board-final.md",
+    text: "# Final",
+    hash: "hash-final",
+    modified: "2026-05-28T10:10:00.000Z",
+  });
+  equal(reverted.document.text, "# Final");
+  equal(reverted.document.dirty, false);
+  equal(reverted.statusMessage, "Reverted Board-final.md to saved content");
+
+  const untitledRevert = applyUntitledRevertState({ ...untitled, text: "draft", dirty: false }, "# Starter", "hash-starter");
+  equal(untitledRevert.document.text, "# Starter");
+  equal(untitledRevert.document.dirty, true);
+  equal(untitledRevert.statusMessage, "Reverted untitled document to starter content");
+
+  const duplicate = createDuplicateDocumentState(
+    {
+      path: "/workspace/Reports/Board-copy.md",
+      text: "# Copy",
+      hash: "hash-copy",
+      modified: "2026-05-28T10:15:00.000Z",
+    },
+    createId,
+  );
+  equal(duplicate.id, "doc-2");
+  equal(duplicate.title, "Board-copy.md");
+  equal(duplicate.dirty, false);
+  equal(duplicate.savedText, "# Copy");
 });
 
 test("review marker helpers append and resolve review workflow comments", () => {

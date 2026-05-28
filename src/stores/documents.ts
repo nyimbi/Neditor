@@ -13,6 +13,16 @@ import {
   setPinnedDocumentState,
 } from "../lib/documentTabs";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
+import {
+  applyRenamedDocumentState,
+  applyRevertedDocumentState,
+  applySavedDocumentState,
+  applyUntitledRevertState,
+  createDuplicateDocumentState,
+  createUntitledDocumentState,
+  folderFromPath,
+  titleFromPath,
+} from "../lib/fileLifecycle";
 import { isAiSourceFenceOpener, rewriteAiAssistedMarker, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
 import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
 import { appendChangeNoteMarker, appendReviewCommentMarker, resolveReviewCommentAtLine } from "../lib/reviewMarkers";
@@ -224,17 +234,6 @@ function isMissingTauriBackendError(error: unknown) {
 function equivalentSha256Hash(left?: string | null, right?: string | null) {
   const normalize = (value?: string | null) => (value || "").replace(/^sha256:/, "");
   return Boolean(left && right && normalize(left) === normalize(right));
-}
-
-function titleFromPath(path: string | null) {
-  if (!path) return "Untitled";
-  return path.split(/[\\/]/).pop() || path;
-}
-
-function folderFromPath(path: string | null) {
-  if (!path) return null;
-  const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return separator > 0 ? path.slice(0, separator) : null;
 }
 
 function watchEventIsAccessOnly(event: WatchEvent) {
@@ -683,15 +682,7 @@ export const useDocumentsStore = defineStore("documents", {
       if (missing.length) await this.persistWorkspace();
     },
     newDocument() {
-      const document: OpenDocument = {
-        id: crypto.randomUUID(),
-        path: null,
-        title: "Untitled",
-        text: starterDocument,
-        savedHash: fallbackHash(starterDocument),
-        savedText: starterDocument,
-        dirty: true,
-      };
+      const document = createUntitledDocumentState(starterDocument, fallbackHash(starterDocument), () => crypto.randomUUID());
       this.documents.push(document);
       this.activeId = document.id;
       void this.compileActive();
@@ -823,15 +814,10 @@ export const useDocumentsStore = defineStore("documents", {
         }
         throw error;
       }
-      doc.path = response.path;
-      doc.title = titleFromPath(response.path);
-      doc.text = response.text;
-      doc.savedHash = response.hash;
-      doc.savedText = response.text;
-      doc.modified = response.modified;
-      doc.dirty = false;
+      const saved = applySavedDocumentState(doc, response);
+      Object.assign(doc, saved.document);
       this.clearIgnoredConflicts();
-      this.statusMessage = `Saved ${doc.title}`;
+      this.statusMessage = saved.statusMessage;
       this.rememberFile(doc.path);
       if (this.workspaceRoot) await this.refreshWorkspace();
       await this.refreshGitStatus();
@@ -846,23 +832,18 @@ export const useDocumentsStore = defineStore("documents", {
       const doc = this.activeDocument;
       await this.snapshotBeforeDestructiveAction("pre-revert");
       if (!doc.path) {
-        doc.text = starterDocument;
-        doc.savedHash = fallbackHash(starterDocument);
-        doc.savedText = starterDocument;
-        doc.dirty = true;
+        const reverted = applyUntitledRevertState(doc, starterDocument, fallbackHash(starterDocument));
+        Object.assign(doc, reverted.document);
         await this.compileActive();
-        this.statusMessage = "Reverted untitled document to starter content";
+        this.statusMessage = reverted.statusMessage;
         return;
       }
       const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", {
         path: doc.path,
       });
-      doc.text = response.text;
-      doc.savedHash = response.hash;
-      doc.savedText = response.text;
-      doc.modified = response.modified;
-      doc.dirty = false;
-      this.statusMessage = `Reverted ${doc.title} to saved content`;
+      const reverted = applyRevertedDocumentState(doc, response);
+      Object.assign(doc, reverted.document);
+      this.statusMessage = reverted.statusMessage;
       await this.compileActive();
       await this.refreshGitStatus();
     },
@@ -873,11 +854,9 @@ export const useDocumentsStore = defineStore("documents", {
       const metadata = await invoke<{ path: string; exists: boolean; hash?: string; modified?: string }>("rename_file", {
         request: { from: doc.path, to: path },
       });
-      doc.path = metadata.path;
-      doc.title = titleFromPath(metadata.path);
-      doc.savedHash = metadata.hash || doc.savedHash;
-      doc.modified = metadata.modified;
-      this.statusMessage = `Renamed ${doc.title}`;
+      const renamed = applyRenamedDocumentState(doc, metadata);
+      Object.assign(doc, renamed.document);
+      this.statusMessage = renamed.statusMessage;
       this.forgetFilePath(oldPath);
       this.rememberFile(doc.path);
       if (this.workspaceRoot) await this.refreshWorkspace();
@@ -895,16 +874,7 @@ export const useDocumentsStore = defineStore("documents", {
       const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("duplicate_file", {
         request: { from: source, to: path },
       });
-      const duplicate: OpenDocument = {
-        id: crypto.randomUUID(),
-        path: response.path,
-        title: titleFromPath(response.path),
-        text: response.text,
-        savedHash: response.hash,
-        savedText: response.text,
-        dirty: false,
-        modified: response.modified,
-      };
+      const duplicate = createDuplicateDocumentState(response, () => crypto.randomUUID());
       this.documents.push(duplicate);
       this.activeId = duplicate.id;
       this.statusMessage = `Duplicated ${duplicate.title}`;
