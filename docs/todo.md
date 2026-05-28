@@ -1609,7 +1609,9 @@ Finish:
 - Debounced rendering behavior on large documents.
 - Editor/preview synchronized scrolling.
 - Preview heading and anchored artifact clicks jump to source for headings and
-  stable preview figures, tables, and equations.
+  stable preview figures, tables, and equations. Source-mapped preview headings,
+  tables, figures, and equations are now keyboard-focusable with Enter/Space
+  source navigation in the rendered preview.
 - Separate preview theme behavior.
 - Inline warning rendering. The preview now injects escaped diagnostic callouts
   into the rendered flow and delegates source jumps back to the editor.
@@ -1618,7 +1620,9 @@ Finish:
 - Print/export preview mode behavior. Export mode now adds an export preview
   summary for the selected target, readiness state, manifest counts, and export
   options.
-- Preview accessibility and keyboard navigation.
+- Remaining preview accessibility work is broader assistive-technology
+  traversal and native/manual review beyond the current keyboard source-jump
+  path.
 
 ### 12. AI Paste Cleanup And Governance
 

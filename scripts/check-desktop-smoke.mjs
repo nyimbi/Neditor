@@ -480,6 +480,7 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow jumped sidebar diagnostic to source range",
     "native workflow jumped preview table artifact to source",
     "native workflow jumped preview equation artifact to source",
+    "native workflow keyboard jumped preview equation artifact to source",
     "native workflow rendered numbered toc from marker and front matter",
     "native workflow jumped toc preview link to source",
     "native workflow opened command palette",
@@ -777,16 +778,25 @@ function validateNativeWorkflowReport(launchReport) {
   const previewSourceMapEvidence = payload.previewSourceMapEvidence || {};
   if (
     previewSourceMapEvidence.table?.previewPaneVisible !== true ||
+    previewSourceMapEvidence.table?.tableFocusable !== true ||
+    previewSourceMapEvidence.table?.tableSourceTarget !== "table" ||
     previewSourceMapEvidence.table?.captionFound !== true ||
     !String(previewSourceMapEvidence.table?.captionText || "").includes("Native source map") ||
     !String(
       `${previewSourceMapEvidence.table?.selection?.lineText || ""}\n${previewSourceMapEvidence.table?.selection?.selectedText || ""}\n${previewSourceMapEvidence.table?.selection?.nearbyText || ""}`,
     ).match(/Table: Native source map|\| Metric \| Value \|/) ||
     previewSourceMapEvidence.equation?.previewPaneVisible !== true ||
+    previewSourceMapEvidence.equation?.figureFocusable !== true ||
+    previewSourceMapEvidence.equation?.figureSourceTarget !== "equation" ||
     previewSourceMapEvidence.equation?.captionFound !== true ||
     !String(previewSourceMapEvidence.equation?.captionText || "").includes("Native equation source") ||
     !String(
       `${previewSourceMapEvidence.equation?.selection?.lineText || ""}\n${previewSourceMapEvidence.equation?.selection?.selectedText || ""}\n${previewSourceMapEvidence.equation?.selection?.nearbyText || ""}`,
+    ).includes("ARR = Revenue") ||
+    previewSourceMapEvidence.keyboardEquation?.focused !== true ||
+    previewSourceMapEvidence.keyboardEquation?.sourceTarget !== "equation" ||
+    !String(
+      `${previewSourceMapEvidence.keyboardEquation?.selection?.lineText || ""}\n${previewSourceMapEvidence.keyboardEquation?.selection?.selectedText || ""}\n${previewSourceMapEvidence.keyboardEquation?.selection?.nearbyText || ""}`,
     ).includes("ARR = Revenue")
   ) {
     issues.push(`native workflow report did not include preview source-map evidence: ${JSON.stringify(previewSourceMapEvidence)}`);

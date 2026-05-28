@@ -5393,6 +5393,15 @@ Editor Markdown syntax styling:
 | `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke validator syntax remains valid after requiring syntax-highlighting evidence in the native editor ergonomics report. |
 | `pnpm run check:docs` | Pass | 15 Markdown files were checked after moving Markdown syntax highlighting from the editor backlog into covered work; local links resolve. |
 
+Preview keyboard source navigation:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding keyboard handlers for source-mapped preview headings, tables, figures, and equations, and after correcting deep-research draft insertion to use the supported append-packet mode. |
+| `pnpm run test:unit` | Pass | 110 frontend unit/static tests passed after adding preview keyboard navigation guards, source-target marker guards, and native-smoke evidence requirements. |
+| `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke validator syntax remains valid after requiring focusable preview source targets and keyboard equation source-jump evidence. |
+| `pnpm run check:docs` | Pass | 15 Markdown files were checked after documenting the preview keyboard source-jump path; local links resolve. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

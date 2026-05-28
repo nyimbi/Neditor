@@ -3170,6 +3170,7 @@
           tabindex="0"
           :style="previewDocumentStyle"
           @click="handlePreviewClick"
+          @keydown="handlePreviewKeydown"
           v-html="previewHtmlWithDiagnostics"
         ></article>
       </section>
@@ -9999,7 +10000,7 @@ async function runDeepResearchDocumentCreation() {
 
 function insertDeepResearchDraft() {
   if (!deepResearchDraft.value.trim()) return;
-  applyAgentMarkdown(deepResearchDraft.value, "append");
+  applyAgentMarkdown(deepResearchDraft.value, "append-packet");
   store.statusMessage = "Inserted deep research draft for editing and review";
 }
 
@@ -14606,6 +14607,7 @@ async function collectNativePreviewSourceMapEvidence(record: (name: string, pass
     await nextTick();
 
     const previewPaneElement = document.querySelector(".preview-pane") as HTMLElement | null;
+    const tableElement = document.querySelector<HTMLElement>("table#tbl\\:native-source-map");
     const tableCaption = document.querySelector<HTMLElement>("table#tbl\\:native-source-map caption");
     tableCaption?.click();
     await waitForNativeWorkflowCondition(
@@ -14617,6 +14619,9 @@ async function collectNativePreviewSourceMapEvidence(record: (name: string, pass
     );
     evidence.table = {
       previewPaneVisible: Boolean(previewPaneElement),
+      tableFocusable: tableElement?.getAttribute("tabindex") === "0",
+      tableSourceTarget: tableElement?.dataset.previewSourceTarget || "",
+      tableLabel: tableElement?.getAttribute("aria-label") || "",
       captionFound: Boolean(tableCaption),
       captionText: tableCaption?.textContent?.replace(/\s+/g, " ").trim() || "",
       selection: sourceSelection(),
@@ -14633,6 +14638,7 @@ async function collectNativePreviewSourceMapEvidence(record: (name: string, pass
       JSON.stringify(evidence.table),
     );
 
+    const equationFigure = document.querySelector<HTMLElement>("figure#eq\\:native-source-map");
     const equationCaption = document.querySelector<HTMLElement>("figure#eq\\:native-source-map figcaption");
     equationCaption?.click();
     await waitForNativeWorkflowCondition(
@@ -14644,6 +14650,9 @@ async function collectNativePreviewSourceMapEvidence(record: (name: string, pass
     );
     evidence.equation = {
       previewPaneVisible: Boolean(previewPaneElement),
+      figureFocusable: equationFigure?.getAttribute("tabindex") === "0",
+      figureSourceTarget: equationFigure?.dataset.previewSourceTarget || "",
+      figureLabel: equationFigure?.getAttribute("aria-label") || "",
       captionFound: Boolean(equationCaption),
       captionText: equationCaption?.textContent?.replace(/\s+/g, " ").trim() || "",
       selection: sourceSelection(),
@@ -14658,6 +14667,37 @@ async function collectNativePreviewSourceMapEvidence(record: (name: string, pass
             (evidence.equation as { selection: { lineText: string; selectedText: string; nearbyText: string } }).selection.nearbyText.includes("ARR = Revenue")),
       ),
       JSON.stringify(evidence.equation),
+    );
+
+    if (editorView) {
+      editorView.dispatch({ selection: { anchor: 0 } });
+    }
+    equationFigure?.focus();
+    const keyboardFocusLanded = document.activeElement === equationFigure;
+    equationFigure?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    await waitForNativeWorkflowCondition(
+      () =>
+        sourceSelection().lineText.includes("ARR = Revenue") ||
+        sourceSelection().selectedText.includes("ARR = Revenue") ||
+        sourceSelection().nearbyText.includes("ARR = Revenue"),
+      1200,
+    );
+    evidence.keyboardEquation = {
+      focused: keyboardFocusLanded,
+      sourceTarget: equationFigure?.dataset.previewSourceTarget || "",
+      selection: sourceSelection(),
+    };
+    record(
+      "native workflow keyboard jumped preview equation artifact to source",
+      Boolean(
+        equationFigure &&
+          (evidence.keyboardEquation as { focused: boolean }).focused &&
+          (evidence.keyboardEquation as { sourceTarget: string }).sourceTarget === "equation" &&
+          ((evidence.keyboardEquation as { selection: { lineText: string; selectedText: string; nearbyText: string } }).selection.lineText.includes("ARR = Revenue") ||
+            (evidence.keyboardEquation as { selection: { lineText: string; selectedText: string; nearbyText: string } }).selection.selectedText.includes("ARR = Revenue") ||
+            (evidence.keyboardEquation as { selection: { lineText: string; selectedText: string; nearbyText: string } }).selection.nearbyText.includes("ARR = Revenue")),
+      ),
+      JSON.stringify(evidence.keyboardEquation),
     );
 
     return evidence;
@@ -15350,6 +15390,9 @@ function annotatePreviewSourceAnchors(html: string) {
   if (!compile || !html.trim() || typeof document === "undefined") return html;
   const template = document.createElement("template");
   template.innerHTML = html;
+  Array.from(template.content.querySelectorAll<HTMLElement>("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]")).forEach((heading) => {
+    markPreviewSourceTarget(heading, "heading");
+  });
   const tableBlocks = compile.document_ast.blocks.filter(
     (block): block is Extract<DocumentBlock, { kind: "table" }> => block.kind === "table" && Boolean(block.id),
   );
@@ -15360,13 +15403,26 @@ function annotatePreviewSourceAnchors(html: string) {
     table.id = table.id || block.id;
     table.dataset.sourceLine = String(block.source?.source_line || block.line || "");
     table.dataset.endSourceLine = String(block.source?.end_source_line || block.end_line || block.line || "");
+    markPreviewSourceTarget(table, "table");
     if (!table.querySelector("caption") && block.caption) {
       const caption = document.createElement("caption");
       caption.textContent = `Table ${index + 1}: ${block.caption}`;
       table.prepend(caption);
     }
   });
+  Array.from(template.content.querySelectorAll<HTMLElement>("figure[id], .figure[id], .equation[id]")).forEach((artifact) => {
+    markPreviewSourceTarget(artifact, artifact.classList.contains("equation") || artifact.id.startsWith("eq:") ? "equation" : "figure");
+  });
   return template.innerHTML;
+}
+
+function markPreviewSourceTarget(element: HTMLElement, kind: string) {
+  if (!element.id || !sourceTargetForAnchor(element.id)?.line) return;
+  element.dataset.previewSourceTarget = kind;
+  element.tabIndex = element.tabIndex >= 0 ? element.tabIndex : 0;
+  const label = `Go to Markdown source for ${kind} ${element.textContent?.replace(/\s+/g, " ").trim().slice(0, 80) || element.id}`;
+  element.setAttribute("aria-label", element.getAttribute("aria-label") || label);
+  element.setAttribute("title", element.getAttribute("title") || "Press Enter or Space to go to Markdown source.");
 }
 
 function escapePreviewHtml(value: string) {
@@ -19439,15 +19495,29 @@ function handlePreviewClick(event: MouseEvent) {
     }
     return;
   }
-  const link = target.closest("a[href^='#']");
-  const heading = target.closest<HTMLElement>("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
-  const anchoredArtifact = target.closest<HTMLElement>("figure[id], table[id], .figure[id], .equation[id]");
-  const anchor = heading?.id || link?.getAttribute("href")?.slice(1) || anchoredArtifact?.id || "";
-  if (!anchor) return;
-  const sourceTarget = sourceTargetForAnchor(anchor);
+  const sourceTarget = previewSourceTargetForElement(target);
   if (!sourceTarget?.line) return;
   event.preventDefault();
   void goToSourceTarget(sourceTarget);
+}
+
+function handlePreviewKeydown(event: KeyboardEvent) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest("button, input, textarea, select")) return;
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const sourceTarget = previewSourceTargetForElement(target);
+  if (!sourceTarget?.line) return;
+  event.preventDefault();
+  void goToSourceTarget(sourceTarget);
+}
+
+function previewSourceTargetForElement(target: Element) {
+  const link = target.closest("a[href^='#']");
+  const heading = target.closest<HTMLElement>("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
+  const anchoredArtifact = target.closest<HTMLElement>("figure[id], table[id], .figure[id], .equation[id], [data-preview-source-target][id]");
+  const anchor = heading?.id || link?.getAttribute("href")?.slice(1) || anchoredArtifact?.id || "";
+  return anchor ? sourceTargetForAnchor(anchor) : null;
 }
 
 function sourceTargetForAnchor(anchor: string) {
@@ -25044,6 +25114,15 @@ select:hover {
 .preview-document .citation:focus {
   outline: 2px solid #275da8;
   outline-offset: 2px;
+}
+
+.preview-document [data-preview-source-target] {
+  cursor: pointer;
+}
+
+.preview-document [data-preview-source-target]:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 4px;
 }
 
 .preview-document .citation[data-citation-detail]:hover::after,

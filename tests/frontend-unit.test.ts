@@ -6361,7 +6361,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Document Set Manifest"));
   ok(store.includes("moveDocument(id: string, targetId: string"));
   ok(store.includes("await this.refreshExternalState(doc, undefined, context);"));
-  ok(app.includes('target.closest<HTMLElement>("figure[id], table[id], .figure[id], .equation[id]")'));
+  ok(app.includes("previewSourceTargetForElement"));
+  ok(app.includes("figure[id], table[id], .figure[id], .equation[id], [data-preview-source-target][id]"));
   ok(app.includes("moveTabWithinGroup"));
   ok(app.includes("dropTabOnDocument"));
   ok(app.includes("tab-drag-handle"));
@@ -8053,8 +8054,13 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow rendered diagnostic range in editor"));
   ok(app.includes("native workflow jumped preview diagnostic to source range"));
   ok(app.includes("collectNativePreviewSourceMapEvidence"));
+  ok(app.includes("@keydown=\"handlePreviewKeydown\""));
+  ok(app.includes("markPreviewSourceTarget"));
+  ok(app.includes("data-preview-source-target"));
+  ok(app.includes("Press Enter or Space to go to Markdown source"));
   ok(app.includes("native workflow jumped preview table artifact to source"));
   ok(app.includes("native workflow jumped preview equation artifact to source"));
+  ok(app.includes("native workflow keyboard jumped preview equation artifact to source"));
   ok(app.includes("collectNativeTocNavigationEvidence"));
   ok(app.includes("native workflow rendered numbered toc from marker and front matter"));
   ok(app.includes("native workflow jumped toc preview link to source"));
