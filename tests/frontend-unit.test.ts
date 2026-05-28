@@ -3401,6 +3401,10 @@ test("business document helpers fill identity templates snippets and wizard cont
     "quarterly-business-review",
     "due-diligence-memo",
     "contract-review-brief",
+    "implementation-playbook",
+    "incident-postmortem",
+    "meeting-decision-pack",
+    "market-research-report",
   ]) {
     ok(businessDocumentTemplates.some((template) => template.id === id), `missing ${id} business document template`);
   }
@@ -3422,6 +3426,10 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(prdMarkdown.includes("## Acceptance Criteria"));
   ok(prdMarkdown.includes("Create a product requirements document"));
   ok(prdMarkdown.includes("Prepared by:** Jane Doe"));
+  const playbook = businessDocumentTemplates.find((template) => template.id === "implementation-playbook")!;
+  const playbookMarkdown = businessTemplateMarkdown(playbook, profile);
+  ok(playbookMarkdown.includes("## Implementation Phases"));
+  ok(playbookMarkdown.includes("## Runbook"));
 
   const snippet = businessSnippetMarkdown(contact, profile);
   ok(snippet.includes("Jane Doe"));

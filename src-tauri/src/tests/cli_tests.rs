@@ -669,7 +669,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     let template_report: serde_json::Value =
         serde_json::from_str(&templates_json.message).expect("templates json");
     assert_eq!(template_report["schema"], "neditor.ned-templates.v1");
-    assert_eq!(template_report["count"], 30);
+    assert_eq!(template_report["count"], 34);
     assert!(template_report["templateDetails"]
         .as_array()
         .expect("template details")
@@ -699,6 +699,10 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "quarterly-business-review",
         "due-diligence-memo",
         "contract-review-brief",
+        "implementation-playbook",
+        "incident-postmortem",
+        "meeting-decision-pack",
+        "market-research-report",
     ] {
         assert!(template_report["templates"]
             .as_array()
@@ -760,7 +764,10 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "--ids-only".to_string(),
     ])
     .expect("research template ids only");
-    assert_eq!(research_ids.message, "research-report");
+    assert_eq!(
+        research_ids.message,
+        "research-report\nmarket-research-report"
+    );
 
     let prd_path = temp_markdown_path("new-prd-template");
     let prd_template = crate::cli::run_cli_with_args(&[
@@ -779,6 +786,24 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     assert!(prd_markdown.contains("documentType: project-plan"));
     assert!(prd_markdown.contains("## Acceptance Criteria"));
     assert!(prd_markdown.contains("## AI Drafting Brief"));
+
+    let playbook_path = temp_markdown_path("new-implementation-playbook");
+    let playbook_template = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "new".to_string(),
+        playbook_path.to_string_lossy().to_string(),
+        "--template".to_string(),
+        "implementation-playbook".to_string(),
+        "--title".to_string(),
+        "Customer Rollout Playbook".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("new implementation playbook json");
+    assert_eq!(playbook_template.exit_code, 0);
+    let playbook_markdown = fs::read_to_string(&playbook_path).expect("playbook markdown");
+    assert!(playbook_markdown.contains("documentType: project-plan"));
+    assert!(playbook_markdown.contains("## Implementation Phases"));
+    assert!(playbook_markdown.contains("## Runbook"));
 
     let snippets = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

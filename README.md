@@ -130,7 +130,9 @@ starter Markdown document from business templates such as proposal, RFP, RFP
 response, RFQ, tender, tutorial, lesson plan, lesson content, technical textbook,
 novel, podcast script, movie script, business case, executive brief, board
 decision memo, policy brief, research report, grant application, SOP, PRD,
-project charter, QBR, due-diligence memo, and contract review brief; add
+project charter, QBR, due-diligence memo, contract review brief,
+implementation playbook, incident postmortem, meeting decision pack, and market
+research report; add
 `--json` for script-friendly creation status, selected template, title, output
 path, and open status. `ned convert` and `ned export` run the same local export
 pipeline used by the app for HTML, PDF, DOCX,
@@ -180,7 +182,9 @@ The CLI starter library and visual Templates panel now share the app's expanded
 business-development, governance, research, funding, product, operations, and
 legal starter set, including statements of work, capability statements, case
 studies, board memos, policy briefs, research reports, grant applications, SOPs,
-PRDs, project charters, QBRs, due-diligence memos, and contract review briefs.
+PRDs, project charters, QBRs, due-diligence memos, contract review briefs,
+implementation playbooks, incident postmortems, meeting decision packs, and
+market research reports.
 Specialist built-in outlines cover lesson content, statements of work,
 capability statements, case studies, executive briefs, RFP technical proposals,
 compliance reviews, grant applications, SOPs, PRDs, project charters, QBRs,
@@ -599,7 +603,9 @@ web app.
   proposals, RFPs, RFQs, tenders, statements of work, capability statements,
   case studies, business cases, executive briefs, board memos, policy briefs,
   research reports, grant applications, SOPs, PRDs, project charters, QBRs,
-  due-diligence memos, and contract review briefs; reusable semi-template
+  due-diligence memos, contract review briefs, implementation playbooks,
+  incident postmortems, meeting decision packs, and market research reports;
+  reusable semi-template
   document parts; and handoff options for Claude Code, Codex, OpenCode, and
   Google Antigravity.
   Each document builder shows context-aware AI step assistance for identity,

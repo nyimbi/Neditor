@@ -43,7 +43,11 @@ export type BusinessDocumentKind =
   | "project-charter"
   | "quarterly-business-review"
   | "due-diligence-memo"
-  | "contract-review-brief";
+  | "contract-review-brief"
+  | "implementation-playbook"
+  | "incident-postmortem"
+  | "meeting-decision-pack"
+  | "market-research-report";
 
 export interface BusinessDocumentTemplate {
   id: BusinessDocumentKind;
@@ -544,6 +548,42 @@ export const businessDocumentTemplates: BusinessDocumentTemplate[] = [
     bestFor: ["Contract review", "Legal handoff", "Commercial negotiation"],
     aiPrompt: "Create a contract review brief that helps business, legal, and delivery reviewers see obligations, risks, negotiation positions, and approvals quickly.",
     outline: ["Contract Summary", "Parties and Scope", "Commercial Terms", "Delivery Obligations", "Service Levels", "Data and IP Terms", "Liability and Indemnities", "Termination and Renewal", "Negotiation Positions", "Approval Checklist"],
+  },
+  {
+    id: "implementation-playbook",
+    label: "Implementation playbook",
+    summary: "Creates an operational playbook for implementing a project, process, tool, or platform.",
+    docsLiveType: "project-plan",
+    bestFor: ["Delivery teams", "Rollouts", "Internal operating guides"],
+    aiPrompt: "Create an implementation playbook that gives teams a practical operating model, phased rollout, roles, training, controls, success metrics, and runbook.",
+    outline: ["Purpose", "Operating Model", "Scope", "Roles and Responsibilities", "Implementation Phases", "Change Management", "Training Plan", "Risks and Controls", "Success Metrics", "Runbook"],
+  },
+  {
+    id: "incident-postmortem",
+    label: "Incident postmortem",
+    summary: "Creates a blameless incident review with impact, timeline, response, root cause, corrective actions, and prevention.",
+    docsLiveType: "operating-procedure",
+    bestFor: ["Service incidents", "Quality failures", "Operational reviews"],
+    aiPrompt: "Create a blameless postmortem that preserves facts, customer impact, timeline, detection and response, causes, corrective actions, prevention, and owner sign-off.",
+    outline: ["Summary", "Customer or Business Impact", "Timeline", "Detection and Response", "Root Cause Analysis", "What Went Well", "What Did Not Go Well", "Corrective Actions", "Preventive Controls", "Owner Sign-off"],
+  },
+  {
+    id: "meeting-decision-pack",
+    label: "Meeting decision pack",
+    summary: "Creates a meeting-ready packet with purpose, agenda, pre-read, options, evidence, risks, decisions, and actions.",
+    docsLiveType: "meeting-brief",
+    bestFor: ["Steering committees", "Executive meetings", "Decision forums"],
+    aiPrompt: "Create a decision-focused meeting pack that makes the required decisions, options, evidence, risks, decision log, and action register easy to review.",
+    outline: ["Meeting Purpose", "Required Decisions", "Agenda", "Pre-Read Summary", "Options and Tradeoffs", "Evidence Pack", "Risks", "Decision Log", "Action Register", "Follow-up Communications"],
+  },
+  {
+    id: "market-research-report",
+    label: "Market research report",
+    summary: "Creates a market analysis report with objectives, method, segments, competitors, trends, findings, and recommendations.",
+    docsLiveType: "research-brief",
+    bestFor: ["Market sizing", "Competitive analysis", "Strategy research"],
+    aiPrompt: "Create a market research report that keeps research objectives, methodology, market definition, customer segments, competitors, trends, findings, implications, and recommendations connected.",
+    outline: ["Executive Summary", "Research Objectives", "Methodology", "Market Definition", "Customer Segments", "Competitor Landscape", "Trends and Drivers", "Findings", "Implications", "Recommendations", "Bibliography"],
   },
 ];
 
