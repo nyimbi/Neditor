@@ -409,7 +409,42 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
         true
     );
     let response_text = fs::read_to_string(&response).expect("response markdown");
+    assert!(response_text.contains("## Compliance Checklist"));
+    assert!(response_text.contains("[TOC]"));
+    assert!(
+        response_text
+            .find("## Compliance Checklist")
+            .expect("checklist")
+            < response_text.find("[TOC]").expect("toc")
+    );
+    assert!(
+        response_text.find("[TOC]").expect("toc")
+            < response_text
+                .find("## Proposal Planning Prompt")
+                .expect("planning prompt")
+    );
+    assert!(
+        response_text
+            .find("## Proposal Planning Prompt")
+            .expect("planning prompt")
+            < response_text
+                .find("## Proposal Outline")
+                .expect("proposal outline")
+    );
+    assert!(
+        response_text
+            .find("## Proposal Outline")
+            .expect("proposal outline")
+            < response_text
+                .find("## Evaluator-Aligned Section Drafts")
+                .expect("section drafts")
+    );
     assert!(response_text.contains("## Compliance Matrix"));
+    assert!(response_text.contains("Extract the evaluator model, scoring weights"));
+    assert!(response_text.contains("Terms of Reference map"));
+    assert!(response_text.contains("### Technical Methodology Draft"));
+    assert!(response_text.contains("### Sustainability and Transition Draft"));
+    assert!(response_text.contains("### Risk, QA, Validation, and KPI Draft"));
     assert!(response_text.contains("## Requirement Response Drafts"));
     assert!(response_text.contains("Win theme: reduce implementation risk."));
     assert!(response_text.contains("SOC 2 security controls"));

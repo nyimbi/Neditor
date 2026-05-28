@@ -3476,6 +3476,11 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(outline.includes("# Technical Proposal Outline for Globex"));
   ok(outline.indexOf("## Compliance Checklist") < outline.indexOf("[TOC]"));
   ok(outline.indexOf("[TOC]") < outline.indexOf("## 1. RFP Metadata"));
+  ok(outline.includes("## Proposal Planning Prompt"));
+  ok(outline.includes("Extract the evaluator model, scoring weights, sub-criteria"));
+  ok(outline.includes("Terms of Reference map"));
+  ok(outline.includes("Turn sustainability, transition, maintenance"));
+  ok(outline.includes("risk, QA, validation, monitoring"));
   ok(outline.includes("## Technical Proposal Outline"));
   ok(outline.includes("Critical Disqualifiers Checklist"));
   ok(outline.includes("Activity 1"));
@@ -3489,8 +3494,14 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   const response = rfpResponseMarkdown(analysis, profile, "Win theme: reduce implementation risk.");
   ok(response.includes("## Compliance Checklist"));
   ok(response.indexOf("## Compliance Checklist") < response.indexOf("[TOC]"));
+  ok(response.indexOf("[TOC]") < response.indexOf("## Proposal Planning Prompt"));
   ok(response.indexOf("[TOC]") < response.indexOf("## Proposal Outline"));
+  ok(response.indexOf("## Proposal Outline") < response.indexOf("## Evaluator-Aligned Section Drafts"));
   ok(response.includes("- Proposed Methodology & Technical Approach"));
+  ok(response.includes("### Technical Methodology Draft"));
+  ok(response.includes("### Team and Experience Draft"));
+  ok(response.includes("### Sustainability and Transition Draft"));
+  ok(response.includes("### Risk, QA, Validation, and KPI Draft"));
   ok(response.includes("### Scoring Weights"));
   ok(response.includes("## Buyer Intent Analysis"));
   ok(response.includes("### Response Context and Decision Notes"));

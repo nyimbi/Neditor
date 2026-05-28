@@ -5028,6 +5028,20 @@ fn rfp_cli_response_markdown(
         "".to_string(),
         format!("# RFP response for {client}"),
         "".to_string(),
+        rfp_cli_compliance_checklist_markdown(analysis),
+        "".to_string(),
+        "[TOC]".to_string(),
+        "".to_string(),
+        rfp_cli_proposal_planning_prompt_markdown(analysis, context_notes),
+        "".to_string(),
+        "## Proposal Outline".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(rfp_cli_proposal_outline_bullets(analysis));
+    lines.extend([
+        "".to_string(),
+        rfp_cli_evaluator_section_drafts_markdown(analysis, &company, &client, context_notes),
+        "".to_string(),
         "## Executive Response".to_string(),
         "".to_string(),
         format!("{company} has prepared a responsive draft for {client}. This response mirrors extracted RFP requirements, maps every detected requirement into a compliance matrix, and keeps evidence review visible before submission."),
@@ -5188,6 +5202,273 @@ fn rfp_cli_response_markdown(
         "<!-- ai-assisted: status=needs-review | source=NEditor ned RFP Response | promptSummary=Analyze RFP, build compliance matrix, draft responsive response -->".to_string(),
     ]);
     lines.join("\n")
+}
+
+fn rfp_cli_compliance_checklist_markdown(analysis: &RfpCliAnalysis) -> String {
+    let mut lines = vec![
+        "## Compliance Checklist".to_string(),
+        "".to_string(),
+        "### Critical Disqualification Traps".to_string(),
+        "".to_string(),
+    ];
+    let critical_rows = analysis
+        .compliance_rows
+        .iter()
+        .filter(|row| rfp_cli_disqualification_risk(&row.requirement))
+        .collect::<Vec<_>>();
+    if critical_rows.is_empty() {
+        lines.push("- [ ] No explicit automatic-exclusion wording detected; reviewer must still inspect the source RFP.".to_string());
+    } else {
+        for row in critical_rows {
+            lines.push(format!(
+                "- [ ] **{}:** {} (source line {}) - {}",
+                row.id, row.requirement, row.source_line, row.verification
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "### Full Checklist".to_string(),
+        "".to_string(),
+        "| ID | Section | Risk | Requirement | Verification method | Owner | Reference |"
+            .to_string(),
+        "| --- | --- | --- | --- | --- | --- | --- |".to_string(),
+    ]);
+    if analysis.compliance_rows.is_empty() {
+        lines.push("| RFP-CHECK-001 | Intake | high | Import or paste the full RFP source. | Re-run RFP analysis and confirm all sections, annexes, and tables were captured. | Bid Owner | RFP source |".to_string());
+    } else {
+        for row in &analysis.compliance_rows {
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} | {} | Source line {} |",
+                table_cell(&row.id.replace("RFP-REQ", "RFP-CHECK")),
+                table_cell(&row.response_section),
+                if rfp_cli_disqualification_risk(&row.requirement) {
+                    "critical"
+                } else if row.compliance_status.contains("Needs") {
+                    "high"
+                } else {
+                    "standard"
+                },
+                table_cell(&row.requirement),
+                table_cell(&row.verification),
+                table_cell(&row.owner),
+                row.source_line,
+            ));
+        }
+    }
+    for (index, attachment) in analysis.mandatory_attachments.iter().enumerate() {
+        lines.push(format!(
+            "| RFP-CHECK-A{:02} | Document checklist - attachments required | high | Include and verify mandatory attachment: {} | Confirm complete, signed where required, current, and included in the final package. | Bid Coordinator | Attachment scan |",
+            index + 1,
+            table_cell(attachment),
+        ));
+    }
+    lines.join("\n")
+}
+
+fn rfp_cli_proposal_planning_prompt_markdown(
+    analysis: &RfpCliAnalysis,
+    context_notes: &str,
+) -> String {
+    let scoring = if analysis.evaluation_criteria.is_empty() {
+        "No explicit scoring weights detected; infer equal review emphasis until the RFP is confirmed.".to_string()
+    } else {
+        analysis.evaluation_criteria.join("; ")
+    };
+    let pass_fail = analysis
+        .compliance_rows
+        .iter()
+        .filter(|row| rfp_cli_disqualification_risk(&row.requirement))
+        .map(|row| format!("{}: {}", row.id, row.requirement))
+        .collect::<Vec<_>>();
+    let technical = rfp_cli_lines_for_categories(
+        analysis,
+        &["Technical Solution", "Compliance"],
+        "technical standards, integrations, hosting, APIs, data formats, licensing, and interoperability",
+    );
+    let team = rfp_cli_lines_for_categories(
+        analysis,
+        &["Team and Experience"],
+        "team composition, minimum credentials, CV evidence, references, and language coverage",
+    );
+    let risk = if analysis.risks.is_empty() {
+        "risk, QA, validation, monitoring, acceptance, and KPI controls".to_string()
+    } else {
+        analysis.risks.join("; ")
+    };
+    let mut lines = vec![
+        "## Proposal Planning Prompt".to_string(),
+        "".to_string(),
+        "Use this evaluator-driven planning prompt before drafting response prose:".to_string(),
+        "".to_string(),
+        format!("- Extract the evaluator model, scoring weights, sub-criteria, and likely reviewer evidence checks; mirror these signals: {scoring}"),
+        format!(
+            "- Treat pass/fail gates as hard blockers: {}",
+            if pass_fail.is_empty() {
+                "No explicit automatic-exclusion gate detected; reviewer must inspect mandatory language, submission rules, and annexes.".to_string()
+            } else {
+                pass_fail.join("; ")
+            }
+        ),
+        format!(
+            "- Build the Terms of Reference map from activities, deliverables, milestones, approval periods, and annexes: {} timeline hint(s), {} mandatory attachment hint(s), {} extracted requirement(s).",
+            analysis.timelines.len(),
+            analysis.mandatory_attachments.len(),
+            analysis.requirements.len()
+        ),
+        format!("- Convert team and experience requirements into a role matrix: {team}."),
+        format!("- Turn technical mandates into section requirements: {technical}."),
+        "- Turn sustainability, transition, maintenance, handover, and support requirements into an operating model; add explicit placeholders when the RFP is silent.".to_string(),
+        format!("- Turn risk, QA, validation, monitoring, acceptance, and KPI language into controls and reviewer checks: {risk}."),
+        "- Draft sections sequentially only after the checklist and outline are reviewed; leave evidence gaps as visible placeholders instead of unsupported claims.".to_string(),
+    ];
+    if !context_notes.trim().is_empty() {
+        lines.push(format!(
+            "- Apply bid-team context notes while preserving RFP traceability: {}",
+            context_notes.trim()
+        ));
+    }
+    lines.join("\n")
+}
+
+fn rfp_cli_proposal_outline_bullets(analysis: &RfpCliAnalysis) -> Vec<String> {
+    let mut lines = vec![
+        "- Executive Summary".to_string(),
+        "- Assignment Understanding & Delivery Approach".to_string(),
+        "- Proposed Methodology & Technical Approach".to_string(),
+    ];
+    let technical_rows = analysis
+        .compliance_rows
+        .iter()
+        .filter(|row| row.response_section == "Technical Response")
+        .take(6)
+        .collect::<Vec<_>>();
+    if technical_rows.is_empty() {
+        lines.push("  - Primary ToR activity".to_string());
+    } else {
+        for row in technical_rows {
+            lines.push(format!("  - {}: {}", row.id, row.requirement));
+        }
+    }
+    lines.extend([
+        "- Work Plan & Timeline".to_string(),
+        "- Team Organization & Key Personnel".to_string(),
+        "- Organizational Capacity & Past Performance".to_string(),
+        "- Technical Standards, Data, and Integration Approach".to_string(),
+        "- Risk Management & Mitigation".to_string(),
+        "- Quality Assurance & Monitoring".to_string(),
+        "- Sustainability & Transition Plan".to_string(),
+        "- Compliance Summary Table".to_string(),
+        "- Required Annexes".to_string(),
+        "- Critical Disqualifiers Checklist".to_string(),
+    ]);
+    lines
+}
+
+fn rfp_cli_evaluator_section_drafts_markdown(
+    analysis: &RfpCliAnalysis,
+    company: &str,
+    client: &str,
+    context_notes: &str,
+) -> String {
+    let technical = rfp_cli_lines_for_categories(
+        analysis,
+        &["Technical Solution", "Compliance"],
+        "Confirm technical standards, data formats, integrations, hosting, API, licensing, and interoperability requirements.",
+    );
+    let team = rfp_cli_lines_for_categories(
+        analysis,
+        &["Team and Experience"],
+        "Confirm team roles, minimum experience, credentials, CV evidence, references, and language coverage.",
+    );
+    let timeline = if analysis.timelines.is_empty() {
+        "Confirm submission deadline, work plan, milestones, dependencies, and approval windows."
+            .to_string()
+    } else {
+        analysis.timelines.join("; ")
+    };
+    let risk = if analysis.risks.is_empty() {
+        "Confirm delivery, compliance, schedule, commercial, technical, QA, validation, KPI, and acceptance risks.".to_string()
+    } else {
+        analysis.risks.join("; ")
+    };
+    let notes = context_notes.trim();
+    let emphasis = if notes.is_empty() {
+        String::new()
+    } else {
+        format!("\n\nBid-team emphasis: {notes}")
+    };
+    [
+        "## Evaluator-Aligned Section Drafts".to_string(),
+        "".to_string(),
+        "These draft sections are generated from the compliance checklist, scoring signals, pass/fail gates, Terms of Reference map, team requirements, technical mandates, sustainability obligations, and risk/QA/KPI signals. They remain evidence-gated until owners attach proof.".to_string(),
+        "".to_string(),
+        "### Executive Summary Draft".to_string(),
+        "".to_string(),
+        format!("{company} will respond to {client} with a compliance-first, evaluator-readable proposal. The response will show how each mandatory requirement is met, how scored criteria are answered with evidence, and where reviewer sign-off is still required before submission.{emphasis}"),
+        "".to_string(),
+        "### Assignment Understanding and ToR Response Draft".to_string(),
+        "".to_string(),
+        format!("Draft response: Map extracted requirements, buyer intent, and timeline signals into work packages. ToR/timeline basis: {timeline}"),
+        "".to_string(),
+        "### Technical Methodology Draft".to_string(),
+        "".to_string(),
+        format!("Draft response: Convert technical mandates into implementation choices, integration patterns, data or documentation standards, test evidence, and acceptance criteria. Technical basis: {technical}"),
+        "".to_string(),
+        "### Team and Experience Draft".to_string(),
+        "".to_string(),
+        format!("Draft response: Link each named role to ToR activities, credentials, comparable work, language or local-knowledge requirements, and CV/reference evidence. Team basis: {team}"),
+        "".to_string(),
+        "### Sustainability and Transition Draft".to_string(),
+        "".to_string(),
+        "Draft response: Explain maintenance, handover, knowledge transfer, operational ownership, support model, and post-project continuity without promising unsupported capacity.".to_string(),
+        "".to_string(),
+        "### Risk, QA, Validation, and KPI Draft".to_string(),
+        "".to_string(),
+        format!("Draft response: List top risks, mitigations, owners, QA checks, validation evidence, monitoring cadence, KPIs, and acceptance criteria. Risk basis: {risk}"),
+        "".to_string(),
+        "### Compliance Summary Draft".to_string(),
+        "".to_string(),
+        "Draft response: Point reviewers back to the front-of-document checklist and compliance matrix. Show requirement ID, response section, evidence owner, verification method, and unresolved proof gaps for every extracted requirement.".to_string(),
+    ]
+    .join("\n")
+}
+
+fn rfp_cli_lines_for_categories(
+    analysis: &RfpCliAnalysis,
+    categories: &[&str],
+    fallback: &str,
+) -> String {
+    let values = analysis
+        .compliance_rows
+        .iter()
+        .filter(|row| categories.iter().any(|category| row.category == *category))
+        .map(|row| row.requirement.clone())
+        .take(6)
+        .collect::<Vec<_>>();
+    if values.is_empty() {
+        fallback.to_string()
+    } else {
+        values.join("; ")
+    }
+}
+
+fn rfp_cli_disqualification_risk(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    contains_any(
+        &lower,
+        &[
+            "disqualif",
+            "will be rejected",
+            "automatic",
+            "failure to",
+            "non-compliant",
+            "noncompliant",
+            "mandatory",
+            "must submit",
+            "shall submit",
+        ],
+    )
 }
 
 fn markdown_bullets(values: Vec<String>, fallback: &str) -> Vec<String> {

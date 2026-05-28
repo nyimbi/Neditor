@@ -1426,6 +1426,8 @@ export function rfpProposalOutlineMarkdown(analysis: RfpAnalysis, profile: Parti
       `- Pass/fail criteria: ${outline.metadata.passFailCriteria.length || "None explicitly detected; manual confirmation required"}`,
       notes ? `- Bid context notes: ${notes}` : "",
       "",
+      rfpProposalPlanningPromptMarkdown(analysis, responseNotes),
+      "",
       "## 2. Scoring Scheme and Page Allocation",
       "",
       "| Criterion | Weight | Sub-criterion | Sub-weight |",
@@ -1573,6 +1575,112 @@ export function rfpProposalOutlineBullets(analysis: RfpAnalysis) {
   ].join("\n");
 }
 
+function rfpProposalPlanningPromptMarkdown(analysis: RfpAnalysis, responseNotes = "") {
+  const outline = analysis.proposalOutline;
+  const scoring = outline.scoringScheme.length
+    ? outline.scoringScheme.map((item) => `${item.criterion} (${item.weight}${item.unit})`).join("; ")
+    : "No explicit scoring weights detected; infer equal review emphasis until the RFP is confirmed.";
+  const passFail = outline.metadata.passFailCriteria.length
+    ? outline.metadata.passFailCriteria.slice(0, 6).join("; ")
+    : "No explicit pass/fail gates detected; reviewer must inspect mandatory language, submission rules, and annexes.";
+  const torSignals = [
+    outline.activities.length ? `${outline.activities.length} ToR activity hint(s)` : "no explicit ToR activities detected",
+    outline.deliverables.length ? `${outline.deliverables.length} deliverable hint(s)` : "no explicit deliverables detected",
+    outline.timelineMilestones.length ? `${outline.timelineMilestones.length} timeline hint(s)` : "no explicit timeline milestones detected",
+  ].join("; ");
+  const notes = responseNotes.trim();
+  return [
+    "## Proposal Planning Prompt",
+    "",
+    "Use this evaluator-driven planning prompt before drafting response prose:",
+    "",
+    `- Extract the evaluator model, scoring weights, sub-criteria, and likely reviewer evidence checks; mirror these signals in headings, proof points, and the compliance summary: ${scoring}`,
+    `- Treat pass/fail gates as hard blockers: ${passFail}`,
+    `- Build the Terms of Reference map from activities, deliverables, milestones, approval periods, and annexes: ${torSignals}.`,
+    "- Convert team and experience requirements into a role matrix with proposed names, minimum credentials, CV/portfolio evidence, language coverage, and ToR responsibility.",
+    `- Turn technical mandates into section requirements: ${markdownInlineList(outline.technicalMandates, "technical standards, integrations, hosting, APIs, data formats, licensing, and interoperability")}.`,
+    `- Turn sustainability, transition, maintenance, handover, and support requirements into an operating model: ${markdownInlineList(outline.sustainabilityRequirements, "sustainability, transition, maintenance, handover, and support")}.`,
+    `- Turn risk, QA, validation, monitoring, acceptance, and KPI language into controls and reviewer checks: ${markdownInlineList(outline.riskQaKpiRequirements, "risk, QA, validation, monitoring, acceptance, and KPI controls")}.`,
+    "- Draft sections sequentially only after the checklist and outline are reviewed; leave evidence gaps as visible placeholders instead of unsupported claims.",
+    notes ? `- Apply bid-team context notes while preserving RFP traceability: ${notes}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function rfpEvaluatorAlignedSectionDraftsMarkdown(analysis: RfpAnalysis, profile: Partial<BusinessProfile> = {}, responseNotes = "") {
+  const placeholders = businessProfilePlaceholderMap(profile);
+  const outline = analysis.proposalOutline;
+  const activities = outline.activities.length ? outline.activities : [{ label: "Primary ToR activity", sourceLine: 0, placeholder: "Describe the approach, outputs, acceptance checks, and evidence." }];
+  const teamRows = outline.teamRequirements.length
+    ? outline.teamRequirements.map((item) => `| ${escapeMarkdownTableCell(item.role)} | ${escapeMarkdownTableCell(item.minimumExperience)} | *Name/TBC* | Source line ${item.sourceLine || "manual review"} |`)
+    : ["| Team Lead | *Confirm minimum requirements from RFP* | *Name/TBC* | Manual review |", "| Core delivery team | *Map skills to ToR activities* | *Names/TBC* | Manual review |"];
+  const technicalMandates = outline.technicalMandates.length ? outline.technicalMandates : ["Confirm technical standards, data formats, integrations, hosting, API, licensing, and interoperability requirements."];
+  const sustainability = outline.sustainabilityRequirements.length ? outline.sustainabilityRequirements : ["Confirm maintenance, transition, handover, training, support, and post-project operating obligations."];
+  const riskQaKpis = outline.riskQaKpiRequirements.length ? outline.riskQaKpiRequirements : ["Confirm risk controls, QA plan, validation method, monitoring cadence, KPIs, and acceptance checks."];
+  const scoringBullets = outline.scoringScheme.length
+    ? outline.scoringScheme.map((item) => `- ${item.criterion}: address ${item.weight}${item.unit} through named evidence, section labels, and reviewer checks.`)
+    : ["- No explicit scoring weights were detected; use equal emphasis across compliance, technical approach, team, delivery, risk, sustainability, and commercial clarity."];
+  const criticalRows = criticalChecklistRows(analysis.complianceChecklist);
+  const notes = responseNotes.trim();
+  return fillBusinessTemplate(
+    [
+      "## Evaluator-Aligned Section Drafts",
+      "",
+      "These draft sections are generated from the compliance checklist, scoring signals, pass/fail gates, Terms of Reference map, team requirements, technical mandates, sustainability obligations, and risk/QA/KPI signals. They remain evidence-gated until owners attach proof.",
+      "",
+      "### Executive Summary Draft",
+      "",
+      `${placeholders.companyName} will respond to ${placeholders.defaultClientName} with a compliance-first, evaluator-readable proposal. The response will show how each mandatory requirement is met, how scored criteria are answered with evidence, and where reviewer sign-off is still required before submission.`,
+      "",
+      "Evaluator priorities to mirror:",
+      ...scoringBullets,
+      criticalRows.length ? `- Pass/fail gates to clear first: ${criticalRows.map((item) => item.id).join(", ")}.` : "- No explicit automatic-exclusion gate was detected; bid reviewers must confirm mandatory submission language manually.",
+      notes ? `- Bid-team emphasis: ${notes}` : "",
+      "",
+      "### Assignment Understanding and ToR Response Draft",
+      "",
+      "The response should frame the buyer's stated outcomes and implied evaluator concerns, then map each ToR activity to a method, output, owner, acceptance check, and evidence reference.",
+      "",
+      ...activities.flatMap((item, index) => [
+        `#### ToR Activity ${index + 1}: ${item.label}`,
+        "",
+        `Draft response: ${placeholders.companyName} will address this activity through a structured work package covering ${item.placeholder.toLowerCase()}. Evidence and assumptions should cite source line ${item.sourceLine || "manual review"} and remain open until the delivery owner confirms feasibility.`,
+        "",
+      ]),
+      "### Technical Methodology Draft",
+      "",
+      "Technical requirements to cover explicitly:",
+      ...technicalMandates.map((item) => `- ${item}`),
+      "",
+      "Draft response: The methodology should convert each technical mandate into an implementation choice, integration pattern, data or documentation standard, test evidence, and acceptance criterion. Any mandate that cannot be confirmed from the source should remain a clarification item.",
+      "",
+      "### Team and Experience Draft",
+      "",
+      "| Role | Minimum requirement | Proposed name | Evidence reference |",
+      "| --- | --- | --- | --- |",
+      ...teamRows,
+      "",
+      "Draft response: The team section should link each named role to ToR activities, relevant credentials, comparable work, language or local-knowledge requirements, and CV/reference evidence.",
+      "",
+      "### Sustainability and Transition Draft",
+      "",
+      ...sustainability.map((item) => `- ${item}`),
+      "",
+      "Draft response: The sustainability plan should explain maintenance, handover, knowledge transfer, operational ownership, support model, and post-project continuity without promising unsupported capacity.",
+      "",
+      "### Risk, QA, Validation, and KPI Draft",
+      "",
+      ...riskQaKpis.map((item) => `- ${item}`),
+      "",
+      "Draft response: The risk and QA section should list top delivery, compliance, schedule, commercial, and technical risks; assign mitigations and owners; and show how KPIs, acceptance checks, and validation evidence will be reviewed.",
+      "",
+      "### Compliance Summary Draft",
+      "",
+      "The compliance summary should point reviewers back to the front-of-document checklist and compliance matrix. It must show requirement ID, response section, evidence owner, verification method, and unresolved proof gaps for every extracted requirement.",
+    ].filter(Boolean).join("\n"),
+    profile,
+  );
+}
+
 export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<BusinessProfile> = {}, responseNotes = "") {
   const placeholders = businessProfilePlaceholderMap(profile);
   const title = `RFP response for ${placeholders.defaultClientName}`;
@@ -1613,9 +1721,13 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "",
       "[TOC]",
       "",
+      rfpProposalPlanningPromptMarkdown(analysis, responseNotes),
+      "",
       "## Proposal Outline",
       "",
       rfpProposalOutlineBullets(analysis),
+      "",
+      rfpEvaluatorAlignedSectionDraftsMarkdown(analysis, profile, responseNotes),
       "",
       "## Executive Response",
       "",
@@ -2553,6 +2665,11 @@ function inferRfpWarnings(input: RfpSourceInput, text: string, requirements: Rfp
 
 function markdownBullets(items: string[], fallback: string) {
   return (items.length ? items : [fallback]).map((item) => `- ${item}`).join("\n");
+}
+
+function markdownInlineList(items: string[], fallback: string) {
+  const values = items.map(normalizeWhitespace).filter(Boolean);
+  return values.length ? values.slice(0, 6).join("; ") : fallback;
 }
 
 function escapeMarkdownTableCell(value: string) {
