@@ -896,7 +896,12 @@ on hosts where Chromium is unavailable or sandbox-limited; readiness records tha
 condition as an evidence gap instead of hiding it. macOS GUI launch and
 WebDriver refresh are likewise opt-in via `--refresh-native-launch-evidence`
 because headless or sandboxed hosts may not be able to produce fresh native
-window proof.
+window proof. The generated manifest joins each readiness gap to its evidence-kit
+work item, so operators can see the runbook, returned evidence paths, validator
+commands, ingest command, and final readiness command without cross-referencing
+multiple JSON files. A candidate is only marked releaseable when that evidence
+kit was collected for the exact source commit in the candidate, the kit validator
+passed, and every final readiness gap has a sendable work item.
 
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`

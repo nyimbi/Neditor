@@ -32,6 +32,7 @@ if (!skipBuild) {
 
 if (!skipEvidence) {
   if (!skipPrerequisiteEvidence) refreshPrerequisiteEvidence();
+  run("pnpm", ["run", "check:release-readiness"]);
   run("pnpm", ["run", "collect:evidence-kit"]);
   run("pnpm", ["run", "check:evidence-kit"]);
   run("pnpm", ["run", "check:release-readiness"]);
@@ -39,6 +40,20 @@ if (!skipEvidence) {
 
 const readiness = readJson(".tmp/release-readiness/report.json");
 const evidenceKit = readJson(".tmp/release-evidence-kit/manifest.json");
+const evidenceKitReport = readOptionalJson(".tmp/release-evidence-kit/report.json");
+const evidenceWorkItemsById = new Map((Array.isArray(evidenceKit.gapWorkItems) ? evidenceKit.gapWorkItems : []).map((item) => [item.id, item]));
+const evidenceKitCurrentForSource = evidenceKit.sourceCommit === sourceCommit;
+const candidateEvidenceGaps = releaseCandidateGaps(readiness);
+const evidenceKitCoversReadiness = candidateEvidenceGaps.every((gap) => gap.readyToSend);
+const evidenceKitReportCurrentForReadiness =
+  evidenceKitReport?.status === "passed" &&
+  evidenceKitReport.sourceCommit === sourceCommit &&
+  evidenceKitReport.currentSourceCommit === sourceCommit &&
+  evidenceKitReport.sourceTreeClean === true &&
+  evidenceKitReport.currentSourceTreeClean === true &&
+  evidenceKitReport.currentReadinessStatus === readiness.status &&
+  Number(evidenceKitReport.summary?.issues || 0) === 0 &&
+  Number(evidenceKitReport.summary?.gaps || -1) === candidateEvidenceGaps.length;
 const sourceTreeCleanAfter = gitTreeClean();
 const artifacts = collectArtifacts();
 const requiredArtifacts = ["frontend:index", "native:app-binary", "native:ned-cli"];
@@ -51,7 +66,13 @@ if (missingRequired.length) {
 const manifest = {
   schema: "neditor.local-release-candidate.v1",
   generatedAt: new Date().toISOString(),
-  releaseable: sourceTreeCleanBefore && sourceTreeCleanAfter && readiness.status === "current-host-ready-with-external-gaps",
+  releaseable:
+    sourceTreeCleanBefore &&
+    sourceTreeCleanAfter &&
+    evidenceKitCurrentForSource &&
+    evidenceKitCoversReadiness &&
+    evidenceKitReportCurrentForReadiness &&
+    readiness.status === "current-host-ready-with-external-gaps",
   product: {
     name: tauriConfig.productName || packageJson.name,
     packageName: packageJson.name,
@@ -73,19 +94,18 @@ const manifest = {
   readiness: {
     status: readiness.status,
     summary: readiness.summary || null,
-    evidenceGapCount: evidenceGaps(readiness).length,
-    evidenceGaps: evidenceGaps(readiness).map((gap) => ({
-      id: gap.id,
-      status: gap.status,
-      returnedEvidencePaths: gap.returnedEvidencePaths || gap.returnPaths || [],
-      validatorCommands: gap.validatorCommands || [],
-      runbook: gap.runbook || null,
-    })),
+    evidenceGapCount: candidateEvidenceGaps.length,
+    evidenceGaps: candidateEvidenceGaps,
   },
   evidenceKit: {
     path: ".tmp/release-evidence-kit/manifest.json",
+    reportPath: ".tmp/release-evidence-kit/report.json",
     schema: evidenceKit.schema,
     sourceCommit: evidenceKit.sourceCommit,
+    currentForSource: evidenceKitCurrentForSource,
+    coversReadiness: evidenceKitCoversReadiness,
+    reportStatus: evidenceKitReport?.status || "missing",
+    reportCurrentForReadiness: evidenceKitReportCurrentForReadiness,
     gapCount: Array.isArray(evidenceKit.gaps) ? evidenceKit.gaps.length : 0,
     workItemCount: Array.isArray(evidenceKit.gapWorkItems) ? evidenceKit.gapWorkItems.length : 0,
     specWorkOrders: evidenceKit.specCompletionWorkOrders || null,
@@ -244,7 +264,7 @@ function renderSha256Sums(artifacts) {
 
 function renderReadme(candidate) {
   const gapLines = candidate.readiness.evidenceGaps.length
-    ? candidate.readiness.evidenceGaps.map((gap) => `- ${gap.id}: ${gap.status}`).join("\n")
+    ? candidate.readiness.evidenceGaps.map((gap) => releaseGateLine(gap)).join("\n")
     : "- None.";
   const artifactLines = candidate.artifacts.map((artifact) => `- \`${artifact.path}\` (${artifact.kind}, ${artifact.size} bytes)`).join("\n");
   const commandLines = candidate.commands.length
@@ -283,6 +303,31 @@ function renderReadme(candidate) {
   ].join("\n")}\n`;
 }
 
+function releaseCandidateGaps(readiness) {
+  return evidenceGaps(readiness).map((gap) => {
+    const workItem = evidenceWorkItemsById.get(gap.id) || {};
+    return {
+      id: gap.id,
+      status: gap.status,
+      detail: gap.detail || workItem.detail || "",
+      evidence: gap.evidence || workItem.evidence || null,
+      runbooks: workItem.runbooks || [],
+      returnedEvidencePaths: workItem.returns || gap.returnedEvidencePaths || gap.returnPaths || [],
+      validatorCommands: workItem.validatorCommands || gap.validatorCommands || [],
+      ingestCommand: workItem.ingestCommand || null,
+      finalReadinessCommand: workItem.finalReadinessCommand || "pnpm run check:release-readiness",
+      readyToSend: workItem.readyToSend === true,
+    };
+  });
+}
+
+function releaseGateLine(gap) {
+  const runbooks = gap.runbooks.length ? gap.runbooks.map((runbook) => runbook.path).join(", ") : "no runbook";
+  const returns = gap.returnedEvidencePaths.length ? gap.returnedEvidencePaths.join(", ") : "no return paths";
+  const validators = gap.validatorCommands.length ? gap.validatorCommands.join(" | ") : "no validator commands";
+  return `- ${gap.id}: ${gap.status}; runbooks: ${runbooks}; returns: ${returns}; validators: ${validators}`;
+}
+
 function nextSteps(readiness) {
   const gaps = evidenceGaps(readiness);
   if (!gaps.length) return ["Tag the release, publish signed artifacts, and archive this release-candidate directory."];
@@ -314,6 +359,12 @@ function sha256(path) {
 
 function readJson(relativePath) {
   return JSON.parse(readFileSync(join(root, relativePath), "utf8"));
+}
+
+function readOptionalJson(relativePath) {
+  const path = join(root, relativePath);
+  if (!existsSync(path)) return null;
+  return JSON.parse(readFileSync(path, "utf8"));
 }
 
 function tail(value) {
