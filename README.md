@@ -646,12 +646,13 @@ web app.
 - Markdown tables, CSV fences, and TSV fences can carry formulas such as
   `=10+15`, `=SUM(2,3)`, and named table references.
 - Data transforms for CSV, TSV, XLSX data sources, JSON, YAML, SQLite SQL,
-  OpenAPI, and JSON Schema produce preview/export-safe artifacts. XLSX front
-  matter sources import the first worksheet as a Markdown table while preserving
-  document-folder path safety. SQL transforms are read-only
-  SQLite table queries behind explicit engine trust, and relative database paths
-  resolve from the current Markdown document's folder without allowing relative
-  escapes outside that folder.
+  OpenAPI, and JSON Schema produce preview/export-safe artifacts. XLSX table
+  import is worksheet-aware: multi-sheet workbooks expose their sheet list in
+  the Tables panel, and front matter XLSX data sources still import a safe
+  default worksheet while preserving document-folder path safety. SQL transforms
+  are read-only SQLite table queries behind explicit engine trust, and relative
+  database paths resolve from the current Markdown document's folder without
+  allowing relative escapes outside that folder.
 - The Templates sidebar includes **AI template assistance** that uses the
   current filters, document context, custom-template draft, and notes to suggest
   which template to use, which values to replace, how to preview and verify the

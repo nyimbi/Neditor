@@ -764,6 +764,22 @@
             </span>
             <button type="button" @click="insertSqlTransformTemplate">Insert SQL transform</button>
           </div>
+          <label v-if="tableImportSheetNames.length > 1">
+            Workbook worksheet
+            <select
+              v-model.number="tableImportSelectedSheetIndex"
+              :disabled="tableDataBusy"
+              title="Choose which worksheet from the imported XLSX workbook should become the editable Markdown table"
+              @change="importSelectedSpreadsheetWorksheet"
+            >
+              <option v-for="(sheet, index) in tableImportSheetNames" :key="`${sheet}-${index}`" :value="index">
+                {{ index + 1 }}. {{ sheet }}
+              </option>
+            </select>
+          </label>
+          <p v-if="tableImportSheetNames.length > 1" class="sidebar-hint">
+            Imported worksheet {{ tableImportSelectedSheetIndex + 1 }} of {{ tableImportSheetNames.length }} from {{ tableImportSourceLabel }}.
+          </p>
           <template v-if="tableDraft">
             <div class="table-actions">
               <button type="button" :disabled="tableDraftHasErrors || tableDraftSourceChanged" title="Write this visual table draft back to the Markdown source" @click="applyTableDraft()">{{ isNewTableDraft ? "Insert table" : "Apply table" }}</button>
@@ -6205,6 +6221,8 @@ type ImportSpreadsheetTableResponse = {
   source_path: string;
   source_format: string;
   sheet_name: string;
+  sheet_names: string[];
+  selected_sheet_index: number;
   rows: number;
   columns: number;
   markdown: string;
@@ -6613,6 +6631,9 @@ const tableTextCellError = ref("");
 const tableFollowSourceCursor = ref(true);
 const isNewTableDraft = ref(false);
 const tableDataBusy = ref(false);
+const tableImportSourcePath = ref("");
+const tableImportSheetNames = ref<string[]>([]);
+const tableImportSelectedSheetIndex = ref(0);
 const tableFormulaFunction = ref<TableFormulaFunction>("SUM");
 const tableFormulaTargetColumn = ref(1);
 const tableFormulaStartRow = ref(1);
@@ -8087,6 +8108,10 @@ const tableSourceSyncMessage = computed(() => {
 });
 const tableDataRowCount = computed(() => {
   return tableDraftDataRowCount(tableDraft.value);
+});
+const tableImportSourceLabel = computed(() => {
+  const path = tableImportSourcePath.value.trim();
+  return path ? path.split(/[\\/]/).pop() || path : "the workbook";
 });
 const tableFormulaTargetColumns = computed(() => {
   return tableFormulaTargetOptions(tableDraft.value);
@@ -20223,22 +20248,24 @@ async function importTableFromSpreadsheet() {
     filters: [{ name: "Spreadsheet tables", extensions: ["csv", "tsv", "xlsx"] }],
   });
   if (typeof selected !== "string") return;
+  await importSpreadsheetTableFromPath(selected);
+}
+
+async function importSelectedSpreadsheetWorksheet() {
+  if (!tableImportSourcePath.value) return;
+  await importSpreadsheetTableFromPath(tableImportSourcePath.value, tableImportSelectedSheetIndex.value);
+}
+
+async function importSpreadsheetTableFromPath(path: string, sheetIndex?: number) {
   tableDataBusy.value = true;
   try {
     const response = await invoke<ImportSpreadsheetTableResponse>("import_spreadsheet_table", {
-      request: { path: selected },
+      request: { path, sheet_index: sheetIndex },
     });
-    const importedDraft = tableDraftFromPasteText(response.markdown, {
-      caption: response.sheet_name || response.source_format.toUpperCase(),
-    });
-    if (!importedDraft) throw new Error("The selected spreadsheet did not contain a usable table.");
-    tableDraft.value = importedDraft;
-    tableSourceSnapshot.value = null;
-    isNewTableDraft.value = true;
-    tablePasteText.value = response.markdown;
-    refreshTableSourceEditFromDraft();
+    applyImportedSpreadsheetTable(response);
     store.sidebar = "tables";
-    store.statusMessage = `Imported ${response.rows} rows and ${response.columns} columns from ${response.source_format.toUpperCase()}`;
+    const sheetSuffix = response.source_format === "xlsx" ? ` worksheet "${response.sheet_name}"` : "";
+    store.statusMessage = `Imported ${response.rows} rows and ${response.columns} columns from ${response.source_format.toUpperCase()}${sheetSuffix}`;
     if (response.warnings.length) store.lastError = response.warnings.join(" ");
   } catch (error) {
     store.lastError = error instanceof Error ? error.message : String(error);
@@ -20246,6 +20273,21 @@ async function importTableFromSpreadsheet() {
   } finally {
     tableDataBusy.value = false;
   }
+}
+
+function applyImportedSpreadsheetTable(response: ImportSpreadsheetTableResponse) {
+  const importedDraft = tableDraftFromPasteText(response.markdown, {
+    caption: response.sheet_name || response.source_format.toUpperCase(),
+  });
+  if (!importedDraft) throw new Error("The selected spreadsheet did not contain a usable table.");
+  tableDraft.value = importedDraft;
+  tableSourceSnapshot.value = null;
+  isNewTableDraft.value = true;
+  tablePasteText.value = response.markdown;
+  tableImportSourcePath.value = response.source_path;
+  tableImportSheetNames.value = response.sheet_names || [];
+  tableImportSelectedSheetIndex.value = response.selected_sheet_index || 0;
+  refreshTableSourceEditFromDraft();
 }
 
 async function exportSelectedTable(format: "csv" | "xlsx") {

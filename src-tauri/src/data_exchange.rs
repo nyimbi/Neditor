@@ -17,6 +17,8 @@ use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 #[derive(Debug, Deserialize)]
 pub(crate) struct ImportSpreadsheetTableRequest {
     pub(crate) path: String,
+    pub(crate) sheet_name: Option<String>,
+    pub(crate) sheet_index: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,6 +34,8 @@ pub(crate) struct ImportSpreadsheetTableResponse {
     pub(crate) source_path: String,
     pub(crate) source_format: String,
     pub(crate) sheet_name: String,
+    pub(crate) sheet_names: Vec<String>,
+    pub(crate) selected_sheet_index: usize,
     pub(crate) rows: usize,
     pub(crate) columns: usize,
     pub(crate) markdown: String,
@@ -59,7 +63,7 @@ pub(crate) fn import_xlsx_data_source_markdown(
     path: &Path,
     caption: &str,
 ) -> Result<(String, Vec<String>), String> {
-    let (mut table, warnings) = read_xlsx_first_sheet(path)?;
+    let (mut table, _, _, _, warnings) = read_xlsx_sheet(path, None, None)?;
     table.caption = caption.trim().to_string();
     Ok((table_to_markdown(&table), warnings))
 }
@@ -74,39 +78,54 @@ pub(crate) fn import_spreadsheet_table(
         .and_then(|value| value.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    let (table, source_format, sheet_name, warnings) = match extension.as_str() {
-        "csv" => {
-            let text = fs::read_to_string(&path)
-                .map_err(|err| format!("Could not read CSV file {}: {err}", path.display()))?;
-            (
-                table_from_rows(parse_delimited_rows(&text, ','), "Imported CSV"),
-                "csv",
-                "CSV",
-                Vec::new(),
-            )
-        }
-        "tsv" => {
-            let text = fs::read_to_string(&path)
-                .map_err(|err| format!("Could not read TSV file {}: {err}", path.display()))?;
-            (
-                table_from_rows(parse_delimited_rows(&text, '\t'), "Imported TSV"),
-                "tsv",
-                "TSV",
-                Vec::new(),
-            )
-        }
-        "xlsx" => {
-            let (table, warnings) = read_xlsx_first_sheet(&path)?;
-            (table, "xlsx", "Sheet1", warnings)
-        }
-        _ => {
-            return Err("Import supports .csv, .tsv, and .xlsx files.".to_string());
-        }
-    };
+    let (table, source_format, sheet_name, sheet_names, selected_sheet_index, warnings) =
+        match extension.as_str() {
+            "csv" => {
+                let text = fs::read_to_string(&path)
+                    .map_err(|err| format!("Could not read CSV file {}: {err}", path.display()))?;
+                (
+                    table_from_rows(parse_delimited_rows(&text, ','), "Imported CSV"),
+                    "csv",
+                    "CSV".to_string(),
+                    vec!["CSV".to_string()],
+                    0usize,
+                    Vec::new(),
+                )
+            }
+            "tsv" => {
+                let text = fs::read_to_string(&path)
+                    .map_err(|err| format!("Could not read TSV file {}: {err}", path.display()))?;
+                (
+                    table_from_rows(parse_delimited_rows(&text, '\t'), "Imported TSV"),
+                    "tsv",
+                    "TSV".to_string(),
+                    vec!["TSV".to_string()],
+                    0usize,
+                    Vec::new(),
+                )
+            }
+            "xlsx" => {
+                let (table, sheet_name, sheet_names, selected_sheet_index, warnings) =
+                    read_xlsx_sheet(&path, request.sheet_name.as_deref(), request.sheet_index)?;
+                (
+                    table,
+                    "xlsx",
+                    sheet_name,
+                    sheet_names,
+                    selected_sheet_index,
+                    warnings,
+                )
+            }
+            _ => {
+                return Err("Import supports .csv, .tsv, and .xlsx files.".to_string());
+            }
+        };
     Ok(ImportSpreadsheetTableResponse {
         source_path: path_to_string(&path),
         source_format: source_format.to_string(),
-        sheet_name: sheet_name.to_string(),
+        sheet_name,
+        sheet_names,
+        selected_sheet_index,
         rows: table.rows.len(),
         columns: table.headers.len(),
         markdown: table_to_markdown(&table),
@@ -275,26 +294,158 @@ fn csv_cell(cell: &str) -> String {
     }
 }
 
-fn read_xlsx_first_sheet(path: &Path) -> Result<(DataTable, Vec<String>), String> {
+#[derive(Debug, Clone)]
+struct XlsxSheet {
+    name: String,
+    target: String,
+}
+
+fn read_xlsx_sheet(
+    path: &Path,
+    requested_name: Option<&str>,
+    requested_index: Option<usize>,
+) -> Result<(DataTable, String, Vec<String>, usize, Vec<String>), String> {
     let file = fs::File::open(path)
         .map_err(|err| format!("Could not open XLSX file {}: {err}", path.display()))?;
     let mut archive =
         ZipArchive::new(file).map_err(|err| format!("Invalid XLSX archive: {err}"))?;
     let shared_strings = read_shared_strings(&mut archive)?;
+    let sheets = read_xlsx_sheets(&mut archive)?;
+    let sheet_names = sheets
+        .iter()
+        .map(|sheet| sheet.name.clone())
+        .collect::<Vec<_>>();
+    let selected_sheet_index = select_xlsx_sheet_index(&sheets, requested_name, requested_index)?;
+    let selected_sheet = sheets
+        .get(selected_sheet_index)
+        .ok_or_else(|| "The selected XLSX worksheet was not found.".to_string())?;
     let mut sheet_xml = String::new();
     archive
-        .by_name("xl/worksheets/sheet1.xml")
-        .map_err(|_| "Only the first XLSX worksheet is supported for import.".to_string())?
+        .by_name(&selected_sheet.target)
+        .map_err(|_| {
+            format!(
+                "Could not find XLSX worksheet '{}' at {}.",
+                selected_sheet.name, selected_sheet.target
+            )
+        })?
         .read_to_string(&mut sheet_xml)
         .map_err(|err| format!("Could not read XLSX worksheet XML: {err}"))?;
     let rows = rows_from_sheet_xml(&sheet_xml, &shared_strings);
     if rows.is_empty() {
-        return Err("The first XLSX worksheet did not contain rows.".to_string());
+        return Err(format!(
+            "The XLSX worksheet '{}' did not contain rows.",
+            selected_sheet.name
+        ));
     }
     let mut warnings = Vec::new();
     warnings
         .push("Imported formulas are read from cached worksheet values when present.".to_string());
-    Ok((table_from_rows(rows, "Imported XLSX table"), warnings))
+    if sheets.len() > 1 && requested_name.is_none() && requested_index.is_none() {
+        warnings.push(format!(
+            "Workbook contains {} worksheets; imported '{}'. Use the worksheet selector to import another sheet.",
+            sheets.len(),
+            selected_sheet.name
+        ));
+    }
+    Ok((
+        table_from_rows(rows, &selected_sheet.name),
+        selected_sheet.name.clone(),
+        sheet_names,
+        selected_sheet_index,
+        warnings,
+    ))
+}
+
+fn read_xlsx_sheets<R: Read + std::io::Seek>(
+    archive: &mut ZipArchive<R>,
+) -> Result<Vec<XlsxSheet>, String> {
+    let mut workbook_xml = String::new();
+    archive
+        .by_name("xl/workbook.xml")
+        .map_err(|_| "XLSX workbook metadata was not found.".to_string())?
+        .read_to_string(&mut workbook_xml)
+        .map_err(|err| format!("Could not read XLSX workbook metadata: {err}"))?;
+    let relationships = read_xlsx_workbook_relationships(archive)?;
+    let sheets = extract_xml_start_tags(&workbook_xml, "sheet")
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, tag)| {
+            let name = xml_attribute(&tag, "name").unwrap_or_else(|| format!("Sheet{}", index + 1));
+            let relationship_id =
+                xml_attribute(&tag, "r:id").or_else(|| xml_attribute(&tag, "id"))?;
+            let target = relationships
+                .iter()
+                .find(|(id, _)| id == &relationship_id)
+                .map(|(_, target)| xlsx_relationship_target_path(target))
+                .unwrap_or_else(|| format!("xl/worksheets/sheet{}.xml", index + 1));
+            Some(XlsxSheet { name, target })
+        })
+        .collect::<Vec<_>>();
+    if sheets.is_empty() {
+        return Err("No worksheets were found in the XLSX workbook.".to_string());
+    }
+    Ok(sheets)
+}
+
+fn read_xlsx_workbook_relationships<R: Read + std::io::Seek>(
+    archive: &mut ZipArchive<R>,
+) -> Result<Vec<(String, String)>, String> {
+    let mut rels_xml = String::new();
+    archive
+        .by_name("xl/_rels/workbook.xml.rels")
+        .map_err(|_| "XLSX workbook relationships were not found.".to_string())?
+        .read_to_string(&mut rels_xml)
+        .map_err(|err| format!("Could not read XLSX workbook relationships: {err}"))?;
+    Ok(extract_xml_start_tags(&rels_xml, "Relationship")
+        .into_iter()
+        .filter_map(|tag| Some((xml_attribute(&tag, "Id")?, xml_attribute(&tag, "Target")?)))
+        .collect())
+}
+
+fn select_xlsx_sheet_index(
+    sheets: &[XlsxSheet],
+    requested_name: Option<&str>,
+    requested_index: Option<usize>,
+) -> Result<usize, String> {
+    if let Some(name) = requested_name
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        return sheets
+            .iter()
+            .position(|sheet| sheet.name.eq_ignore_ascii_case(name))
+            .ok_or_else(|| {
+                format!(
+                    "Worksheet '{name}' was not found. Available worksheets: {}",
+                    sheets
+                        .iter()
+                        .map(|sheet| sheet.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            });
+    }
+    if let Some(index) = requested_index {
+        if index < sheets.len() {
+            return Ok(index);
+        }
+        return Err(format!(
+            "Worksheet index {} was not found. This workbook has {} worksheet{}.",
+            index + 1,
+            sheets.len(),
+            if sheets.len() == 1 { "" } else { "s" }
+        ));
+    }
+    Ok(0)
+}
+
+fn xlsx_relationship_target_path(target: &str) -> String {
+    let trimmed = target.trim().trim_start_matches('/');
+    if trimmed.starts_with("xl/") {
+        trimmed.to_string()
+    } else {
+        format!("xl/{trimmed}")
+    }
 }
 
 fn read_shared_strings<R: Read + std::io::Seek>(
@@ -542,6 +693,38 @@ fn extract_xml_elements(xml: &str, tag: &str) -> Vec<String> {
         start_at = end;
     }
     elements
+}
+
+fn extract_xml_start_tags(xml: &str, tag: &str) -> Vec<String> {
+    let mut tags = Vec::new();
+    let mut start_at = 0usize;
+    let open_prefix = format!("<{tag}");
+    while let Some(open_offset) = xml[start_at..].find(&open_prefix) {
+        let open = start_at + open_offset;
+        let after_prefix = open + open_prefix.len();
+        let Some(next) = xml.as_bytes().get(after_prefix).copied() else {
+            break;
+        };
+        if !matches!(next, b' ' | b'\t' | b'\n' | b'\r' | b'/' | b'>') {
+            start_at = after_prefix;
+            continue;
+        }
+        let Some(close_offset) = xml[open..].find('>') else {
+            break;
+        };
+        let end = open + close_offset + 1;
+        tags.push(xml[open..end].to_string());
+        start_at = end;
+    }
+    tags
+}
+
+fn xml_attribute(tag: &str, name: &str) -> Option<String> {
+    let marker = format!(r#"{name}=""#);
+    let start = tag.find(&marker)? + marker.len();
+    let value = tag.get(start..)?;
+    let end = value.find('"')?;
+    Some(decode_xml_text(&value[..end]))
 }
 
 fn extract_xml_text_tags(xml: &str, tag: &str) -> Vec<String> {

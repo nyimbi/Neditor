@@ -273,6 +273,8 @@ fn spreadsheet_table_import_export_round_trips_csv_and_xlsx() {
     let imported = crate::data_exchange::import_spreadsheet_table(
         crate::data_exchange::ImportSpreadsheetTableRequest {
             path: path_to_string(&csv_path),
+            sheet_name: None,
+            sheet_index: None,
         },
     )
     .expect("import csv");
@@ -296,10 +298,13 @@ fn spreadsheet_table_import_export_round_trips_csv_and_xlsx() {
     let xlsx_import = crate::data_exchange::import_spreadsheet_table(
         crate::data_exchange::ImportSpreadsheetTableRequest {
             path: path_to_string(&xlsx_path),
+            sheet_name: None,
+            sheet_index: None,
         },
     )
     .expect("import xlsx");
     assert!(xlsx_import.markdown.contains("| East | 120 |"));
+    assert_eq!(xlsx_import.sheet_names, vec!["Imported CSV".to_string()]);
 
     let csv_output = root.join("table.csv");
     let csv_export = crate::data_exchange::export_markdown_tables(
@@ -315,6 +320,82 @@ fn spreadsheet_table_import_export_round_trips_csv_and_xlsx() {
     assert!(fs::read_to_string(csv_output)
         .expect("csv output")
         .contains("Region,Revenue"));
+}
+
+#[test]
+fn spreadsheet_xlsx_import_selects_named_worksheets() {
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-spreadsheet-sheets-{unique}"));
+    fs::create_dir_all(&root).expect("test root");
+    let xlsx_path = root.join("multi-sheet.xlsx");
+    crate::data_exchange::export_markdown_tables(
+        crate::data_exchange::ExportMarkdownTablesRequest {
+            markdown: [
+                "Table: Sales Pipeline",
+                "| Client | Value |",
+                "| --- | ---: |",
+                "| Ada | 240 |",
+                "",
+                "Table: Delivery Risks",
+                "| Risk | Owner |",
+                "| --- | --- |",
+                "| Scope | PMO |",
+            ]
+            .join("\n"),
+            output_path: path_to_string(&xlsx_path),
+            format: "xlsx".to_string(),
+            table_index: None,
+        },
+    )
+    .expect("export multi-sheet xlsx");
+
+    let first = crate::data_exchange::import_spreadsheet_table(
+        crate::data_exchange::ImportSpreadsheetTableRequest {
+            path: path_to_string(&xlsx_path),
+            sheet_name: None,
+            sheet_index: None,
+        },
+    )
+    .expect("import first worksheet");
+    assert_eq!(first.sheet_name, "Sales Pipeline");
+    assert_eq!(first.selected_sheet_index, 0);
+    assert_eq!(
+        first.sheet_names,
+        vec!["Sales Pipeline".to_string(), "Delivery Risks".to_string()]
+    );
+    assert!(first.markdown.contains("| Ada | 240 |"));
+    assert!(first
+        .warnings
+        .iter()
+        .any(|warning| warning.contains("Workbook contains 2 worksheets")));
+
+    let by_index = crate::data_exchange::import_spreadsheet_table(
+        crate::data_exchange::ImportSpreadsheetTableRequest {
+            path: path_to_string(&xlsx_path),
+            sheet_name: None,
+            sheet_index: Some(1),
+        },
+    )
+    .expect("import worksheet by index");
+    assert_eq!(by_index.sheet_name, "Delivery Risks");
+    assert_eq!(by_index.selected_sheet_index, 1);
+    assert!(by_index.markdown.contains("| Scope | PMO |"));
+
+    let by_name = crate::data_exchange::import_spreadsheet_table(
+        crate::data_exchange::ImportSpreadsheetTableRequest {
+            path: path_to_string(&xlsx_path),
+            sheet_name: Some("sales pipeline".to_string()),
+            sheet_index: Some(1),
+        },
+    )
+    .expect("import worksheet by name");
+    assert_eq!(by_name.sheet_name, "Sales Pipeline");
+    assert!(by_name.markdown.contains("| Ada | 240 |"));
+
+    fs::remove_dir_all(root).expect("clean multi-sheet spreadsheet test dir");
 }
 
 #[test]

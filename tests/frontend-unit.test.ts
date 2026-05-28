@@ -7992,6 +7992,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Copy TTS model download details"));
   ok(app.includes('aria-label="Text to speech runtime report"'));
   ok(app.includes("Import CSV/XLSX"));
+  ok(app.includes("Workbook worksheet"));
+  ok(app.includes("tableImportSheetNames"));
+  ok(app.includes("importSelectedSpreadsheetWorksheet"));
   ok(app.includes("export_markdown_tables"));
   ok(app.includes("import_spreadsheet_table"));
   ok(app.includes("Insert SQL transform"));

@@ -407,14 +407,16 @@ Margin: {{=margin | percent}}
 
 CSV and TSV transform blocks can also evaluate formula cells and feed export
 artifacts. Front matter data sources can reference local CSV, TSV, JSON, YAML,
-or XLSX files; XLSX sources render the first worksheet as a Markdown table and
-stay under the same document-folder path safety rules as other local sources.
+or XLSX files; XLSX sources render a safe default worksheet as a Markdown table
+and stay under the same document-folder path safety rules as other local
+sources.
 
 For spreadsheet exchange, open the Tables panel and choose CSV, TSV, or XLSX
 import. Review the detected headers, rows, alignment, and formula cells, then
 insert the table as Markdown. Use table export when a reviewer needs CSV or
-XLSX output from a Markdown table. XLSX import reads the first worksheet and
-uses cached formula values when the workbook provides them.
+XLSX output from a Markdown table. XLSX import lists workbook worksheets in the
+Tables panel so you can switch sheets before inserting or applying the Markdown
+table, and uses cached formula values when the workbook provides them.
 
 For database-backed tables, insert a SQL transform template or write a fenced
 `sql` block with a `database` option. Configure and trust the local `sqlite3`
