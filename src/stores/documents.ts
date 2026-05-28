@@ -19,6 +19,7 @@ import {
   moveDocumentTabState,
   setPinnedDocumentState,
 } from "../lib/documentTabs";
+import { activeDocumentState, externalTransformEnginesState, windowTitleState } from "../lib/documentSelectors";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
 import {
   applyRenamedDocumentState,
@@ -394,14 +395,13 @@ export const useDocumentsStore = defineStore("documents", {
   }),
   getters: {
     activeDocument(state): OpenDocument {
-      return state.documents.find((document) => document.id === state.activeId) || state.documents[0];
+      return activeDocumentState(state.documents, state.activeId) || state.documents[0];
     },
     windowTitle(): string {
-      const doc = this.activeDocument;
-      return `${doc.dirty ? "* " : ""}${doc.title} - NEditor`;
+      return windowTitleState(this.activeDocument);
     },
     externalTransformEngines(state): TransformEngineMetadata[] {
-      return state.transformEngines.filter((engine) => engine.requiresExecution);
+      return externalTransformEnginesState(state.transformEngines);
     },
   },
   actions: {

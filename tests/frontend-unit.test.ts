@@ -91,6 +91,7 @@ import {
   moveDocumentTabState,
   setPinnedDocumentState,
 } from "../src/lib/documentTabs.js";
+import { activeDocumentState, externalTransformEnginesState, windowTitleState } from "../src/lib/documentSelectors.js";
 import { emacsKillLineRange, emacsWordRange } from "../src/lib/emacsKeybindings.js";
 import {
   buildExportMetadataChecklist,
@@ -532,6 +533,28 @@ test("document tab helpers close pin move and forget file state", () => {
       recentlyClosed: [],
       missingWorkspaceFiles: [],
     },
+  );
+});
+
+test("document selector helpers expose active title and external engines", () => {
+  const documents = [
+    { id: "doc-1", title: "One.md", dirty: false },
+    { id: "doc-2", title: "Two.md", dirty: true },
+  ];
+
+  equal(activeDocumentState(documents, "doc-2")?.id, "doc-2");
+  equal(activeDocumentState(documents, "missing")?.id, "doc-1");
+  equal(activeDocumentState([], "missing"), null);
+  equal(windowTitleState(documents[0]), "One.md - NEditor");
+  equal(windowTitleState(documents[1]), "* Two.md - NEditor");
+  equal(windowTitleState(null), "Untitled - NEditor");
+  deepEqual(
+    externalTransformEnginesState([
+      { name: "math", requiresExecution: false },
+      { name: "dot", requiresExecution: true },
+      { name: "vega-lite" },
+    ]).map((engine) => engine.name),
+    ["dot"],
   );
 });
 
