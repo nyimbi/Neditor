@@ -609,6 +609,14 @@ export const useDocumentsStore = defineStore("documents", {
       this.activeId = created.activeId;
       void this.compileActive();
     },
+    newDocumentFromText(text: string, title = "Untitled") {
+      const document = createUntitledDocumentState(text, fallbackHash(text), () => crypto.randomUUID(), title);
+      const created = applyNewWorkspaceDocumentState(this.documents, document);
+      this.documents = created.documents;
+      this.activeId = created.activeId;
+      this.statusMessage = `Created editable ${document.title}`;
+      void this.compileActive();
+    },
     async openPath(path: string) {
       const existing = this.documents.find((document) => document.path === path);
       if (existing) {

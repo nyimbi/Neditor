@@ -1050,6 +1050,11 @@ test("file lifecycle helpers update document state for rich file operations", ()
   equal(untitled.title, "Untitled");
   equal(untitled.dirty, true);
   equal(untitled.savedText, "# Starter");
+  const namedUntitled = createUntitledDocumentState("# Research", "hash-research", () => "named-doc", " Deep Research - AI procurement ");
+  equal(namedUntitled.id, "named-doc");
+  equal(namedUntitled.title, "Deep Research - AI procurement");
+  equal(namedUntitled.path, null);
+  equal(namedUntitled.dirty, true);
 
   const saved = applySavedDocumentState(untitled, {
     path: "/workspace/Reports/Board.md",
@@ -6370,6 +6375,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("expansionPassBudget(settings)"));
   ok(app.includes("deepResearchQualityPrompt(settings"));
   ok(app.includes("ensureDeepResearchQualityAudit"));
+  ok(app.includes("openDeepResearchDraftAsDocument"));
+  ok(app.includes("store.newDocumentFromText(deepResearchDraft.value"));
   ok(app.includes("toggleToolbarRow"));
   ok(app.includes("markdownFenceOpener(text)"));
   ok(app.includes("isAiSourceFenceOpener(text)"));

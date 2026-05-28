@@ -1553,6 +1553,7 @@
                 {{ deepResearchBusy ? "Researching..." : "Create deep research draft" }}
               </button>
               <button type="button" :disabled="!deepResearchDraft" @click="insertDeepResearchDraft">Insert draft</button>
+              <button type="button" :disabled="!deepResearchDraft" @click="openDeepResearchDraftAsDocument">Open as document</button>
               <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchLog">Insert research log</button>
             </div>
             <p class="sidebar-hint">
@@ -10446,6 +10447,16 @@ function insertDeepResearchDraft() {
   if (!deepResearchDraft.value.trim()) return;
   applyAgentMarkdown(deepResearchDraft.value, "append-packet");
   store.statusMessage = "Inserted deep research draft for editing and review";
+}
+
+function openDeepResearchDraftAsDocument() {
+  if (!deepResearchDraft.value.trim()) return;
+  const title = deepResearchTopic.value.trim()
+    ? `Deep Research - ${deepResearchTopic.value.trim()}`
+    : "Deep Research Draft";
+  store.newDocumentFromText(deepResearchDraft.value, title);
+  store.sidebar = "review";
+  store.statusMessage = `Opened ${title} as an editable Markdown document`;
 }
 
 function insertDeepResearchLog() {

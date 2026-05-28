@@ -467,8 +467,8 @@ web app.
   report, and expand it toward a slider-selected length from a 1-page brief to
   a 200-page report. It then runs a quality-assurance and humanization pass
   that preserves a final review handoff with evidence checks, open gaps,
-  citation TODOs, and distribution cautions before the user inserts and edits
-  the Markdown. When the
+  citation TODOs, and distribution cautions before the user inserts it into the
+  current file or opens it as a separate editable Markdown document. When the
   active document has been saved, Deep Research can also preserve the source
   documents it found in the same local source library for later review. It also
   exposes front matter and merged project variables from

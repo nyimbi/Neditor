@@ -24,11 +24,11 @@ export function folderFromPath(path: string | null) {
   return separator > 0 ? path.slice(0, separator) : null;
 }
 
-export function createUntitledDocumentState(text: string, savedHash: string, createId: () => string): OpenDocument {
+export function createUntitledDocumentState(text: string, savedHash: string, createId: () => string, title = "Untitled"): OpenDocument {
   return {
     id: createId(),
     path: null,
-    title: "Untitled",
+    title: title.trim() || "Untitled",
     text,
     savedHash,
     savedText: text,
