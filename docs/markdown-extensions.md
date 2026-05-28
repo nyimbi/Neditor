@@ -369,7 +369,9 @@ citations or citation TODOs appear outside generated handoff sections. The
 current-document insert action appends the same editable review package as the
 standalone document flow, omitting only standalone front matter while preserving
 AI provenance, bibliography data, citation index, bibliography marker, evidence
-log, and source-library audit.
+log, and source-library audit. Standalone Deep Research front matter uses the
+configured business identity for owner, preparer, and organization metadata
+when those profile values are available.
 
 ## Glossary And Index
 

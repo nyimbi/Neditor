@@ -482,7 +482,9 @@ web app.
   inline citation keys. Inserting the draft into the current document appends
   the same editable review package used by standalone reports: AI provenance,
   bibliography data, citation index, bibliography marker, evidence log, and
-  source-library audit when available. It also
+  source-library audit when available. Standalone Deep Research document
+  metadata uses the configured business identity for owner, preparer, and
+  organization instead of avoidable TODO placeholders. It also
   exposes front matter and merged project variables from
   `.neditor/variables.yaml` as insertable placeholders
   with filters, so repeated client, owner, budget, and source values do not

@@ -4931,9 +4931,16 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
         },
       ],
       sourceLibraryAuditMarkdown: "## Source Library Audit\n\n| Citation | Status |\n| --- | --- |\n| @agency2026 | OK |",
+      owner: "Acme Research Office",
+      preparedBy: "Jane Doe",
+      organization: "Acme Advisory",
     },
   );
   ok(standalone.startsWith("---\ntitle: \"AI procurement controls\""));
+  ok(standalone.includes('owner: "Acme Research Office"'));
+  ok(standalone.includes('preparedBy: "Jane Doe"'));
+  ok(standalone.includes('organization: "Acme Advisory"'));
+  ok(!standalone.includes("owner: TODO owner"));
   ok(standalone.includes("deepResearchTargetPages: 200"));
   ok(standalone.includes("deepResearchSourceCandidates: 1"));
   ok(standalone.includes("deepResearchSavedSources: 1"));
@@ -6688,6 +6695,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("openDeepResearchDraftAsDocument"));
   ok(app.includes("deepResearchDocumentMarkdown("));
   ok(app.includes("deepResearchReviewPackageMarkdown("));
+  ok(app.includes("deepResearchDocumentOptions()"));
+  ok(app.includes("owner: profile.companyName || profile.fullName || profile.roleTitle || \"\""));
+  ok(app.includes("preparedBy: profile.fullName || profile.companyName || \"\""));
   ok(app.includes("bibliographySources: citationSourceLibrary.value"));
   ok(app.includes("deepResearchDraftPrompt(settings, deepResearchIterations.value, citationSourceLibrary.value)"));
   ok(app.includes("fallbackResearchDraft(settings, deepResearchIterations.value, citationSourceLibrary.value)"));

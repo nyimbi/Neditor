@@ -68,6 +68,9 @@ export interface DeepResearchDocumentOptions {
   savedSourceCount?: number;
   sourceLibraryAuditMarkdown?: string;
   bibliographySources?: DeepResearchBibliographySource[];
+  owner?: string;
+  preparedBy?: string;
+  organization?: string;
 }
 
 const WORDS_PER_MARKDOWN_PAGE = 500;
@@ -283,13 +286,18 @@ export function deepResearchDocumentMarkdown(
   const generatedAt = options.generatedAt || new Date().toISOString();
   const sources = uniqueSources(iterations);
   const body = draftMarkdown.trim();
+  const owner = normalizeText(options.owner, 160) || "review owner";
+  const preparedBy = normalizeText(options.preparedBy, 160);
+  const organization = normalizeText(options.organization, 160);
   const withFrontMatter = hasFrontMatter(body) ? body : [
     "---",
     `title: ${yamlString(settings.topic || "Deep Research Draft")}`,
     `documentType: ${yamlString(settings.documentType)}`,
     `audience: ${yamlString(settings.audience)}`,
     "status: draft",
-    "owner: TODO owner",
+    `owner: ${yamlString(owner)}`,
+    ...(preparedBy ? [`preparedBy: ${yamlString(preparedBy)}`] : []),
+    ...(organization ? [`organization: ${yamlString(organization)}`] : []),
     "releaseTarget: review package",
     `deepResearchTopic: ${yamlString(settings.topic)}`,
     `deepResearchTargetPages: ${settings.targetPages}`,

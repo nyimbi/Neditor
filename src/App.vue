@@ -10465,16 +10465,24 @@ function insertDeepResearchDraft() {
     deepResearchSettings(),
     deepResearchDraft.value,
     deepResearchIterations.value,
-    {
-      savedSourceCount: deepResearchSavedSourceCount.value,
-      bibliographySources: citationSourceLibrary.value,
-      sourceLibraryAuditMarkdown: citationSourceLibrary.value.length
-        ? citationSourceLibraryAuditMarkdown(citationSourceLibrary.value)
-        : "",
-    },
+    deepResearchDocumentOptions(),
   );
   applyAgentMarkdown(reviewPackageMarkdown, "append-packet");
   store.statusMessage = "Inserted deep research draft with bibliography, citations, evidence log, and source audit";
+}
+
+function deepResearchDocumentOptions() {
+  const profile = store.businessProfile;
+  return {
+    savedSourceCount: deepResearchSavedSourceCount.value,
+    bibliographySources: citationSourceLibrary.value,
+    sourceLibraryAuditMarkdown: citationSourceLibrary.value.length
+      ? citationSourceLibraryAuditMarkdown(citationSourceLibrary.value)
+      : "",
+    owner: profile.companyName || profile.fullName || profile.roleTitle || "",
+    preparedBy: profile.fullName || profile.companyName || "",
+    organization: profile.companyName || "",
+  };
 }
 
 function openDeepResearchDraftAsDocument() {
@@ -10486,13 +10494,7 @@ function openDeepResearchDraftAsDocument() {
     deepResearchSettings(),
     deepResearchDraft.value,
     deepResearchIterations.value,
-    {
-      savedSourceCount: deepResearchSavedSourceCount.value,
-      bibliographySources: citationSourceLibrary.value,
-      sourceLibraryAuditMarkdown: citationSourceLibrary.value.length
-        ? citationSourceLibraryAuditMarkdown(citationSourceLibrary.value)
-        : "",
-    },
+    deepResearchDocumentOptions(),
   );
   store.newDocumentFromText(documentMarkdown, title);
   store.sidebar = "review";
