@@ -859,10 +859,14 @@ a reviewer-friendly bundle with runbooks, templates, return paths, validator
 commands, ingest commands, and final release-readiness commands for platform
 evidence, signing, live AI provider/runtime proof, independent security review,
 Google Docs import, release-device performance profiling, human review sign-offs,
-optional external engines such as Pikchr, and spec-completion closure work. The
-kit contract now fails if a readiness gap cannot be closed from a generated work
-item with at least one runbook, returned evidence path, validator command, and
-`pnpm run check:release-readiness` handoff. Release readiness also rejects a
+optional external engines such as Pikchr, and spec-completion closure work. It
+also embeds the current spec-completion work-order JSON and Markdown packet so
+manual reviewers and supported-host owners can work from the same row-level
+assignments that `pnpm run check:spec-completion` generated. The kit contract now
+fails if a readiness gap cannot be closed from a generated work item with at
+least one runbook, returned evidence path, validator command, and
+`pnpm run check:release-readiness` handoff, or if the spec-completion work-order
+packet is missing or not ready to send. Release readiness also rejects a
 stale kit when its recorded source commit does not match the current Git HEAD or
 the current checkout is dirty, so regenerate the kit from a clean release
 checkout after code or evidence changes. The ingest tool

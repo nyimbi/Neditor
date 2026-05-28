@@ -10,6 +10,10 @@ const outputDir = resolve(process.env.NEDITOR_RELEASE_EVIDENCE_KIT_DIR || join(r
 const sourceCommit = gitCommit();
 const sourceTreeClean = gitTreeClean();
 const readiness = readJson(join(root, ".tmp", "release-readiness", "report.json"));
+const specWorkOrderSchema = "neditor.spec-completion-work-orders.v1";
+const specWorkOrdersPath = join(root, ".tmp", "spec-completion", "work-orders.json");
+const specWorkOrdersMarkdownPath = join(root, ".tmp", "spec-completion", "work-orders.md");
+const specWorkOrders = readJson(specWorkOrdersPath);
 const readinessStatus = effectiveReadinessStatus(readiness);
 const gaps = Array.isArray(readiness?.evidenceGaps) ? readiness.evidenceGaps : Array.isArray(readiness?.gaps) ? readiness.gaps : [];
 
@@ -274,6 +278,7 @@ rmSync(outputDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100
 mkdirSync(outputDir, { recursive: true });
 
 const copiedTemplates = copyTemplates();
+const copiedSpecWorkOrders = copySpecWorkOrders();
 const staleTemplates = copiedTemplates.filter((template) => template.copied && template.freshness.status === "stale");
 const manifest = {
   schema: "neditor.release-evidence-kit.v1",
@@ -289,6 +294,7 @@ const manifest = {
     evidence: gap.evidence || null,
   })),
   copiedTemplates,
+  specCompletionWorkOrders: copiedSpecWorkOrders,
   missingTemplates: copiedTemplates.filter((template) => !template.copied),
   staleTemplates,
   runbooks: runbooks.map((runbook) => ({
@@ -335,6 +341,32 @@ function copyTemplates() {
       freshness,
     };
   });
+}
+
+function copySpecWorkOrders() {
+  const jsonDestination = join(outputDir, "spec-completion", "work-orders.json");
+  const markdownDestination = join(outputDir, "spec-completion", "work-orders.md");
+  const jsonCopied = existsSync(specWorkOrdersPath);
+  const markdownCopied = existsSync(specWorkOrdersMarkdownPath);
+  if (jsonCopied) {
+    mkdirSync(dirname(jsonDestination), { recursive: true });
+    cpSync(specWorkOrdersPath, jsonDestination);
+  }
+  if (markdownCopied) {
+    mkdirSync(dirname(markdownDestination), { recursive: true });
+    cpSync(specWorkOrdersMarkdownPath, markdownDestination);
+  }
+  return {
+    jsonPath: "spec-completion/work-orders.json",
+    markdownPath: "spec-completion/work-orders.md",
+    jsonCopied,
+    markdownCopied,
+    expectedSchema: specWorkOrderSchema,
+    schema: specWorkOrders?.schema || null,
+    total: Number(specWorkOrders?.summary?.total || specWorkOrders?.workOrders?.length || 0),
+    readyToSend: Number(specWorkOrders?.summary?.readyToSend || 0),
+    generatedAt: specWorkOrders?.generatedAt || null,
+  };
 }
 
 function inspectTemplateFreshness(path) {
@@ -431,6 +463,14 @@ function readme(manifest) {
   const staleLines = manifest.staleTemplates.length
     ? manifest.staleTemplates.map((template) => `- \`${template.source}\`: ${template.freshness.issues.join("; ")}`).join("\n")
     : "- None.";
+  const workOrders = manifest.specCompletionWorkOrders || {};
+  const workOrderLines = workOrders.jsonCopied
+    ? [
+        `- JSON: [${workOrders.jsonPath}](${workOrders.jsonPath})`,
+        `- Markdown: ${workOrders.markdownCopied ? `[${workOrders.markdownPath}](${workOrders.markdownPath})` : "missing"}`,
+        `- Ready work orders: ${workOrders.readyToSend}/${workOrders.total}`,
+      ].join("\n")
+    : "- Spec-completion work orders are missing. Run `pnpm run check:spec-completion`, then regenerate this kit.";
   return `${[
     "# NEditor Release Evidence Kit",
     "",
@@ -451,6 +491,10 @@ function readme(manifest) {
     "## Gap Work Items",
     "",
     workItemLines,
+    "",
+    "## Spec Completion Work Orders",
+    "",
+    workOrderLines,
     "",
     "## Missing Templates",
     "",

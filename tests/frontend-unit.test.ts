@@ -8541,6 +8541,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("NEDITOR_TEST_SQLITE3"));
   ok(evidenceKitCollector.includes("spec-completion-open-items"));
   ok(evidenceKitCollector.includes("runbooks/spec-completion-closure.md"));
+  ok(evidenceKitCollector.includes("specCompletionWorkOrders"));
+  ok(evidenceKitCollector.includes("spec-completion/work-orders.json"));
+  ok(evidenceKitCollector.includes("spec-completion/work-orders.md"));
+  ok(evidenceKitCollector.includes("neditor.spec-completion-work-orders.v1"));
+  ok(evidenceKitCollector.includes("copySpecWorkOrders"));
   ok(evidenceKitCollector.includes("gapWorkItems"));
   ok(evidenceKitCollector.includes("readyToSend"));
   ok(evidenceKitCollector.includes("validatorCommandsForRunbook"));
@@ -8565,6 +8570,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("currentSourceTreeClean"));
   ok(evidenceKitChecker.includes("staleTemplates must be empty"));
   ok(evidenceKitChecker.includes("missingTemplates must be empty"));
+  ok(evidenceKitChecker.includes("validateSpecCompletionWorkOrders"));
+  ok(evidenceKitChecker.includes("spec completion work-orders JSON must be copied"));
+  ok(evidenceKitChecker.includes("all spec completion work orders must be ready to send"));
+  ok(evidenceKitChecker.includes("specWorkOrdersReady"));
   ok(evidenceKitChecker.includes("manifest gaps must mirror the release readiness report"));
   ok(evidenceKitChecker.includes("gapWorkItems must mirror the release readiness report"));
   ok(evidenceKitChecker.includes("must list validator commands"));

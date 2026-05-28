@@ -71,6 +71,7 @@ function validateManifest(manifest, readiness, readinessStatus) {
   requireValue(copiedTemplates.length === expectedTemplateCount, `copiedTemplates must include ${expectedTemplateCount} entries`);
   requireValue(Array.isArray(manifest.missingTemplates) && manifest.missingTemplates.length === 0, "missingTemplates must be empty");
   requireValue(Array.isArray(manifest.staleTemplates) && manifest.staleTemplates.length === 0, "staleTemplates must be empty");
+  validateSpecCompletionWorkOrders(manifest.specCompletionWorkOrders);
   for (const template of copiedTemplates) {
     requireValue(template.copied === true, `template must be copied: ${template.source || template.path}`);
     requireValue(template.freshness?.status === "current", `template freshness must be current: ${template.source || template.path}`);
@@ -104,6 +105,17 @@ function validateManifest(manifest, readiness, readinessStatus) {
   }
 }
 
+function validateSpecCompletionWorkOrders(workOrders) {
+  requireValue(workOrders && typeof workOrders === "object", "manifest must include specCompletionWorkOrders");
+  requireValue(workOrders.jsonCopied === true, "spec completion work-orders JSON must be copied");
+  requireValue(workOrders.markdownCopied === true, "spec completion work-orders Markdown must be copied");
+  requireValue(workOrders.schema === "neditor.spec-completion-work-orders.v1", "spec completion work-orders schema must be neditor.spec-completion-work-orders.v1");
+  requireValue(Number(workOrders.total || 0) >= 0, "spec completion work-orders total must be numeric");
+  requireValue(Number(workOrders.readyToSend || 0) === Number(workOrders.total || 0), "all spec completion work orders must be ready to send");
+  requireFile(join(kitDir, workOrders.jsonPath || ""), "spec completion work-orders JSON", 100);
+  requireFile(join(kitDir, workOrders.markdownPath || ""), "spec completion work-orders Markdown", 100);
+}
+
 function writeReport(manifest, readiness, readinessStatus) {
   mkdirSync(dirname(reportPath), { recursive: true });
   writeFileSync(
@@ -129,6 +141,8 @@ function writeReport(manifest, readiness, readinessStatus) {
           missingTemplates: Array.isArray(manifest?.missingTemplates) ? manifest.missingTemplates.length : 0,
           staleTemplates: Array.isArray(manifest?.staleTemplates) ? manifest.staleTemplates.length : 0,
           runbooks: Array.isArray(manifest?.runbooks) ? manifest.runbooks.length : 0,
+          specWorkOrders: Number(manifest?.specCompletionWorkOrders?.total || 0),
+          specWorkOrdersReady: Number(manifest?.specCompletionWorkOrders?.readyToSend || 0),
           issues: issues.length,
         },
         gapIds: Array.isArray(manifest?.gaps) ? manifest.gaps.map((gap) => gap.id) : [],
