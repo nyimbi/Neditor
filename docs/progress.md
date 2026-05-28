@@ -66,6 +66,12 @@ Transform option alias architecture:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked external_transform_tests --lib` | Pass | All 16 external-transform tests passed, including trust gating, cache reuse/invalidation, Graphviz alias inheritance, graph option aliases, adapter argument shaping, missing/disabled engine diagnostics, timeout handling, and installed-engine conformance when available. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked transform_tests --lib` | Pass | All 54 transform tests passed after the option alias change, covering first-release transform registry behavior, aliases, embedded fallbacks, structured data, diagrams, charts, visual data, and business transforms. |
 
+Core transform fidelity documentation:
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `docs/markdown-extensions.md` | Updated | The author-facing transform documentation now states the first-release native Mermaid and Pikchr subsets explicitly: simple Mermaid `flowchart`/`graph` edges and labels, simple Pikchr business shapes/arrows/connector labels, warnings for unsupported syntax, and the need for a trusted Pikchr executable or external workflow when exact grammar/layout fidelity is required. |
+
 ## Completed Recently
 
 Recent pushed checkpoints visible in current git history:
