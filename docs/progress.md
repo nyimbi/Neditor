@@ -39,6 +39,17 @@ Table cursor-follow source editing verification:
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the table editor cursor-follow evidence. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow still passes for the broader two-way table workflow after the cursor-follow change. |
 
+AI provenance native-smoke proof update:
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 87 frontend unit/static tests passed, including static guards that the launched native workflow collects reviewed AI source provenance, reviewed AI-assisted section provenance, Review-sidebar evidence, provenance export readiness, and exported HTML appendix evidence. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the native workflow started authoring reviewed AI provenance, preparing HTML provenance export, and carrying the evidence through smoke progress reports. |
+| `pnpm run build` | Pass | Vite production build completed after the AI provenance workflow wiring. |
+| `./node_modules/.bin/tauri build --no-bundle` | Pass | Rebuilt the release binary at `src-tauri/target/release/neditor` with the updated native workflow smoke. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked native_workflow_ai_provenance_fixture_exports_reviewed_appendix --lib` | Pass | Focused native artifact proof compiles the same reviewed AI provenance fixture, verifies export readiness with `includeProvenance`, checks semantic source/section records, and asserts HTML/text export appendices carry audit-readable source, section, reviewer, timestamp, and prompt summary evidence. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS=120000 NEDITOR_DESKTOP_SMOKE_ATTEMPTS=1 pnpm run test:desktop-smoke` | Host launch failure before in-app report | The command path passed the native command workflow, but the launched app survived until timeout without writing `.tmp/desktop-smoke/native-window-report.json`, `.tmp/desktop-smoke/native-ui-report.json`, or `.tmp/desktop-smoke/native-workflow-report.json`; launch stderr showed macOS `-10827` and `com.apple.hiservices-xpcservice` connection errors before the WebView smoke code produced an accepted report. |
+
 ## Completed Recently
 
 Recent pushed checkpoints visible in current git history:

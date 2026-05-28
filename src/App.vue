@@ -11190,9 +11190,14 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     record("native workflow rendered calc template preview", text("#live-preview").includes("Total dose"));
     record("native workflow exposed dirty title", document.title.startsWith("* "), document.title);
 
+    const aiProvenanceEvidence = await collectNativeAiProvenanceEvidence(record);
+    smokePhase = "ai-provenance";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence });
+
     store.activeExportProfileId = "";
     store.exportTarget = "html";
     store.exportDefaults.includeManifest = true;
+    store.exportDefaults.includeProvenance = true;
     await store.prepareForExport();
     await nextTick();
     const readinessTarget = store.exportReadiness?.manifest?.export_target;
@@ -11219,6 +11224,28 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       ),
       JSON.stringify(exportResult),
     );
+    if (exportOutputPath) {
+      const exportedHtml = await invoke<{ text: string }>("read_file", { path: exportOutputPath }).catch(() => null);
+      const htmlText = exportedHtml?.text || "";
+      aiProvenanceEvidence.htmlAppendix = {
+        sourceRecord: htmlText.includes('data-kind="source"') && htmlText.includes('data-status="human-reviewed"'),
+        sectionRecord: htmlText.includes('data-kind="section"') && htmlText.includes('data-line='),
+        reviewerTimestamp: htmlText.includes("2026-05-27T12:05:00Z"),
+        sourceLabel: htmlText.includes("AI source: OpenAI / gpt-5.4"),
+        sectionLabel: htmlText.includes("AI-assisted section: Native AI Draft"),
+      };
+      record(
+        "native workflow exported AI provenance appendix",
+        Boolean(
+          aiProvenanceEvidence.htmlAppendix.sourceRecord &&
+            aiProvenanceEvidence.htmlAppendix.sectionRecord &&
+            aiProvenanceEvidence.htmlAppendix.reviewerTimestamp &&
+            aiProvenanceEvidence.htmlAppendix.sourceLabel &&
+            aiProvenanceEvidence.htmlAppendix.sectionLabel,
+        ),
+        JSON.stringify(aiProvenanceEvidence.htmlAppendix),
+      );
+    }
     store.lastExportOutputPath = "";
     store.lastExportManifestPath = "";
     store.lastExportProgressSteps = [];
@@ -11255,7 +11282,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       JSON.stringify(nativeMenuExportResult),
     );
     smokePhase = "html-export";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult });
     const editorSnippet = smokeSnippetAround(active.value.text, "weight_kg = 72");
     const previewSnippet = text("#live-preview").slice(0, 2000);
     const exportReadinessEvidence = store.exportReadiness
@@ -11268,12 +11295,12 @@ async function runDesktopWorkflowSmokeIfEnabled() {
         }
       : null;
     smokePhase = "export-profile-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult });
     const exportProfileEvidence = await collectNativeExportProfileEvidence(record);
     smokePhase = "export-profile";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     smokePhase = "theme-accessibility-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
     smokePhase = "theme-accessibility";
     await writeNativeWorkflowProgress(smokePhase, assertions, {
@@ -11287,6 +11314,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       diagnosticNavigationEvidence,
       previewSourceMapEvidence,
       tocNavigationEvidence,
+      aiProvenanceEvidence,
       exportResult,
       nativeMenuExportResult,
       exportProfileEvidence,
@@ -11322,6 +11350,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       diagnosticNavigationEvidence,
       previewSourceMapEvidence,
       tocNavigationEvidence,
+      aiProvenanceEvidence,
       editorSnippet,
       previewSnippet,
       themeAccessibility,
@@ -11443,6 +11472,28 @@ async function collectNativeSnapshotEvidence(record: (name: string, passed: bool
   };
 }
 
+interface NativeAiProvenanceEvidence {
+  sourceCount: number;
+  sectionCount: number;
+  sourceStatus: string;
+  sectionStatus: string;
+  sourceProvider: string;
+  sectionHeading: string;
+  reviewVisible: boolean;
+  exportOption: boolean;
+  readinessTarget: string;
+  readinessReady: boolean;
+  readinessErrors: number;
+  readinessWarnings: number;
+  htmlAppendix?: {
+    sourceRecord: boolean;
+    sectionRecord: boolean;
+    reviewerTimestamp: boolean;
+    sourceLabel: boolean;
+    sectionLabel: boolean;
+  };
+}
+
 async function writeNativeWorkflowProgress(
   phase: string,
   assertions: Array<{ name: string; passed: boolean; detail?: string }>,
@@ -11471,6 +11522,73 @@ async function writeNativeWorkflowCheckpoint(
     mode: store.mode,
     sidebar: store.sidebar,
   });
+}
+
+async function collectNativeAiProvenanceEvidence(record: (name: string, passed: boolean, detail?: string) => void): Promise<NativeAiProvenanceEvidence> {
+  const provenanceBlock = [
+    "```ai-source",
+    "provider: OpenAI",
+    "model: gpt-5.4",
+    "date: 2026-05-27",
+    "promptSummary: native workflow provenance smoke",
+    "reviewedBy: Native QA",
+    "reviewedAt: 2026-05-27T12:00:00Z",
+    "status: human-reviewed",
+    "```",
+    "",
+    "<!-- ai-assisted: status=human-reviewed | reviewedBy=Native QA | reviewedAt=2026-05-27T12:05:00Z | source=OpenAI / gpt-5.4 | promptSummary=Native smoke reviewed summary -->",
+    "## Native AI Draft",
+    "Reviewed native AI workflow content.",
+  ].join("\n");
+  await setNativeWorkflowText(`${active.value.text.trimEnd()}\n\n${provenanceBlock}`);
+  await store.compileActive();
+  await nextTick();
+  const semantic = active.value.compile?.semantic;
+  const source = semantic?.ai_sources.find((item) => item.provider === "OpenAI" && item.model === "gpt-5.4");
+  const section = semantic?.ai_assisted_sections.find((item) => item.heading === "Native AI Draft");
+  store.sidebar = "review";
+  await nextTick();
+  const reviewText = document.body.textContent?.replace(/\s+/g, " ").trim() || "";
+  store.exportTarget = "html";
+  store.exportDefaults.includeManifest = true;
+  store.exportDefaults.includeProvenance = true;
+  await store.prepareForExport();
+  await nextTick();
+  const evidence: NativeAiProvenanceEvidence = {
+    sourceCount: semantic?.ai_sources.length || 0,
+    sectionCount: semantic?.ai_assisted_sections.length || 0,
+    sourceStatus: source?.status || "",
+    sectionStatus: section?.status || "",
+    sourceProvider: source ? `${source.provider} / ${source.model}` : "",
+    sectionHeading: section?.heading || "",
+    reviewVisible: reviewText.includes("OpenAI") && reviewText.includes("Native AI Draft") && reviewText.includes("human-reviewed"),
+    exportOption: store.exportReadiness?.manifest?.export_options?.includeProvenance === true,
+    readinessTarget: store.exportReadiness?.manifest?.export_target || "",
+    readinessReady: store.exportReadiness?.ready === true,
+    readinessErrors: store.exportReadiness?.error_count || 0,
+    readinessWarnings: store.exportReadiness?.warning_count || 0,
+  };
+  record(
+    "native workflow collected AI source provenance",
+    evidence.sourceCount > 0 && evidence.sourceStatus === "human-reviewed" && evidence.sourceProvider === "OpenAI / gpt-5.4",
+    JSON.stringify(evidence),
+  );
+  record(
+    "native workflow collected AI section provenance",
+    evidence.sectionCount > 0 && evidence.sectionStatus === "human-reviewed" && evidence.sectionHeading === "Native AI Draft",
+    JSON.stringify(evidence),
+  );
+  record(
+    "native workflow rendered AI provenance review state",
+    evidence.reviewVisible,
+    JSON.stringify(evidence),
+  );
+  record(
+    "native workflow prepared provenance export option",
+    evidence.exportOption && evidence.readinessTarget === "html" && evidence.readinessErrors === 0,
+    JSON.stringify(evidence),
+  );
+  return evidence;
 }
 
 async function collectNativeExportProfileEvidence(record: (name: string, passed: boolean, detail?: string) => void) {

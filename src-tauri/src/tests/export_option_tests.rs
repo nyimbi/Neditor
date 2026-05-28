@@ -446,6 +446,86 @@ Reviewed content.
 }
 
 #[test]
+fn native_workflow_ai_provenance_fixture_exports_reviewed_appendix() {
+    let text = r#"---
+title: Native AI Provenance
+version: 1.0.0
+status: approved
+approvedBy: Native QA
+approvedAt: 2026-05-28T00:00:00Z
+---
+# Native AI Provenance
+
+```ai-source
+provider: OpenAI
+model: gpt-5.4
+date: 2026-05-27
+promptSummary: native workflow provenance smoke
+reviewedBy: Native QA
+reviewedAt: 2026-05-27T12:00:00Z
+status: human-reviewed
+```
+
+<!-- ai-assisted: status=human-reviewed | reviewedBy=Native QA | reviewedAt=2026-05-27T12:05:00Z | source=OpenAI / gpt-5.4 | promptSummary=Native smoke reviewed summary -->
+## Native AI Draft
+Reviewed native AI workflow content.
+"#;
+
+    let readiness = prepare_for_export(PrepareExportRequest {
+        text: text.to_string(),
+        file_path: None,
+        target: "html".to_string(),
+        options: json!({
+            "includeManifest": true,
+            "includeProvenance": true,
+            "warnOnDirtyGit": false
+        }),
+    });
+    assert!(readiness.ready, "{:#?}", readiness.diagnostics);
+    assert_eq!(readiness.error_count, 0);
+    assert_eq!(readiness.manifest.export_target, "html");
+    assert_eq!(
+        readiness
+            .manifest
+            .export_options
+            .get("includeProvenance")
+            .and_then(Value::as_bool),
+        Some(true)
+    );
+
+    let response = compile(CompileRequest {
+        text: text.to_string(),
+        file_path: None,
+    });
+    assert_eq!(response.semantic.ai_sources.len(), 1);
+    assert_eq!(response.semantic.ai_assisted_sections.len(), 1);
+    let source = &response.semantic.ai_sources[0];
+    let section = &response.semantic.ai_assisted_sections[0];
+    assert_eq!(source.provider, "OpenAI");
+    assert_eq!(source.model, "gpt-5.4");
+    assert_eq!(source.status, "human-reviewed");
+    assert_eq!(source.reviewed_by, "Native QA");
+    assert_eq!(section.heading, "Native AI Draft");
+    assert_eq!(section.status, "human-reviewed");
+    assert_eq!(section.reviewed_at, "2026-05-27T12:05:00Z");
+
+    let html = render_full_html(&response, &json!({ "includeProvenance": true }));
+    assert!(html.contains("class=\"export-provenance\""));
+    assert!(html.contains("data-kind=\"source\" data-status=\"human-reviewed\""));
+    assert!(html.contains("data-kind=\"section\" data-status=\"human-reviewed\" data-line="));
+    assert!(html.contains("AI source: OpenAI / gpt-5.4"));
+    assert!(html.contains("AI-assisted section: Native AI Draft"));
+    assert!(html.contains("reviewed by Native QA on 2026-05-27T12:05:00Z"));
+    assert!(html.contains("Native smoke reviewed summary"));
+
+    let text_export = export::export_text(&response, &json!({ "includeProvenance": true }));
+    assert!(text_export.contains("AI Provenance"));
+    assert!(text_export.contains("AI source: OpenAI / gpt-5.4 generated 2026-05-27"));
+    assert!(text_export.contains("AI-assisted section 'Native AI Draft'"));
+    assert!(text_export.contains("reviewed by Native QA on 2026-05-27T12:05:00Z"));
+}
+
+#[test]
 fn export_option_matrix_is_preserved_across_targets_and_bundle_evidence() {
     let response = compile(CompileRequest {
         text: r##"---

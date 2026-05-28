@@ -6050,6 +6050,12 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow merged external conflict changes"));
   ok(app.includes("native workflow accepted external conflict changes"));
   ok(app.includes("native workflow inserted calc template into source"));
+  ok(app.includes("collectNativeAiProvenanceEvidence"));
+  ok(app.includes("native workflow collected AI source provenance"));
+  ok(app.includes("native workflow collected AI section provenance"));
+  ok(app.includes("native workflow rendered AI provenance review state"));
+  ok(app.includes("native workflow prepared provenance export option"));
+  ok(app.includes("native workflow exported AI provenance appendix"));
   ok(app.includes("native workflow prepared html export readiness"));
   ok(app.includes("native workflow wrote html export artifact"));
   ok(app.includes("native workflow exported html from native menu command"));
@@ -6112,6 +6118,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native workflow report did not include diagnostic navigation evidence"));
   ok(smoke.includes("native workflow report did not include preview source-map evidence"));
   ok(smoke.includes("native workflow report did not include toc navigation evidence"));
+  ok(smoke.includes("native workflow report did not include AI provenance evidence"));
   ok(smoke.includes("native workflow report did not include rendered outline-mode structure"));
   ok(smoke.includes("native workflow report did not include rendered export-mode content"));
   ok(smoke.includes("native workflow report did not include rendered review-mode governance content"));

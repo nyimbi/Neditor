@@ -487,6 +487,11 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow inserted calc template into source",
     "native workflow rendered calc template preview",
     "native workflow exposed dirty title",
+    "native workflow collected AI source provenance",
+    "native workflow collected AI section provenance",
+    "native workflow rendered AI provenance review state",
+    "native workflow prepared provenance export option",
+    "native workflow exported AI provenance appendix",
     "native workflow prepared html export readiness",
     "native workflow wrote html export artifact",
     "native workflow exported html from native menu command",
@@ -798,6 +803,26 @@ function validateNativeWorkflowReport(launchReport) {
     ).includes("# Native TOC Navigation")
   ) {
     issues.push(`native workflow report did not include toc navigation evidence: ${JSON.stringify(tocNavigationEvidence)}`);
+  }
+  const aiProvenanceEvidence = payload.aiProvenanceEvidence || {};
+  if (
+    Number(aiProvenanceEvidence.sourceCount || 0) < 1 ||
+    Number(aiProvenanceEvidence.sectionCount || 0) < 1 ||
+    aiProvenanceEvidence.sourceStatus !== "human-reviewed" ||
+    aiProvenanceEvidence.sectionStatus !== "human-reviewed" ||
+    aiProvenanceEvidence.sourceProvider !== "OpenAI / gpt-5.4" ||
+    aiProvenanceEvidence.sectionHeading !== "Native AI Draft" ||
+    aiProvenanceEvidence.reviewVisible !== true ||
+    aiProvenanceEvidence.exportOption !== true ||
+    aiProvenanceEvidence.readinessTarget !== "html" ||
+    Number(aiProvenanceEvidence.readinessErrors || 0) !== 0 ||
+    aiProvenanceEvidence.htmlAppendix?.sourceRecord !== true ||
+    aiProvenanceEvidence.htmlAppendix?.sectionRecord !== true ||
+    aiProvenanceEvidence.htmlAppendix?.reviewerTimestamp !== true ||
+    aiProvenanceEvidence.htmlAppendix?.sourceLabel !== true ||
+    aiProvenanceEvidence.htmlAppendix?.sectionLabel !== true
+  ) {
+    issues.push(`native workflow report did not include AI provenance evidence: ${JSON.stringify(aiProvenanceEvidence)}`);
   }
   const snapshotEvidence = payload.snapshotEvidence || {};
   if (
