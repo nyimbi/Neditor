@@ -22,7 +22,12 @@ import {
   updateTransformEnginePathState,
   type TransformProbeResult,
 } from "../lib/transformSettings";
-import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "../lib/transformTemplates";
+import {
+  deleteCustomTransformTemplateState,
+  normalizeCustomTransformTemplates,
+  saveCustomTransformTemplateState,
+  type CustomTransformTemplate,
+} from "../lib/transformTemplates";
 import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../lib/watchPaths";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import {
@@ -1489,18 +1494,15 @@ export const useDocumentsStore = defineStore("documents", {
       await this.persistWorkspace();
     },
     async saveCustomTransformTemplate(template: CustomTransformTemplate) {
-      const [normalized] = normalizeCustomTransformTemplates([template]);
-      if (!normalized) return;
-      const existingIndex = this.customTransformTemplates.findIndex((candidate) => candidate.id === normalized.id);
-      if (existingIndex >= 0) {
-        this.customTransformTemplates = this.customTransformTemplates.map((candidate, index) => (index === existingIndex ? normalized : candidate));
-      } else {
-        this.customTransformTemplates = [...this.customTransformTemplates, normalized];
-      }
+      const next = saveCustomTransformTemplateState(this.customTransformTemplates, template);
+      if (!next.changed) return;
+      this.customTransformTemplates = next.templates;
       await this.persistWorkspace();
     },
     async deleteCustomTransformTemplate(id: string) {
-      this.customTransformTemplates = this.customTransformTemplates.filter((template) => template.id !== id);
+      const next = deleteCustomTransformTemplateState(this.customTransformTemplates, id);
+      if (!next.changed) return;
+      this.customTransformTemplates = next.templates;
       await this.persistWorkspace();
     },
     setEditorPaneRatio(value: number, persist = true) {

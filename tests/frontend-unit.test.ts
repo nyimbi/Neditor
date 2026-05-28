@@ -148,7 +148,9 @@ import {
 import {
   buildTransformTemplateAssistance,
   builtinTransformTemplates,
+  deleteCustomTransformTemplateState,
   normalizeCustomTransformTemplates,
+  saveCustomTransformTemplateState,
   transformTemplateFillFields,
   transformTemplateMarkdown,
 } from "../src/lib/transformTemplates.js";
@@ -4804,6 +4806,64 @@ test("transform template library covers reusable calculations and custom templat
   ok(assistance.some((item) => item.stepId === "fill-values" && item.suggestedAnswer.includes("investment")));
   ok(assistance.some((item) => item.contextSignals.some((signal) => signal.includes("Custom draft fill fields: revenue"))));
   ok(assistance.some((item) => item.contextSignals.includes("Category: Business")));
+});
+
+test("custom transform template state helpers save replace and delete templates", () => {
+  const existing = {
+    id: "custom-margin",
+    name: "Margin",
+    category: "Finance",
+    transform: "calc",
+    summary: "Margin model",
+    body: "```calc\nrevenue = 100\ncost = 60\n```",
+    tags: ["margin"],
+  };
+  const added = saveCustomTransformTemplateState([existing], {
+    id: "custom-risk",
+    name: " Risk score ",
+    category: "",
+    transform: "calc",
+    summary: "",
+    body: "```calc\nrisk = likelihood * impact\n```",
+    tags: ["risk", "qa"],
+  });
+  equal(added.changed, true);
+  deepEqual(
+    added.templates.map((template) => template.id),
+    ["custom-margin", "custom-risk"],
+  );
+  equal(added.template?.name, "Risk score");
+  equal(added.template?.category, "Custom");
+  equal(added.template?.summary, "Reusable transform template.");
+
+  const replaced = saveCustomTransformTemplateState(added.templates, {
+    ...existing,
+    name: "Updated margin",
+    body: "```calc\nrevenue = 120\ncost = 72\nmargin = (revenue - cost) / revenue\n```",
+  });
+  equal(replaced.changed, true);
+  equal(replaced.templates.length, 2);
+  equal(replaced.templates[0].name, "Updated margin");
+  equal(replaced.templates[1].id, "custom-risk");
+
+  const invalid = saveCustomTransformTemplateState(replaced.templates, {
+    ...existing,
+    id: "missing-body",
+    body: "",
+  });
+  equal(invalid.changed, false);
+  equal(invalid.template, null);
+  deepEqual(invalid.templates, replaced.templates);
+
+  const deleted = deleteCustomTransformTemplateState(replaced.templates, "custom-risk");
+  equal(deleted.changed, true);
+  deepEqual(
+    deleted.templates.map((template) => template.id),
+    ["custom-margin"],
+  );
+  const missingDelete = deleteCustomTransformTemplateState(deleted.templates, "missing");
+  equal(missingDelete.changed, false);
+  deepEqual(missingDelete.templates, deleted.templates);
 });
 
 test("workbench command bar exposes icon display controls and workflow groups", () => {

@@ -1277,6 +1277,53 @@ export function normalizeCustomTransformTemplates(value: unknown): CustomTransfo
   return templates.slice(0, 100);
 }
 
+export interface SaveCustomTransformTemplateStateResult {
+  templates: CustomTransformTemplate[];
+  template: CustomTransformTemplate | null;
+  changed: boolean;
+}
+
+export interface DeleteCustomTransformTemplateStateResult {
+  templates: CustomTransformTemplate[];
+  changed: boolean;
+}
+
+export function saveCustomTransformTemplateState(
+  templates: CustomTransformTemplate[],
+  template: CustomTransformTemplate,
+): SaveCustomTransformTemplateStateResult {
+  const normalizedTemplates = normalizeCustomTransformTemplates(templates);
+  const [normalized] = normalizeCustomTransformTemplates([template]);
+  if (!normalized) {
+    return { templates: normalizedTemplates, template: null, changed: false };
+  }
+  const existingIndex = normalizedTemplates.findIndex((candidate) => candidate.id === normalized.id);
+  if (existingIndex >= 0) {
+    return {
+      templates: normalizedTemplates.map((candidate, index) => (index === existingIndex ? normalized : candidate)),
+      template: normalized,
+      changed: true,
+    };
+  }
+  return {
+    templates: [...normalizedTemplates, normalized],
+    template: normalized,
+    changed: true,
+  };
+}
+
+export function deleteCustomTransformTemplateState(
+  templates: CustomTransformTemplate[],
+  id: string,
+): DeleteCustomTransformTemplateStateResult {
+  const normalizedTemplates = normalizeCustomTransformTemplates(templates);
+  const nextTemplates = normalizedTemplates.filter((template) => template.id !== id);
+  return {
+    templates: nextTemplates,
+    changed: nextTemplates.length !== normalizedTemplates.length,
+  };
+}
+
 function stringValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
