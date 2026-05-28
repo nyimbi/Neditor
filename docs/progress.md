@@ -5094,6 +5094,12 @@ Side-by-side editor/preview evidence consolidation:
 | --- | --- | --- |
 | `pnpm run check:spec-completion` | Pass | The baseline side-by-side Markdown editor/live preview row is now complete with exact `src/App.vue`, frontend debounce unit, focused browser workflow, structured e2e report, and native UI smoke evidence; broader mode/platform/manual proof stays tracked in the dedicated view-mode and platform rows. |
 
+Window-title evidence consolidation:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:spec-completion` | Pass | The window-title row is now complete with exact store/app title code, browser clean/dirty title assertions, static native-smoke guards, native UI dirty-title evidence, and app-authored native workflow proof for save, dirty edit, revert, and template insertion title changes. |
+
 Vim punctuation word-motion parity:
 
 | Command | Result | Evidence |
