@@ -51,6 +51,11 @@ export interface DeepResearchRun {
   draftMarkdown: string;
 }
 
+export interface DeepResearchDocumentOptions {
+  generatedAt?: string;
+  savedSourceCount?: number;
+}
+
 const WORDS_PER_MARKDOWN_PAGE = 500;
 const EXPANSION_PAGES_PER_PASS = 5;
 const MAX_EXPANSION_PASSES = 40;
@@ -232,6 +237,43 @@ export function deepResearchQualityAuditMarkdown(
     ...(openGaps.length ? openGaps.slice(0, 12).map((gap) => `- ${gap}`) : ["- No explicit knowledge gaps were recorded by the research loop."]),
     "",
   ].join("\n");
+}
+
+export function deepResearchDocumentMarkdown(
+  settings: DeepResearchSettings,
+  draftMarkdown: string,
+  iterations: DeepResearchIteration[],
+  options: DeepResearchDocumentOptions = {},
+) {
+  const generatedAt = options.generatedAt || new Date().toISOString();
+  const sources = uniqueSources(iterations);
+  const body = draftMarkdown.trim();
+  const withFrontMatter = hasFrontMatter(body) ? body : [
+    "---",
+    `title: ${yamlString(settings.topic || "Deep Research Draft")}`,
+    `documentType: ${yamlString(settings.documentType)}`,
+    `audience: ${yamlString(settings.audience)}`,
+    "status: draft",
+    "owner: TODO owner",
+    "releaseTarget: review package",
+    `deepResearchTopic: ${yamlString(settings.topic)}`,
+    `deepResearchTargetPages: ${settings.targetPages}`,
+    `deepResearchIterations: ${iterations.length}`,
+    `deepResearchSourceCandidates: ${sources.length}`,
+    `deepResearchSavedSources: ${Math.max(0, options.savedSourceCount || 0)}`,
+    `aiProviderProfile: ${yamlString(settings.providerProfileId)}`,
+    `aiProviderModel: ${yamlString(settings.model)}`,
+    `generatedAt: ${yamlString(generatedAt)}`,
+    "---",
+    "",
+    body,
+  ].join("\n");
+  const withProvenance = hasDeepResearchProvenance(withFrontMatter)
+    ? withFrontMatter
+    : insertAfterFrontMatter(withFrontMatter, deepResearchProvenanceBlock(settings, generatedAt));
+  return hasDeepResearchEvidenceLog(withProvenance)
+    ? withProvenance
+    : `${withProvenance.trim()}\n\n## Deep Research Evidence Log\n\n${formatDeepResearchLog(iterations)}\n`;
 }
 
 export function fallbackDeepResearchQuery(settings: DeepResearchSettings, iterations: DeepResearchIteration[]) {
@@ -487,6 +529,48 @@ function normalizeSearchProvider(value: unknown): DeepResearchSearchProvider {
 
 function normalizeText(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function hasFrontMatter(markdown: string) {
+  return /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.test(markdown);
+}
+
+function hasDeepResearchProvenance(markdown: string) {
+  return /```ai-source[\s\S]*provider:\s*NEditor Deep Research/i.test(markdown);
+}
+
+function hasDeepResearchEvidenceLog(markdown: string) {
+  return /^##\s+Deep Research Evidence Log\b/im.test(markdown);
+}
+
+function insertAfterFrontMatter(markdown: string, block: string) {
+  const match = markdown.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+  if (!match) return `${block}\n\n${markdown}`;
+  const start = markdown.slice(0, match[0].length).trimEnd();
+  const rest = markdown.slice(match[0].length).trimStart();
+  return `${start}\n\n${block}\n\n${rest}`;
+}
+
+function deepResearchProvenanceBlock(settings: DeepResearchSettings, generatedAt: string) {
+  return [
+    "```ai-source",
+    "provider: NEditor Deep Research",
+    `model: ${markerValue(settings.model || settings.providerProfileId)}`,
+    `date: ${markerValue(generatedAt)}`,
+    `promptSummary: ${markerValue(`Generated ${settings.documentType} for ${settings.audience} on ${settings.topic || "research topic"}`)}`,
+    "reviewedBy: ",
+    "reviewedAt: ",
+    "status: needs-review",
+    "```",
+  ].join("\n");
+}
+
+function yamlString(value: string) {
+  return JSON.stringify(value || "");
+}
+
+function markerValue(value: string) {
+  return value.replace(/\r?\n/g, " ").replace(/\|/g, "/").trim();
 }
 
 function clampInteger(value: unknown, min: number, max: number, fallback: number) {

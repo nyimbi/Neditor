@@ -5664,6 +5664,7 @@ import {
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import {
   deepResearchDraftPrompt,
+  deepResearchDocumentMarkdown,
   deepResearchExpansionPrompt,
   deepResearchQueryPrompt,
   deepResearchQualityAuditMarkdown,
@@ -10454,7 +10455,13 @@ function openDeepResearchDraftAsDocument() {
   const title = deepResearchTopic.value.trim()
     ? `Deep Research - ${deepResearchTopic.value.trim()}`
     : "Deep Research Draft";
-  store.newDocumentFromText(deepResearchDraft.value, title);
+  const documentMarkdown = deepResearchDocumentMarkdown(
+    deepResearchSettings(),
+    deepResearchDraft.value,
+    deepResearchIterations.value,
+    { savedSourceCount: deepResearchSavedSourceCount.value },
+  );
+  store.newDocumentFromText(documentMarkdown, title);
   store.sidebar = "review";
   store.statusMessage = `Opened ${title} as an editable Markdown document`;
 }
