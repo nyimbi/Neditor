@@ -245,6 +245,7 @@ import {
   applyWorkspaceRefreshFailureState,
   applyWorkspaceRefreshSuccessState,
   applyWorkspaceRestoreState,
+  applyRenamedWorkspaceDocumentState,
   applySavedWorkspaceDocumentState,
   clearWorkspaceRefreshState,
   createRestoredWorkspaceDocumentState,
@@ -938,6 +939,26 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   deepEqual(savedWorkspace.recentFiles, ["/workspace/saved.md", "/old.md"]);
   deepEqual(savedWorkspace.ignoredConflictHashes, {});
   equal(savedWorkspace.statusMessage, "Saved saved.md");
+
+  const renamedWorkspace = applyRenamedWorkspaceDocumentState(
+    { ...savedWorkspace.document, path: "/workspace/old-name.md", title: "old-name.md" },
+    {
+      path: "/workspace/new-name.md",
+      hash: "hash-renamed",
+      modified: "2026-05-28T12:05:00.000Z",
+    },
+    "/workspace/old-name.md",
+    ["/workspace/old-name.md", "/old.md"],
+    ["/workspace/old-name.md", "/closed.md"],
+    ["/workspace/old-name.md", "/missing.md"],
+  );
+  equal(renamedWorkspace.document.path, "/workspace/new-name.md");
+  equal(renamedWorkspace.document.title, "new-name.md");
+  equal(renamedWorkspace.document.savedHash, "hash-renamed");
+  deepEqual(renamedWorkspace.recentFiles, ["/workspace/new-name.md", "/old.md"]);
+  deepEqual(renamedWorkspace.recentlyClosed, ["/closed.md"]);
+  deepEqual(renamedWorkspace.missingWorkspaceFiles, ["/missing.md"]);
+  equal(renamedWorkspace.statusMessage, "Renamed new-name.md");
 });
 
 test("file lifecycle helpers update document state for rich file operations", () => {

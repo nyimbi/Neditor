@@ -1,5 +1,12 @@
 import type { OpenDocument } from "../types.js";
-import { applySavedDocumentState, titleFromPath, type FileContentResponse } from "./fileLifecycle.js";
+import {
+  applyRenamedDocumentState,
+  applySavedDocumentState,
+  titleFromPath,
+  type FileContentResponse,
+  type FileRenameMetadata,
+} from "./fileLifecycle.js";
+import { forgetDocumentPathState } from "./documentTabs.js";
 import { forgetRecentItem, rememberRecentItem } from "./recentItems.js";
 import { clampScrollRatio } from "./workspacePersistence.js";
 
@@ -58,6 +65,14 @@ export interface SavedWorkspaceDocumentStateResult {
   document: OpenDocument;
   recentFiles: string[];
   ignoredConflictHashes: Record<string, string>;
+  statusMessage: string;
+}
+
+export interface RenamedWorkspaceDocumentStateResult {
+  document: OpenDocument;
+  recentFiles: string[];
+  recentlyClosed: string[];
+  missingWorkspaceFiles: string[];
   statusMessage: string;
 }
 
@@ -272,5 +287,24 @@ export function applySavedWorkspaceDocumentState(
     recentFiles: rememberRecentItem(recentFiles, saved.document.path, 20),
     ignoredConflictHashes: {},
     statusMessage: saved.statusMessage,
+  };
+}
+
+export function applyRenamedWorkspaceDocumentState(
+  document: OpenDocument,
+  metadata: FileRenameMetadata,
+  oldPath: string | null,
+  recentFiles: string[],
+  recentlyClosed: string[],
+  missingWorkspaceFiles: string[],
+): RenamedWorkspaceDocumentStateResult {
+  const renamed = applyRenamedDocumentState(document, metadata);
+  const forgotten = forgetDocumentPathState(recentFiles, recentlyClosed, missingWorkspaceFiles, oldPath);
+  return {
+    document: renamed.document,
+    recentFiles: rememberRecentItem(forgotten.recentFiles, renamed.document.path, 20),
+    recentlyClosed: forgotten.recentlyClosed,
+    missingWorkspaceFiles: forgotten.missingWorkspaceFiles,
+    statusMessage: renamed.statusMessage,
   };
 }

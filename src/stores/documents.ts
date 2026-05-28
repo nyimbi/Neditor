@@ -32,7 +32,6 @@ import {
   finishExportWorkflowState,
 } from "../lib/exportWorkflowState";
 import {
-  applyRenamedDocumentState,
   applyRevertedDocumentState,
   applyUntitledRevertState,
   applyUpdatedDocumentTextState,
@@ -96,6 +95,7 @@ import {
   applyWorkspaceRefreshFailureState,
   applyWorkspaceRefreshSuccessState,
   applyWorkspaceRestoreState,
+  applyRenamedWorkspaceDocumentState,
   applySavedWorkspaceDocumentState,
   clearWorkspaceRefreshState,
   createRestoredWorkspaceDocumentState,
@@ -753,11 +753,19 @@ export const useDocumentsStore = defineStore("documents", {
       const metadata = await invoke<{ path: string; exists: boolean; hash?: string; modified?: string }>("rename_file", {
         request: { from: doc.path, to: path },
       });
-      const renamed = applyRenamedDocumentState(doc, metadata);
+      const renamed = applyRenamedWorkspaceDocumentState(
+        doc,
+        metadata,
+        oldPath,
+        this.recentFiles,
+        this.recentlyClosed,
+        this.missingWorkspaceFiles,
+      );
       Object.assign(doc, renamed.document);
+      this.recentFiles = renamed.recentFiles;
+      this.recentlyClosed = renamed.recentlyClosed;
+      this.missingWorkspaceFiles = renamed.missingWorkspaceFiles;
       this.statusMessage = renamed.statusMessage;
-      this.forgetFilePath(oldPath);
-      this.rememberFile(doc.path);
       if (this.workspaceRoot) await this.refreshWorkspace();
       await this.refreshGitStatus();
       await this.persistWorkspace();
