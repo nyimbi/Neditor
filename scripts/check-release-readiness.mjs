@@ -119,12 +119,13 @@ function evaluateReport(spec) {
   }
 
   const custom = spec.customAccept?.(report);
-  const statusValue = String(report.status ?? custom?.status ?? "present");
+  const statusValue = String(custom?.status ?? report.status ?? "present");
   const accepted =
     custom?.accepted ??
     (spec.acceptedStatuses.length === 0 ? true : spec.acceptedStatuses.includes(statusValue));
   if (!accepted) {
-    failures.push(`${spec.id} report status ${statusValue} is not accepted`);
+    const detail = custom?.detail ? `: ${custom.detail}` : "";
+    failures.push(`${spec.id} report status ${statusValue} is not accepted${detail}`);
   }
   return {
     id: spec.id,
