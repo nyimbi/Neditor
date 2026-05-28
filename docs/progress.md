@@ -27,6 +27,21 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Compiler Output Closure
+
+`7.2 Outputs | Compiled Markdown, HTML, semantic model, diagnostics, include
+graph, source map, metadata, bibliography, index, formula graph, transform
+artifacts, manifest` is now marked complete in
+`docs/spec-completion-matrix.md`. The closure is based on the `CompileResponse`
+contract, Markdown bundle artifact proof, cross-target data-source persistence,
+and browser-visible Diagnostics sidebar output inventory.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked document_ast_models_transform_artifacts_semantically --lib` | Pass | Proved document AST and Markdown bundle transform artifacts preserve output kinds, source ranges, cache keys, execution kind, and output hashes. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked front_matter_data_sources_survive_cross_target_exports --lib` | Pass | Proved structured and delimited local data-source outputs survive HTML, PDF, DOCX, PPTX, Markdown bundle text, and manifest evidence. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "navigates compiler diagnostics" --project chromium` | Pass | Proved the Diagnostics sidebar compiler output inventory renders beside source-ranged diagnostics, surfaces media map and figure media-use counts, and navigates diagnostics to source. |
+
 ## 2026-05-28 JSON/YAML Structured Transform Closure
 
 `10.4.11 JSON | Structured rendering` and `10.4.12 YAML | Structured
