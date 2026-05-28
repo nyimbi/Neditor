@@ -1041,7 +1041,7 @@
             <header>
               <div>
                 <strong>RFP response wizard</strong>
-                <span>Import an RFP, surface stated and implied buyer intent, extract requirements, verify coverage, and create a compliance matrix.</span>
+                <span>Import an RFP, create the compliance checklist, build the proposal outline, and then draft the response section by section.</span>
               </div>
               <small>{{ rfpAnalysisSummary }}</small>
             </header>
@@ -1119,8 +1119,24 @@
                 <span><strong>{{ rfpAnalysis.budgetHints.length }}</strong> budget hints</span>
                 <span><strong>{{ rfpAnalysis.complianceChecklist.length }}</strong> checklist items</span>
                 <span><strong>{{ rfpAnalysis.criticalDisqualifiers.length }}</strong> critical traps</span>
+                <span><strong>{{ rfpAnalysis.proposalOutline.activities.length }}</strong> outline activities</span>
                 <span><strong>{{ rfpAnalysis.verificationSummary.rowsNeedingEvidence }}</strong> evidence checks</span>
               </div>
+              <details open>
+                <summary>Proposal outline planner</summary>
+                <ul>
+                  <li>Deadline: {{ rfpAnalysis.proposalOutline.metadata.submissionDeadline }}</li>
+                  <li>Page limit: {{ rfpAnalysis.proposalOutline.metadata.pageLimitSource }}</li>
+                  <li>Evaluation model: {{ rfpAnalysis.proposalOutline.metadata.evaluationModel }}</li>
+                  <li>Currency: {{ rfpAnalysis.proposalOutline.metadata.currency }}</li>
+                </ul>
+                <ol>
+                  <li v-for="item in rfpAnalysis.proposalOutline.activities.slice(0, 10)" :key="`${item.sourceLine}-${item.label}`">
+                    {{ item.label }}
+                    <small>Source line {{ item.sourceLine }} | {{ item.placeholder }}</small>
+                  </li>
+                </ol>
+              </details>
               <details open>
                 <summary>Compliance checklist extractor</summary>
                 <ul>
@@ -1164,6 +1180,7 @@
               </details>
               <div class="template-actions">
                 <button type="button" title="Insert only the generated compliance matrix into the active document" @click="insertRfpComplianceMatrix">Insert matrix</button>
+                <button type="button" title="Replace the active document with the compliance checklist followed by a scored proposal outline" @click="createRfpProposalOutline">Create outline</button>
                 <button type="button" title="Replace the active document with a full responsive RFP response draft" @click="createResponsiveRfpResponse">Create response</button>
                 <button type="button" title="Send the analyzed RFP to Docs Live for section-by-section drafting" @click="sendRfpResponseToDocsLive">Docs Live</button>
                 <button type="button" title="Prepare a Claude Code, Codex, OpenCode, or Google Antigravity handoff for the analyzed RFP" @click="openAgentWorkspaceForRfpAnalysis">Agent handoff</button>
@@ -5752,6 +5769,8 @@ import {
   buildRfpWizardStepAssistance,
   normalizeBusinessProfile,
   rfpComplianceMatrixMarkdown,
+  rfpProposalOutlineBullets,
+  rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
   type BusinessDocumentSnippet,
   type BusinessDocumentTemplate,
@@ -8202,7 +8221,7 @@ const configurationCenterSections = computed(() =>
 const rfpAnalysisSummary = computed(() => {
   const analysis = rfpAnalysis.value;
   if (!analysis) return "No RFP analyzed yet";
-  return `${analysis.requirements.length} requirements | ${analysis.statedIntent.length} stated intent | ${analysis.impliedIntent.length} implied intent | ${analysis.completenessScore}/100 ready`;
+  return `${analysis.requirements.length} requirements | ${analysis.complianceChecklist.length} checklist items | ${analysis.proposalOutline.activities.length} outline activities | ${analysis.completenessScore}/100 ready`;
 });
 const rfpWizardStepAssistance = computed(() =>
   buildRfpWizardStepAssistance({
@@ -16923,6 +16942,14 @@ function insertRfpComplianceMatrix() {
   store.statusMessage = `Inserted compliance matrix with ${analysis.complianceRows.length} requirements`;
 }
 
+function createRfpProposalOutline() {
+  const analysis = ensureRfpAnalysis();
+  store.updateText(rfpProposalOutlineMarkdown(analysis, store.businessProfile, rfpResponseContextNotes.value));
+  store.sidebar = "outline";
+  store.mode = "outline";
+  store.statusMessage = `Created proposal outline with ${analysis.complianceChecklist.length} checklist items before the table of contents`;
+}
+
 function createResponsiveRfpResponse() {
   const analysis = ensureRfpAnalysis();
   store.updateText(rfpResponseMarkdown(analysis, store.businessProfile, rfpResponseContextNotes.value));
@@ -16934,24 +16961,12 @@ function sendRfpResponseToDocsLive() {
   const analysis = ensureRfpAnalysis();
   docsLiveDocumentType.value = "rfp-response";
   docsLiveTitle.value = `RFP response for ${store.businessProfile.defaultClientName || analysis.source.title || "Client"}`;
-  docsLiveOutlineText.value = [
-    "- Executive Response",
-    "- RFP Intake Summary",
-    "- Requirements Analysis",
-    "- Buyer Intent Analysis",
-    "  - Stated Intent",
-    "  - Implied Intent",
-    "- Compliance Matrix",
-    "- Capability Match",
-    "- Proposed Solution",
-    "- Implementation Plan and Timeline",
-    "- Pricing and Budget Response",
-    "- Mandatory Attachments",
-    "- Risk and Assumptions",
-    "- Submission QA Checklist",
-  ].join("\n");
+  docsLiveOutlineText.value = rfpProposalOutlineBullets(analysis);
   docsLiveContext.value = [
     businessWizardContext(businessDocumentTemplates.find((template) => template.id === "rfp") || businessDocumentTemplates[0], store.businessProfile),
+    "",
+    "Proposal outline:",
+    rfpProposalOutlineMarkdown(analysis, store.businessProfile, rfpResponseContextNotes.value),
     "",
     "RFP analysis:",
     rfpResponseAnalysisBrief(analysis, rfpResponseContextNotes.value),
@@ -17000,6 +17015,7 @@ function rfpResponseAnalysisBrief(analysis: RfpAnalysis, responseNotes = "") {
     `Completeness score: ${analysis.completenessScore}/100`,
     `Verification: ${analysis.verificationSummary.allRequirementsMapped ? "all extracted requirements mapped" : "coverage gaps detected"}`,
     `Evidence checks: ${analysis.verificationSummary.rowsNeedingEvidence}`,
+    `Proposal outline: ${analysis.proposalOutline.metadata.pageLimitSource}; ${analysis.proposalOutline.activities.length} ToR activity hint(s); ${analysis.proposalOutline.teamRequirements.length} team requirement hint(s).`,
     "",
     "Requirement verification:",
     ...analysis.verificationSummary.checklist.map((item) => `- ${item}`),

@@ -147,6 +147,42 @@ export interface RfpComplianceChecklistItem {
   sourceLine: number;
 }
 
+export interface RfpProposalMetadata {
+  submissionDeadline: string;
+  pageLimit: number;
+  pageLimitSource: string;
+  currency: string;
+  evaluationModel: string;
+  passFailCriteria: string[];
+}
+
+export interface RfpProposalActivity {
+  label: string;
+  sourceLine: number;
+  placeholder: string;
+}
+
+export interface RfpProposalTeamRequirement {
+  role: string;
+  minimumExperience: string;
+  sourceLine: number;
+}
+
+export interface RfpProposalOutline {
+  metadata: RfpProposalMetadata;
+  scoringScheme: RfpScoringWeight[];
+  activities: RfpProposalActivity[];
+  deliverables: RfpProposalActivity[];
+  timelineMilestones: RfpProposalActivity[];
+  approvalPeriods: RfpProposalActivity[];
+  annexes: RfpAnnexReference[];
+  teamRequirements: RfpProposalTeamRequirement[];
+  technicalMandates: string[];
+  sustainabilityRequirements: string[];
+  riskQaKpiRequirements: string[];
+  pageAllocations: Array<{ section: string; pages: string; basis: string }>;
+}
+
 export interface RfpVerificationSummary {
   totalRequirements: number;
   complianceRows: number;
@@ -179,6 +215,7 @@ export interface RfpAnalysis {
   annexReferences: RfpAnnexReference[];
   bilingualRequirements: string[];
   placeholderRisks: string[];
+  proposalOutline: RfpProposalOutline;
   risks: string[];
   questions: string[];
   warnings: string[];
@@ -1031,6 +1068,15 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
     .filter((item) => item.risk === "critical")
     .map((item) => `${item.id}: ${item.requirement}`);
   const verificationSummary = buildRfpVerificationSummary(requirements, complianceRows, mandatoryAttachments, evaluationCriteria, scoringWeights, annexReferences, bilingualRequirements, placeholderRisks);
+  const proposalOutline = buildRfpProposalOutline({
+    lines: significantLines,
+    requirements,
+    complianceRows,
+    scoringWeights,
+    annexReferences,
+    bilingualRequirements,
+    criticalDisqualifiers,
+  });
   const risks = inferRfpRisks(requirements, timelines, budgetHints, mandatoryAttachments, criticalDisqualifiers, placeholderRisks);
   const questions = inferRfpQuestions(requirements, timelines, budgetHints, evaluationCriteria, mandatoryAttachments, normalizedProfile);
   const warnings = inferRfpWarnings(input, normalizedText, requirements);
@@ -1071,6 +1117,7 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
     annexReferences,
     bilingualRequirements,
     placeholderRisks,
+    proposalOutline,
     risks,
     questions,
     warnings,
@@ -1119,6 +1166,209 @@ export function rfpComplianceChecklistMarkdown(analysis: RfpAnalysis) {
   ].join("\n");
 }
 
+export function rfpProposalOutlineMarkdown(analysis: RfpAnalysis, profile: Partial<BusinessProfile> = {}, responseNotes = "") {
+  const placeholders = businessProfilePlaceholderMap(profile);
+  const outline = analysis.proposalOutline;
+  const notes = responseNotes.trim();
+  const scoringRows = outline.scoringScheme.length
+    ? outline.scoringScheme.map((item) => `| ${escapeMarkdownTableCell(item.criterion)} | ${item.weight}${item.unit} | ${subCriterionForScoringItem(item.criterion)} | ${subWeightForScoringItem(item)} |`)
+    : ["| No explicit weights detected | Assumed equal | Major proposal sections | Equal split |"];
+  const pageRows = outline.pageAllocations.map((item) => `| ${escapeMarkdownTableCell(item.section)} | ${escapeMarkdownTableCell(item.pages)} | ${escapeMarkdownTableCell(item.basis)} |`);
+  const teamRows = outline.teamRequirements.length
+    ? outline.teamRequirements.map((item) => `| ${escapeMarkdownTableCell(item.role)} | ${escapeMarkdownTableCell(item.minimumExperience)} | *Name or TBC* | Source line ${item.sourceLine} |`)
+    : ["| Team Lead | *Confirm minimum requirements* | *Name or TBC* | RFP team scan |", "| Core Team | *Map roles to ToR activities* | *Names or TBC* | RFP team scan |"];
+  const annexRows = outline.annexes.length
+    ? outline.annexes.map((item) => `| ${escapeMarkdownTableCell(item.annex)} | ${escapeMarkdownTableCell(item.label || item.requirement)} | *Confirm page-limit treatment* | Source line ${item.sourceLine} |`)
+    : ["| Annexes | *List all required forms and schedules* | *Confirm page-limit treatment* | Manual review |"];
+  const passFailRows = outline.metadata.passFailCriteria.length
+    ? outline.metadata.passFailCriteria.map((item, index) => `| PF-${String(index + 1).padStart(2, "0")} | ${escapeMarkdownTableCell(item)} | *Map to proposal section or signed annex* |`)
+    : ["| PF-01 | No explicit automatic-exclusion wording detected | *Reviewer must inspect full RFP and add gates* |"];
+  const methodologyPages = pageAllocationFor(outline, "Proposed Methodology & Technical Approach", "4-5 pages");
+  const teamPages = pageAllocationFor(outline, "Team Organization & Key Personnel", "2-3 pages");
+  const orgPages = pageAllocationFor(outline, "Organizational Capacity & Past Performance", "2-3 pages");
+  const activities = outline.activities.length ? outline.activities : [{ label: "Activity 1 - RFP ToR activity", sourceLine: 0, placeholder: "Describe approach, tools, outputs" }];
+  const deliverables = outline.deliverables.length ? outline.deliverables : [{ label: "Deliverable register", sourceLine: 0, placeholder: "List reports, prototypes, handover assets" }];
+  const milestones = outline.timelineMilestones.length ? outline.timelineMilestones : [{ label: "Submission and delivery schedule", sourceLine: 0, placeholder: "Add deadline, milestones, approvals" }];
+  const technicalMandates = outline.technicalMandates.length ? outline.technicalMandates : ["[CLARIFICATION NEEDED: confirm open-source, interoperability, data-format, hosting, and API mandates]"];
+  const sustainability = outline.sustainabilityRequirements.length ? outline.sustainabilityRequirements : ["[CLARIFICATION NEEDED: confirm maintenance, handover, and post-project support obligations]"];
+  const riskQaKpis = outline.riskQaKpiRequirements.length ? outline.riskQaKpiRequirements : ["[CLARIFICATION NEEDED: confirm QA, testing, validation, risk, and KPI obligations]"];
+  return fillBusinessTemplate(
+    [
+      "---",
+      `title: ${yamlScalar(`Technical Proposal Outline for ${placeholders.defaultClientName}`)}`,
+      "status: outline",
+      "documentType: RFP technical proposal outline",
+      `company: ${yamlScalar(placeholders.companyName)}`,
+      `preparedBy: ${yamlScalar(placeholders.fullName)}`,
+      `rfpSource: ${yamlScalar(analysis.source.title)}`,
+      analysis.source.url ? `rfpUrl: ${yamlScalar(analysis.source.url)}` : "",
+      "toc: true",
+      "---",
+      "",
+      `# Technical Proposal Outline for ${placeholders.defaultClientName}`,
+      "",
+      businessDocumentSnippets[0].body,
+      "",
+      rfpComplianceChecklistMarkdown(analysis),
+      "",
+      "[TOC]",
+      "",
+      "## 1. RFP Metadata",
+      "",
+      `- Submission deadline: ${outline.metadata.submissionDeadline}`,
+      `- Page limit: ${outline.metadata.pageLimitSource}`,
+      `- Currency: ${outline.metadata.currency}`,
+      `- Evaluation model: ${outline.metadata.evaluationModel}`,
+      `- Pass/fail criteria: ${outline.metadata.passFailCriteria.length || "None explicitly detected; manual confirmation required"}`,
+      notes ? `- Bid context notes: ${notes}` : "",
+      "",
+      "## 2. Scoring Scheme and Page Allocation",
+      "",
+      "| Criterion | Weight | Sub-criterion | Sub-weight |",
+      "| --- | --- | --- | --- |",
+      ...scoringRows,
+      "",
+      "| Proposal section | Suggested pages | Basis |",
+      "| --- | --- | --- |",
+      ...pageRows,
+      "",
+      "## 3. Mandatory Pass/Fail Gates",
+      "",
+      "| Gate | Requirement | Where addressed |",
+      "| --- | --- | --- |",
+      ...passFailRows,
+      "",
+      "## 4. Terms of Reference Map",
+      "",
+      "### 4.1 Activities",
+      "",
+      ...activities.map((item, index) => `- ${index + 1}. ${item.label} - *${item.placeholder}*`),
+      "",
+      "### 4.2 Deliverables",
+      "",
+      ...deliverables.map((item) => `- ${item.label} - *${item.placeholder}*`),
+      "",
+      "### 4.3 Timeline Milestones and Approval Periods",
+      "",
+      ...milestones.map((item) => `- ${item.label} - *${item.placeholder}*`),
+      ...outline.approvalPeriods.map((item) => `- ${item.label} - *${item.placeholder}*`),
+      "",
+      "### 4.4 Required Annexes",
+      "",
+      "| Annex | Purpose | Page-limit treatment | Reference |",
+      "| --- | --- | --- | --- |",
+      ...annexRows,
+      "",
+      "## 5. Team Composition and Experience Requirements",
+      "",
+      "| Role | Minimum requirement | Proposed name | Reference |",
+      "| --- | --- | --- | --- |",
+      ...teamRows,
+      "",
+      "## 6. Technical Mandates",
+      "",
+      ...technicalMandates.map((item) => `- ${item}`),
+      "",
+      "## 7. Sustainability, Risk, QA, and KPI Signals",
+      "",
+      "### 7.1 Sustainability and Transition",
+      "",
+      ...sustainability.map((item) => `- ${item}`),
+      "",
+      "### 7.2 Risk, QA, Validation, and KPIs",
+      "",
+      ...riskQaKpis.map((item) => `- ${item}`),
+      "",
+      "## Technical Proposal Outline",
+      "",
+      `### 1. Executive Summary (${pageAllocationFor(outline, "Executive Summary", "0.5 page")})`,
+      "- *High-level value proposition*",
+      "- *Mandatory-gate coverage statement*",
+      "- *Approach and differentiators*",
+      "",
+      `### 2. Assignment Understanding & Delivery Approach (${pageAllocationFor(outline, "Assignment Understanding & Delivery Approach", "1 page")})`,
+      "- *Context and buyer challenges*",
+      "- *Delivery principles and win themes*",
+      "- *Stated and implied intent response*",
+      "",
+      `### 3. Proposed Methodology & Technical Approach (${methodologyPages})`,
+      ...activities.map((item, index) => `#### 3.${index + 1} ${item.label}\n- *${item.placeholder}*`),
+      `#### 3.${activities.length + 1} Technology & Standards Summary`,
+      "- *Open-source, interoperability, APIs, data formats, hosting constraints*",
+      "",
+      `### 4. Work Plan & Timeline (${pageAllocationFor(outline, "Work Plan & Timeline", "1 page")})`,
+      "- *Milestone table or Gantt summary*",
+      "- *Approval periods and dependencies*",
+      "- *Annex D reference*",
+      "",
+      `### 5. Team Organization & Key Personnel (${teamPages})`,
+      "- *Team Lead mandatory evidence*",
+      "- *Responsibility matrix: Role | Name/TBC | ToR activity | Key qualifications*",
+      outline.teamRequirements.some((item) => /consortium|subcontract|partner/i.test(item.role)) ? "- *Consortium Management: roles, interfaces, accountability*" : "- *Specialist support and partner roles if applicable*",
+      "",
+      `### 6. Organizational Capacity & Past Performance (${orgPages})`,
+      "- *Firm profile*",
+      "- *Relevant project summaries*",
+      "- *Financial capacity and references*",
+      "",
+      `### 7. Open Data, Licensing & Governance Statement (${pageAllocationFor(outline, "Open Data, Licensing & Governance Statement", "0.5-1 page")})`,
+      "- *License proposals for data, code, documentation*",
+      "- *Governance model and contributor workflow*",
+      "",
+      `### 8. Risk Management & Mitigation (${pageAllocationFor(outline, "Risk Management & Mitigation", "0.5 page")})`,
+      "- *Top risks and mitigations table*",
+      "",
+      `### 9. Quality Assurance & Monitoring (${pageAllocationFor(outline, "Quality Assurance & Monitoring", "0.5 page")})`,
+      "- *KPIs and acceptance checks*",
+      "- *Testing, validation, feedback loops*",
+      "",
+      `### 10. Sustainability & Transition Plan (${pageAllocationFor(outline, "Sustainability & Transition Plan", "0.5-1 page")})`,
+      "- *Hosting, maintenance, post-project support*",
+      "- *Handover deliverables and runbooks*",
+      "",
+      `### 11. Compliance Summary Table (${pageAllocationFor(outline, "Compliance Summary Table", "1 page")})`,
+      "- *Map each mandatory requirement to section or annex*",
+      "",
+      "### 12. Required Annexes (not counted unless RFP says otherwise)",
+      ...outline.annexes.map((item) => `- ${item.annex} - *${item.label || "Confirm title and format"}*`),
+      outline.annexes.length ? "" : "- *Annex B/C/D/E/F/H and any buyer forms after source confirmation*",
+      "",
+      "## Critical Disqualifiers Checklist",
+      "",
+      ...criticalChecklistRows(analysis.complianceChecklist).map((item) => `- [ ] ${item.id}: ${item.requirement} - *${item.verification}*`),
+      criticalChecklistRows(analysis.complianceChecklist).length ? "" : "- [ ] No explicit automatic-exclusion wording detected - *manual source review required*",
+      "",
+      "<!-- ai-assisted: status=outline-needs-approval | source=NEditor RFP Proposal Outline Wizard | promptSummary=Extract metadata, scoring, pass/fail gates, ToR, team, technical mandates, sustainability, risk, QA, and page-aware proposal outline before section drafting -->",
+    ].filter(Boolean).join("\n"),
+    profile,
+  );
+}
+
+export function rfpProposalOutlineBullets(analysis: RfpAnalysis) {
+  const outline = analysis.proposalOutline;
+  const activities = outline.activities.length ? outline.activities : [{ label: "Activity 1 - RFP ToR activity", sourceLine: 0, placeholder: "Describe approach, tools, outputs" }];
+  return [
+    "- Executive Summary",
+    "- Assignment Understanding & Delivery Approach",
+    "- Proposed Methodology & Technical Approach",
+    ...activities.map((item) => `  - ${item.label}`),
+    "  - Technology & Standards Summary",
+    "- Work Plan & Timeline",
+    "- Team Organization & Key Personnel",
+    "  - Team Lead",
+    "  - Core Team",
+    "  - Specialist Support / Consortium Partners",
+    "- Organizational Capacity & Past Performance",
+    "- Open Data, Licensing & Governance Statement",
+    "- Risk Management & Mitigation",
+    "- Quality Assurance & Monitoring",
+    "- Sustainability & Transition Plan",
+    "- Compliance Summary Table",
+    "- Required Annexes",
+    "- Critical Disqualifiers Checklist",
+  ].join("\n");
+}
+
 export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<BusinessProfile> = {}, responseNotes = "") {
   const placeholders = businessProfilePlaceholderMap(profile);
   const title = `RFP response for ${placeholders.defaultClientName}`;
@@ -1155,7 +1405,13 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "",
       businessDocumentSnippets[0].body,
       "",
+      rfpComplianceChecklistMarkdown(analysis),
+      "",
       "[TOC]",
+      "",
+      "## Proposal Outline",
+      "",
+      rfpProposalOutlineBullets(analysis),
       "",
       "## Executive Response",
       "",
@@ -1186,8 +1442,6 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "### Implied Intent",
       "",
       impliedIntentBullets,
-      "",
-      rfpComplianceChecklistMarkdown(analysis),
       "",
       rfpComplianceMatrixMarkdown(analysis),
       "",
@@ -1389,6 +1643,202 @@ function extractRfpComplianceChecklist(input: {
   }
 
   return rows;
+}
+
+function buildRfpProposalOutline(input: {
+  lines: Array<{ line: string; index: number }>;
+  requirements: RfpRequirement[];
+  complianceRows: RfpComplianceRow[];
+  scoringWeights: RfpScoringWeight[];
+  annexReferences: RfpAnnexReference[];
+  bilingualRequirements: string[];
+  criticalDisqualifiers: string[];
+}): RfpProposalOutline {
+  const pageLimit = extractRfpPageLimit(input.lines);
+  const metadata: RfpProposalMetadata = {
+    submissionDeadline: extractRfpSubmissionDeadline(input.lines),
+    pageLimit: pageLimit.pages,
+    pageLimitSource: pageLimit.source,
+    currency: extractRfpCurrency(input.lines),
+    evaluationModel: inferRfpEvaluationModel(input.lines, input.scoringWeights),
+    passFailCriteria: input.criticalDisqualifiers.length
+      ? input.criticalDisqualifiers
+      : input.complianceRows.filter((row) => row.disqualificationRisk || row.requirementType === "MANDATORY").slice(0, 10).map((row) => `${row.id}: ${row.text}`),
+  };
+  const activities = extractRfpOutlineItems(
+    input.lines,
+    /\b(activity|task|work package|workstream|phase)\s*(\d+|[ivx]+|[a-z])?\b/i,
+    "Describe approach, tools, outputs",
+    10,
+  );
+  const deliverables = extractRfpOutlineItems(
+    input.lines,
+    /\b(deliverable|output|report|prototype|platform|manual|training material|workshop|source code|handover)\b/i,
+    "Define output, acceptance criteria, owner, and evidence",
+    12,
+  );
+  const timelineMilestones = extractRfpOutlineItems(
+    input.lines,
+    /\b(month\s*\d+|week\s*\d+|\d+\s*(?:days?|weeks?|months?)|milestone|deadline|submission|inception|prototype|final)\b/i,
+    "Map milestone, dependency, approval date, and responsible role",
+    12,
+  );
+  const approvalPeriods = extractRfpOutlineItems(
+    input.lines,
+    /\b(approval|review period|acceptance|client review|steering committee|sign[- ]off)\b/i,
+    "Show review window, decision owner, dependency, and fallback",
+    8,
+  );
+  const teamRequirements = extractRfpTeamRequirements(input.lines, input.bilingualRequirements);
+  const technicalMandates = extractMatchingLines(
+    input.lines,
+    /\b(open[- ]source|license|licence|interoperab|standard|api|ogc|wms|wfs|openapi|netcdf|geojson|postgis|postgres|python|react|cloud|on[- ]prem|hosting|integration|data format|source code|repository)\b/i,
+    14,
+  );
+  const sustainabilityRequirements = extractMatchingLines(
+    input.lines,
+    /\b(sustainab|maintenance|maintain|roadmap|handover|transition|post[- ]project|support|operations|runbook|knowledge transfer|capacity building)\b/i,
+    10,
+  );
+  const riskQaKpiRequirements = extractMatchingLines(
+    input.lines,
+    /\b(risk|mitigation|quality assurance|qa\b|testing|validation|pilot|kpi|key performance|monitoring|completion rate|trained|users|acceptance criteria)\b/i,
+    12,
+  );
+  return {
+    metadata,
+    scoringScheme: input.scoringWeights,
+    activities,
+    deliverables,
+    timelineMilestones,
+    approvalPeriods,
+    annexes: input.annexReferences,
+    teamRequirements,
+    technicalMandates,
+    sustainabilityRequirements,
+    riskQaKpiRequirements,
+    pageAllocations: buildRfpPageAllocations(pageLimit.pages, input.scoringWeights),
+  };
+}
+
+function extractRfpSubmissionDeadline(lines: Array<{ line: string; index: number }>) {
+  const deadlineLine = lines.find((item) => /\b(submission deadline|deadline for submission|due no later than|closing date|close date|proposals? due|submit.*by)\b/i.test(item.line));
+  if (!deadlineLine) return "Not specified - confirm deadline, time, and time zone";
+  const dateMatch = deadlineLine.line.match(/\b(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+\s+\d{4}|[A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})(?:[,\s]+(?:at\s*)?(\d{1,2}:\d{2}\s*(?:am|pm|AM|PM)?|\d{1,2}\s*(?:am|pm|AM|PM)))?/);
+  return dateMatch ? `${dateMatch[0]} (source line ${deadlineLine.index})` : `${stripRequirementPrefix(deadlineLine.line)} (source line ${deadlineLine.index})`;
+}
+
+function extractRfpPageLimit(lines: Array<{ line: string; index: number }>) {
+  for (const item of lines) {
+    const match = item.line.match(/\b(?:maximum|limit(?:ed)? to|not exceed|no more than)\s+(\d{1,3})\s+pages?\b/i) || item.line.match(/\b(\d{1,3})\s+page\s+(?:limit|maximum)\b/i);
+    if (match) {
+      const pages = Number(match[1]);
+      if (Number.isFinite(pages) && pages > 0) return { pages, source: `${pages} pages (source line ${item.index})` };
+    }
+  }
+  return { pages: 15, source: "Not specified - assume 15 pages" };
+}
+
+function extractRfpCurrency(lines: Array<{ line: string; index: number }>) {
+  const currencyLine = lines.find((item) => /\b(currency|financial proposal|pricing|price|cost|budget|usd|eur|gbp|kes|cad|aud|\$|€|£)\b/i.test(item.line));
+  if (!currencyLine) return "Not specified";
+  const symbol = currencyLine.line.match(/\b(USD|EUR|GBP|KES|CAD|AUD|ZAR|CHF|JPY)\b|[$€£]/i)?.[0];
+  if (!symbol) return `Not explicit; pricing line ${currencyLine.index} needs review`;
+  const map: Record<string, string> = { "$": "USD or local dollar - confirm", "€": "EUR", "£": "GBP" };
+  return map[symbol] || symbol.toUpperCase();
+}
+
+function inferRfpEvaluationModel(lines: Array<{ line: string; index: number }>, scoringWeights: RfpScoringWeight[]) {
+  const explicit = lines.find((item) => /\b(QCBS|quality and cost|least cost|LCS|fixed budget|FBS|best value|technical and financial|quality[- ]based)\b/i.test(item.line));
+  if (explicit) return `${stripRequirementPrefix(explicit.line)} (source line ${explicit.index})`;
+  const technical = scoringWeights.filter((item) => /technical|methodology|team|experience|approach|quality/i.test(item.criterion)).reduce((sum, item) => sum + item.weight, 0);
+  const cost = scoringWeights.filter((item) => /price|cost|financial|commercial/i.test(item.criterion)).reduce((sum, item) => sum + item.weight, 0);
+  if (technical && cost) return `Inferred QCBS / technical-financial scoring (${technical}:${cost} by detected weights)`;
+  if (technical) return "Inferred quality-based evaluation from technical scoring weights";
+  return "Not explicit - infer after confirming evaluation weights";
+}
+
+function extractRfpOutlineItems(lines: Array<{ line: string; index: number }>, pattern: RegExp, placeholder: string, limit: number): RfpProposalActivity[] {
+  const seen = new Set<string>();
+  const items: RfpProposalActivity[] = [];
+  for (const item of lines) {
+    if (!pattern.test(item.line)) continue;
+    const label = stripRequirementPrefix(item.line).replace(/\s+/g, " ").trim();
+    const key = label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 120);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    items.push({ label, sourceLine: item.index, placeholder });
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
+function extractRfpTeamRequirements(lines: Array<{ line: string; index: number }>, bilingualRequirements: string[]) {
+  const teamLines = extractRfpOutlineItems(
+    lines,
+    /\b(team lead|project manager|architect|expert|specialist|analyst|engineer|consultant|personnel|staff|role|cv|curriculum|experience|years?|degree|certification|multidisciplinary|consortium|subcontract)\b/i,
+    "Map role to ToR activity and attach CV evidence",
+    14,
+  );
+  const output: RfpProposalTeamRequirement[] = teamLines.map((item) => {
+    const role = normalizeWhitespace(item.label.match(/\b([A-Z][A-Za-z /&-]*(?:Lead|Manager|Architect|Expert|Specialist|Analyst|Engineer|Consultant|Team|Consortium|Subcontractor))\b/)?.[1] || item.label.split(/[;:|.]/)[0] || "Required role");
+    const minimumExperience = item.label.match(/\b(\d+\+?\s+years?[^.;|]*)/i)?.[1] || (/\bdegree|certif|minimum|required|must|shall/i.test(item.label) ? item.label : "Confirm minimum experience and credentials");
+    return { role, minimumExperience: normalizeWhitespace(minimumExperience), sourceLine: item.sourceLine };
+  });
+  if (bilingualRequirements.length && !output.some((item) => /language|bilingual|french/i.test(item.role))) {
+    output.push({ role: "Bilingual EN/FR delivery capability", minimumExperience: "Confirm French/English workshop, training-material, and review coverage", sourceLine: 0 });
+  }
+  return output.slice(0, 14);
+}
+
+function buildRfpPageAllocations(totalPages: number, weights: RfpScoringWeight[]) {
+  const base = [
+    { section: "Executive Summary", pages: "0.5", basis: "Front matter and win theme" },
+    { section: "Assignment Understanding & Delivery Approach", pages: "1", basis: "Buyer context and stated/implied intent" },
+    { section: "Proposed Methodology & Technical Approach", pages: "4-5", basis: "Default largest technical scoring section" },
+    { section: "Work Plan & Timeline", pages: "1", basis: "Milestones, approvals, and Gantt reference" },
+    { section: "Team Organization & Key Personnel", pages: "2-3", basis: "Default team and CV scoring section" },
+    { section: "Organizational Capacity & Past Performance", pages: "2-3", basis: "Default experience and firm capability section" },
+    { section: "Open Data, Licensing & Governance Statement", pages: "0.5-1", basis: "Technical mandate coverage" },
+    { section: "Risk Management & Mitigation", pages: "0.5", basis: "Risk controls" },
+    { section: "Quality Assurance & Monitoring", pages: "0.5", basis: "QA and KPI coverage" },
+    { section: "Sustainability & Transition Plan", pages: "0.5-1", basis: "Handover and operating model" },
+    { section: "Compliance Summary Table", pages: "1", basis: "Mandatory requirement traceability" },
+  ];
+  if (!weights.length) return base.map((item) => ({ ...item, basis: `${item.basis}; no explicit weights, ${totalPages}-page assumed cap` }));
+  return base.map((item) => {
+    const matchingWeight = weights.find((weight) => sectionMatchesWeight(item.section, weight.criterion));
+    if (!matchingWeight) return item;
+    const pages = Math.max(0.5, Math.round(totalPages * (matchingWeight.weight / 100) * 2) / 2);
+    return { ...item, pages: `${pages}`, basis: `${matchingWeight.weight}${matchingWeight.unit} detected for ${matchingWeight.criterion}` };
+  });
+}
+
+function sectionMatchesWeight(section: string, criterion: string) {
+  const haystack = `${section} ${criterion}`.toLowerCase();
+  if (/method|approach|technical/.test(haystack) && /method|approach|technical|solution/.test(criterion.toLowerCase())) return true;
+  if (/team|personnel|key/.test(haystack) && /team|personnel|key|staff|experience/.test(criterion.toLowerCase())) return true;
+  if (/capacity|past performance|experience/.test(haystack) && /experience|past|capacity|reference/.test(criterion.toLowerCase())) return true;
+  if (/work plan|timeline/.test(haystack) && /work plan|timeline|schedule/.test(criterion.toLowerCase())) return true;
+  return false;
+}
+
+function pageAllocationFor(outline: RfpProposalOutline, section: string, fallback: string) {
+  return outline.pageAllocations.find((item) => item.section === section)?.pages || fallback;
+}
+
+function subCriterionForScoringItem(criterion: string) {
+  const clean = normalizeWhitespace(criterion);
+  if (/\bmethod|approach|technical\b/i.test(clean)) return "*Understanding, methodology, work plan*";
+  if (/\bteam|personnel|lead\b/i.test(clean)) return "*Team Lead, role fit, CV evidence*";
+  if (/\bexperience|past|capacity\b/i.test(clean)) return "*Relevant projects, references, firm capacity*";
+  if (/\bprice|cost|financial\b/i.test(clean)) return "*Financial proposal; separate response if required*";
+  return "*Confirm sub-criteria in RFP*";
+}
+
+function subWeightForScoringItem(item: RfpScoringWeight) {
+  if (item.weight >= 15) return "*Split across detected sub-criteria*";
+  return `${item.weight}${item.unit}`;
 }
 
 function sectionPromptForHeading(heading: string) {

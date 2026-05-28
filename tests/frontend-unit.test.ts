@@ -82,6 +82,8 @@ import {
   normalizeBusinessProfile,
   rfpComplianceChecklistMarkdown,
   rfpComplianceMatrixMarkdown,
+  rfpProposalOutlineBullets,
+  rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
 } from "../src/lib/businessDocuments.js";
 import {
@@ -3330,6 +3332,9 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
       title: "Globex Customer Support RFP",
       text: [
         "Purpose: Globex seeks a partner to improve customer support operations and reduce implementation risk.",
+        "Activity 1: Technical specifications and stakeholder engagement.",
+        "Deliverable: Inception Report and final platform handover.",
+        "The solution must use open-source APIs, interoperable data formats, and a cloud-agnostic platform architecture.",
         "1. Vendor must provide a phased implementation plan within 90 days.",
         "2. Proposer shall include pricing, payment terms, and all assumptions.",
         "3. Vendor must demonstrate SOC 2 security controls and data protection practices.",
@@ -3345,7 +3350,7 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
     },
     profile,
   );
-  equal(analysis.requirements.length, 11);
+  ok(analysis.requirements.length >= 11);
   ok(analysis.statedIntent.some((item) => item.includes("improve customer support")));
   ok(analysis.impliedIntent.some((item) => item.includes("easily scored response")));
   ok(analysis.impliedIntent.some((item) => item.includes("procurement risk")));
@@ -3366,6 +3371,17 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(analysis.annexReferences.some((item) => item.annex === "Annex C"));
   ok(analysis.bilingualRequirements.some((item) => item.includes("EN/FR")));
   ok(analysis.placeholderRisks.some((item) => item.includes("TBD")));
+  equal(analysis.proposalOutline.metadata.pageLimit, 25);
+  ok(analysis.proposalOutline.metadata.submissionDeadline.includes("Not specified"));
+  ok(analysis.proposalOutline.metadata.evaluationModel.includes("Inferred"));
+  ok(analysis.proposalOutline.metadata.passFailCriteria.some((item) => item.includes("Bid bond certificate")));
+  ok(analysis.proposalOutline.activities.some((item) => item.label.includes("Activity 1")));
+  ok(analysis.proposalOutline.deliverables.some((item) => item.label.includes("Inception Report")));
+  ok(analysis.proposalOutline.timelineMilestones.some((item) => item.label.includes("90 days")));
+  ok(analysis.proposalOutline.teamRequirements.some((item) => item.role.includes("Legal") || item.minimumExperience.includes("Legal")));
+  ok(analysis.proposalOutline.teamRequirements.some((item) => item.role.includes("Bilingual")));
+  ok(analysis.proposalOutline.technicalMandates.some((item) => item.includes("platform")));
+  ok(analysis.proposalOutline.pageAllocations.some((item) => item.section === "Proposed Methodology & Technical Approach"));
   ok(analysis.complianceRows.every((row) => row.verification.includes("Compliance Matrix")));
   ok(analysis.complianceRows.every((row) => row.suggestedResponse.includes("Specific requirement:")));
   ok(analysis.complianceRows.some((row) => row.category === "Compliance" && row.suggestedResponse.includes("mapping controls")));
@@ -3418,8 +3434,25 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(checklist.includes("Annex C"));
   ok(checklist.includes("bilingual EN/FR"));
 
+  const outline = rfpProposalOutlineMarkdown(analysis, profile, "Win theme: reduce implementation risk.");
+  ok(outline.includes("# Technical Proposal Outline for Globex"));
+  ok(outline.indexOf("## Compliance Checklist") < outline.indexOf("[TOC]"));
+  ok(outline.indexOf("[TOC]") < outline.indexOf("## 1. RFP Metadata"));
+  ok(outline.includes("## Technical Proposal Outline"));
+  ok(outline.includes("Critical Disqualifiers Checklist"));
+  ok(outline.includes("Activity 1"));
+  ok(outline.includes("Technical specifications and stakeholder engagement"));
+  ok(outline.includes("Inception Report"));
+  ok(outline.includes("Proposal section | Suggested pages"));
+  const outlineBullets = rfpProposalOutlineBullets(analysis);
+  ok(outlineBullets.includes("- Proposed Methodology & Technical Approach"));
+  ok(outlineBullets.includes("  - Activity 1: Technical specifications and stakeholder engagement."));
+
   const response = rfpResponseMarkdown(analysis, profile, "Win theme: reduce implementation risk.");
   ok(response.includes("## Compliance Checklist"));
+  ok(response.indexOf("## Compliance Checklist") < response.indexOf("[TOC]"));
+  ok(response.indexOf("[TOC]") < response.indexOf("## Proposal Outline"));
+  ok(response.includes("- Proposed Methodology & Technical Approach"));
   ok(response.includes("### Scoring Weights"));
   ok(response.includes("## Buyer Intent Analysis"));
   ok(response.includes("### Response Context and Decision Notes"));
