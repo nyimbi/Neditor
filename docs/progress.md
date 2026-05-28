@@ -27,6 +27,21 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Two-Way Table Editing Refresh
+
+Refreshed focused proof for the user's table-editing requirement. NEditor
+already supports the two-way flow: users can create a table visually, insert a
+draft as editable Markdown text, select and edit an existing pipe-table source
+range in the main editor, keep valid text edits synced into the visual grid,
+apply source-block edits back into the document, write grid edits back to the
+Markdown source, export valid edited source text to CSV, and edit a single cell
+directly in the Markdown row under the cursor.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit -- --runInBand` | Pass | 87 frontend unit/static tests passed, including table source snapshot recovery, direct document-text resync, two-way status state, cursor-cell text replacement, edited-source export selection, row/column mutation, sorting, formulas, spans, and static command/menu wiring. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow passed on 2026-05-28, proving table creation, direct Markdown source edits, text-to-grid sync, source-text apply, edited-source CSV export, exact source range selection, typed Markdown table loading, and direct cell-to-text editing. |
+
 ## 2026-05-28 Transform Architecture Closure
 
 `10.1 Architecture | Registry, option validation, artifact cache, diagnostics`
