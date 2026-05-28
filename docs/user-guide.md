@@ -436,6 +436,10 @@ Research and business documents can keep reference metadata near the source.
   issue, pages, DOI, and URL fields are shown before export.
 - Import CSL JSON as a root array, a single item, or an object with `items`,
   `references`, `bibliography`, or `data`.
+- Deep Research report handoffs append CSL JSON records for any missing source
+  keys even when the AI draft already contains an empty or partial bibliography
+  fence, then add the source citation index, `[BIBLIOGRAPHY]` marker, evidence
+  log, and source-library audit when available.
 - Choose `title`, `author-year`, `key`, `numeric`, or a common CSL alias such
   as `apa`, `chicago-author-date`, `ieee`, or `vancouver` from front matter,
   preferences, or the references panel.

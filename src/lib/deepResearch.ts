@@ -337,11 +337,14 @@ function appendDeepResearchEvidenceSections(
   iterations: DeepResearchIteration[],
   options: DeepResearchDocumentOptions,
 ) {
-  const bibliography = deepResearchBibliographyMarkdown(iterations, options.bibliographySources);
-  const withBibliographyEntries = !bibliography || hasBibliographyEntries(markdown)
+  const bibliographyRecords = deepResearchBibliographyRecords(iterations, options.bibliographySources);
+  const missingBibliography = deepResearchBibliographyMarkdownFromRecords(
+    missingDeepResearchBibliographyRecords(markdown, bibliographyRecords),
+  );
+  const withBibliographyEntries = !missingBibliography
     ? markdown
-    : `${markdown.trim()}\n\n${bibliography}`;
-  const citationIndex = deepResearchCitationIndexMarkdown(iterations, options.bibliographySources);
+    : `${markdown.trim()}\n\n${missingBibliography}`;
+  const citationIndex = deepResearchCitationIndexMarkdownFromRecords(bibliographyRecords);
   const withCitationIndex = !citationIndex || hasDeepResearchCitationIndex(withBibliographyEntries)
     ? withBibliographyEntries
     : `${withBibliographyEntries.trim()}\n\n## Source Citation Index\n\n${citationIndex}`;
@@ -361,16 +364,23 @@ export function deepResearchBibliographyMarkdown(
   iterations: DeepResearchIteration[],
   savedSources: DeepResearchBibliographySource[] = [],
 ) {
-  const entries = deepResearchBibliographyRecords(iterations, savedSources).map((record) => record.entry);
-  if (!entries.length) return "";
-  return ["```bibliography", JSON.stringify(entries, null, 2), "```", ""].join("\n");
+  return deepResearchBibliographyMarkdownFromRecords(deepResearchBibliographyRecords(iterations, savedSources));
 }
 
 export function deepResearchCitationIndexMarkdown(
   iterations: DeepResearchIteration[],
   savedSources: DeepResearchBibliographySource[] = [],
 ) {
-  const records = deepResearchBibliographyRecords(iterations, savedSources);
+  return deepResearchCitationIndexMarkdownFromRecords(deepResearchBibliographyRecords(iterations, savedSources));
+}
+
+function deepResearchBibliographyMarkdownFromRecords(records: DeepResearchBibliographyRecord[]) {
+  const entries = records.map((record) => record.entry);
+  if (!entries.length) return "";
+  return ["```bibliography", JSON.stringify(entries, null, 2), "```", ""].join("\n");
+}
+
+function deepResearchCitationIndexMarkdownFromRecords(records: DeepResearchBibliographyRecord[]) {
   if (!records.length) return "";
   return [
     "| Citation | Source | Evidence | Local copy |",
@@ -670,10 +680,16 @@ function bibliographySourcesForDocument(
   return Array.from(byUrl.values());
 }
 
+interface DeepResearchBibliographyRecord {
+  citationKey: string;
+  source: DeepResearchBibliographySource;
+  entry: Record<string, unknown>;
+}
+
 function deepResearchBibliographyRecords(
   iterations: DeepResearchIteration[],
   savedSources: DeepResearchBibliographySource[] = [],
-) {
+): DeepResearchBibliographyRecord[] {
   const bibliographySources = bibliographySourcesForDocument(iterations, savedSources);
   const usedKeys = new Set<string>();
   return bibliographySources.map((source, index) => {
@@ -690,6 +706,40 @@ function deepResearchBibliographyRecords(
     if (note) entry.note = note;
     return { citationKey, source, entry };
   });
+}
+
+function missingDeepResearchBibliographyRecords(
+  markdown: string,
+  records: DeepResearchBibliographyRecord[],
+) {
+  if (!records.length) return [];
+  const blocks = bibliographyFenceBlocks(markdown);
+  if (!blocks.length) return records;
+  return records.filter(
+    (record) => !blocks.some((block) => bibliographyBlockContainsKey(block, record.citationKey)),
+  );
+}
+
+function bibliographyFenceBlocks(markdown: string) {
+  const blocks: string[] = [];
+  const fencePattern = /^(```|~~~)(?:bibliography|bibtex|hayagriva)\b[^\n]*\r?\n([\s\S]*?)^\1\s*$/gim;
+  for (const match of markdown.matchAll(fencePattern)) {
+    blocks.push(match[2] || "");
+  }
+  return blocks;
+}
+
+function bibliographyBlockContainsKey(block: string, key: string) {
+  const escaped = escapeRegExp(key);
+  return [
+    new RegExp(`"id"\\s*:\\s*"${escaped}"`),
+    new RegExp(`@\\w+\\s*[({]\\s*${escaped}\\s*,`, "i"),
+    new RegExp(`^\\s*${escaped}\\s*:`, "m"),
+  ].some((pattern) => pattern.test(block));
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function uniqueBibliographyKey(
@@ -788,10 +838,6 @@ function hasDeepResearchEvidenceLog(markdown: string) {
 
 function hasDeepResearchCitationIndex(markdown: string) {
   return /^##\s+Source Citation Index\b/im.test(markdown);
-}
-
-function hasBibliographyEntries(markdown: string) {
-  return /^(```|~~~)(?:bibliography|bibtex|hayagriva)\b/im.test(markdown);
 }
 
 function hasBibliographyMarker(markdown: string) {

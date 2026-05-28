@@ -4967,6 +4967,75 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ok(standalone.includes("## Deep Research Evidence Log"));
   ok(standalone.includes("## Source Library Audit"));
 
+  const standaloneWithEmptyBibliography = deepResearchDocumentMarkdown(
+    settings,
+    "# Draft\n\n```bibliography\n[]\n```\n\nBody with source review.",
+    [
+      {
+        index: 1,
+        query: "AI procurement controls policy",
+        summary: "Initial source review.",
+        gaps: [],
+        results: [
+          {
+            title: "Policy Evidence",
+            url: "https://agency.gov/policy.pdf",
+            snippet: "Controls policy.",
+            source: "DuckDuckGo",
+          },
+        ],
+      },
+    ],
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+      bibliographySources: [
+        {
+          citation_key: "agency2026",
+          title: "Policy Evidence",
+          url: "https://agency.gov/policy.pdf",
+          snippet: "Controls policy.",
+          source: "DuckDuckGo",
+        },
+      ],
+    },
+  );
+  equal((standaloneWithEmptyBibliography.match(/```bibliography/g) || []).length, 2);
+  ok(standaloneWithEmptyBibliography.includes('"id": "agency2026"'));
+
+  const standaloneWithExistingSourceBibliography = deepResearchDocumentMarkdown(
+    settings,
+    '# Draft\n\n```bibliography\n[{ "id": "agency2026", "type": "webpage", "title": "Policy Evidence", "URL": "https://agency.gov/policy.pdf" }]\n```\n\nBody with source review.',
+    [
+      {
+        index: 1,
+        query: "AI procurement controls policy",
+        summary: "Initial source review.",
+        gaps: [],
+        results: [
+          {
+            title: "Policy Evidence",
+            url: "https://agency.gov/policy.pdf",
+            snippet: "Controls policy.",
+            source: "DuckDuckGo",
+          },
+        ],
+      },
+    ],
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+      bibliographySources: [
+        {
+          citation_key: "agency2026",
+          title: "Policy Evidence",
+          url: "https://agency.gov/policy.pdf",
+          snippet: "Controls policy.",
+          source: "DuckDuckGo",
+        },
+      ],
+    },
+  );
+  equal((standaloneWithExistingSourceBibliography.match(/"id"\s*:\s*"agency2026"/g) || []).length, 1);
+
   const reviewPackage = deepResearchReviewPackageMarkdown(
     settings,
     "# Draft\n\nBody with source review. [@agency2026]",
