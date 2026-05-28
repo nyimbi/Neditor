@@ -1,5 +1,7 @@
 use crate::{
-    diagnostics::diag, document_ast::AstSourceRange, front_matter::strip_front_matter,
+    diagnostics::{diag, with_range},
+    document_ast::AstSourceRange,
+    front_matter::strip_front_matter,
     path_to_string, DocumentDiagnostic, IncludeEdge, SourceMapEntry,
 };
 use std::{
@@ -43,11 +45,13 @@ pub(crate) fn expand_includes(
             let child = base_dir.join(include_target);
             let canonical = child.canonicalize().unwrap_or(child.clone());
             if visited.contains(&canonical) {
-                let mut diagnostic = diag(
+                let mut diagnostic = include_diagnostic_for_target(
                     "error",
                     "Circular include detected.",
-                    Some(source_file.to_string()),
-                    Some(line_index + 1),
+                    source_file,
+                    line_index + 1,
+                    line,
+                    include_target,
                     Some("Remove the cycle or include a different file."),
                 );
                 diagnostic
@@ -60,11 +64,13 @@ pub(crate) fn expand_includes(
                 continue;
             }
             if !child.exists() {
-                let mut diagnostic = diag(
+                let mut diagnostic = include_diagnostic_for_target(
                     "error",
                     format!("Missing include file: {}", child.display()),
-                    Some(source_file.to_string()),
-                    Some(line_index + 1),
+                    source_file,
+                    line_index + 1,
+                    line,
+                    include_target,
                     Some("Create the file or update the include path."),
                 );
                 diagnostic
@@ -109,11 +115,13 @@ pub(crate) fn expand_includes(
                     visited.remove(&canonical);
                 }
                 Err(err) => {
-                    let mut diagnostic = diag(
+                    let mut diagnostic = include_diagnostic_for_target(
                         "error",
                         format!("Unable to read include file: {err}"),
-                        Some(source_file.to_string()),
-                        Some(line_index + 1),
+                        source_file,
+                        line_index + 1,
+                        line,
+                        include_target,
                         Some("Check file permissions."),
                     );
                     diagnostic
@@ -143,6 +151,36 @@ pub(crate) fn expand_includes(
 fn push_unmapped_expanded_text(output: &mut String, generated_line_count: &mut usize, text: &str) {
     output.push_str(text);
     *generated_line_count += text.chars().filter(|ch| *ch == '\n').count();
+}
+
+fn include_diagnostic_for_target(
+    severity: &str,
+    message: impl Into<String>,
+    source_file: &str,
+    line_number: usize,
+    source_line: &str,
+    include_target: &str,
+    suggestion: Option<&str>,
+) -> DocumentDiagnostic {
+    let diagnostic = diag(
+        severity,
+        message,
+        Some(source_file.to_string()),
+        Some(line_number),
+        suggestion,
+    );
+    if let Some((column, end_column)) = include_target_range(source_line, include_target) {
+        return with_range(diagnostic, column, Some(line_number), end_column);
+    }
+    diagnostic
+}
+
+fn include_target_range(source_line: &str, include_target: &str) -> Option<(usize, usize)> {
+    if include_target.is_empty() {
+        return None;
+    }
+    let start = source_line.find(include_target)? + 1;
+    Some((start, start + include_target.len()))
 }
 
 pub(crate) fn parse_include_directive(line: &str) -> Option<&str> {

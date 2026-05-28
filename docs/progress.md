@@ -27,6 +27,18 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Include Diagnostic Range Tightening
+
+`7.3 Diagnostics` is still partial, but the include diagnostic family is now
+more precise. Missing, circular, and unreadable include diagnostics range the
+exact include target path in the source directive instead of only naming the
+directive line, while preserving the existing source file, suggestion, and
+related target/path context.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked include --lib` | Pass | 13 include-filtered Rust tests passed, including missing include, circular include, unreadable include, documented include forms, include graph, duplicate include basename, duplicate relative media, and related export/include behavior. |
+
 ## 2026-05-28 Validation Closure
 
 `9.20 Validation | One-click prepare report across metadata/includes/

@@ -1279,6 +1279,15 @@ fn compiler_reports_missing_include_without_panicking() {
             diagnostic.severity == "error" && diagnostic.message.contains("Missing include file")
         })
         .expect("missing include diagnostic");
+    assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(diagnostic.line, Some(1));
+    assert_eq!(diagnostic.column, Some(10));
+    assert_eq!(diagnostic.end_line, Some(1));
+    assert_eq!(diagnostic.end_column, Some(28));
+    assert!(diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("Create the file")));
     assert!(diagnostic
         .related
         .iter()
@@ -1316,6 +1325,14 @@ fn compiler_reports_circular_and_too_deep_includes() {
         cycle_diagnostic.source_file.as_deref(),
         Some(path_to_string(&cycle_dir.join("b.md")).as_str())
     );
+    assert_eq!(cycle_diagnostic.line, Some(2));
+    assert_eq!(cycle_diagnostic.column, Some(10));
+    assert_eq!(cycle_diagnostic.end_line, Some(2));
+    assert_eq!(cycle_diagnostic.end_column, Some(14));
+    assert!(cycle_diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("Remove the cycle")));
     assert!(cycle_diagnostic
         .related
         .iter()
@@ -1394,6 +1411,9 @@ fn compiler_reports_unreadable_include_targets_with_context() {
         .expect("unreadable include diagnostic");
     assert_eq!(diagnostic.severity, "error");
     assert_eq!(diagnostic.line, Some(2));
+    assert_eq!(diagnostic.column, Some(10));
+    assert_eq!(diagnostic.end_line, Some(2));
+    assert_eq!(diagnostic.end_column, Some(31));
     assert_eq!(
         diagnostic.source_file.as_deref(),
         Some(path_to_string(&root_doc).as_str())
