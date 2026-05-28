@@ -240,6 +240,7 @@ import {
 import {
   applyDuplicatedWorkspaceDocumentState,
   applyOpenedWorkspaceDocumentState,
+  applyOpenRecentWorkspaceFileFailureState,
   applyOpenRecentWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderSuccessState,
@@ -905,6 +906,17 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   deepEqual(opened.recentlyClosed, ["/old.md"]);
   deepEqual(opened.missingWorkspaceFiles, ["/missing.md"]);
   equal(opened.statusMessage, "Opened c.md");
+
+  const missingRecentFile = applyOpenRecentWorkspaceFileFailureState(
+    ["/workspace/missing.md", "/workspace/c.md"],
+    ["/workspace/missing.md", "/closed.md"],
+    ["/workspace/missing.md", "/stale.md"],
+    "/workspace/missing.md",
+  );
+  deepEqual(missingRecentFile.recentFiles, ["/workspace/c.md"]);
+  deepEqual(missingRecentFile.recentlyClosed, ["/closed.md"]);
+  deepEqual(missingRecentFile.missingWorkspaceFiles, ["/stale.md"]);
+  equal(missingRecentFile.statusMessage, "Removed missing recent file missing.md");
 
   const duplicated = applyDuplicatedWorkspaceDocumentState(
     [restored],

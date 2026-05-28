@@ -90,6 +90,7 @@ import {
 import {
   applyDuplicatedWorkspaceDocumentState,
   applyOpenedWorkspaceDocumentState,
+  applyOpenRecentWorkspaceFileFailureState,
   applyOpenRecentWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderSuccessState,
@@ -621,8 +622,16 @@ export const useDocumentsStore = defineStore("documents", {
         await this.openPath(path);
         return true;
       } catch {
-        this.forgetFilePath(path);
-        this.statusMessage = `Removed missing recent file ${titleFromPath(path)}`;
+        const failed = applyOpenRecentWorkspaceFileFailureState(
+          this.recentFiles,
+          this.recentlyClosed,
+          this.missingWorkspaceFiles,
+          path,
+        );
+        this.recentFiles = failed.recentFiles;
+        this.recentlyClosed = failed.recentlyClosed;
+        this.missingWorkspaceFiles = failed.missingWorkspaceFiles;
+        this.statusMessage = failed.statusMessage;
         await this.persistWorkspace();
         return false;
       }

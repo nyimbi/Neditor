@@ -54,6 +54,13 @@ export interface OpenedWorkspaceDocumentStateResult {
   statusMessage: string;
 }
 
+export interface OpenRecentWorkspaceFileFailureStateResult {
+  recentFiles: string[];
+  recentlyClosed: string[];
+  missingWorkspaceFiles: string[];
+  statusMessage: string;
+}
+
 export interface DuplicatedWorkspaceDocumentStateResult {
   documents: OpenDocument[];
   activeId: string;
@@ -260,6 +267,21 @@ export function applyOpenedWorkspaceDocumentState(
     recentlyClosed: forgetRecentItem(recentlyClosed, document.path),
     missingWorkspaceFiles: missingWorkspaceFiles.filter((missing) => missing !== document.path),
     statusMessage: `Opened ${document.title}`,
+  };
+}
+
+export function applyOpenRecentWorkspaceFileFailureState(
+  recentFiles: string[],
+  recentlyClosed: string[],
+  missingWorkspaceFiles: string[],
+  path: string | null,
+): OpenRecentWorkspaceFileFailureStateResult {
+  const forgotten = forgetDocumentPathState(recentFiles, recentlyClosed, missingWorkspaceFiles, path);
+  return {
+    recentFiles: forgotten.recentFiles,
+    recentlyClosed: forgotten.recentlyClosed,
+    missingWorkspaceFiles: forgotten.missingWorkspaceFiles,
+    statusMessage: `Removed missing recent file ${titleFromPath(path)}`,
   };
 }
 
