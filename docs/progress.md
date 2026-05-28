@@ -27,6 +27,18 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 CSV/TSV Transform Closure
+
+`10.4.9 CSV | Tables and formulas` and `10.4.10 TSV | Tables and formulas`
+are now marked complete in `docs/spec-completion-matrix.md`. The closure is
+based on the shared delimited-table transform renderer, table formula evaluator,
+numeric formatting metadata, ragged-row diagnostics/normalization, local
+data-source safety proof, and References-sidebar data-source workflow evidence.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked csv_and_tsv --lib` | Pass | Three Rust tests passed, proving CSV/TSV formula cells, export-safe numeric/currency/percent/negative metadata, alignment classes, ragged row diagnostics, placeholder headers, row padding, extra-cell preservation, and normalized table rendering. |
+
 ## 2026-05-28 Split Editor Pane Closure
 
 `5.6 Native Tab Organization | Split editor panes` is now marked complete in
