@@ -7,6 +7,15 @@ export interface DeepResearchSource {
   url: string;
   snippet: string;
   source: string;
+  fitScore?: number;
+  fitLabel?: string;
+  fitReasons?: string[];
+}
+
+export interface DeepResearchSourceFit {
+  score: number;
+  label: string;
+  reasons: string[];
 }
 
 export interface DeepResearchSettings {
@@ -88,7 +97,12 @@ export function deepResearchReflectionPrompt(settings: DeepResearchSettings, que
     `Search query: ${query}`,
     "",
     "Search results:",
-    ...results.map((result, index) => `${index + 1}. ${result.title}\nURL: ${result.url}\nSource: ${result.source}\nSnippet: ${result.snippet || "(no snippet)"}`),
+    ...results.map((result, index) => {
+      const fit = result.fitScore === undefined
+        ? ""
+        : `\nFit: ${result.fitScore}/100 ${result.fitLabel || ""}${result.fitReasons?.length ? ` - ${result.fitReasons.join("; ")}` : ""}`;
+      return `${index + 1}. ${result.title}\nURL: ${result.url}\nSource: ${result.source}${fit}\nSnippet: ${result.snippet || "(no snippet)"}`;
+    }),
     "",
     iterations.length ? `Prior iteration summaries:\n${iterations.map((iteration) => `- ${iteration.summary}`).join("\n")}` : "",
     "",
@@ -155,6 +169,72 @@ export function fallbackDeepResearchQuery(settings: DeepResearchSettings, iterat
   const suffixes = ["overview evidence", "recent data sources", "risks limitations", "case studies", "implementation guidance"];
   const suffix = suffixes[iterations.length % suffixes.length];
   return `${settings.topic} ${settings.documentType} ${suffix}`;
+}
+
+export function rankDeepResearchSources(sources: DeepResearchSource[], query: string) {
+  return sources
+    .map((source, index) => {
+      const fit = assessDeepResearchSource(source, query);
+      return {
+        ...source,
+        fitScore: fit.score,
+        fitLabel: fit.label,
+        fitReasons: fit.reasons,
+        __index: index,
+      };
+    })
+    .sort((left, right) => (right.fitScore || 0) - (left.fitScore || 0) || left.__index - right.__index)
+    .map(({ __index: _index, ...source }) => source);
+}
+
+export function assessDeepResearchSource(source: DeepResearchSource, query: string): DeepResearchSourceFit {
+  const queryTokens = significantWords(query);
+  const titleTokens = new Set(significantWords(source.title));
+  const snippetTokens = new Set(significantWords(source.snippet));
+  let score = 20;
+  const reasons: string[] = [];
+
+  const titleMatches = queryTokens.filter((token) => titleTokens.has(token)).length;
+  const snippetMatches = queryTokens.filter((token) => snippetTokens.has(token)).length;
+  if (titleMatches) {
+    score += Math.min(24, titleMatches * 8);
+    reasons.push(`${titleMatches} query term${titleMatches === 1 ? "" : "s"} in title`);
+  }
+  if (snippetMatches) {
+    score += Math.min(18, snippetMatches * 4);
+    reasons.push(`${snippetMatches} query term${snippetMatches === 1 ? "" : "s"} in snippet`);
+  }
+
+  const lowerText = `${source.title} ${source.snippet}`.toLowerCase();
+  const normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.length >= 12 && lowerText.includes(normalizedQuery)) {
+    score += 10;
+    reasons.push("exact query phrase match");
+  }
+
+  const urlAssessment = assessSourceUrl(source.url);
+  score += urlAssessment.scoreDelta;
+  reasons.push(...urlAssessment.reasons);
+
+  if (!source.snippet.trim()) {
+    score -= 5;
+    reasons.push("no snippet for quick evidence review");
+  }
+  if (/\b(?:blog|forum|reddit|x\.com|twitter|facebook|linkedin|medium\.com|substack\.com)\b/i.test(source.url)) {
+    score -= 10;
+    reasons.push("publication context may need extra verification");
+  }
+  if (/\b(?:search|login|signup|account)\b/i.test(source.url)) {
+    score -= 8;
+    reasons.push("URL may not point directly to source evidence");
+  }
+
+  const bounded = Math.max(0, Math.min(100, Math.round(score)));
+  return {
+    score: bounded,
+    label: sourceFitLabel(bounded),
+    reasons: reasons.length ? reasons.slice(0, 4) : ["general web source; inspect before citing"],
+  };
 }
 
 export function parseReflection(markdown: string) {
@@ -230,10 +310,85 @@ export function formatDeepResearchLog(iterations: DeepResearchIteration[]) {
         ...(iteration.gaps.length ? iteration.gaps.map((gap) => `- ${gap}`) : ["- No gaps recorded."]),
         "",
         "Sources:",
-        ...iteration.results.map((result) => `- [${result.title}](${result.url}) - ${result.snippet || result.source}`),
+        ...iteration.results.map((result) => {
+          const fit = result.fitScore === undefined ? "" : ` (${result.fitScore}/100 ${result.fitLabel || "fit"})`;
+          return `- [${result.title}](${result.url})${fit} - ${result.snippet || result.source}`;
+        }),
       ].join("\n"),
     )
     .join("\n\n");
+}
+
+function assessSourceUrl(url: string) {
+  const reasons: string[] = [];
+  let scoreDelta = 0;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname.toLowerCase();
+    if (host.endsWith(".gov") || host.includes(".gov.")) {
+      scoreDelta += 15;
+      reasons.push("government source domain");
+    } else if (host.endsWith(".edu") || host.includes(".edu.")) {
+      scoreDelta += 12;
+      reasons.push("academic source domain");
+    } else if (host.endsWith(".org") || host.includes(".org.")) {
+      scoreDelta += 6;
+      reasons.push("organization source domain");
+    }
+    if (/\.(pdf)(?:$|[?#])/.test(path)) {
+      scoreDelta += 12;
+      reasons.push("downloadable PDF source");
+    } else if (/\.(docx?|rtf)(?:$|[?#])/.test(path)) {
+      scoreDelta += 8;
+      reasons.push("downloadable document source");
+    } else if (/\.(csv|xlsx?|json)(?:$|[?#])/.test(path)) {
+      scoreDelta += 8;
+      reasons.push("data file source");
+    } else if (/\.(html?|md|txt)(?:$|[?#])/.test(path)) {
+      scoreDelta += 3;
+      reasons.push("reviewable text source");
+    }
+  } catch {
+    scoreDelta -= 10;
+    reasons.push("invalid URL");
+  }
+  return { scoreDelta, reasons };
+}
+
+function sourceFitLabel(score: number) {
+  if (score >= 75) return "strong";
+  if (score >= 55) return "good";
+  if (score >= 35) return "review";
+  return "weak";
+}
+
+function significantWords(value: string) {
+  const stopWords = new Set([
+    "about",
+    "after",
+    "also",
+    "and",
+    "from",
+    "into",
+    "with",
+    "that",
+    "this",
+    "the",
+    "for",
+    "are",
+    "was",
+    "were",
+    "will",
+    "report",
+    "brief",
+    "study",
+    "source",
+  ]);
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 4 && !stopWords.has(word));
 }
 
 function uniqueSources(iterations: DeepResearchIteration[]) {

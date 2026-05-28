@@ -21,11 +21,13 @@ import {
   localAgentCliProfiles,
 } from "../src/lib/aiProviderPackages.js";
 import {
+  assessDeepResearchSource,
   deepResearchDraftPrompt,
   estimateMarkdownPages,
   expansionPassBudget,
   pageShortfall,
   normalizeDeepResearchSettings,
+  rankDeepResearchSources,
   targetWordCount,
 } from "../src/lib/deepResearch.js";
 import {
@@ -4709,6 +4711,36 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   equal(response.markdown, "# Draft\n\nReady.");
 });
 
+test("Deep Research ranks stronger citation source candidates first", () => {
+  const ranked = rankDeepResearchSources(
+    [
+      {
+        title: "Opinion thread",
+        url: "https://social.example.com/thread",
+        snippet: "",
+        source: "DuckDuckGo",
+      },
+      {
+        title: "AI procurement controls policy evidence",
+        url: "https://agency.gov/reports/ai-procurement-controls.pdf",
+        snippet: "Procurement controls, risk review, audit evidence, and policy implementation guidance.",
+        source: "SearXNG",
+      },
+    ],
+    "AI procurement controls policy evidence",
+  );
+  equal(ranked[0].title, "AI procurement controls policy evidence");
+  equal(ranked[0].fitLabel, "strong");
+  ok((ranked[0].fitScore || 0) > (ranked[1].fitScore || 0));
+  ok(ranked[0].fitReasons?.some((reason) => reason.includes("government source domain")));
+
+  const weak = assessDeepResearchSource(
+    { title: "Login", url: "not a url", snippet: "", source: "DuckDuckGo" },
+    "AI procurement controls",
+  );
+  equal(weak.label, "weak");
+});
+
 test("AI provider defaults normalize non-secret setup preferences", () => {
   deepEqual(
     normalizeAiProviderDefaults({
@@ -6564,6 +6596,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("deepResearchSaveSources"));
   ok(app.includes("saveDeepResearchSources"));
   ok(app.includes("deepResearchSavedSourceCount"));
+  ok(app.includes("rankDeepResearchSources"));
+  ok(app.includes("source.fitScore"));
+  ok(app.includes("source.fitReasons"));
   ok(app.includes('invoke<CitationSourceLibraryResponse>("list_citation_sources"'));
   ok(app.includes("citationSourceLibrary"));
   ok(app.includes("insertCitationSourceBibliography"));

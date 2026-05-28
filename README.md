@@ -450,11 +450,12 @@ web app.
   resolving, deferring, jumping to, and exporting citation blockers as a
   reviewer-ready Markdown audit. Source Search can query DuckDuckGo, SearXNG,
   or Tavily, download selected source documents into a document-associated
-  `.neditor-sources` directory, insert a CSL JSON bibliography stub, and retain
-  a local source manifest for review. Repeated downloads reuse the saved local
-  copy when present, and the source library can be refreshed to cite saved
-  sources again, insert their bibliography entries, link to the local files, or
-  copy/reveal the downloaded evidence path. Users can also bulk-save every
+  `.neditor-sources` directory, rank candidates by deterministic citation fit,
+  insert a CSL JSON bibliography stub, and retain a local source manifest for
+  review. Repeated downloads reuse the saved local copy when present, and the
+  source library can be refreshed to cite saved sources again, insert their
+  bibliography entries, link to the local files, or copy/reveal the downloaded
+  evidence path. Users can also bulk-save every
   visible source search result without changing the document text.
   Deep Research uses the configured AI provider, including Ollama, to iterate
   search queries, summarize evidence, identify knowledge gaps, draft a sourced

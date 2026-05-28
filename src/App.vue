@@ -1447,7 +1447,8 @@
             <p v-if="citationSourceLibraryDir" class="sidebar-hint">Saved source library: {{ citationSourceLibraryDir }}</p>
             <article v-for="source in citationSearchResults" :key="source.url" class="snapshot-row">
               <p>{{ source.title }}</p>
-              <small>{{ source.source }} | {{ source.url }}</small>
+              <small>{{ source.source }}<template v-if="source.fitScore !== undefined"> | fit {{ source.fitScore }}/100 {{ source.fitLabel }}</template> | {{ source.url }}</small>
+              <small v-if="source.fitReasons?.length">{{ source.fitReasons.join(" | ") }}</small>
               <small v-if="source.snippet">{{ source.snippet }}</small>
               <div class="reference-actions">
                 <button type="button" :disabled="citationSourceBusyUrl === source.url || !active.path" @click="downloadCitationSource(source)">
@@ -5619,6 +5620,7 @@ import {
   normalizeDeepResearchSettings,
   pageShortfall,
   parseReflection,
+  rankDeepResearchSources,
   targetWordCount,
   type DeepResearchIteration,
   type DeepResearchSearchProvider,
@@ -9948,7 +9950,7 @@ async function searchCitationSources(query = citationSearchQuery.value) {
         document_path: active.value.path,
       },
     });
-    citationSearchResults.value = response.results || [];
+    citationSearchResults.value = rankDeepResearchSources(response.results || [], trimmed);
     store.statusMessage = `Found ${citationSearchResults.value.length} citation source candidate${citationSearchResults.value.length === 1 ? "" : "s"}`;
     return citationSearchResults.value;
   } catch (error) {
