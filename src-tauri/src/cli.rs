@@ -320,6 +320,24 @@ struct RfpCliVerificationSummary {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct RfpCliScoringWeight {
+    criterion: String,
+    weight: u16,
+    unit: String,
+    source_line: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RfpCliAnnexReference {
+    annex: String,
+    label: String,
+    source_line: usize,
+    requirement: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RfpCliAnalysis {
     source: RfpCliSource,
     requirements: Vec<RfpCliRequirement>,
@@ -333,6 +351,10 @@ struct RfpCliAnalysis {
     evaluation_criteria: Vec<String>,
     mandatory_attachments: Vec<String>,
     critical_disqualifiers: Vec<String>,
+    scoring_weights: Vec<RfpCliScoringWeight>,
+    annex_references: Vec<RfpCliAnnexReference>,
+    bilingual_requirements: Vec<String>,
+    placeholder_risks: Vec<String>,
     risks: Vec<String>,
     questions: Vec<String>,
     completeness_score: u8,
@@ -6148,23 +6170,70 @@ fn analyze_rfp_text(
         ],
         8,
     );
-    let mandatory_attachments = extract_rfp_lines(
+    let scoring_weights = extract_rfp_scoring_weights(&significant_lines);
+    let annex_references = extract_rfp_annex_references(&significant_lines);
+    let bilingual_requirements = extract_rfp_lines(
         &significant_lines,
         &[
-            "attachment",
-            "appendix",
-            "form",
-            "certificate",
-            "insurance",
-            "tax",
-            "license",
-            "registration",
-            "declaration",
-            "signature",
-            "signed",
-            "mandatory document",
+            "bilingual",
+            "english/french",
+            "english / french",
+            "en/fr",
+            "en / fr",
+            "french",
+            "français",
+            "francais",
+            "translation",
+            "translated",
         ],
         10,
+    );
+    let placeholder_risks = extract_rfp_lines(
+        &significant_lines,
+        &[
+            "tbd",
+            "to be confirmed",
+            "to be assigned",
+            "placeholder",
+            "insert",
+            "fill in",
+            "not yet available",
+            "pending",
+        ],
+        10,
+    );
+    let mandatory_attachments = dedupe_rfp_strings(
+        extract_rfp_lines(
+            &significant_lines,
+            &[
+                "attachment",
+                "appendix",
+                "annex",
+                "annexure",
+                "form",
+                "certificate",
+                "insurance",
+                "tax",
+                "license",
+                "licence",
+                "registration",
+                "declaration",
+                "signature",
+                "signed",
+                "mandatory document",
+                "audited accounts",
+                "bank statement",
+                "bank statements",
+            ],
+            20,
+        )
+        .into_iter()
+        .chain(
+            annex_references
+                .iter()
+                .map(|annex| annex.requirement.clone()),
+        )
+        .collect(),
     );
     let critical_disqualifiers = requirements
         .iter()
@@ -6199,6 +6268,10 @@ fn analyze_rfp_text(
             rows_needing_evidence,
             &mandatory_attachments,
             &evaluation_criteria,
+            &scoring_weights,
+            &annex_references,
+            &bilingual_requirements,
+            &placeholder_risks,
         ),
     };
     let risks = infer_rfp_risks(
@@ -6206,6 +6279,7 @@ fn analyze_rfp_text(
         &timelines,
         &budget_hints,
         &mandatory_attachments,
+        &placeholder_risks,
     );
     let questions = infer_rfp_questions(
         &requirements,
@@ -6220,8 +6294,8 @@ fn analyze_rfp_text(
         capabilities.len(),
         timelines.len(),
         budget_hints.len(),
-        evaluation_criteria.len(),
-        mandatory_attachments.len(),
+        evaluation_criteria.len() + scoring_weights.len(),
+        mandatory_attachments.len() + annex_references.len() + bilingual_requirements.len(),
         warnings.len(),
     );
     RfpCliAnalysis {
@@ -6246,6 +6320,10 @@ fn analyze_rfp_text(
         evaluation_criteria,
         mandatory_attachments,
         critical_disqualifiers,
+        scoring_weights,
+        annex_references,
+        bilingual_requirements,
+        placeholder_risks,
         risks,
         questions,
         completeness_score,
@@ -6663,12 +6741,193 @@ fn dedupe_rfp_requirements(requirements: Vec<RfpCliRequirement>) -> Vec<RfpCliRe
 }
 
 fn extract_rfp_lines(lines: &[(usize, String)], needles: &[&str], limit: usize) -> Vec<String> {
-    lines
+    dedupe_rfp_strings(
+        lines
+            .iter()
+            .filter(|(_, line)| contains_any(&line.to_ascii_lowercase(), needles))
+            .map(|(_, line)| line.clone())
+            .take(limit)
+            .collect(),
+    )
+}
+
+fn dedupe_rfp_strings(values: Vec<String>) -> Vec<String> {
+    let mut seen = Vec::<String>::new();
+    let mut output = Vec::new();
+    for value in values {
+        let normalized = normalize_cli_whitespace(&value);
+        let key = normalized.to_ascii_lowercase();
+        if normalized.is_empty() || seen.iter().any(|seen_key| seen_key == &key) {
+            continue;
+        }
+        seen.push(key);
+        output.push(normalized);
+    }
+    output
+}
+
+fn extract_rfp_scoring_weights(lines: &[(usize, String)]) -> Vec<RfpCliScoringWeight> {
+    let mut weights = Vec::new();
+    let mut seen = Vec::<String>::new();
+    for (line_number, line) in lines {
+        let normalized = normalize_rfp_table_like_line(line);
+        let segments = normalized
+            .split([',', ';', '|'])
+            .map(normalize_cli_whitespace)
+            .filter(|segment| !segment.is_empty())
+            .collect::<Vec<_>>();
+        for segment in segments {
+            if let Some((criterion, weight, unit)) = parse_rfp_scoring_segment(&segment) {
+                let key = format!("{}|{}|{}", criterion.to_ascii_lowercase(), weight, unit);
+                if seen.iter().any(|seen_key| seen_key == &key) {
+                    continue;
+                }
+                seen.push(key);
+                weights.push(RfpCliScoringWeight {
+                    criterion,
+                    weight,
+                    unit,
+                    source_line: *line_number,
+                });
+                if weights.len() >= 30 {
+                    return weights;
+                }
+            }
+        }
+    }
+    weights
+}
+
+fn parse_rfp_scoring_segment(segment: &str) -> Option<(String, u16, String)> {
+    let parts = segment.split_whitespace().collect::<Vec<_>>();
+    for index in 0..parts.len() {
+        let raw = parts[index].trim_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '%');
+        let (digits, inline_unit) = if let Some(stripped) = raw.strip_suffix('%') {
+            (stripped, Some("%"))
+        } else {
+            (raw, None)
+        };
+        let Ok(weight) = digits.parse::<u16>() else {
+            continue;
+        };
+        if weight == 0 || weight > 1000 {
+            continue;
+        }
+        let next = parts
+            .get(index + 1)
+            .map(|value| {
+                value
+                    .trim_matches(|ch: char| !ch.is_ascii_alphabetic())
+                    .to_ascii_lowercase()
+            })
+            .unwrap_or_default();
+        let unit = if inline_unit == Some("%") || next == "percent" {
+            "%"
+        } else if matches!(next.as_str(), "point" | "points" | "pt" | "pts") {
+            "points"
+        } else {
+            continue;
+        };
+        let criterion = clean_rfp_scoring_criterion(&parts[..index].join(" "));
+        if criterion.is_empty() {
+            continue;
+        }
+        return Some((criterion, weight, unit.to_string()));
+    }
+    None
+}
+
+fn clean_rfp_scoring_criterion(value: &str) -> String {
+    normalize_cli_whitespace(value)
+        .trim_start_matches(|ch: char| matches!(ch, '-' | ':' | ';'))
+        .trim()
+        .trim_start_matches("Evaluation criteria")
+        .trim_start_matches("evaluation criteria")
+        .trim_start_matches("Criteria")
+        .trim_start_matches("criteria")
+        .trim_start_matches("Scoring")
+        .trim_start_matches("scoring")
+        .trim_start_matches(|ch: char| matches!(ch, ':' | '-' | ';'))
+        .trim()
+        .to_string()
+}
+
+fn extract_rfp_annex_references(lines: &[(usize, String)]) -> Vec<RfpCliAnnexReference> {
+    let mut references = Vec::new();
+    let mut seen = Vec::<String>::new();
+    for (line_number, line) in lines {
+        let tokens = line.split_whitespace().collect::<Vec<_>>();
+        for (index, token) in tokens.iter().enumerate() {
+            let normalized = token
+                .trim_matches(|ch: char| !ch.is_ascii_alphanumeric())
+                .to_ascii_lowercase();
+            if normalized != "annex" && normalized != "annexure" {
+                continue;
+            }
+            let Some(raw_code) = tokens.get(index + 1) else {
+                continue;
+            };
+            let code = raw_code
+                .trim_matches(|ch: char| !ch.is_ascii_alphanumeric())
+                .to_ascii_uppercase();
+            if code.is_empty() {
+                continue;
+            }
+            let annex = format!("{} {}", capitalize_word(&normalized), code);
+            let label = annex_label_from_line(line, &code);
+            let key = format!(
+                "{}|{}",
+                annex.to_ascii_lowercase(),
+                label.to_ascii_lowercase()
+            );
+            if seen.iter().any(|seen_key| seen_key == &key) {
+                continue;
+            }
+            seen.push(key);
+            let requirement = if label.is_empty() {
+                format!("{annex} must be reviewed, completed, and included if required.")
+            } else {
+                format!("{annex}: {label}")
+            };
+            references.push(RfpCliAnnexReference {
+                annex,
+                label,
+                source_line: *line_number,
+                requirement,
+            });
+            if references.len() >= 30 {
+                return references;
+            }
+        }
+    }
+    references
+}
+
+fn annex_label_from_line(line: &str, code: &str) -> String {
+    let upper_line = line.to_ascii_uppercase();
+    let Some((position, prefix_len)) = [format!("ANNEX {code}"), format!("ANNEXURE {code}")]
         .iter()
-        .filter(|(_, line)| contains_any(&line.to_ascii_lowercase(), needles))
-        .map(|(_, line)| line.clone())
-        .take(limit)
-        .collect()
+        .filter_map(|prefix| {
+            upper_line
+                .find(prefix)
+                .map(|position| (position, prefix.len()))
+        })
+        .min_by_key(|(position, _)| *position)
+    else {
+        return String::new();
+    };
+    let after_code = &line[position + prefix_len..];
+    let label = after_code
+        .trim_start_matches(|ch: char| {
+            ch.is_whitespace() || matches!(ch, '-' | ':' | '\u{2013}' | '\u{2014}')
+        })
+        .split(['.', ';'])
+        .next()
+        .unwrap_or_default();
+    normalize_cli_whitespace(label)
+        .trim_matches(',')
+        .trim()
+        .to_string()
 }
 
 fn infer_rfp_capabilities(
@@ -6841,6 +7100,10 @@ fn rfp_verification_checklist(
     rows_needing_evidence: usize,
     attachments: &[String],
     criteria: &[String],
+    scoring_weights: &[RfpCliScoringWeight],
+    annex_references: &[RfpCliAnnexReference],
+    bilingual_requirements: &[String],
+    placeholder_risks: &[String],
 ) -> Vec<String> {
     vec![
         format!(
@@ -6866,6 +7129,38 @@ fn rfp_verification_checklist(
                 criteria.len()
             )
         },
+        if scoring_weights.is_empty() {
+            "Confirm scoring weights, point totals, and evaluator emphasis manually.".to_string()
+        } else {
+            format!(
+                "Use {} extracted scoring weight(s) to allocate proposal emphasis.",
+                scoring_weights.len()
+            )
+        },
+        if annex_references.is_empty() {
+            "Confirm annex schedules and required forms manually.".to_string()
+        } else {
+            format!(
+                "Map {} annex reference(s) to signed or completed response attachments.",
+                annex_references.len()
+            )
+        },
+        if bilingual_requirements.is_empty() {
+            "Confirm whether bilingual or French-language delivery is required.".to_string()
+        } else {
+            format!(
+                "Cover {} bilingual/language obligation(s) in staffing, materials, and delivery.",
+                bilingual_requirements.len()
+            )
+        },
+        if placeholder_risks.is_empty() {
+            "Search the response for TBD, placeholder, pending, and similar unfinished language before final export.".to_string()
+        } else {
+            format!(
+                "Resolve {} placeholder/readiness trap(s) before submission.",
+                placeholder_risks.len()
+            )
+        },
     ]
 }
 
@@ -6874,6 +7169,7 @@ fn infer_rfp_risks(
     timelines: &[String],
     budget_hints: &[String],
     attachments: &[String],
+    placeholder_risks: &[String],
 ) -> Vec<String> {
     let mut risks = Vec::new();
     if requirements.len() > 30 {
@@ -6893,6 +7189,9 @@ fn infer_rfp_risks(
     }
     if !attachments.is_empty() {
         risks.push("Mandatory attachments can block submission if certificates, declarations, or signatures are missing.".to_string());
+    }
+    if !placeholder_risks.is_empty() {
+        risks.push("Placeholder or unfinished-response wording was detected; unresolved placeholders can make the submission non-compliant.".to_string());
     }
     if risks.is_empty() {
         risks.push("Review source RFP for exceptions, addenda, submission portal rules, and attachments before final delivery.".to_string());
@@ -7150,12 +7449,68 @@ fn rfp_cli_response_markdown(
     ));
     lines.extend([
         "".to_string(),
+        "### Scoring Weights".to_string(),
+        "".to_string(),
+    ]);
+    if analysis.scoring_weights.is_empty() {
+        lines.push("- Add scoring weights after reviewing the evaluation section.".to_string());
+    } else {
+        lines.extend(analysis.scoring_weights.iter().map(|item| {
+            format!(
+                "- {}: {} (source line {})",
+                item.criterion,
+                rfp_cli_scoring_weight_display(item),
+                item.source_line
+            )
+        }));
+    }
+    lines.extend([
+        "".to_string(),
         "## Mandatory Attachments".to_string(),
         "".to_string(),
     ]);
     lines.extend(markdown_bullets(
         analysis.mandatory_attachments.clone(),
         "Add mandatory forms, certificates, declarations, and signatures.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "### Annex References".to_string(),
+        "".to_string(),
+    ]);
+    if analysis.annex_references.is_empty() {
+        lines.push("- Confirm annex schedules manually.".to_string());
+    } else {
+        lines.extend(analysis.annex_references.iter().map(|item| {
+            format!(
+                "- {} - {} (source line {})",
+                item.annex,
+                if item.label.is_empty() {
+                    "Confirm required format and inclusion"
+                } else {
+                    item.label.as_str()
+                },
+                item.source_line
+            )
+        }));
+    }
+    lines.extend([
+        "".to_string(),
+        "### Bilingual and Language Obligations".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.bilingual_requirements.clone(),
+        "Confirm whether bilingual or French-language materials, workshops, or staffing are required.",
+    ));
+    lines.extend([
+        "".to_string(),
+        "### Placeholder and Readiness Traps".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(markdown_bullets(
+        analysis.placeholder_risks.clone(),
+        "Search the draft for TBD, placeholder, pending, and similar unfinished language before submission.",
     ));
     lines.extend([
         "".to_string(),
@@ -7248,6 +7603,29 @@ fn rfp_cli_compliance_checklist_markdown(analysis: &RfpCliAnalysis) -> String {
             "| RFP-CHECK-A{:02} | Document checklist - attachments required | high | Include and verify mandatory attachment: {} | Confirm complete, signed where required, current, and included in the final package. | Bid Coordinator | Attachment scan |",
             index + 1,
             table_cell(attachment),
+        ));
+    }
+    for (index, annex) in analysis.annex_references.iter().enumerate() {
+        lines.push(format!(
+            "| RFP-CHECK-X{:02} | Annex references | high | {} | Locate {}, confirm required format/signature, and include it in the response bundle. | Bid Coordinator | Source line {} |",
+            index + 1,
+            table_cell(&annex.requirement),
+            table_cell(&annex.annex),
+            annex.source_line,
+        ));
+    }
+    for (index, requirement) in analysis.bilingual_requirements.iter().enumerate() {
+        lines.push(format!(
+            "| RFP-CHECK-L{:02} | Bilingual / language obligations | high | {} | Confirm staffing, training materials, workshops, and deliverables cover the language obligation. | Delivery Lead | Language scan |",
+            index + 1,
+            table_cell(requirement),
+        ));
+    }
+    for (index, placeholder) in analysis.placeholder_risks.iter().enumerate() {
+        lines.push(format!(
+            "| RFP-CHECK-P{:02} | Placeholder and response-readiness traps | high | Resolve non-final placeholder language before submission: {} | Search the response for TBD, placeholder, pending, and similar markers; replace or explicitly escalate before final packaging. | Bid Owner | Placeholder scan |",
+            index + 1,
+            table_cell(placeholder),
         ));
     }
     lines.join("\n")
@@ -7437,6 +7815,14 @@ fn rfp_cli_lines_for_categories(
         fallback.to_string()
     } else {
         values.join("; ")
+    }
+}
+
+fn rfp_cli_scoring_weight_display(item: &RfpCliScoringWeight) -> String {
+    if item.unit == "%" {
+        format!("{}%", item.weight)
+    } else {
+        format!("{} {}", item.weight, item.unit)
     }
 }
 
