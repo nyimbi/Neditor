@@ -5058,6 +5058,12 @@ Text-preserving table cell edits:
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after the table text-edit helper started preserving the source row style during two-way table edits. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow still proves table creation, direct Markdown source replacement, source-to-grid sync, edited-source CSV export, and cursor-cell text editing after the source-preserving cell edit change. |
 
+RFP import command coverage:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked rfp_import --lib` | Pass | 7 RFP import tests passed, including direct command-level Markdown/text alias import, pasted-source normalization, metadata trimming, unsupported source-type rejection, DOCX XML text/table handling, and URL HTML cleanup/title extraction. |
+
 Vim punctuation word-motion parity:
 
 | Command | Result | Evidence |

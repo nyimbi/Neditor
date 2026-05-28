@@ -463,6 +463,45 @@ mod tests {
     use super::*;
 
     #[test]
+    fn import_rfp_source_accepts_pasted_markdown_aliases() {
+        let repeated_requirements = (1..=25)
+            .map(|index| format!("Requirement {index}: vendor must provide implementation support, evidence, timeline, and commercial assumptions."))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let response = import_rfp_source(ImportRfpSourceRequest {
+            source_type: "txt".to_string(),
+            path: None,
+            url: Some("  Pasted RFP Intake  ".to_string()),
+            text: Some(format!(
+                "# RFP Intake\n\n  Vendor   must   respond   clearly.\n\n{repeated_requirements}"
+            )),
+        })
+        .expect("pasted markdown import");
+
+        assert_eq!(response.source_type, "markdown");
+        assert_eq!(response.title, "Pasted RFP Intake");
+        assert_eq!(response.url.as_deref(), Some("Pasted RFP Intake"));
+        assert_eq!(response.extraction_method, "pasted-markdown-text");
+        assert!(response.path.is_none());
+        assert!(response.warnings.is_empty());
+        assert!(response.text.contains("Vendor must respond clearly."));
+        assert!(!response.text.contains("Vendor   must"));
+    }
+
+    #[test]
+    fn import_rfp_source_rejects_unsupported_source_types() {
+        let error = import_rfp_source(ImportRfpSourceRequest {
+            source_type: "spreadsheet".to_string(),
+            path: None,
+            url: None,
+            text: Some("RFP".to_string()),
+        })
+        .expect_err("unsupported RFP source type");
+
+        assert!(error.contains("Unsupported RFP source type"));
+    }
+
+    #[test]
     fn docx_xml_text_preserves_paragraphs_and_table_cells() {
         let text = docx_xml_to_text(
             r#"<w:p><w:r><w:t>Requirement &amp; A</w:t></w:r></w:p><w:tr><w:tc><w:p><w:r><w:t>Cell &#x32;</w:t></w:r></w:p></w:tc></w:tr>"#,
