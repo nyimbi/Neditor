@@ -83,6 +83,7 @@ import {
   workspaceOutlineLibraryPath,
   buildBusinessWizardStepAssistance,
   buildRfpWizardStepAssistance,
+  fillBusinessTemplate,
   businessSnippetMarkdown,
   businessTemplateMarkdown,
   businessWizardContext,
@@ -3446,10 +3447,26 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(snippet.includes("Jane Doe"));
   ok(snippet.includes("Acme Advisory"));
   ok(snippet.includes("https://acme.example"));
+  const dottedSnippet = fillBusinessTemplate(
+    [
+      "Prepared by {{profile.owner}}",
+      "Company {{company.name}}",
+      "Website {{company.website}}",
+      "Client {{client.name}}",
+      "Project {{project.name}}",
+    ].join("\n"),
+    profile,
+  );
+  ok(dottedSnippet.includes("Prepared by Jane Doe"));
+  ok(dottedSnippet.includes("Company Acme Advisory"));
+  ok(dottedSnippet.includes("Website https://acme.example"));
+  ok(dottedSnippet.includes("Client Globex"));
+  ok(dottedSnippet.includes("{{project.name}}"));
 
   const placeholderText = businessProfilePlaceholderText(profile);
   ok(placeholderText.includes("companyName: Acme Advisory"));
   ok(placeholderText.includes("defaultClientName: Globex"));
+  ok(!placeholderText.includes("company.name:"));
 
   const context = businessWizardContext(tender, profile);
   ok(context.includes("Document builder: Tender response"));
@@ -8218,17 +8235,18 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned file.md"));
   ok(app.includes("ned open file.md --dry-run --json"));
   ok(app.includes("ned templates --category Procurement --json"));
+  ok(app.includes("ned templates --markdown report --workspace . --fill-profile"));
   ok(app.includes("ned transform-templates --category Business --transform calc --query ROI --json"));
-  ok(app.includes("ned snippets --markdown review-handoff"));
+  ok(app.includes("ned snippets --workspace . --markdown business-contact-block --fill-profile"));
   ok(app.includes("ned profile --workspace . --set companyName=Acme --json"));
   ok(app.includes("ned profile --fields --json"));
   ok(app.includes("ned profile --workspace . --get companyName"));
   ok(app.includes("ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json"));
   ok(app.includes("ned analyze-rfp - --matrix"));
-  ok(app.includes("ned new tender.md --template tender --json"));
-  ok(app.includes("ned new podcast.md --template podcast-script --json"));
+  ok(app.includes("ned new tender.md --template tender --workspace . --fill-profile --json"));
+  ok(app.includes("ned new podcast.md --template podcast-script --workspace . --fill-profile --json"));
   ok(app.includes("ned outlines --category Procurement --query RFP --json"));
-  ok(app.includes("ned outlines --markdown rfp-technical-proposal"));
+  ok(app.includes("ned outlines --markdown business-report"));
   ok(app.includes('ned outlines --workspace . --save board-pack --docs-live-type board-memo --section "Decision Requested" --section "Recommendation"'));
   ok(app.includes("Sync workspace outlines"));
   ok(app.includes("workspaceOutlineSyncStatus"));

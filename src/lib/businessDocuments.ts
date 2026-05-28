@@ -1053,15 +1053,33 @@ export function normalizeBusinessProfile(value: unknown): BusinessProfile {
 
 export function businessProfilePlaceholderMap(profile: Partial<BusinessProfile> = {}) {
   const normalized = normalizeBusinessProfile(profile);
-  return Object.fromEntries(
+  const canonical = Object.fromEntries(
     Object.entries(normalized).map(([key, value]) => [key, value || `{{${key}}}`]),
   ) as Record<keyof BusinessProfile, string>;
+  const placeholders: Record<string, string> = {
+    ...canonical,
+    owner: canonical.fullName,
+    reviewer: canonical.fullName,
+    approver: canonical.fullName,
+    preparedBy: canonical.fullName,
+    "profile.owner": canonical.fullName,
+    "profile.fullName": canonical.fullName,
+    "profile.email": canonical.email,
+    "profile.roleTitle": canonical.roleTitle,
+    "profile.phone": canonical.phone,
+    "company.name": canonical.companyName,
+    "company.address": canonical.companyAddress,
+    "company.website": canonical.website,
+    "company.industry": canonical.industry,
+    "client.name": canonical.defaultClientName,
+  };
+  return placeholders;
 }
 
 export function businessProfilePlaceholderText(profile: Partial<BusinessProfile> = {}) {
   const placeholders = businessProfilePlaceholderMap(profile);
-  return Object.entries(placeholders)
-    .map(([key, value]) => `${key}: ${value}`)
+  return businessProfileFields
+    .map((field) => `${field.key}: ${placeholders[field.key]}`)
     .join("\n");
 }
 
@@ -1211,9 +1229,10 @@ export function deleteCustomDocumentOutlineTemplateState(
 
 export function fillBusinessTemplate(markdown: string, profile: Partial<BusinessProfile> = {}, extra: Record<string, string> = {}) {
   const placeholders = { ...businessProfilePlaceholderMap(profile), ...extra };
-  return markdown.replace(/\{\{([a-zA-Z0-9_ -]+)\}\}/g, (match, key: string) => {
-    const normalizedKey = key.trim().replace(/\s+/g, "_");
-    return placeholders[normalizedKey as keyof BusinessProfile] || extra[normalizedKey] || match;
+  return markdown.replace(/\{\{([a-zA-Z0-9_. -]+)\}\}/g, (match, key: string) => {
+    const trimmedKey = key.trim();
+    const normalizedKey = trimmedKey.replace(/\s+/g, "_");
+    return placeholders[trimmedKey] || placeholders[normalizedKey] || extra[trimmedKey] || extra[normalizedKey] || match;
   });
 }
 

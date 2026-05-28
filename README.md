@@ -84,7 +84,8 @@ Packaged developer and release builds include a command-line helper named
 ```sh
 ned board-paper.md
 ned init ~/Documents/client-pack --json
-ned new proposal.md --template proposal --title "Client Expansion Proposal" --json
+ned profile --workspace . --set fullName="Jane Doe" --set companyName="Acme Advisory" --json
+ned new proposal.md --template proposal --title "Client Expansion Proposal" --workspace . --fill-profile --json
 ned open board-paper.md --dry-run --json
 ned convert board-paper.md --to pdf --output board-paper.pdf
 ned convert board-paper.md --to pdf,docx,html --output-dir exports
@@ -98,12 +99,12 @@ ned templates --category Procurement --json
 ned transform-templates --category Business --transform calc --query ROI --json
 ned transform-templates --markdown calc-business-roi
 ned outlines --category Procurement --query RFP --json
-ned outlines --markdown rfp-technical-proposal
+ned outlines --markdown business-report
+ned outlines --markdown outline-rfp-technical-proposal
 ned outlines --workspace . --save board-pack --name "Board Pack" --docs-live-type board-memo --section "Decision Requested" --section "Recommendation" --json
 ned outlines --workspace . --markdown board-pack
 ned snippets --kind procurement --json
-ned snippets --markdown review-handoff
-ned profile --workspace . --set fullName="Jane Doe" --set companyName="Acme Advisory" --json
+ned snippets --workspace . --markdown business-contact-block --fill-profile
 ned profile --fields --json
 ned profile --workspace . --get companyName
 ned profile --workspace . --placeholders

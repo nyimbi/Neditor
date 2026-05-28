@@ -5871,12 +5871,7 @@ fn business_profile_placeholder_value(
     profile: &BusinessProfile,
     placeholder: &str,
 ) -> Option<String> {
-    let normalized = normalize_profile_key(
-        placeholder
-            .trim()
-            .strip_prefix("profile.")
-            .unwrap_or_else(|| placeholder.trim()),
-    );
+    let normalized = normalize_business_profile_placeholder_key(placeholder);
     let value = match normalized.as_str() {
         "full name" | "name" | "owner" | "prepared by" | "author" | "reviewer" | "approver" => {
             &profile.full_name
@@ -5900,6 +5895,29 @@ fn business_profile_placeholder_value(
     } else {
         Some(trimmed.to_string())
     }
+}
+
+fn normalize_business_profile_placeholder_key(placeholder: &str) -> String {
+    let trimmed = placeholder.trim();
+    if let Some(rest) = trimmed.strip_prefix("profile.") {
+        return normalize_profile_key(rest);
+    }
+    if let Some(rest) = trimmed.strip_prefix("company.") {
+        return match normalize_profile_key(rest).as_str() {
+            "name" => "company name".to_string(),
+            "address" | "mailing address" => "company address".to_string(),
+            "website" | "web site" | "url" => "website".to_string(),
+            "industry" | "sector" => "industry".to_string(),
+            other => other.to_string(),
+        };
+    }
+    if let Some(rest) = trimmed.strip_prefix("client.") {
+        return match normalize_profile_key(rest).as_str() {
+            "name" | "default name" => "default client name".to_string(),
+            other => other.to_string(),
+        };
+    }
+    normalize_profile_key(trimmed)
 }
 
 fn business_profile_placeholder_text(profile: &BusinessProfile) -> String {

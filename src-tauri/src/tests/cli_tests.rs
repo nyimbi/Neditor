@@ -113,6 +113,32 @@ fn ned_cli_initializes_project_workspace_scaffold() {
         .expect("snippet");
     assert!(snippet.contains("Compliance Matrix Starter"));
     assert!(snippet.contains("{{profile.owner}}"));
+    assert!(snippet.contains("{{company.name}}"));
+    assert!(snippet.contains("{{company.website}}"));
+
+    let filled_scaffold_snippet = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "snippets".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--markdown".to_string(),
+        "business-contact-block".to_string(),
+        "--fill-profile".to_string(),
+    ])
+    .expect("filled scaffold snippet");
+    assert!(filled_scaffold_snippet
+        .message
+        .contains("**Prepared by:** Your Name"));
+    assert!(filled_scaffold_snippet
+        .message
+        .contains("**Company:** Your Company"));
+    assert!(filled_scaffold_snippet
+        .message
+        .contains("**Website:** https://example.com"));
+    assert!(!filled_scaffold_snippet.message.contains("{{company.name}}"));
+    assert!(!filled_scaffold_snippet
+        .message
+        .contains("{{company.website}}"));
 
     let rerun = crate::cli::run_cli_with_args(&args).expect("idempotent init");
     let rerun_report: serde_json::Value = serde_json::from_str(&rerun.message).expect("rerun json");
