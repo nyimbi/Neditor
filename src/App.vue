@@ -2358,7 +2358,7 @@
             </select>
           </label>
           </section>
-          <section v-show="selectedConfigurationSection === 'exports'" class="configuration-center-panel" aria-label="Export and brand configuration">
+          <section v-show="selectedConfigurationSection === 'exports' || selectedConfigurationSection === 'google-auth'" class="configuration-center-panel" aria-label="Export and brand configuration">
           <h3>Export defaults</h3>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Manifest next to export</label>
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Styles</label>
@@ -2391,6 +2391,60 @@
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Glossary</label>
           <label><input v-model="store.exportDefaults.includeAgenda" type="checkbox" /> PPTX agenda</label>
+          <section class="agent-provider-panel" aria-label="Google Docs authorization">
+            <header>
+              <div>
+                <strong>Google Docs sign-in</strong>
+                <span>Use a desktop OAuth client and keep access tokens session-only.</span>
+              </div>
+              <button type="button" @click="saveGoogleIntegrationSetup">Save Google setup</button>
+            </header>
+            <section class="agent-provider-grid">
+              <label>
+                OAuth client ID
+                <input v-model="googleClientId" placeholder="Desktop app client ID from Google Cloud" />
+              </label>
+              <label>
+                Account hint
+                <input v-model="googleAccountHint" placeholder="name@example.com" />
+              </label>
+              <label class="wide-field">
+                Google scopes
+                <textarea v-model="googleScopesText" rows="3"></textarea>
+              </label>
+            </section>
+            <div class="reference-actions">
+              <button type="button" :disabled="googleAuthBusy || !googleClientId.trim()" @click="startGoogleSignIn">
+                {{ googleAuthBusy ? "Waiting..." : "Sign in with Google" }}
+              </button>
+              <button type="button" :disabled="!googleAuthSession" @click="pollGoogleSignIn">Check callback</button>
+              <button type="button" :disabled="!googleAccessToken" @click="copyGoogleAccessToken">Copy session token</button>
+              <button type="button" :disabled="!googleAccessToken && !googleAuthSession" @click="clearGoogleSession">Clear session</button>
+            </div>
+            <p class="sidebar-hint">{{ googleAuthStatus || googleAuthSummary }}</p>
+            <div class="agent-cli-list" aria-label="Google authorization status">
+              <span>
+                Token storage
+                <code>session-only</code>
+              </span>
+              <span>
+                Scopes
+                <code>{{ googleScopeList.length }}</code>
+              </span>
+              <span v-if="googleAuthSession">
+                Redirect URI
+                <code>{{ googleAuthSession.redirect_uri }}</code>
+              </span>
+              <span v-if="googleAuthPollStartedAt">
+                Login started
+                <code>{{ googleAuthPollStartedAt }}</code>
+              </span>
+              <span v-if="googleTokenScope">
+                Granted scope
+                <code>{{ googleTokenScope }}</code>
+              </span>
+            </div>
+          </section>
           <h3>Bibliography defaults</h3>
           <label>
             Citation style
@@ -5149,6 +5203,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { homeDir } from "@tauri-apps/api/path";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EditorSelection, EditorState, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, keymap, lineNumbers, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
@@ -5308,6 +5363,15 @@ import {
   upsertFrontMatterField,
   upsertFrontMatterListField,
 } from "./lib/frontMatter";
+import {
+  googleOAuthScopesText,
+  googleOAuthTokenRequestBody,
+  normalizeGoogleIntegrationPreferences,
+  normalizeGoogleOAuthScopes,
+  type GoogleOAuthCallbackResponse,
+  type GoogleOAuthStartResponse,
+  type GoogleOAuthTokenResponse,
+} from "./lib/googleAuth";
 import { emacsSupplementalKeymap, type EmacsKillRing } from "./lib/emacsKeybindings";
 import {
   appendFrontMatterDataSource,
@@ -5747,6 +5811,17 @@ const agentProviderPackage = ref<AiProviderRequestPackage | null>(null);
 const agentProviderApiKey = ref("");
 const agentProviderBusy = ref(false);
 const agentProviderResult = ref<AiProviderExecutionResult | null>(null);
+const googleClientId = ref(store.googleIntegration.clientId);
+const googleAccountHint = ref(store.googleIntegration.accountHint);
+const googleScopesText = ref(googleOAuthScopesText(store.googleIntegration.scopes));
+const googleAuthBusy = ref(false);
+const googleAuthStatus = ref("");
+const googleAuthSession = ref<GoogleOAuthStartResponse | null>(null);
+const googleAccessToken = ref("");
+const googleTokenScope = ref("");
+const googleTokenExpiresAt = ref(store.googleIntegration.tokenExpiresAt);
+const googleAuthPollStartedAt = ref("");
+let googleAuthPollTimer: ReturnType<typeof window.setInterval> | null = null;
 const localAgentHandoffBusy = ref(false);
 const localAgentHandoffResult = ref<LocalAgentHandoffResponse | null>(null);
 const localAgentHandoffError = ref("");
@@ -7392,6 +7467,14 @@ const ttsModelDownloadPlan = computed<TtsModelDownloadPlan | null>(() => {
   return buildTtsModelDownloadPlan(store.ttsPreferences, ttsModelStorageDefault.value);
 });
 const ttsReadDisabled = computed(() => ttsReadIsDisabled(ttsBusy.value, ttsModelDownloadPlan.value));
+const googleScopeList = computed(() => normalizeGoogleOAuthScopes(googleScopesText.value));
+const googleAuthReady = computed(() => Boolean(googleClientId.value.trim() && googleScopeList.value.length && googleAccessToken.value));
+const googleAuthSummary = computed(() => {
+  if (googleAccessToken.value) return `Google authorized until ${googleTokenExpiresAt.value || "session end"}`;
+  if (store.googleIntegration.lastAuthorizedAt) return `Last authorized ${store.googleIntegration.lastAuthorizedAt}; sign in again for a session token`;
+  if (googleClientId.value.trim()) return "Google client configured; sign-in required";
+  return "Google desktop OAuth client required";
+});
 const currentConfigurationSetupStep = computed(
   () => configurationSetupStepById(configurationSetupStepId.value),
 );
@@ -7411,6 +7494,10 @@ const configurationSetupStatus = computed(() =>
     exportIncludeManifest: store.exportDefaults.includeManifest,
     exportLayoutPreset: store.exportDefaults.layoutPreset,
     citationStyle: store.bibliographyDefaults.citationStyle,
+    googleClientId: googleClientId.value,
+    googleScopeCount: googleScopeList.value.length,
+    googleAuthorized: googleAuthReady.value,
+    googleTokenExpiresAt: googleTokenExpiresAt.value,
     externalEngineCount: store.externalTransformEngines.length,
     transformReadyOrDisabled: store.externalTransformEngines.length
       ? store.externalTransformEngines.some((engine) => externalEngineSetupStatus(engine).status === "ready" || store.disabledTransformEngines[engine.name])
@@ -7443,6 +7530,10 @@ const configurationSetupStepAssistance = computed(() => {
     exportTarget: store.exportTarget,
     exportLayoutPreset: store.exportDefaults.layoutPreset,
     citationStyle: store.bibliographyDefaults.citationStyle,
+    googleClientId: googleClientId.value,
+    googleScopeCount: googleScopeList.value.length,
+    googleAuthorized: googleAuthReady.value,
+    googleTokenExpiresAt: googleTokenExpiresAt.value,
     readyEngineCount: readyEngines,
     disabledEngineCount: disabledEngines,
     externalEngineCount: store.externalTransformEngines.length,
@@ -7471,6 +7562,7 @@ const configurationCenterSections = computed(() =>
     snapshotStorage: store.snapshotStorage,
     exportTarget: store.exportTarget,
     citationStyle: store.bibliographyDefaults.citationStyle,
+    googleReady: googleAuthReady.value,
     aiProviderProfileId: store.aiProviderDefaults.profileId,
     ttsEngine: store.ttsPreferences.engine,
     externalEngineCount: store.externalTransformEngines.length,
@@ -8918,6 +9010,173 @@ function saveAgentProviderDefaults() {
   store.statusMessage = `Saved ${providerProfileById(agentProviderId.value).label} setup defaults without storing an API key`;
 }
 
+function syncGoogleIntegrationFields() {
+  googleClientId.value = store.googleIntegration.clientId;
+  googleAccountHint.value = store.googleIntegration.accountHint;
+  googleScopesText.value = googleOAuthScopesText(store.googleIntegration.scopes);
+  googleTokenExpiresAt.value = store.googleIntegration.tokenExpiresAt;
+}
+
+function saveGoogleIntegrationSetup() {
+  const preferences = normalizeGoogleIntegrationPreferences({
+    clientId: googleClientId.value,
+    accountHint: googleAccountHint.value,
+    scopes: googleScopeList.value,
+    lastAuthorizedAt: store.googleIntegration.lastAuthorizedAt,
+    tokenExpiresAt: googleTokenExpiresAt.value,
+  });
+  store.saveGoogleIntegrationPreferences(preferences);
+  googleScopesText.value = googleOAuthScopesText(preferences.scopes);
+  store.statusMessage = "Saved Google Docs OAuth setup without storing an access token";
+  return preferences;
+}
+
+function startGoogleAuthPolling() {
+  if (googleAuthPollTimer) window.clearInterval(googleAuthPollTimer);
+  googleAuthPollTimer = window.setInterval(() => {
+    void pollGoogleSignIn();
+  }, 1500);
+}
+
+function stopGoogleAuthPolling() {
+  if (!googleAuthPollTimer) return;
+  window.clearInterval(googleAuthPollTimer);
+  googleAuthPollTimer = null;
+}
+
+async function startGoogleSignIn() {
+  const preferences = saveGoogleIntegrationSetup();
+  if (!preferences.clientId) {
+    googleAuthStatus.value = "Add a Google desktop OAuth client ID before signing in";
+    return;
+  }
+  googleAuthBusy.value = true;
+  googleAuthStatus.value = "Opening Google sign-in in the system browser";
+  googleAccessToken.value = "";
+  googleTokenScope.value = "";
+  try {
+    const session = await invoke<GoogleOAuthStartResponse>("start_google_oauth_sign_in", {
+      request: {
+        client_id: preferences.clientId,
+        scopes: preferences.scopes,
+        login_hint: preferences.accountHint || null,
+      },
+    });
+    googleAuthSession.value = session;
+    googleAuthPollStartedAt.value = new Date().toISOString();
+    try {
+      await openUrl(session.authorization_url);
+    } catch {
+      window.open(session.authorization_url, "_blank", "noopener,noreferrer");
+    }
+    startGoogleAuthPolling();
+    googleAuthStatus.value = "Complete Google sign-in in the browser, then return to NEditor";
+  } catch (error) {
+    googleAuthBusy.value = false;
+    googleAuthStatus.value = appErrorText(error);
+  }
+}
+
+async function pollGoogleSignIn() {
+  const session = googleAuthSession.value;
+  if (!session) return;
+  try {
+    const response = await invoke<GoogleOAuthCallbackResponse>("poll_google_oauth_sign_in", {
+      stateId: session.state,
+    });
+    if (!response.received) {
+      googleAuthStatus.value = "Waiting for Google browser callback";
+      return;
+    }
+    stopGoogleAuthPolling();
+    googleAuthBusy.value = false;
+    if (response.error) {
+      googleAuthStatus.value = `Google sign-in failed: ${response.error}`;
+      googleAuthSession.value = null;
+      return;
+    }
+    if (!response.code) {
+      googleAuthStatus.value = "Google callback did not include an authorization code";
+      googleAuthSession.value = null;
+      return;
+    }
+    await exchangeGoogleAuthorizationCode(session, response.code);
+  } catch (error) {
+    stopGoogleAuthPolling();
+    googleAuthBusy.value = false;
+    googleAuthStatus.value = appErrorText(error);
+  }
+}
+
+async function exchangeGoogleAuthorizationCode(session: GoogleOAuthStartResponse, code: string) {
+  googleAuthBusy.value = true;
+  googleAuthStatus.value = "Exchanging Google authorization code for a session token";
+  try {
+    const body = googleOAuthTokenRequestBody(session, googleClientId.value, code);
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    const token = (await response.json()) as GoogleOAuthTokenResponse;
+    if (!response.ok || token.error || !token.access_token) {
+      throw new Error(token.error_description || token.error || `Google token exchange failed with HTTP ${response.status}`);
+    }
+    const expiresAt = token.expires_in ? new Date(Date.now() + token.expires_in * 1000).toISOString() : "";
+    googleAccessToken.value = token.access_token;
+    googleTokenScope.value = token.scope || session.scopes.join(" ");
+    googleTokenExpiresAt.value = expiresAt;
+    googleAuthSession.value = null;
+    googleAuthPollStartedAt.value = "";
+    store.saveGoogleIntegrationPreferences({
+      clientId: googleClientId.value,
+      accountHint: googleAccountHint.value,
+      scopes: session.scopes,
+      lastAuthorizedAt: new Date().toISOString(),
+      tokenExpiresAt: expiresAt,
+    });
+    googleAuthStatus.value = "Google session token is ready for Docs and Drive actions";
+    store.statusMessage = "Google Docs sign-in complete; token kept in session memory";
+  } catch (error) {
+    googleAuthStatus.value = appErrorText(error);
+  } finally {
+    googleAuthBusy.value = false;
+  }
+}
+
+async function copyGoogleAccessToken() {
+  if (!googleAccessToken.value) return;
+  try {
+    await navigator.clipboard.writeText(googleAccessToken.value);
+    googleAuthStatus.value = "Copied session-only Google access token";
+  } catch {
+    googleAuthStatus.value = "Google access token is ready in this session, but clipboard copy was unavailable";
+  }
+}
+
+async function clearGoogleSession() {
+  const sessionState = googleAuthSession.value?.state;
+  stopGoogleAuthPolling();
+  googleAuthBusy.value = false;
+  googleAccessToken.value = "";
+  googleTokenScope.value = "";
+  googleAuthSession.value = null;
+  googleAuthPollStartedAt.value = "";
+  googleTokenExpiresAt.value = "";
+  if (sessionState) {
+    try {
+      await invoke("cancel_google_oauth_sign_in", { stateId: sessionState });
+    } catch {
+      // Clearing local session state is still correct if the transient loopback listener already ended.
+    }
+  }
+  googleAuthStatus.value = "Cleared Google session token";
+}
+
+function appErrorText(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function aiProviderDefaultKeyEnv(profileId: AiProviderProfileId) {
   if (profileId === "openai-compatible" || profileId === "codex-cli") return "OPENAI_API_KEY";
   if (profileId === "anthropic-compatible" || profileId === "claude-code-cli") return "ANTHROPIC_API_KEY";
@@ -10278,6 +10537,23 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     },
   },
   { name: "Open transform templates", group: "Transforms", run: () => openTransformTemplates() },
+  {
+    name: "Configure Google Docs sign-in",
+    group: "Settings",
+    description: "Open Google Docs OAuth setup for browser sign-in and session token handling.",
+    keywords: ["google", "docs", "drive", "oauth", "sign in", "token"],
+    run: () => {
+      store.sidebar = "settings";
+      selectConfigurationSection("google-auth");
+    },
+  },
+  {
+    name: "Sign in with Google",
+    group: "Settings",
+    description: "Start the Google browser authorization flow for Docs and Drive access.",
+    keywords: ["google", "login", "oauth", "token", "docs", "drive"],
+    run: () => startGoogleSignIn(),
+  },
   { name: "Set up business identity", group: "Templates", run: () => openBusinessProfile() },
   { name: "Insert company contact block", group: "Templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
   ...businessDocumentTemplates.map((template) => ({
@@ -10568,6 +10844,13 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-export-current":
       await exportDocument();
       break;
+    case "neditor-configure-google-docs":
+      store.sidebar = "settings";
+      selectConfigurationSection("google-auth");
+      break;
+    case "neditor-sign-in-google":
+      await startGoogleSignIn();
+      break;
     case "neditor-open-folder":
       await openFolder();
       break;
@@ -10769,6 +11052,7 @@ function installE2eAppHooks() {
 
 onMounted(async () => {
   await store.boot();
+  syncGoogleIntegrationFields();
   await openPendingCliPaths();
   await loadTransformHandlerInstallers();
   await loadDefaultMarkdownReaderPlan();
@@ -10815,6 +11099,7 @@ onBeforeUnmount(() => {
   delete window.__NEDITOR_APP_E2E__;
   unlistenNativeMenuCommand?.();
   unlistenNativeMenuCommand = null;
+  stopGoogleAuthPolling();
   stopDocsLiveDictation();
   stopPaneResize();
 });
@@ -10829,6 +11114,7 @@ watch(guidedDemoOpen, (open) => handleModalStateChange(open, guidedDemoDialog));
 watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteDialog));
 watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
 watch(() => store.aiProviderDefaults, applyStoredAiProviderDefaults, { deep: true });
+watch(() => store.googleIntegration, syncGoogleIntegrationFields, { deep: true });
 
 watch(
   () => active.value.id,
@@ -22652,6 +22938,10 @@ select:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
+}
+
+.agent-provider-grid .wide-field {
+  grid-column: 1 / -1;
 }
 
 .tts-model-download-notice {

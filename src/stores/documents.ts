@@ -5,7 +5,13 @@ import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/p
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessDocuments";
-import { saveAiProviderDefaultsState, saveBusinessProfileState, saveTtsPreferencesState } from "../lib/configurationProfiles";
+import {
+  saveAiProviderDefaultsState,
+  saveBusinessProfileState,
+  saveGoogleIntegrationPreferencesState,
+  saveTtsPreferencesState,
+} from "../lib/configurationProfiles";
+import { normalizeGoogleIntegrationPreferences } from "../lib/googleAuth";
 import {
   acceptExternalRootConflictState,
   applyExternalRootReloadState,
@@ -122,6 +128,7 @@ import {
   type ExportTarget,
   type AgentRunHistoryItem,
   type AiProviderDefaults,
+  type GoogleIntegrationPreferences,
   type PersistedScrollPosition,
   type PreviewTheme,
   type SnapshotStorage,
@@ -367,6 +374,7 @@ export const useDocumentsStore = defineStore("documents", {
     brandProfileDefaults: normalizeBrandProfileDefaults({}),
     businessProfile: normalizeBusinessProfile({}) as BusinessProfile,
     aiProviderDefaults: normalizeAiProviderDefaults({}) as AiProviderDefaults,
+    googleIntegration: normalizeGoogleIntegrationPreferences({}) as GoogleIntegrationPreferences,
     ttsPreferences: normalizeTtsPreferences({}) as TtsPreferences,
     exportProfiles: [] as ExportProfile[],
     activeExportProfileId: "",
@@ -525,6 +533,12 @@ export const useDocumentsStore = defineStore("documents", {
       const next = saveAiProviderDefaultsState(this.aiProviderDefaults, defaults);
       if (!next.changed) return;
       this.aiProviderDefaults = next.value;
+      void this.persistWorkspace();
+    },
+    saveGoogleIntegrationPreferences(defaults: Partial<GoogleIntegrationPreferences>) {
+      const next = saveGoogleIntegrationPreferencesState(this.googleIntegration, defaults);
+      if (!next.changed) return;
+      this.googleIntegration = next.value;
       void this.persistWorkspace();
     },
     saveTtsPreferences(defaults: Partial<TtsPreferences>) {

@@ -1,5 +1,6 @@
 import { activeDocumentState } from "./documentSelectors.js";
 import { normalizeBusinessProfile } from "./businessDocuments.js";
+import { normalizeGoogleIntegrationPreferences } from "./googleAuth.js";
 import { normalizeCustomTransformTemplates } from "./transformTemplates.js";
 import { applyPersistedUiPreferences } from "./uiPreferences.js";
 import {
@@ -55,6 +56,7 @@ export interface WorkspacePersistenceStateInput {
   brandProfileDefaults: RequiredPersistedValue<"brandProfileDefaults">;
   businessProfile: RequiredPersistedValue<"businessProfile">;
   aiProviderDefaults: RequiredPersistedValue<"aiProviderDefaults">;
+  googleIntegration: RequiredPersistedValue<"googleIntegration">;
   ttsPreferences: RequiredPersistedValue<"ttsPreferences">;
   exportProfiles: RequiredPersistedValue<"exportProfiles">;
   activeExportProfileId: string;
@@ -114,6 +116,7 @@ export function applyPersistedWorkspacePreferenceState(
     gitIntegration: persisted.gitIntegration ? normalizeGitIntegrationPreferences(persisted.gitIntegration) : current.gitIntegration,
     aiCleanupDefaults: persisted.aiCleanupDefaults ? normalizeAiCleanupDefaults(persisted.aiCleanupDefaults) : current.aiCleanupDefaults,
     aiProviderDefaults: normalizeAiProviderDefaults(persisted.aiProviderDefaults),
+    googleIntegration: normalizeGoogleIntegrationPreferences(persisted.googleIntegration),
     ttsPreferences: normalizeTtsPreferences(persisted.ttsPreferences),
     agentRunHistory: normalizeAgentRunHistory(persisted.agentRunHistory),
     docsLiveDraftHistory: normalizeDocsLiveDraftHistory(persisted.docsLiveDraftHistory),
@@ -174,6 +177,7 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     brandProfileDefaults: state.brandProfileDefaults,
     businessProfile: state.businessProfile,
     aiProviderDefaults: state.aiProviderDefaults,
+    googleIntegration: state.googleIntegration,
     ttsPreferences: state.ttsPreferences,
     exportProfiles: state.exportProfiles,
     activeExportProfileId: state.activeExportProfileId,

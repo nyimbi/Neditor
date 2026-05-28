@@ -1,8 +1,10 @@
 import { normalizeBusinessProfile, type BusinessProfile } from "./businessDocuments.js";
+import { normalizeGoogleIntegrationPreferences } from "./googleAuth.js";
 import {
   normalizeAiProviderDefaults,
   normalizeTtsPreferences,
   type AiProviderDefaults,
+  type GoogleIntegrationPreferences,
   type TtsPreferences,
 } from "./workspacePersistence.js";
 
@@ -28,6 +30,14 @@ export function saveAiProviderDefaultsState(
   defaults: Partial<AiProviderDefaults>,
 ): ConfigurationProfileStateResult<AiProviderDefaults> {
   const value = normalizeAiProviderDefaults(defaults);
+  return { value, changed: changedByJson(current, value) };
+}
+
+export function saveGoogleIntegrationPreferencesState(
+  current: GoogleIntegrationPreferences,
+  defaults: Partial<GoogleIntegrationPreferences>,
+): ConfigurationProfileStateResult<GoogleIntegrationPreferences> {
+  const value = normalizeGoogleIntegrationPreferences(defaults);
   return { value, changed: changedByJson(current, value) };
 }
 

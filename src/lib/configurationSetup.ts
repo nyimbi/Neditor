@@ -36,6 +36,12 @@ export const configurationSetupSteps = [
     actionLabel: "Review exports",
   },
   {
+    id: "google-auth",
+    title: "Google Docs authorization",
+    summary: "Configure Google sign-in for Docs and Drive export workflows with session-only tokens.",
+    actionLabel: "Connect Google",
+  },
+  {
     id: "transforms",
     title: "Transforms and templates",
     summary: "Configure external engines, trusted paths, timeout, input modes, and reusable calculation templates.",
@@ -88,6 +94,10 @@ export interface ConfigurationSetupStatusInput {
   exportIncludeManifest: boolean;
   exportLayoutPreset: string;
   citationStyle: string;
+  googleClientId: string;
+  googleScopeCount: number;
+  googleAuthorized: boolean;
+  googleTokenExpiresAt: string;
   externalEngineCount: number;
   transformReadyOrDisabled: boolean;
 }
@@ -111,6 +121,10 @@ export interface ConfigurationSetupAssistanceInput {
   exportTarget: string;
   exportLayoutPreset: string;
   citationStyle: string;
+  googleClientId: string;
+  googleScopeCount: number;
+  googleAuthorized: boolean;
+  googleTokenExpiresAt: string;
   readyEngineCount: number;
   disabledEngineCount: number;
   externalEngineCount: number;
@@ -124,6 +138,7 @@ export interface ConfigurationCenterSectionInput {
   snapshotStorage: string;
   exportTarget: string;
   citationStyle: string;
+  googleReady: boolean;
   aiProviderProfileId: string;
   ttsEngine: string;
   externalEngineCount: number;
@@ -142,6 +157,7 @@ export function buildConfigurationSetupStatus(input: ConfigurationSetupStatusInp
   const llmDone = Boolean(input.aiProviderProfileId && input.aiProviderModel && input.aiProviderKeyEnv);
   const runtimeDone = input.docsLiveRuntimeIssueCount !== null;
   const exportDone = Boolean(input.exportIncludeManifest && input.exportLayoutPreset && input.citationStyle);
+  const googleDone = Boolean(input.googleClientId && input.googleScopeCount && input.googleAuthorized);
   const items: ConfigurationSetupStatusItem[] = [
     {
       id: "identity",
@@ -169,6 +185,12 @@ export function buildConfigurationSetupStatus(input: ConfigurationSetupStatusInp
       detail: input.ttsRuntimeSummary,
     },
     { id: "exports", label: "Exports", done: exportDone, detail: input.exportTarget.toUpperCase() },
+    {
+      id: "google-auth",
+      label: "Google Docs",
+      done: googleDone,
+      detail: googleDone ? `authorized until ${input.googleTokenExpiresAt || "session end"}` : "sign-in required",
+    },
     {
       id: "transforms",
       label: "Transforms",
@@ -235,6 +257,17 @@ export function buildConfigurationSetupStepAssistance(input: ConfigurationSetupA
       rationale = "Production export setup needs consistent metadata and evidence packages across PDF, DOCX, HTML, Google Docs, LaTeX, EPUB, blog, and Substack targets.";
       contextSignals.push(`Export target: ${input.exportTarget}`, `Layout preset: ${input.exportLayoutPreset}`);
       break;
+    case "google-auth":
+      suggestedAnswer = input.googleAuthorized
+        ? `Google authorization is ready for this session with ${input.googleScopeCount} scope(s). Keep the access token session-only, use the configured desktop OAuth client, and reauthorize before Google Docs import/export evidence if the token expires at ${input.googleTokenExpiresAt || "session end"}.`
+        : `Add a desktop OAuth client ID, keep the Google Docs and Drive scopes least-privilege, then sign in with Google before exporting or verifying Google Docs collaboration packages.`;
+      rationale = "Google Docs distribution needs an explicit user grant; NEditor should never store Google access tokens in workspace preferences.";
+      contextSignals.push(
+        `Google client ID: ${input.googleClientId ? "configured" : "missing"}`,
+        `Google scope count: ${input.googleScopeCount}`,
+        `Google authorized: ${input.googleAuthorized ? "yes" : "no"}`,
+      );
+      break;
     case "transforms":
       suggestedAnswer = `Configure only the transform engines users actually need. Ready engines: ${input.readyEngineCount}; disabled engines: ${input.disabledEngineCount}; total known engines: ${input.externalEngineCount}. Keep untrusted handlers disabled until paths, permissions, timeouts, and input modes are verified.`;
       rationale = "Transform setup can execute external tools, so handler readiness must be explicit, trust-gated, and easy to audit.";
@@ -289,6 +322,12 @@ export function buildConfigurationCenterSections(input: ConfigurationCenterSecti
       label: "Exports and brand",
       summary: `${input.exportTarget.toUpperCase()}; ${input.citationStyle}`,
       detail: "Export defaults, publishing metadata, bibliography style, layout, and brand package.",
+    },
+    {
+      id: "google-auth",
+      label: "Google Docs",
+      summary: input.googleReady ? "authorized" : "needs sign-in",
+      detail: "Google account authorization, Docs scopes, Drive file access, and session token state.",
     },
     {
       id: "ai",

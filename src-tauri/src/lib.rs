@@ -26,6 +26,7 @@ mod generated_sections;
 mod git;
 mod git_support;
 mod git_types;
+mod google_auth;
 mod html_preview;
 mod indexing;
 mod layout;
@@ -99,6 +100,10 @@ use git::{
 use git_support::run_git;
 #[cfg(test)]
 use git_types::{GitCommitRequest, GitPathRequest, GitRestoreRequest, GitTagRequest};
+use google_auth::{
+    cancel_google_oauth_sign_in, poll_google_oauth_sign_in, start_google_oauth_sign_in,
+    GoogleAuthState,
+};
 use local_agents::prepare_local_agent_handoff;
 use rfp_import::import_rfp_source;
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
@@ -135,6 +140,7 @@ pub fn run() {
             }
         })
         .manage(FileWatcherState::default())
+        .manage(GoogleAuthState::default())
         .manage(NativeTtsState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -169,6 +175,9 @@ pub fn run() {
             prepare_for_export,
             import_spreadsheet_table,
             export_markdown_tables,
+            start_google_oauth_sign_in,
+            poll_google_oauth_sign_in,
+            cancel_google_oauth_sign_in,
             import_rfp_source,
             prepare_local_agent_handoff,
             create_snapshot,
@@ -237,6 +246,18 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             "Substack Package Export",
         )?)
         .item(&menu_item(app, "neditor-export-latex", "LaTeX Export")?)
+        .separator()
+        .item(&menu_item(
+            app,
+            "neditor-configure-google-docs",
+            "Configure Google Docs Sign-In",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-sign-in-google",
+            "Sign in with Google",
+        )?)
+        .separator()
         .item(&menu_item(
             app,
             "neditor-export-google-docs",

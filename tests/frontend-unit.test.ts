@@ -199,6 +199,13 @@ import {
   isConfigurationSetupStepId,
 } from "../src/lib/configurationSetup.js";
 import {
+  googleOAuthScopesText,
+  googleOAuthTokenRequestBody,
+  normalizeGoogleIntegrationPreferences,
+  normalizeGoogleOAuthScopes,
+  type GoogleOAuthStartResponse,
+} from "../src/lib/googleAuth.js";
+import {
   buildTtsModelDownloadPlan,
   formatTtsRuntimeSummary,
   formatTtsSetupSummary,
@@ -4712,11 +4719,16 @@ test("configuration setup helpers score readiness and generate context-aware ass
     exportIncludeManifest: true,
     exportLayoutPreset: "board",
     citationStyle: "apa",
+    googleClientId: "desktop-client.apps.googleusercontent.com",
+    googleScopeCount: 2,
+    googleAuthorized: true,
+    googleTokenExpiresAt: "2026-05-28T12:00:00.000Z",
     externalEngineCount: 6,
     transformReadyOrDisabled: true,
   });
-  equal(formatConfigurationSetupSummary(status), "6/8 setup areas ready");
+  equal(formatConfigurationSetupSummary(status), "7/9 setup areas ready");
   equal(status.items.find((item) => item.id === "tts")?.done, false);
+  equal(status.items.find((item) => item.id === "google-auth")?.detail, "authorized until 2026-05-28T12:00:00.000Z");
   equal(status.items.find((item) => item.id === "release")?.detail, "external evidence required");
   equal(configurationSetupStepById("unknown").id, "identity");
   equal(isConfigurationSetupStepId("transforms"), true);
@@ -4740,6 +4752,10 @@ test("configuration setup helpers score readiness and generate context-aware ass
     exportTarget: "pdf",
     exportLayoutPreset: "board",
     citationStyle: "apa",
+    googleClientId: "desktop-client.apps.googleusercontent.com",
+    googleScopeCount: 2,
+    googleAuthorized: true,
+    googleTokenExpiresAt: "2026-05-28T12:00:00.000Z",
     readyEngineCount: 2,
     disabledEngineCount: 1,
     externalEngineCount: 6,
@@ -4749,20 +4765,54 @@ test("configuration setup helpers score readiness and generate context-aware ass
   ok(configurationSetupAssistanceBlock(assistance).includes("Context signals:"));
 
   const sections = buildConfigurationCenterSections({
-    setupSummary: "6/8 setup areas ready",
+    setupSummary: "7/9 setup areas ready",
     toolbarDisplay: "both",
     editorKeymapMode: "default",
     autosave: true,
     snapshotStorage: "project",
     exportTarget: "pdf",
     citationStyle: "apa",
+    googleReady: true,
     aiProviderProfileId: "openai-compatible",
     ttsEngine: "supertonic-cli",
     externalEngineCount: 6,
     installerPlanCount: 3,
   });
-  deepEqual(sections.map((section) => section.id), ["overview", "appearance", "files", "exports", "ai", "transforms"]);
+  deepEqual(sections.map((section) => section.id), ["overview", "appearance", "files", "exports", "google-auth", "ai", "transforms"]);
   equal(sections.find((section) => section.id === "transforms")?.summary, "6 external engines; 3 installer plan");
+});
+
+test("Google OAuth helpers normalize setup without exposing stored tokens", () => {
+  const preferences = normalizeGoogleIntegrationPreferences({
+    clientId: " desktop-client.apps.googleusercontent.com ",
+    scopes: [
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive.file",
+      "profile",
+      "https://www.googleapis.com/auth/documents",
+    ],
+    accountHint: " user@example.com ",
+    lastAuthorizedAt: "2026-05-28T10:00:00.000Z",
+    tokenExpiresAt: "2026-05-28T11:00:00.000Z",
+    accessToken: "must-not-persist",
+  });
+  deepEqual(preferences.scopes, ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/documents"]);
+  equal(preferences.clientId, "desktop-client.apps.googleusercontent.com");
+  equal(googleOAuthScopesText(preferences.scopes), "https://www.googleapis.com/auth/drive.file\nhttps://www.googleapis.com/auth/documents");
+  deepEqual(normalizeGoogleOAuthScopes("profile"), ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/documents"]);
+
+  const session: GoogleOAuthStartResponse = {
+    authorization_url: "https://accounts.google.com/o/oauth2/v2/auth",
+    redirect_uri: "http://127.0.0.1:4321/google-oauth-callback",
+    state: "state",
+    code_verifier: "verifier",
+    scopes: preferences.scopes,
+    expires_in_seconds: 300,
+  };
+  const body = googleOAuthTokenRequestBody(session, preferences.clientId, "code 123");
+  equal(body.get("grant_type"), "authorization_code");
+  equal(body.get("code_verifier"), "verifier");
+  equal(body.get("redirect_uri"), session.redirect_uri);
 });
 
 test("AI provider execution extracts Markdown without persisting secrets", async () => {
@@ -4918,6 +4968,14 @@ test("workspace persistence migration versions and normalizes saved settings", (
       endpoint: " https://api.openai.com/v1/chat/completions ",
       model: " gpt-4.1 ",
       keyEnv: "openai api key",
+    },
+    googleIntegration: {
+      clientId: " desktop-client.apps.googleusercontent.com ",
+      scopes: ["profile", "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive.file"],
+      accountHint: " user@example.com ",
+      lastAuthorizedAt: "2026-05-28T10:00:00.000Z",
+      tokenExpiresAt: "2026-05-28T11:00:00.000Z",
+      accessToken: "not-persisted",
     },
     ttsPreferences: {
       engine: "supertonic-cli",
@@ -5259,6 +5317,13 @@ test("workspace persistence migration versions and normalizes saved settings", (
     model: "gpt-4.1",
     keyEnv: "OPENAI_API_KEY",
   });
+  deepEqual(migrated.googleIntegration, {
+    clientId: "desktop-client.apps.googleusercontent.com",
+    scopes: ["https://www.googleapis.com/auth/drive.file"],
+    accountHint: "user@example.com",
+    lastAuthorizedAt: "2026-05-28T10:00:00.000Z",
+    tokenExpiresAt: "2026-05-28T11:00:00.000Z",
+  });
   deepEqual(migrated.ttsPreferences, {
     engine: "supertonic-cli",
     voice: "Samantha",
@@ -5562,6 +5627,7 @@ test("workspace persistence state helper builds normalized store snapshots", () 
     brandProfileDefaults: { name: "Acme", color: "#123456" },
     businessProfile: normalizeBusinessProfile({ companyName: "Acme" }),
     aiProviderDefaults: normalizeAiProviderDefaults({ profileId: "openai-compatible", model: "gpt-4.1" }),
+    googleIntegration: normalizeGoogleIntegrationPreferences({ clientId: "desktop-client", scopes: ["https://www.googleapis.com/auth/drive.file"] }),
     ttsPreferences: normalizeTtsPreferences({ engine: "macos-say", voice: "Samantha" }),
     exportProfiles: [],
     activeExportProfileId: "profile-missing",
@@ -5600,6 +5666,7 @@ test("workspace persistence state helper builds normalized store snapshots", () 
   equal(workspace.transformTimeoutMs, 30_000);
   deepEqual(workspace.transformInputModes, { dot: "file" });
   deepEqual(workspace.transformEnginePaths, { dot: "/usr/bin/dot" });
+  deepEqual(workspace.googleIntegration?.scopes, ["https://www.googleapis.com/auth/drive.file"]);
   deepEqual(workspace.guidedDemoCompletedStepIds, ["intro", "ai-create"]);
 });
 
@@ -5635,6 +5702,7 @@ test("workspace persistence state helper applies persisted preferences and resto
     brandProfileDefaults: { name: "Current", color: "#000000" },
     businessProfile: normalizeBusinessProfile({ companyName: "Current Co" }),
     aiProviderDefaults: normalizeAiProviderDefaults({ profileId: "none" }),
+    googleIntegration: normalizeGoogleIntegrationPreferences({}),
     ttsPreferences: normalizeTtsPreferences({ engine: "off" }),
     exportProfiles: [],
     activeExportProfileId: "",
@@ -5668,6 +5736,7 @@ test("workspace persistence state helper applies persisted preferences and resto
       activeExportProfileId: "board-pdf",
       businessProfile: { companyName: " Loaded Co ", email: " team@example.com " },
       aiProviderDefaults: { profileId: "openai-compatible", model: " gpt-4.1 " },
+      googleIntegration: { clientId: " desktop-client ", scopes: ["https://www.googleapis.com/auth/documents"], accountHint: " user@example.com " },
       ttsPreferences: { engine: "macos-say", voice: " Samantha " },
       aiCleanupDefaults: { preserveHeadings: true },
       recentFiles: ["/a.md", "/b.md"],
@@ -5696,6 +5765,8 @@ test("workspace persistence state helper applies persisted preferences and resto
   equal(result.state.activeExportProfileId, "board-pdf");
   equal(result.state.businessProfile.companyName, "Loaded Co");
   equal(result.state.aiProviderDefaults.model, "gpt-4.1");
+  equal(result.state.googleIntegration.clientId, "desktop-client");
+  deepEqual(result.state.googleIntegration.scopes, ["https://www.googleapis.com/auth/documents"]);
   equal(result.state.ttsPreferences.voice, "Samantha");
   equal(result.state.aiCleanupDefaults.preserveHeadings, true);
   deepEqual(result.state.recentFiles, ["/a.md", "/b.md"]);
@@ -6416,6 +6487,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(configurationSetup.includes("Exports and brand"));
   ok(configurationSetup.includes("AI, agents, and voice"));
   ok(app.includes("LLM access defaults"));
+  ok(app.includes('aria-label="Google Docs authorization"'));
+  ok(app.includes("Sign in with Google"));
+  ok(app.includes("start_google_oauth_sign_in"));
+  ok(app.includes("poll_google_oauth_sign_in"));
+  ok(app.includes("oauth2.googleapis.com/token"));
+  ok(app.includes("session-only Google access token"));
   ok(app.includes("Open configuration setup wizard"));
   ok(app.includes("saveAgentProviderDefaults"));
   ok(app.includes("aiProviderDefaultKeyEnv"));
@@ -6770,6 +6847,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Help")'));
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
   ok(tauriLib.includes('"neditor-export-epub", "EPUB Export"'));
+  ok(tauriLib.includes('"neditor-configure-google-docs"'));
+  ok(tauriLib.includes('"neditor-sign-in-google"'));
   ok(tauriLib.includes('"neditor-open-docs-live", "Docs Live"'));
   ok(tauriLib.includes('"neditor-open-table-editor",'));
   ok(tauriLib.includes('"neditor-edit-table-at-cursor",'));
@@ -6795,6 +6874,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-mode-outline", "Outline Mode"'));
   ok(app.includes('case "neditor-mode-export"'));
   ok(app.includes('case "neditor-mode-outline"'));
+  ok(app.includes('case "neditor-configure-google-docs"'));
+  ok(app.includes('case "neditor-sign-in-google"'));
   ok(app.includes('case "neditor-open-table-editor"'));
   ok(app.includes('case "neditor-edit-table-at-cursor"'));
   ok(app.includes('case "neditor-go-to-source-table"'));

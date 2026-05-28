@@ -1,6 +1,7 @@
 import type { AiCleanupOptions } from "../types.js";
 import type { AiProviderProfileId } from "./aiProviderPackages.js";
 import { normalizeBusinessProfile, type BusinessProfile } from "./businessDocuments.js";
+import { normalizeGoogleIntegrationPreferences, type GoogleIntegrationPreferences } from "./googleAuth.js";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "./transformTemplates.js";
 
 export const WORKSPACE_SCHEMA_VERSION = 2;
@@ -115,6 +116,8 @@ export interface AiProviderDefaults {
   model: string;
   keyEnv: string;
 }
+
+export type { GoogleIntegrationPreferences };
 
 export type TtsEngineId = "browser-speech" | "macos-say" | "supertonic-cli";
 
@@ -400,6 +403,7 @@ export interface PersistedWorkspace {
   brandProfileDefaults?: Partial<BrandProfileDefaults>;
   businessProfile?: Partial<BusinessProfile>;
   aiProviderDefaults?: Partial<AiProviderDefaults>;
+  googleIntegration?: Partial<GoogleIntegrationPreferences>;
   ttsPreferences?: Partial<TtsPreferences>;
   exportProfiles?: Partial<ExportProfile>[];
   activeExportProfileId?: string;
@@ -1180,6 +1184,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (isRecord(raw.brandProfileDefaults)) migrated.brandProfileDefaults = normalizeBrandProfileDefaults(raw.brandProfileDefaults);
   migrated.businessProfile = normalizeBusinessProfile(raw.businessProfile);
   migrated.aiProviderDefaults = normalizeAiProviderDefaults(raw.aiProviderDefaults);
+  migrated.googleIntegration = normalizeGoogleIntegrationPreferences(raw.googleIntegration);
   migrated.ttsPreferences = normalizeTtsPreferences(raw.ttsPreferences);
   const exportProfiles = normalizeExportProfiles(raw.exportProfiles);
   if (exportProfiles.length) {
