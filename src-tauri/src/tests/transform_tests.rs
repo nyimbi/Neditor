@@ -1508,6 +1508,27 @@ fn vega_lite_preview_preserves_negative_values_aggregation_and_axis_titles() {
 }
 
 #[test]
+fn vega_lite_count_aggregate_renders_row_counts_without_y_field() {
+    let artifact = run_transform(
+            "vega-lite".to_string(),
+            r##"{"mark":{"type":"bar"},"title":"Open Issues by Severity","data":{"values":[{"severity":"Critical","owner":"Security"},{"severity":"Critical","owner":"Security"},{"severity":"High","owner":"Delivery"},{"severity":"Low","owner":"Support"}]},"encoding":{"x":{"field":"severity","type":"nominal","title":"Severity"},"y":{"aggregate":"count","type":"quantitative","title":"Open items"},"color":{"field":"owner","type":"nominal"}}}"##.to_string(),
+        )
+        .expect("vega-lite count aggregate transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("Open Issues by Severity"));
+    assert!(artifact.html.contains("data-vega-mark=\"bar\""));
+    assert!(artifact.html.contains("data-vega-aggregate=\"count\""));
+    assert!(artifact.html.contains(">Severity<"));
+    assert!(artifact.html.contains(">Open items<"));
+    assert!(artifact.html.contains("data-series=\"Security\""));
+    assert!(artifact.html.contains("data-value=\"2\""));
+    assert!(artifact.html.contains("data-value=\"1\""));
+    assert!(!artifact.html.contains("Missing y encoding"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn vega_lite_rule_mark_renders_reference_lines() {
     let horizontal = run_transform(
             "vega-lite".to_string(),

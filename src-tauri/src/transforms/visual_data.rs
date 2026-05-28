@@ -51,15 +51,16 @@ pub(crate) fn render_vega_lite_svg(
     let Some(x_field) = vega_lite_encoding_field(&spec, "x") else {
         return vega_lite_missing_field("x", artifact_diags, diagnostics);
     };
-    let Some(y_field) = vega_lite_encoding_field(&spec, "y") else {
-        return vega_lite_missing_field("y", artifact_diags, diagnostics);
-    };
+    let y_field = vega_lite_encoding_field(&spec, "y");
     let size_field = vega_lite_encoding_field(&spec, "size");
     let y_aggregate = vega_lite_encoding_aggregate(&spec, "y");
+    if y_field.is_none() && !vega_lite_is_count_aggregate(y_aggregate.as_deref()) {
+        return vega_lite_missing_field("y", artifact_diags, diagnostics);
+    }
     let values = vega_lite_values(
         &spec,
         &x_field,
-        &y_field,
+        y_field.as_deref(),
         color_field.as_deref(),
         text_field.as_deref(),
         size_field.as_deref(),
@@ -82,8 +83,17 @@ pub(crate) fn render_vega_lite_svg(
         .and_then(Value::as_str)
         .unwrap_or("Vega-Lite chart");
     let x_title = vega_lite_encoding_title(&spec, "x").unwrap_or(x_field);
-    let y_title = vega_lite_encoding_title(&spec, "y").unwrap_or(y_field);
-    render_vega_lite_chart_svg(title, &mark, &values, &x_title, &y_title)
+    let y_title = vega_lite_encoding_title(&spec, "y")
+        .or(y_field)
+        .unwrap_or_else(|| "Count".to_string());
+    render_vega_lite_chart_svg(
+        title,
+        &mark,
+        &values,
+        &x_title,
+        &y_title,
+        y_aggregate.as_deref(),
+    )
 }
 
 pub(crate) fn render_geojson_svg(
@@ -295,7 +305,16 @@ fn vega_lite_encoding_aggregate(spec: &Value, channel: &str) -> Option<String> {
     spec.pointer(&format!("/encoding/{channel}/aggregate"))
         .and_then(Value::as_str)
         .map(|value| value.trim().to_ascii_lowercase())
-        .filter(|value| matches!(value.as_str(), "sum" | "mean" | "average" | "min" | "max"))
+        .filter(|value| {
+            matches!(
+                value.as_str(),
+                "sum" | "mean" | "average" | "avg" | "min" | "max" | "count"
+            )
+        })
+}
+
+fn vega_lite_is_count_aggregate(aggregate: Option<&str>) -> bool {
+    aggregate.is_some_and(|value| value == "count")
 }
 
 fn vega_lite_encoding_numeric_datum(spec: &Value, channel: &str) -> Option<f64> {
@@ -336,7 +355,7 @@ enum VegaLiteRuleSource {
 fn vega_lite_values(
     spec: &Value,
     x_field: &str,
-    y_field: &str,
+    y_field: Option<&str>,
     color_field: Option<&str>,
     text_field: Option<&str>,
     size_field: Option<&str>,
@@ -349,9 +368,12 @@ fn vega_lite_values(
         .flatten()
         .filter_map(|row| {
             let x = row.get(x_field).map(value_to_axis_label)?;
-            let y = row
-                .get(y_field)
-                .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))?;
+            let y = if vega_lite_is_count_aggregate(y_aggregate) {
+                1.0
+            } else {
+                row.get(y_field?)
+                    .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))?
+            };
             let series = color_field
                 .and_then(|field| row.get(field))
                 .map(value_to_axis_label)
@@ -547,9 +569,10 @@ fn aggregate_vega_bucket(values: &[f64], aggregate: &str) -> Option<f64> {
     }
     match aggregate {
         "sum" => Some(values.iter().sum()),
-        "mean" | "average" => Some(values.iter().sum::<f64>() / values.len() as f64),
+        "mean" | "average" | "avg" => Some(values.iter().sum::<f64>() / values.len() as f64),
         "min" => values.iter().copied().reduce(f64::min),
         "max" => values.iter().copied().reduce(f64::max),
+        "count" => Some(values.len() as f64),
         _ => None,
     }
 }
@@ -586,6 +609,7 @@ fn render_vega_lite_chart_svg(
     values: &[VegaLiteDatum],
     x_title: &str,
     y_title: &str,
+    y_aggregate: Option<&str>,
 ) -> String {
     let domain = VegaLiteDomain::from_values(values);
     let width = 820usize;
@@ -596,8 +620,12 @@ fn render_vega_lite_chart_svg(
     let series = unique_vega_series(values);
     let size_domain = VegaLiteSizeDomain::from_values(values);
     let step = plot_width / labels.len().max(1);
+    let aggregate_attr = y_aggregate
+        .map(|aggregate| format!(" data-vega-aggregate=\"{}\"", escape_html(aggregate)))
+        .unwrap_or_default();
     let mut svg = format!(
-        "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\"><text x=\"72\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><line x1=\"72\" y1=\"262\" x2=\"770\" y2=\"262\" stroke=\"#94a3b8\"/><line x1=\"72\" y1=\"54\" x2=\"72\" y2=\"262\" stroke=\"#94a3b8\"/><line class=\"vega-zero-line\" x1=\"72\" y1=\"{:.1}\" x2=\"770\" y2=\"{:.1}\" stroke=\"#64748b\" stroke-dasharray=\"4 3\"/>",
+        "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\" data-vega-mark=\"{}\"{aggregate_attr}><text x=\"72\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><line x1=\"72\" y1=\"262\" x2=\"770\" y2=\"262\" stroke=\"#94a3b8\"/><line x1=\"72\" y1=\"54\" x2=\"72\" y2=\"262\" stroke=\"#94a3b8\"/><line class=\"vega-zero-line\" x1=\"72\" y1=\"{:.1}\" x2=\"770\" y2=\"{:.1}\" stroke=\"#64748b\" stroke-dasharray=\"4 3\"/>",
+        escape_html(mark),
         escape_html(title),
         domain.zero_y,
         domain.zero_y

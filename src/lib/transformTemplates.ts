@@ -890,6 +890,34 @@ valueSuffix: "%"
     ["vega-lite", "grouped"],
   ),
   template(
+    "vega-lite-count-by-category",
+    "Charts",
+    "vega-lite",
+    "Count by category bar",
+    "Creates a Vega-Lite count aggregate chart for issue, response, or pipeline distributions.",
+    fenced(
+      "vega-lite",
+      `{
+  "mark": { "type": "bar" },
+  "title": "Open items by severity",
+  "data": {
+    "values": [
+      { "severity": "Critical", "owner": "Security" },
+      { "severity": "Critical", "owner": "Security" },
+      { "severity": "High", "owner": "Delivery" },
+      { "severity": "Low", "owner": "Support" }
+    ]
+  },
+  "encoding": {
+    "x": { "field": "severity", "type": "nominal", "title": "Severity" },
+    "y": { "aggregate": "count", "type": "quantitative", "title": "Open items" },
+    "color": { "field": "owner", "type": "nominal" }
+  }
+}`,
+    ),
+    ["vega-lite", "count", "distribution", "issues"],
+  ),
+  template(
     "vega-lite-risk-ticks",
     "Charts",
     "vega-lite",

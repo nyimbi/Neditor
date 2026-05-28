@@ -7185,6 +7185,11 @@ test("transform template library covers reusable calculations and custom templat
   if (!vegaTickTemplate) throw new Error("missing Vega-Lite tick template");
   ok(vegaTickTemplate.body.includes('"type": "tick"'));
   ok(vegaTickTemplate.tags.includes("qa"));
+  const vegaCountTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-count-by-category");
+  if (!vegaCountTemplate) throw new Error("missing Vega-Lite count template");
+  ok(vegaCountTemplate.body.includes('"aggregate": "count"'));
+  ok(vegaCountTemplate.body.includes('"y": { "aggregate": "count"'));
+  ok(vegaCountTemplate.tags.includes("distribution"));
   const vegaScatterTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-opportunity-scatter");
   if (!vegaScatterTemplate) throw new Error("missing Vega-Lite scatter template");
   ok(vegaScatterTemplate.body.includes('"type": "circle"'));
