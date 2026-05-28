@@ -812,7 +812,7 @@ fn compiler_loads_front_matter_xlsx_data_sources() {
     fs::create_dir_all(root.join("data")).expect("create xlsx data dir");
     let xlsx_path = root.join("data").join("forecast.xlsx");
     crate::data_exchange::export_markdown_tables(crate::data_exchange::ExportMarkdownTablesRequest {
-        markdown: "Table: Forecast\n| Region | Revenue | Risk |\n| --- | ---: | --- |\n| East | 120 | Low |\n| West | 95 | Watch |\n".to_string(),
+        markdown: "Table: Forecast\n| Region | Revenue | Risk |\n| --- | ---: | --- |\n| East | 120 | Low |\n| West | 95 | Watch |\n\nTable: Risk Sheet\n| Risk | Owner |\n| --- | --- |\n| Scope | PMO |\n| Funding | Finance |\n".to_string(),
         output_path: path_to_string(&xlsx_path),
         format: "xlsx".to_string(),
         table_index: None,
@@ -820,7 +820,7 @@ fn compiler_loads_front_matter_xlsx_data_sources() {
     .expect("write xlsx data source");
 
     let response = compile(CompileRequest {
-        text: "---\ntitle: XLSX Data Source\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Forecast Workbook\n    path: data/forecast.xlsx\n    type: xlsx\nxlsxFiles:\n  - data/forecast.xlsx\n---\n# XLSX Data Source\n".to_string(),
+        text: "---\ntitle: XLSX Data Source\nstatus: approved\napprovedBy: QA\ndataSources:\n  - name: Forecast Workbook\n    path: data/forecast.xlsx\n    type: xlsx\n    sheet: Risk Sheet\nxlsxFiles:\n  - data/forecast.xlsx\n---\n# XLSX Data Source\n".to_string(),
         file_path: Some(path_to_string(&root.join("report.md"))),
     });
 
@@ -829,9 +829,11 @@ fn compiler_loads_front_matter_xlsx_data_sources() {
         .iter()
         .any(|diagnostic| diagnostic.severity == "error"));
     assert!(response.html.contains("Data Source: Forecast Workbook"));
+    assert!(response.html.contains("<td>Scope</td>"));
+    assert!(response.html.contains("<td>PMO</td>"));
+    assert!(response.html.contains("Data Source: forecast"));
     assert!(response.html.contains("<td>East</td>"));
     assert!(response.html.contains("<td>120</td>"));
-    assert!(response.html.contains("Data Source: forecast"));
     assert!(response
         .compiled_markdown
         .contains("Table: Forecast Workbook"));

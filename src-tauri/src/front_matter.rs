@@ -1,5 +1,5 @@
 use crate::{
-    data_exchange::import_xlsx_data_source_markdown,
+    data_exchange::import_xlsx_data_source_markdown_with_sheet,
     diagnostics::{diag, with_range},
     path_to_string, DocumentDiagnostic, IncludeEdge,
 };
@@ -378,22 +378,23 @@ pub(crate) fn render_front_matter_data_sources(
             diagnostics.push(data_source_path_diagnostic(root_file, &spec, Some(&path)));
             continue;
         }
-        let title = spec.name.unwrap_or_else(|| {
+        let title = spec.name.clone().unwrap_or_else(|| {
             path.file_stem()
                 .and_then(|name| name.to_str())
                 .unwrap_or("Data source")
                 .to_string()
         });
         let data_source_markdown = if kind == "xlsx" {
-            match import_xlsx_data_source_markdown(&path, &title) {
+            match import_xlsx_data_source_markdown_with_sheet(
+                &path,
+                &title,
+                spec.sheet_name.as_deref(),
+                spec.sheet_index,
+            ) {
                 Ok((markdown, warnings)) => {
                     for warning in warnings {
                         diagnostics.push(data_source_context_diagnostic(
-                            &DataSourceSpec {
-                                name: Some(title.clone()),
-                                path: spec.path.clone(),
-                                kind: Some(kind.clone()),
-                            },
+                            &spec,
                             Some(&path),
                             Some(path_to_string(&path)),
                             "info",
@@ -406,11 +407,7 @@ pub(crate) fn render_front_matter_data_sources(
                 }
                 Err(err) => {
                     diagnostics.push(data_source_context_diagnostic(
-                        &DataSourceSpec {
-                            name: Some(title.clone()),
-                            path: spec.path.clone(),
-                            kind: Some(kind.clone()),
-                        },
+                        &spec,
                         Some(&path),
                         Some(path_to_string(&path)),
                         "error",
@@ -426,11 +423,7 @@ pub(crate) fn render_front_matter_data_sources(
                 Ok(contents) => contents,
                 Err(err) => {
                     diagnostics.push(data_source_context_diagnostic(
-                        &DataSourceSpec {
-                            name: Some(title.clone()),
-                            path: spec.path.clone(),
-                            kind: Some(kind.clone()),
-                        },
+                        &spec,
                         Some(&path),
                         Some(path_to_string(&path)),
                         "error",
@@ -453,10 +446,13 @@ pub(crate) fn render_front_matter_data_sources(
     rendered.join("\n\n")
 }
 
+#[derive(Clone)]
 struct DataSourceSpec {
     name: Option<String>,
     path: String,
     kind: Option<String>,
+    sheet_name: Option<String>,
+    sheet_index: Option<usize>,
 }
 
 fn collect_data_source_specs(
@@ -469,6 +465,8 @@ fn collect_data_source_specs(
             name: None,
             path: path.clone(),
             kind: default_kind.map(ToString::to_string),
+            sheet_name: None,
+            sheet_index: None,
         }),
         Some(Value::Array(items)) => {
             for item in items {
@@ -487,6 +485,21 @@ fn collect_data_source_specs(
                 .and_then(Value::as_str)
                 .map(ToString::to_string)
                 .or_else(|| default_kind.map(ToString::to_string));
+            let sheet_name = object
+                .get("sheet")
+                .or_else(|| object.get("sheetName"))
+                .or_else(|| object.get("sheet_name"))
+                .or_else(|| object.get("worksheet"))
+                .or_else(|| object.get("worksheetName"))
+                .or_else(|| object.get("worksheet_name"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string);
+            let sheet_index = object
+                .get("sheetIndex")
+                .or_else(|| object.get("sheet_index"))
+                .or_else(|| object.get("worksheetIndex"))
+                .or_else(|| object.get("worksheet_index"))
+                .and_then(data_source_sheet_index_from_value);
             if let Some(path) = object
                 .get("path")
                 .or_else(|| object.get("file"))
@@ -496,17 +509,31 @@ fn collect_data_source_specs(
                     name,
                     path: path.to_string(),
                     kind,
+                    sheet_name,
+                    sheet_index,
                 });
             } else {
                 specs.push(DataSourceSpec {
                     name,
                     path: String::new(),
                     kind,
+                    sheet_name,
+                    sheet_index,
                 });
             }
         }
         _ => {}
     }
+}
+
+fn data_source_sheet_index_from_value(value: &Value) -> Option<usize> {
+    if let Some(index) = value.as_u64() {
+        return Some(if index == 0 { 0 } else { index as usize - 1 });
+    }
+    value
+        .as_str()
+        .and_then(|text| text.trim().parse::<usize>().ok())
+        .map(|index| if index == 0 { 0 } else { index - 1 })
 }
 
 fn data_source_kind_from_path(path: &str) -> Option<&'static str> {

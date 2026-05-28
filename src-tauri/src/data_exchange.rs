@@ -59,11 +59,13 @@ struct DataTable {
     rows: Vec<Vec<String>>,
 }
 
-pub(crate) fn import_xlsx_data_source_markdown(
+pub(crate) fn import_xlsx_data_source_markdown_with_sheet(
     path: &Path,
     caption: &str,
+    sheet_name: Option<&str>,
+    sheet_index: Option<usize>,
 ) -> Result<(String, Vec<String>), String> {
-    let (mut table, _, _, _, warnings) = read_xlsx_sheet(path, None, None)?;
+    let (mut table, _, _, _, warnings) = read_xlsx_sheet(path, sheet_name, sheet_index)?;
     table.caption = caption.trim().to_string();
     Ok((table_to_markdown(&table), warnings))
 }

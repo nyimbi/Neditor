@@ -649,10 +649,11 @@ web app.
   OpenAPI, and JSON Schema produce preview/export-safe artifacts. XLSX table
   import is worksheet-aware: multi-sheet workbooks expose their sheet list in
   the Tables panel, and front matter XLSX data sources still import a safe
-  default worksheet while preserving document-folder path safety. SQL transforms
-  are read-only SQLite table queries behind explicit engine trust, and relative
-  database paths resolve from the current Markdown document's folder without
-  allowing relative escapes outside that folder.
+  default worksheet, or a named/indexed worksheet from `dataSources` metadata,
+  while preserving document-folder path safety. SQL transforms are read-only
+  SQLite table queries behind explicit engine trust, and relative database paths
+  resolve from the current Markdown document's folder without allowing relative
+  escapes outside that folder.
 - The Templates sidebar includes **AI template assistance** that uses the
   current filters, document context, custom-template draft, and notes to suggest
   which template to use, which values to replace, how to preview and verify the

@@ -409,7 +409,8 @@ CSV and TSV transform blocks can also evaluate formula cells and feed export
 artifacts. Front matter data sources can reference local CSV, TSV, JSON, YAML,
 or XLSX files; XLSX sources render a safe default worksheet as a Markdown table
 and stay under the same document-folder path safety rules as other local
-sources.
+sources. For multi-sheet workbooks, add `sheet: Sheet Name` or a one-based
+`sheetIndex: 2` to a `dataSources` XLSX entry to render a specific worksheet.
 
 For spreadsheet exchange, open the Tables panel and choose CSV, TSV, or XLSX
 import. Review the detected headers, rows, alignment, and formula cells, then

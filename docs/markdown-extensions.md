@@ -197,10 +197,12 @@ comma-separated cells, keyed object maps such as `accounts: { acme: ... }`
 render as tables with a stable key column, scalar settings maps render as
 two-column field tables, and other nested JSON/YAML values render as structured
 trees. XLSX data
-sources import a safe default worksheet and use cached formula values when the
-workbook provides them. Data source paths must stay inside the document folder
-by using relative child paths; absolute paths and `..` parent-directory escapes
-are blocked before any file is read, and resolved symlinks are checked before
+sources import a safe default worksheet, or a selected worksheet when a
+`dataSources` entry includes `sheet`/`sheetName` or one-based `sheetIndex`, and
+use cached formula values when the workbook provides them. Data source paths
+must stay inside the document folder by using relative child paths; absolute
+paths and `..` parent-directory escapes are blocked before any file is read,
+and resolved symlinks are checked before
 import. Missing paths, unsupported source types, and unreadable files are
 reported as diagnostics.
 
