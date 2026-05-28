@@ -969,6 +969,43 @@ fn chart_transform_renders_horizontal_business_comparisons() {
 }
 
 #[test]
+fn chart_transform_applies_business_style_options() {
+    let styled = run_transform(
+            "chart".to_string(),
+            "type: bar\ntitle: Executive Pipeline\nsubtitle: Weighted ACV by segment\nsource: CRM extract May 2026\npalette:\n  - \"#123456\"\n  - \"#abcdef\"\ntarget: 80\ntargetColor: \"#222222\"\nnegativeColor: \"#f43f5e\"\ntitleColor: \"#111827\"\ntextColor: \"#0f172a\"\nmutedColor: \"#475569\"\naxisColor: \"#cbd5e1\"\nbackground: \"#ffffff\"\ndata:\n  - segment: Enterprise\n    value: 110\n    color: \"#ffcc00\"\n  - segment: Mid-market\n    value: -14\nx: segment\ny: value\n".to_string(),
+        )
+        .expect("styled chart transform");
+
+    assert_eq!(styled.output_kind, "svg");
+    assert!(styled.html.contains("Executive Pipeline"));
+    assert!(styled.html.contains("chart-subtitle"));
+    assert!(styled.html.contains("Weighted ACV by segment"));
+    assert!(styled.html.contains("chart-source"));
+    assert!(styled.html.contains("CRM extract May 2026"));
+    assert!(styled.html.contains("chart-background"));
+    assert!(styled.html.contains("fill=\"#ffffff\""));
+    assert!(styled.html.contains("stroke=\"#cbd5e1\""));
+    assert!(styled.html.contains("fill=\"#111827\""));
+    assert!(styled.html.contains("fill=\"#ffcc00\""));
+    assert!(styled.html.contains("fill=\"#f43f5e\""));
+    assert!(styled.html.contains("stroke=\"#222222\""));
+    assert!(styled.diagnostics.is_empty());
+
+    let grouped = run_transform(
+            "chart".to_string(),
+            "type: line\ntitle: Renewal Trend\nshowValues: false\ncolors: \"#0057b8, #00a36c\"\ndata:\n  - month: Jan\n    base: 74\n    expansion: 18\n  - month: Feb\n    base: 79\n    expansion: 22\nx: month\nseries:\n  - key: base\n    label: Base\n    color: \"#7c3aed\"\n  - key: expansion\n    label: Expansion\n".to_string(),
+        )
+        .expect("styled grouped chart transform");
+    assert_eq!(grouped.output_kind, "svg");
+    assert!(grouped.html.contains("data-show-values=\"false\""));
+    assert!(grouped.html.contains("stroke=\"#7c3aed\""));
+    assert!(grouped.html.contains("stroke=\"#00a36c\""));
+    assert!(grouped.html.contains("chart-legend-item"));
+    assert!(!grouped.html.contains(">79<"));
+    assert!(grouped.diagnostics.is_empty());
+}
+
+#[test]
 fn timeline_transform_renders_static_svg_preview() {
     let artifact = run_transform(
         "timeline".to_string(),

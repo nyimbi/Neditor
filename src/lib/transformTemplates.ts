@@ -819,6 +819,50 @@ y: risk
     ["chart", "risk", "horizontal"],
   ),
   template(
+    "chart-board-styled-scorecard",
+    "Charts",
+    "chart",
+    "Board styled scorecard",
+    "Creates a styled executive chart with subtitle, source note, palette, target line, and value label controls.",
+    fenced(
+      "chart",
+      `
+type: bar
+title: Executive pipeline coverage
+subtitle: Weighted qualified pipeline by segment
+source: CRM export, May 2026
+target: 85
+targetLabel: Board plan
+targetColor: "#334155"
+negativeColor: "#be123c"
+titleColor: "#111827"
+textColor: "#0f172a"
+mutedColor: "#64748b"
+axisColor: "#cbd5e1"
+background: "#ffffff"
+showValues: true
+palette:
+  - "#2563eb"
+  - "#16a34a"
+  - "#f59e0b"
+data:
+  - segment: Enterprise
+    coverage: 112
+    color: "#2563eb"
+  - segment: Mid-market
+    coverage: 78
+    color: "#16a34a"
+  - segment: SMB
+    coverage: 44
+    color: "#f59e0b"
+x: segment
+y: coverage
+valueSuffix: "%"
+`,
+    ),
+    ["chart", "board", "style", "scorecard"],
+  ),
+  template(
     "vega-lite-grouped",
     "Charts",
     "vega-lite",

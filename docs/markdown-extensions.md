@@ -467,15 +467,19 @@ y: revenue
 Use `type: horizontal-bar` or `type: barh` when category labels are long or
 the chart is a ranked comparison. Horizontal charts support the same `target`,
 `targetLabel`, `valuePrefix`, `valueSuffix`, `unit`, and multi-series fields as
-standard bar charts.
+standard bar charts. Business charts also accept `subtitle`, `source`,
+`palette`/`colors`, row-level `color`, series-level `color`, `targetColor`,
+`negativeColor`, `titleColor`, `textColor`, `mutedColor`, `axisColor`,
+`background`, and `showValues: false` for board-ready scorecards and compact
+exports without hand-editing SVG.
 
 External engines are disabled until trusted. See
 [External transform setup](external-transforms.md) for Graphviz, D2, PlantUML,
 Pikchr, and SQLite setup.
 
-The same Templates panel also includes starter blocks for chart, Vega-Lite
-grouped bars, opportunity scatter plots, risk-score tick plots, and readiness
-label plots,
+The same Templates panel also includes starter blocks for chart, a styled
+board scorecard chart, Vega-Lite grouped bars, opportunity scatter plots,
+risk-score tick plots, and readiness label plots,
 timeline, roadmap, ADR, Mermaid, Pikchr, DOT, PlantUML, CSV, JSON Schema,
 OpenAPI, and QR transforms. Duplicate any built-in template to create a
 workspace custom template, then edit the name, category, transform, tags, and

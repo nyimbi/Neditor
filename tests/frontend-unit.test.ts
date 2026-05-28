@@ -6005,6 +6005,10 @@ test("transform template library covers reusable calculations and custom templat
   if (!horizontalChartTemplate) throw new Error("missing horizontal chart template");
   ok(horizontalChartTemplate.body.includes("type: horizontal-bar"));
   ok(transformTemplateFillFields(horizontalChartTemplate).some((field) => field.name === "targetLabel"));
+  const styledChartTemplate = builtinTransformTemplates.find((template) => template.id === "chart-board-styled-scorecard");
+  if (!styledChartTemplate) throw new Error("missing styled chart template");
+  ok(styledChartTemplate.body.includes("palette:"));
+  ok(transformTemplateFillFields(styledChartTemplate).some((field) => field.name === "targetColor"));
   const vegaTickTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-risk-ticks");
   if (!vegaTickTemplate) throw new Error("missing Vega-Lite tick template");
   ok(vegaTickTemplate.body.includes('"type": "tick"'));
