@@ -5088,6 +5088,12 @@ Purpose evidence consolidation:
 | --- | --- | --- |
 | `pnpm run check:spec-completion` | Pass | The local-first workbench purpose row now cites exact docs, source modules, and `example_fixture_tests::example_project_fixtures_compile_and_export` evidence for Markdown source-of-truth/local-first positioning across HTML, DOCX, PPTX, and Markdown bundle outputs instead of carrying a duplicate broad buildout gap. |
 
+Side-by-side editor/preview evidence consolidation:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:spec-completion` | Pass | The baseline side-by-side Markdown editor/live preview row is now complete with exact `src/App.vue`, frontend debounce unit, focused browser workflow, structured e2e report, and native UI smoke evidence; broader mode/platform/manual proof stays tracked in the dedicated view-mode and platform rows. |
+
 Vim punctuation word-motion parity:
 
 | Command | Result | Evidence |
