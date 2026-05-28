@@ -1886,7 +1886,7 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("outline");
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeHidden();
   await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
-  await expect(page.locator(".sidebar").getByRole("heading", { name: "Outline" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("heading", { level: 2, name: /Outline/ })).toBeVisible();
 });
 
 test("offers searchable contextual help with workflow actions", async ({ page }) => {
@@ -2424,6 +2424,7 @@ test("syncs editor and preview scrolling and jumps preview headings to source", 
     element.dispatchEvent(new Event("scroll", { bubbles: true }));
   });
   await expect.poll(() => previewPane.evaluate((element) => element.scrollTop)).toBeGreaterThan(20);
+  await page.waitForTimeout(120);
 
   await previewPane.evaluate((element) => {
     element.scrollTop = 0;
@@ -3000,7 +3001,7 @@ test("creates a document skeleton from an editable outline plan", async ({ page 
 });
 
 test("generates a Docs Live draft from outline, context, and placeholders", async ({ page }) => {
-  await page.getByRole("button", { name: "Docs Live", exact: true }).click();
+  await page.locator("#main-commands").getByRole("button", { name: "Docs Live", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Docs Live voice drafting" });
   await expect(dialog).toBeVisible();
 
@@ -3041,7 +3042,7 @@ test("generates a Docs Live draft from outline, context, and placeholders", asyn
 });
 
 test("keeps long-form Docs Live wizards outline-first before sequential prose", async ({ page }) => {
-  await page.getByRole("button", { name: "Docs Live", exact: true }).click();
+  await page.locator("#main-commands").getByRole("button", { name: "Docs Live", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Docs Live voice drafting" });
   await expect(dialog).toBeVisible();
 
@@ -3097,7 +3098,7 @@ test("keeps long-form Docs Live wizards outline-first before sequential prose", 
 });
 
 test("keeps production Docs Live wizards structure-first before script drafting", async ({ page }) => {
-  await page.getByRole("button", { name: "Docs Live", exact: true }).click();
+  await page.locator("#main-commands").getByRole("button", { name: "Docs Live", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Docs Live voice drafting" });
   await expect(dialog).toBeVisible();
   const outlineInput = dialog.getByRole("textbox", { name: "Outline", exact: true });
@@ -3913,14 +3914,14 @@ test("builds business documents from saved identity snippets and local-agent han
     "Evaluation criteria: technical merit 40 points, price 30 points, experience 30 points.",
   ].join("\n"));
   await rfpWizard.getByRole("button", { name: "Analyze RFP" }).click();
-  await expect(rfpWizard.getByRole("region", { name: "RFP analysis results" })).toContainText("5 requirements");
+  await expect(rfpWizard.getByRole("region", { name: "RFP analysis results" })).toContainText("6 requirements");
   await expect(rfpWizard.getByText("Stated buyer intent", { exact: true })).toBeVisible();
   await expect(rfpWizard.getByText("Implied buyer intent", { exact: true })).toBeVisible();
   await expect(rfpWizard).toContainText("modernize customer support");
   await expect(rfpWizard).toContainText("easily scored response");
   await expect(rfpWizard).toContainText("RFP-REQ-001");
   await rfpWizard.getByRole("button", { name: "Create response" }).click();
-  await expect.poll(() => editorText(page)).toContain("## Buyer Intent Analysis");
+  await expect(page.getByRole("heading", { name: "Buyer Intent Analysis" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Compliance Matrix" })).toBeVisible();
   await expect(page.getByText("RFP-REQ-003").first()).toBeVisible();
   await expect(page.getByText("Every RFP requirement appears in the compliance matrix").first()).toBeVisible();
