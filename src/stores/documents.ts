@@ -7,6 +7,13 @@ import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTask
 import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessDocuments";
 import { saveAiProviderDefaultsState, saveBusinessProfileState, saveTtsPreferencesState } from "../lib/configurationProfiles";
 import {
+  acceptExternalRootConflictState,
+  applyRootConflictMergeState,
+  createExternalConflictState,
+  keepLocalRootConflictState,
+  type ExternalConflictState,
+} from "../lib/conflict";
+import {
   closeDocumentTabState,
   forgetDocumentPathState,
   moveDocumentTabState,
@@ -109,15 +116,6 @@ interface FileMetadataResponse {
   hash?: string | null;
   modified?: string | null;
   role?: "root" | "include" | string;
-}
-
-interface ExternalConflict {
-  documentId: string;
-  path: string;
-  reason: "root" | "include";
-  message: string;
-  externalHash: string;
-  externalText?: string;
 }
 
 interface DocumentWatchEvent {
@@ -349,7 +347,7 @@ export const useDocumentsStore = defineStore("documents", {
     statusMessage: "Ready",
     lastError: "",
     externalHash: "",
-    externalConflict: null as ExternalConflict | null,
+    externalConflict: null as ExternalConflictState | null,
     ignoredConflictHashes: {} as Record<string, string>,
     watchSignature: "",
     watchDriver: "off" as "off" | "native" | "plugin",
@@ -1172,17 +1170,15 @@ export const useDocumentsStore = defineStore("documents", {
         const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", {
           path: conflict.path,
         });
-        doc.text = response.text;
-        doc.savedHash = response.hash;
-        doc.savedText = response.text;
-        doc.modified = response.modified;
-        doc.dirty = false;
-        this.statusMessage = "Accepted external file changes";
+        const accepted = acceptExternalRootConflictState(doc, response);
+        Object.assign(doc, accepted.document);
+        this.externalConflict = accepted.externalConflict;
+        this.statusMessage = accepted.statusMessage;
       } else {
         await this.compileActive();
         this.statusMessage = "Accepted included file changes";
+        this.externalConflict = null;
       }
-      this.externalConflict = null;
       this.clearIgnoredConflicts();
       await this.compileActive();
       await this.refreshGitStatus();
@@ -1195,9 +1191,12 @@ export const useDocumentsStore = defineStore("documents", {
       if (conflict?.reason === "root") {
         const doc = this.documents.find((document) => document.id === conflict.documentId) || this.activeDocument;
         this.setActiveDocument(doc.id);
-        doc.savedHash = conflict.externalHash;
-        doc.savedText = conflict.externalText || doc.savedText;
-        this.externalHash = conflict.externalHash;
+        const kept = keepLocalRootConflictState(doc, conflict);
+        Object.assign(doc, kept.document);
+        this.externalHash = kept.externalHash;
+        this.externalConflict = kept.externalConflict;
+        this.statusMessage = kept.statusMessage;
+        return;
       }
       this.externalConflict = null;
       this.statusMessage = "Keeping local edits";
@@ -1218,14 +1217,12 @@ export const useDocumentsStore = defineStore("documents", {
       const doc = this.documents.find((document) => document.id === conflict.documentId) || this.activeDocument;
       this.setActiveDocument(doc.id);
       await this.snapshotBeforeDestructiveAction("pre-conflict-merge");
-      doc.text = text;
-      doc.savedHash = conflict.externalHash;
-      doc.savedText = conflict.externalText || "";
-      doc.dirty = text !== (conflict.externalText || "");
-      this.externalHash = conflict.externalHash;
-      this.externalConflict = null;
+      const merged = applyRootConflictMergeState(doc, conflict, text);
+      Object.assign(doc, merged.document);
+      this.externalHash = merged.externalHash;
+      this.externalConflict = merged.externalConflict;
       this.clearIgnoredConflicts();
-      this.statusMessage = "Merged external changes into the working document";
+      this.statusMessage = merged.statusMessage;
       await this.compileActive();
       await this.refreshGitStatus();
     },
@@ -1257,14 +1254,7 @@ export const useDocumentsStore = defineStore("documents", {
       } catch {
         externalText = reason === "include" ? "The changed included file could not be read. It may have been deleted or moved." : "";
       }
-      this.externalConflict = {
-        documentId: doc.id,
-        path,
-        reason,
-        message,
-        externalHash,
-        externalText,
-      };
+      this.externalConflict = createExternalConflictState(doc, path, reason, message, externalHash, externalText);
     },
     async exportActive(path: string) {
       if (this.exportBusy) return;

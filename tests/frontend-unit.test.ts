@@ -40,7 +40,13 @@ import {
   citationReferenceSnippet,
   normalizeCitationKey,
 } from "../src/lib/bibliographyManager.js";
-import { buildConflictDiff } from "../src/lib/conflict.js";
+import {
+  acceptExternalRootConflictState,
+  applyRootConflictMergeState,
+  buildConflictDiff,
+  createExternalConflictState,
+  keepLocalRootConflictState,
+} from "../src/lib/conflict.js";
 import {
   agenticCliIntegrations,
   analyzeRfpSource,
@@ -1530,6 +1536,61 @@ test("conflict diff keeps local and external edits aligned for merge UI", () => 
   equal(rows[2].external, "external");
   equal(rows[3].localLine, 3);
   equal(rows[3].externalLine, 3);
+});
+
+test("external conflict state helpers accept keep and merge root conflicts", () => {
+  const doc = {
+    id: "doc-1",
+    path: "/workspace/report.md",
+    title: "report.md",
+    text: "local",
+    savedHash: "hash-old",
+    savedText: "base",
+    dirty: true,
+  };
+  const conflict = createExternalConflictState(doc, "/workspace/report.md", "root", "Root changed", "hash-external", "external");
+
+  deepEqual(conflict, {
+    documentId: "doc-1",
+    path: "/workspace/report.md",
+    reason: "root",
+    message: "Root changed",
+    externalHash: "hash-external",
+    externalText: "external",
+  });
+
+  const accepted = acceptExternalRootConflictState(doc, {
+    path: "/workspace/report.md",
+    text: "external",
+    hash: "hash-external",
+    modified: "2026-05-28T11:00:00.000Z",
+  });
+  equal(accepted.document.text, "external");
+  equal(accepted.document.savedHash, "hash-external");
+  equal(accepted.document.savedText, "external");
+  equal(accepted.document.dirty, false);
+  equal(accepted.externalConflict, null);
+  equal(accepted.statusMessage, "Accepted external file changes");
+
+  const kept = keepLocalRootConflictState(doc, conflict);
+  equal(kept.document.text, "local");
+  equal(kept.document.savedHash, "hash-external");
+  equal(kept.document.savedText, "external");
+  equal(kept.externalHash, "hash-external");
+  equal(kept.externalConflict, null);
+  equal(kept.statusMessage, "Keeping local edits");
+
+  const merged = applyRootConflictMergeState(doc, conflict, "merged");
+  equal(merged.document.text, "merged");
+  equal(merged.document.savedHash, "hash-external");
+  equal(merged.document.savedText, "external");
+  equal(merged.document.dirty, true);
+  equal(merged.externalHash, "hash-external");
+  equal(merged.externalConflict, null);
+  equal(merged.statusMessage, "Merged external changes into the working document");
+
+  const cleanMerge = applyRootConflictMergeState(doc, conflict, "external");
+  equal(cleanMerge.document.dirty, false);
 });
 
 test("conflict merge helpers compose selected local and external lines", () => {
@@ -6040,7 +6101,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Vim-style mode starts in insert mode"));
   ok(types.includes("savedText?: string"));
   ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
-  ok(store.includes("doc.savedText = response.text"));
+  ok(store.includes("acceptExternalRootConflictState(doc, response)"));
+  ok(store.includes("keepLocalRootConflictState(doc, conflict)"));
+  ok(store.includes("applyRootConflictMergeState(doc, conflict, text)"));
+  ok(store.includes("createExternalConflictState(doc, path, reason, message, externalHash, externalText)"));
 });
 
 test("local verification scripts expose local baseline checks", () => {

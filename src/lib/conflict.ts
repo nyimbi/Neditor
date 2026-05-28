@@ -1,3 +1,5 @@
+import type { OpenDocument } from "../types.js";
+
 export interface ConflictDiffRow {
   key: string;
   kind: "equal" | "local" | "external";
@@ -5,6 +7,93 @@ export interface ConflictDiffRow {
   external: string;
   localLine: number | null;
   externalLine: number | null;
+}
+
+export type ExternalConflictReason = "root" | "include";
+
+export interface ExternalConflictState {
+  documentId: string;
+  path: string;
+  reason: ExternalConflictReason;
+  message: string;
+  externalHash: string;
+  externalText?: string;
+}
+
+export interface ExternalConflictFileResponse {
+  path?: string;
+  text: string;
+  hash: string;
+  modified?: string | null;
+}
+
+export function createExternalConflictState(
+  document: Pick<OpenDocument, "id">,
+  path: string,
+  reason: ExternalConflictReason,
+  message: string,
+  externalHash: string,
+  externalText: string,
+): ExternalConflictState {
+  return {
+    documentId: document.id,
+    path,
+    reason,
+    message,
+    externalHash,
+    externalText,
+  };
+}
+
+export function acceptExternalRootConflictState<T extends OpenDocument>(
+  document: T,
+  response: ExternalConflictFileResponse,
+) {
+  return {
+    document: {
+      ...document,
+      text: response.text,
+      savedHash: response.hash,
+      savedText: response.text,
+      modified: response.modified,
+      dirty: false,
+    },
+    externalConflict: null,
+    statusMessage: "Accepted external file changes",
+  };
+}
+
+export function keepLocalRootConflictState<T extends OpenDocument>(document: T, conflict: ExternalConflictState) {
+  return {
+    document: {
+      ...document,
+      savedHash: conflict.externalHash,
+      savedText: conflict.externalText || document.savedText,
+    },
+    externalHash: conflict.externalHash,
+    externalConflict: null,
+    statusMessage: "Keeping local edits",
+  };
+}
+
+export function applyRootConflictMergeState<T extends OpenDocument>(
+  document: T,
+  conflict: ExternalConflictState,
+  text: string,
+) {
+  const externalText = conflict.externalText || "";
+  return {
+    document: {
+      ...document,
+      text,
+      savedHash: conflict.externalHash,
+      savedText: externalText,
+      dirty: text !== externalText,
+    },
+    externalHash: conflict.externalHash,
+    externalConflict: null,
+    statusMessage: "Merged external changes into the working document",
+  };
 }
 
 export function buildConflictDiff(localText: string, externalText: string): ConflictDiffRow[] {
