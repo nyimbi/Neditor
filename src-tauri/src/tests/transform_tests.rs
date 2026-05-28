@@ -1216,6 +1216,28 @@ endsolid depth"
 }
 
 #[test]
+fn stl_transform_renders_base64_binary_static_svg_preview() {
+    let artifact = run_transform(
+        "stl".to_string(),
+        "data:application/sla;base64,TkVkaXRvciBiaW5hcnkgU1RMIHRlc3QgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICACAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAIA/AAAAAAAAgD8AAAAAAACAPwAAgD8AAA==".to_string(),
+    )
+    .expect("binary stl transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-stl"));
+    assert!(artifact.html.contains("data-stl-source=\"binary-base64\""));
+    assert!(artifact
+        .html
+        .contains("data-coordinate-assumption=\"binary-stl-base64-xyz\""));
+    assert!(artifact
+        .html
+        .contains("2 triangles / 6 vertices / z-depth 1"));
+    assert!(artifact.html.contains("data-depth=\"0.00\""));
+    assert!(artifact.html.contains("data-depth=\"1.00\""));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn vega_lite_transform_renders_static_svg_preview() {
     let artifact = run_transform(
             "vega-lite".to_string(),

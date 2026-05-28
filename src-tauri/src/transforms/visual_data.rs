@@ -173,18 +173,34 @@ pub(crate) fn render_stl_svg(
     artifact_diags: &mut Vec<DocumentDiagnostic>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> String {
-    let vertices = parse_ascii_stl_vertices(body);
-    if vertices.is_empty() {
+    let Some(parsed) = parse_stl_vertices(body) else {
         let diagnostic = diag(
             "warning",
-            "STL transform did not contain ASCII vertex data.",
+            "STL transform did not contain ASCII vertices or base64-encoded binary STL data.",
             None,
             None,
-            Some("Use ASCII STL fences for static previews, or configure an external STL renderer later."),
+            Some("Use ASCII STL vertex records, or paste a base64-encoded binary STL payload or data:application/sla;base64 URI."),
         );
         artifact_diags.push(diagnostic.clone());
         diagnostics.push(diagnostic);
-        return "<section class=\"transform transform-stl transform-error\">No ASCII STL vertices found</section>".to_string();
+        return "<section class=\"transform transform-stl transform-error\">No STL vertices found</section>".to_string();
+    };
+    let StlParsedGeometry {
+        vertices,
+        source_kind,
+        coordinate_assumption,
+    } = parsed;
+    if vertices.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "STL transform did not contain drawable vertex data.",
+            None,
+            None,
+            Some("Provide triangle facets with finite XYZ vertex coordinates."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-stl transform-error\">No STL vertices found</section>".to_string();
     }
     let triangles = vertices
         .chunks(3)
@@ -235,7 +251,7 @@ pub(crate) fn render_stl_svg(
         .join("");
     let z_summary = stl_depth_summary(min_z, max_z);
     format!(
-        "<svg class=\"transform transform-stl\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\" data-projection=\"isometric-depth-fit\" data-coordinate-assumption=\"ascii-stl-xyz\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#cbd5e1\"/>{triangle_polygons}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#334155\">{} triangles / {} vertices{z_summary}</text></svg>",
+        "<svg class=\"transform transform-stl\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\" data-projection=\"isometric-depth-fit\" data-stl-source=\"{source_kind}\" data-coordinate-assumption=\"{coordinate_assumption}\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#cbd5e1\"/>{triangle_polygons}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#334155\">{} triangles / {} vertices{z_summary}</text></svg>",
         sorted_triangles.len(),
         vertices.len(),
     )
@@ -1168,6 +1184,13 @@ struct StlTrianglePreview {
     average_z: f64,
 }
 
+#[derive(Clone, Debug)]
+struct StlParsedGeometry {
+    vertices: Vec<(f64, f64, f64)>,
+    source_kind: &'static str,
+    coordinate_assumption: &'static str,
+}
+
 fn stl_isometric_position((x, y, z): (f64, f64, f64)) -> (f64, f64) {
     (x - (z * 0.45), y + (z * 0.35))
 }
@@ -1221,6 +1244,134 @@ fn parse_ascii_stl_vertices(body: &str) -> Vec<(f64, f64, f64)> {
             ))
         })
         .collect()
+}
+
+fn parse_stl_vertices(body: &str) -> Option<StlParsedGeometry> {
+    let ascii_vertices = parse_ascii_stl_vertices(body);
+    if !ascii_vertices.is_empty() {
+        return Some(StlParsedGeometry {
+            vertices: ascii_vertices,
+            source_kind: "ascii",
+            coordinate_assumption: "ascii-stl-xyz",
+        });
+    }
+    let vertices = parse_base64_binary_stl_vertices(body)?;
+    Some(StlParsedGeometry {
+        vertices,
+        source_kind: "binary-base64",
+        coordinate_assumption: "binary-stl-base64-xyz",
+    })
+}
+
+fn parse_base64_binary_stl_vertices(body: &str) -> Option<Vec<(f64, f64, f64)>> {
+    let payload = stl_base64_payload(body)?;
+    let bytes = decode_base64_payload(payload)?;
+    parse_binary_stl_vertices(&bytes)
+}
+
+fn stl_base64_payload(body: &str) -> Option<&str> {
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed
+        .get(..5)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("data:"))
+    {
+        return trimmed.split_once(',').map(|(_, payload)| payload.trim());
+    }
+    if let Some((prefix, payload)) = trimmed.split_once(':') {
+        if matches!(
+            prefix.trim().to_ascii_lowercase().as_str(),
+            "base64" | "binary" | "binary-stl" | "stl-base64"
+        ) {
+            return Some(payload.trim());
+        }
+    }
+    Some(trimmed)
+}
+
+fn parse_binary_stl_vertices(bytes: &[u8]) -> Option<Vec<(f64, f64, f64)>> {
+    if bytes.len() < 84 {
+        return None;
+    }
+    let triangle_count = u32::from_le_bytes(bytes.get(80..84)?.try_into().ok()?) as usize;
+    let expected_len = 84usize.checked_add(triangle_count.checked_mul(50)?)?;
+    if bytes.len() < expected_len {
+        return None;
+    }
+    let mut vertices = Vec::with_capacity(triangle_count.saturating_mul(3));
+    for triangle_index in 0..triangle_count {
+        let triangle_start = 84 + triangle_index * 50;
+        for vertex_index in 0..3 {
+            let vertex_start = triangle_start + 12 + vertex_index * 12;
+            let vertex = (
+                read_le_f32(bytes, vertex_start)? as f64,
+                read_le_f32(bytes, vertex_start + 4)? as f64,
+                read_le_f32(bytes, vertex_start + 8)? as f64,
+            );
+            if !(vertex.0.is_finite() && vertex.1.is_finite() && vertex.2.is_finite()) {
+                return None;
+            }
+            vertices.push(vertex);
+        }
+    }
+    Some(vertices)
+}
+
+fn read_le_f32(bytes: &[u8], offset: usize) -> Option<f32> {
+    Some(f32::from_le_bytes(
+        bytes.get(offset..offset + 4)?.try_into().ok()?,
+    ))
+}
+
+fn decode_base64_payload(input: &str) -> Option<Vec<u8>> {
+    let cleaned = input
+        .bytes()
+        .filter(|byte| !byte.is_ascii_whitespace())
+        .collect::<Vec<_>>();
+    if cleaned.is_empty() || cleaned.len() % 4 != 0 {
+        return None;
+    }
+    let mut output = Vec::with_capacity(cleaned.len() / 4 * 3);
+    for chunk in cleaned.chunks(4) {
+        let a = base64_value(chunk[0])?;
+        let b = base64_value(chunk[1])?;
+        let c_is_padding = chunk[2] == b'=';
+        let d_is_padding = chunk[3] == b'=';
+        if c_is_padding && !d_is_padding {
+            return None;
+        }
+        let c = if c_is_padding {
+            0
+        } else {
+            base64_value(chunk[2])?
+        };
+        let d = if d_is_padding {
+            0
+        } else {
+            base64_value(chunk[3])?
+        };
+        output.push((a << 2) | (b >> 4));
+        if !c_is_padding {
+            output.push(((b & 0x0f) << 4) | (c >> 2));
+        }
+        if !d_is_padding {
+            output.push(((c & 0x03) << 6) | d);
+        }
+    }
+    Some(output)
+}
+
+fn base64_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'A'..=b'Z' => Some(byte - b'A'),
+        b'a'..=b'z' => Some(byte - b'a' + 26),
+        b'0'..=b'9' => Some(byte - b'0' + 52),
+        b'+' => Some(62),
+        b'/' => Some(63),
+        _ => None,
+    }
 }
 
 fn geojson_bounds(positions: &[(f64, f64)]) -> (f64, f64, f64, f64) {
