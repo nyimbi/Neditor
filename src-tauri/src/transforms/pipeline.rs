@@ -1,7 +1,9 @@
 use super::TransformArtifact;
 use crate::{
-    compiler_support::fenced_code_marker, diagnostics::DocumentDiagnostic,
-    source_mapping::ast_source_range_for_generated_lines, SourceMapEntry,
+    compiler_support::fenced_code_marker,
+    diagnostics::{diag, with_range, DocumentDiagnostic},
+    source_mapping::ast_source_range_for_generated_lines,
+    SourceMapEntry,
 };
 use serde_json::Value;
 
@@ -50,6 +52,17 @@ where
                 output.push('\n');
                 artifacts.push(artifact);
                 continue;
+            }
+            let source_line = line_index + 1;
+            if should_report_unknown_transform(name, info) {
+                diagnostics.push(unknown_transform_diagnostic(
+                    name,
+                    info,
+                    marker,
+                    line,
+                    source_map,
+                    source_line,
+                ));
             }
             output.push_str(line);
             output.push('\n');
@@ -160,6 +173,61 @@ fn push_related_once(diagnostic: &mut DocumentDiagnostic, value: String) {
     if !diagnostic.related.iter().any(|related| related == &value) {
         diagnostic.related.push(value);
     }
+}
+
+fn should_report_unknown_transform(name: &str, info: &str) -> bool {
+    !name.is_empty()
+        && transform_info_tokens(info).iter().skip(1).any(|token| {
+            token
+                .split_once('=')
+                .map(|(key, _)| is_transform_intent_option(key))
+                .unwrap_or_else(|| is_transform_intent_option(token))
+        })
+}
+
+fn is_transform_intent_option(key: &str) -> bool {
+    matches!(
+        key,
+        "transform" | "render" | "output" | "format" | "target" | "engine"
+    )
+}
+
+fn unknown_transform_diagnostic(
+    name: &str,
+    info: &str,
+    marker: &str,
+    line: &str,
+    source_map: &[SourceMapEntry],
+    generated_line: usize,
+) -> DocumentDiagnostic {
+    let (source_file, source_line) = if let Some(source) =
+        ast_source_range_for_generated_lines(source_map, generated_line, generated_line)
+    {
+        (Some(source.source_file), Some(source.source_line))
+    } else {
+        (None, Some(generated_line))
+    };
+    let mut diagnostic = diag(
+        "warning",
+        format!("Unknown fenced transform: {name}"),
+        source_file,
+        source_line,
+        Some("Use a supported transform name or remove transform-specific fence options to keep this as plain code."),
+    );
+    diagnostic.related.push(format!("transform: {name}"));
+    diagnostic.related.push(format!("fence info: {info}"));
+    if let Some((column, end_column)) = fence_name_range(line, marker, name) {
+        diagnostic = with_range(diagnostic, column, source_line, end_column);
+    }
+    diagnostic
+}
+
+fn fence_name_range(line: &str, marker: &str, name: &str) -> Option<(usize, usize)> {
+    let trimmed_start = line.len().saturating_sub(line.trim_start().len());
+    let after_marker = trimmed_start + marker.len();
+    let offset = line[after_marker..].find(name)?;
+    let column = after_marker + offset + 1;
+    Some((column, column + name.len()))
 }
 
 fn transform_fence_options(info: &str) -> Value {

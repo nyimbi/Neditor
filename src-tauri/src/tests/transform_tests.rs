@@ -532,6 +532,47 @@ title: Bad Transform
 }
 
 #[test]
+fn unknown_transform_attempts_report_source_ranged_diagnostics() {
+    let response = compile(CompileRequest {
+        text: "# Unknown Transform\n\n```notebook output=html\nvalue: 42\n```\n\n```python\nprint(42)\n```\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    let diagnostic = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message == "Unknown fenced transform: notebook")
+        .expect("unknown transform diagnostic");
+    assert_eq!(diagnostic.severity, "warning");
+    assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(diagnostic.line, Some(3));
+    assert_eq!(diagnostic.end_line, Some(3));
+    assert_eq!(diagnostic.column, Some(4));
+    assert_eq!(diagnostic.end_column, Some(12));
+    assert!(diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("supported transform name")));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "transform: notebook"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "fence info: notebook output=html"));
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.message.contains("python")));
+    assert!(response
+        .compiled_markdown
+        .contains("```notebook output=html"));
+    assert!(response.compiled_markdown.contains("```python"));
+}
+
+#[test]
 fn document_ast_parses_multiline_semantic_html_blocks() {
     let response = compile(CompileRequest {
         text: r#"---

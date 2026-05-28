@@ -5349,6 +5349,13 @@ Vim punctuation word-motion parity:
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after the Vim motion helper started using punctuation-aware character classes. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs configurable Emacs and Vim-style editor keybinding modes" --project chromium` | Pass | Focused Chromium workflow now proves punctuation-aware Vim operator motions and word motions in the actual CodeMirror editor by deleting `client`, deleting `.`, and inserting before `/` in `client.name/value next`. |
 
+Unknown transform diagnostic tightening:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked unknown_transform_attempts_report_source_ranged_diagnostics --lib` | Pass | Focused Rust proof now warns on explicit unsupported transform attempts such as `notebook output=html`, ranges the unknown fence name in `untitled.md`, preserves the fence as Markdown source, and avoids false warnings for ordinary `python` code fences. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked transform_diagnostics_resolve_to_source_fence_ranges --lib` | Pass | Existing transform diagnostic source-range proof still passes after adding the unknown-transform warning path. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
