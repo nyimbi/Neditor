@@ -6599,6 +6599,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("rankDeepResearchSources"));
   ok(app.includes("source.fitScore"));
   ok(app.includes("source.fitReasons"));
+  ok(app.includes("fit_score: source.fitScore"));
+  ok(app.includes("fit_reasons: source.fitReasons"));
+  ok(app.includes("source.fit_score"));
+  ok(app.includes("source.fit_reasons"));
   ok(app.includes('invoke<CitationSourceLibraryResponse>("list_citation_sources"'));
   ok(app.includes("citationSourceLibrary"));
   ok(app.includes("insertCitationSourceBibliography"));

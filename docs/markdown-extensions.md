@@ -334,10 +334,11 @@ controls. Users can search DuckDuckGo, a configured SearXNG endpoint, or Tavily
 for source candidates, download selected source documents into a
 `<document>.neditor-sources/` directory beside the active document, insert a
 CSL JSON bibliography stub, and keep a `sources.json` manifest with URL, hash,
-file path, media type, download time, and citation-key evidence. Candidate
-results are ranked by deterministic citation fit using query-term coverage,
-domain/source-file signals, and review-risk hints before users download or save
-them. Repeated downloads reuse the saved manifest entry when the source file
+file path, media type, download time, provider, fit score, fit reasons, and
+citation-key evidence. Candidate results are ranked by deterministic citation
+fit using query-term coverage, domain/source-file signals, and review-risk hints
+before users download or save them; those fit details stay with the saved source
+manifest. Repeated downloads reuse the saved manifest entry when the source file
 still exists, and the References panel can refresh the active document's source
 library, cite a saved source again, insert its bibliography entry, link to the
 local copy, or copy/reveal the downloaded evidence path. Users can also

@@ -1466,7 +1466,10 @@
               </header>
               <article v-for="source in citationSourceLibrary" :key="`${source.citation_key}-${source.sha256}`" class="snapshot-row">
                 <p>{{ source.title }}</p>
-                <small>@{{ source.citation_key }} | {{ source.media_type || "source file" }} | {{ formatCitationSourceBytes(source.bytes) }}</small>
+                <small>
+                  @{{ source.citation_key }} | {{ source.source || "saved source" }}<template v-if="source.fit_score !== undefined"> | fit {{ source.fit_score }}/100 {{ source.fit_label }}</template> | {{ source.media_type || "source file" }} | {{ formatCitationSourceBytes(source.bytes) }}
+                </small>
+                <small v-if="source.fit_reasons?.length">{{ source.fit_reasons.join(" | ") }}</small>
                 <small>{{ source.relative_path }}</small>
                 <small>{{ source.url }}</small>
                 <div class="reference-actions">
@@ -5872,12 +5875,16 @@ interface CitationSourceLibraryItem {
   title: string;
   url: string;
   snippet: string;
+  source?: string;
   path: string;
   relative_path: string;
   sha256: string;
   bytes: number;
   downloaded_at?: string;
   media_type?: string;
+  fit_score?: number;
+  fit_label?: string;
+  fit_reasons?: string[];
 }
 
 interface CitationSourceLibraryResponse {
@@ -9978,6 +9985,10 @@ async function saveCitationSourceToLibrary(
         url: source.url,
         title: source.title,
         snippet: source.snippet,
+        source: source.source,
+        fit_score: source.fitScore,
+        fit_label: source.fitLabel,
+        fit_reasons: source.fitReasons,
       },
     });
     if (options.insertBibliography) insertBlock(response.bibliography_stub);

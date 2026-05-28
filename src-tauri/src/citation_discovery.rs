@@ -40,7 +40,11 @@ pub(crate) struct CitationDownloadRequest {
     pub(crate) url: String,
     pub(crate) title: Option<String>,
     pub(crate) snippet: Option<String>,
+    pub(crate) source: Option<String>,
     pub(crate) citation_key: Option<String>,
+    pub(crate) fit_score: Option<u8>,
+    pub(crate) fit_label: Option<String>,
+    pub(crate) fit_reasons: Option<Vec<String>>,
     pub(crate) force_refresh: Option<bool>,
 }
 
@@ -148,12 +152,19 @@ pub(crate) fn download_citation_source(
             title: request.title.clone().unwrap_or_else(|| key.clone()),
             url: request.url.clone(),
             snippet: request.snippet.unwrap_or_default(),
+            source: request.source.as_deref().and_then(normalize_manifest_text),
             path: path_to_string(&output_path),
             relative_path: relative_path.clone(),
             sha256,
             bytes: bytes.len(),
             downloaded_at: Some(downloaded_at),
             media_type: media_type_from_extension(extension).map(ToString::to_string),
+            fit_score: request.fit_score.map(|score| score.min(100)),
+            fit_label: request
+                .fit_label
+                .as_deref()
+                .and_then(normalize_manifest_text),
+            fit_reasons: normalize_fit_reasons(request.fit_reasons.as_deref()),
         },
     )?;
     let item = read_source_manifest(&manifest_path)?
@@ -415,6 +426,8 @@ pub(crate) struct CitationManifestItem {
     title: String,
     url: String,
     snippet: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source: Option<String>,
     path: String,
     relative_path: String,
     sha256: String,
@@ -423,6 +436,12 @@ pub(crate) struct CitationManifestItem {
     downloaded_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     media_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fit_score: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fit_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fit_reasons: Option<Vec<String>>,
 }
 
 fn citation_download_response(
@@ -626,6 +645,28 @@ fn media_type_from_extension(extension: &str) -> Option<&'static str> {
     }
 }
 
+fn normalize_manifest_text(value: &str) -> Option<String> {
+    let normalized = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized.chars().take(240).collect())
+    }
+}
+
+fn normalize_fit_reasons(value: Option<&[String]>) -> Option<Vec<String>> {
+    let reasons = value?
+        .iter()
+        .filter_map(|reason| normalize_manifest_text(reason))
+        .take(6)
+        .collect::<Vec<_>>();
+    if reasons.is_empty() {
+        None
+    } else {
+        Some(reasons)
+    }
+}
+
 fn citation_key_from_title_or_url(title: Option<&str>, url: &str) -> String {
     let base = title
         .map(safe_citation_key)
@@ -728,6 +769,13 @@ mod tests {
             bytes: 12,
             downloaded_at: Some("2026-05-28T10:00:00+03:00".to_string()),
             media_type: Some("application/pdf".to_string()),
+            source: Some("SearXNG".to_string()),
+            fit_score: Some(82),
+            fit_label: Some("strong".to_string()),
+            fit_reasons: Some(vec![
+                "government source domain".to_string(),
+                "downloadable PDF source".to_string(),
+            ]),
         };
         let second = CitationManifestItem {
             citation_key: "second".to_string(),
@@ -742,6 +790,7 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].citation_key, "second");
         assert_eq!(items[0].bytes, 24);
+        assert_eq!(items[0].fit_score, Some(82));
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -772,6 +821,10 @@ mod tests {
                 bytes: 5,
                 downloaded_at: Some("2026-05-27T10:00:00+03:00".to_string()),
                 media_type: Some("text/html".to_string()),
+                source: Some("DuckDuckGo".to_string()),
+                fit_score: Some(44),
+                fit_label: Some("review".to_string()),
+                fit_reasons: Some(vec!["reviewable text source".to_string()]),
             },
         )
         .expect("write older");
@@ -788,6 +841,10 @@ mod tests {
                 bytes: 5,
                 downloaded_at: Some("2026-05-28T10:00:00+03:00".to_string()),
                 media_type: Some("application/pdf".to_string()),
+                source: Some("SearXNG".to_string()),
+                fit_score: Some(91),
+                fit_label: Some("strong".to_string()),
+                fit_reasons: Some(vec!["downloadable PDF source".to_string()]),
             },
         )
         .expect("write newer");
@@ -798,7 +855,27 @@ mod tests {
         assert!(library.associated_dir.ends_with("proposal.neditor-sources"));
         assert_eq!(library.sources.len(), 2);
         assert_eq!(library.sources[0].citation_key, "newer");
+        assert_eq!(library.sources[0].source.as_deref(), Some("SearXNG"));
+        assert_eq!(library.sources[0].fit_label.as_deref(), Some("strong"));
         assert_eq!(library.sources[1].citation_key, "older");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn citation_source_manifest_normalizes_fit_metadata() {
+        let reasons = normalize_fit_reasons(Some(&[
+            "  query term in title  ".to_string(),
+            "".to_string(),
+            "downloadable PDF source".to_string(),
+        ]))
+        .expect("reasons");
+        assert_eq!(
+            reasons,
+            vec!["query term in title", "downloadable PDF source"]
+        );
+        assert_eq!(
+            normalize_manifest_text("  SearXNG   Result  ").as_deref(),
+            Some("SearXNG Result")
+        );
     }
 }
