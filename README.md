@@ -217,7 +217,7 @@ settings.
 | Send a quick review copy | Use **HTML Export** for a clean, browser-readable file. |
 | Send a client-facing document | Export to PDF or DOCX, depending on what the recipient expects. |
 | Prepare slides or an executive handoff | Export to PPTX or use presentation mode to review the section flow. |
-| Publish to a blog or Substack | Use **Export** -> **Publish and distribute** for a dry-run payload, copy-ready content, or a session-token POST to an approved webhook, WordPress REST endpoint, Ghost Admin proxy, or Substack manual handoff. |
+| Publish to a blog or Substack | Use **Publish** in the toolbar or **Export** -> **Publishing** for a dry-run payload, copy-ready content, or a session-token POST to an approved webhook, WordPress REST endpoint, Ghost Admin proxy, or Substack manual handoff. |
 | Continue editing in Google Docs | Export the Google Docs package, then import the included DOCX into Google Docs. |
 | Share a long-form reader copy | Export the EPUB ebook, then open it in an EPUB reader before sending it. |
 | Keep formal evidence for approvals | Use export manifests, review status, approval metadata, snapshots, release tags, and the AI Export Assistance notes for metadata, readiness diagnostics, and artifact evidence when your team needs an audit trail. |

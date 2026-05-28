@@ -229,6 +229,27 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             "Export Selected Target",
         )?)
         .separator()
+        .item(&menu_item(
+            app,
+            "neditor-open-publishing-handoff",
+            "Open Publishing Handoff",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-prepare-publishing-handoff",
+            "Prepare Publishing Packet",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-copy-publishing-payload",
+            "Copy Publishing Payload",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-copy-publishing-content",
+            "Copy Publishing Content",
+        )?)
+        .separator()
         .item(&menu_item(app, "neditor-export-pdf", "PDF Export")?)
         .item(&menu_item(app, "neditor-export-docx", "DOCX Export")?)
         .item(&menu_item(app, "neditor-export-pptx", "PPTX Export")?)

@@ -7003,6 +7003,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Export EPUB"));
   ok(app.includes('id: "export-html", label: "HTML Export", title: "Export standalone HTML"'));
   ok(app.includes('id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package"'));
+  ok(app.includes('id: "publish", label: "Publish", title: "Open blog, Substack, or CMS publishing handoff"'));
   ok(app.includes('aria-label="Public export metadata options"'));
   ok(app.includes('aria-label="Distribution metadata checklist"'));
   ok(app.includes('aria-label="AI export readiness assistance"'));
@@ -7010,6 +7011,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Save destination"));
   ok(app.includes("session-only endpoint tokens"));
   ok(app.includes("publishingDestinationProfiles"));
+  ok(app.includes("Open publishing handoff"));
+  ok(app.includes("Prepare publishing packet"));
+  ok(app.includes("Copy publishing payload"));
+  ok(app.includes("Copy publishing content"));
+  ok(app.includes("openPublishingHandoff"));
   ok(app.includes('aria-label="Export readiness notes"'));
   ok(app.includes("exportStepAssistance"));
   ok(app.includes("appendExportStepAssistance"));
@@ -7039,6 +7045,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('listen<string>("neditor-menu-command"'));
   ok(app.includes('"neditor-export-html": "html"'));
   ok(app.includes('"neditor-export-epub": "epub"'));
+  ok(app.includes('case "neditor-open-publishing-handoff"'));
+  ok(app.includes('case "neditor-prepare-publishing-handoff"'));
   ok(app.includes("collectNativeMenuCommandEvidence"));
   ok(app.includes("native workflow inserted table from native writing tools menu"));
   ok(app.includes("native workflow opened table editor from native writing tools menu"));
@@ -7057,6 +7065,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('SubmenuBuilder::new(app, "Help")'));
   ok(tauriLib.includes('"neditor-export-html", "HTML Export"'));
   ok(tauriLib.includes('"neditor-export-epub", "EPUB Export"'));
+  ok(tauriLib.includes('"neditor-open-publishing-handoff",'));
+  ok(tauriLib.includes('"neditor-prepare-publishing-handoff",'));
+  ok(tauriLib.includes('"neditor-copy-publishing-payload",'));
+  ok(tauriLib.includes('"neditor-copy-publishing-content",'));
   ok(tauriLib.includes('"neditor-configure-google-docs"'));
   ok(tauriLib.includes('"neditor-sign-in-google"'));
   ok(tauriLib.includes('"neditor-import-google-docs"'));

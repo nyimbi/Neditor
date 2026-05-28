@@ -8472,6 +8472,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "save-as", label: "Save As", title: "Save document as", icon: "saveAs", run: () => saveDocumentAs() },
       { id: "export-html", label: "HTML Export", title: "Export standalone HTML", icon: "html", run: () => exportDocumentAs("html") },
       { id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package", icon: "epub", run: () => exportDocumentAs("epub") },
+      { id: "publish", label: "Publish", title: "Open blog, Substack, or CMS publishing handoff", icon: "export", primary: true, run: () => openPublishingHandoff() },
       { id: "export", label: "Export", title: "Export document", icon: "export", disabled: store.exportBusy, run: () => exportDocument() },
     ],
   },
@@ -8794,6 +8795,17 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "metadata", label: "Prepare Metadata", help: "Scaffold target-specific distribution metadata.", run: () => applyExportMetadataScaffold() },
           { id: "export-current", label: "Export Selected Target", help: "Export using the selected target and settings.", disabled: store.exportBusy, run: () => exportDocument() },
           { id: "profiles", label: "Export Profiles", help: "Open saved export profiles.", run: () => { store.mode = "export"; store.sidebar = "exports"; } },
+        ],
+      },
+      {
+        id: "publishing",
+        label: "Publishing",
+        items: [
+          { id: "publish-open", label: "Open Publishing Handoff", help: "Open blog, Substack, webhook, WordPress, and Ghost publishing controls.", run: () => openPublishingHandoff() },
+          { id: "publish-prepare", label: "Prepare Publishing Packet", help: "Run export readiness and build a publishable payload preview.", disabled: store.exportBusy, run: () => preparePublishingHandoff() },
+          { id: "publish-copy-payload", label: "Copy Publishing Payload", help: "Copy the JSON payload for a CMS bridge or automation.", run: () => copyPublishingPayload() },
+          { id: "publish-copy-content", label: "Copy Publishing Content", help: "Copy the selected HTML, Markdown, or plain-text publishing content.", run: () => copyPublishingContent() },
+          { id: "publish-save-destination", label: "Save Publishing Destination", help: "Save the current non-secret endpoint profile for reuse.", run: () => savePublishingDestinationProfile() },
         ],
       },
       {
@@ -10776,6 +10788,11 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Rename document", group: "File", run: () => void renameDocument() },
   { name: "Duplicate document", group: "File", run: () => void duplicateDocument() },
   { name: "Prepare for export", group: "Export", run: () => void prepareForExport() },
+  { name: "Open publishing handoff", group: "Export", keywords: ["publish", "blog", "substack", "webhook", "wordpress", "ghost", "cms"], run: () => openPublishingHandoff() },
+  { name: "Prepare publishing packet", group: "Export", keywords: ["publish", "payload", "cms", "webhook", "substack"], run: () => void preparePublishingHandoff() },
+  { name: "Copy publishing payload", group: "Export", keywords: ["publish", "json", "webhook", "cms"], run: () => void copyPublishingPayload() },
+  { name: "Copy publishing content", group: "Export", keywords: ["publish", "html", "markdown", "substack"], run: () => void copyPublishingContent() },
+  { name: "Save publishing destination", group: "Export", keywords: ["publish", "destination", "profile", "webhook", "cms"], run: () => savePublishingDestinationProfile() },
   { name: "Export HTML", group: "Export", run: () => void exportDocumentAs("html") },
   { name: "Export EPUB", group: "Export", run: () => void exportDocumentAs("epub") },
   { name: "Export document", group: "Export", run: () => void exportDocument() },
@@ -11230,6 +11247,18 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-prepare-export":
       await prepareForExport();
       store.sidebar = "exports";
+      break;
+    case "neditor-open-publishing-handoff":
+      openPublishingHandoff();
+      break;
+    case "neditor-prepare-publishing-handoff":
+      await preparePublishingHandoff();
+      break;
+    case "neditor-copy-publishing-payload":
+      await copyPublishingPayload();
+      break;
+    case "neditor-copy-publishing-content":
+      await copyPublishingContent();
       break;
     case "neditor-export-current":
       await exportDocument();
@@ -16887,6 +16916,13 @@ async function preparePublishingHandoff() {
   await prepareForExport();
   store.sidebar = "exports";
   store.statusMessage = `Prepared ${publishingTargetLabels[publishingTargetKind.value]} publishing packet`;
+}
+
+function openPublishingHandoff() {
+  if (!publishingPanelVisible.value) store.exportTarget = "blog";
+  store.mode = "export";
+  store.sidebar = "exports";
+  store.statusMessage = "Opened publishing handoff";
 }
 
 function selectPublishingDestination(id: string) {
