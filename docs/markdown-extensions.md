@@ -341,8 +341,9 @@ before users download or save them; those fit details stay with the saved source
 manifest. Repeated downloads reuse the saved manifest entry when the source file
 still exists, and the References panel can refresh the active document's source
 library, cite a saved source again, insert its bibliography entry, link to the
-local copy, or copy/reveal the downloaded evidence path. Users can also
-bulk-save every visible search result without changing the document text. Deep
+local copy, insert/copy a source-library audit table, or copy/reveal the
+downloaded evidence path. Users can also bulk-save every visible search result
+without changing the document text. Deep
 Research uses the selected AI provider, including Ollama local or remote/cloud
 endpoints, to plan iterative queries, reflect on knowledge gaps, preserve found
 source documents in the active document's local source library when enabled,

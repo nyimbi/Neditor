@@ -1463,6 +1463,10 @@
                   <strong>Downloaded Source Library</strong>
                   <span>{{ citationSourceLibrary.length }} saved source{{ citationSourceLibrary.length === 1 ? "" : "s" }} for this document</span>
                 </div>
+                <div class="reference-actions">
+                  <button type="button" @click="insertCitationSourceLibraryAudit">Insert audit</button>
+                  <button type="button" @click="copyCitationSourceLibraryAudit">Copy audit</button>
+                </div>
               </header>
               <article v-for="source in citationSourceLibrary" :key="`${source.citation_key}-${source.sha256}`" class="snapshot-row">
                 <p>{{ source.title }}</p>
@@ -5637,6 +5641,7 @@ import {
   resolveCitationTodo,
   type CitationTodoItem,
 } from "./lib/citationTodoWorkflow";
+import { citationSourceLibraryAuditMarkdown, type CitationSourceAuditItem } from "./lib/citationSourceLibrary";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import {
   agenticCliIntegrations,
@@ -5870,22 +5875,7 @@ import {
 import { useDocumentsStore } from "./stores/documents";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
 
-interface CitationSourceLibraryItem {
-  citation_key: string;
-  title: string;
-  url: string;
-  snippet: string;
-  source?: string;
-  path: string;
-  relative_path: string;
-  sha256: string;
-  bytes: number;
-  downloaded_at?: string;
-  media_type?: string;
-  fit_score?: number;
-  fit_label?: string;
-  fit_reasons?: string[];
-}
+type CitationSourceLibraryItem = CitationSourceAuditItem;
 
 interface CitationSourceLibraryResponse {
   associated_dir: string;
@@ -9091,6 +9081,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "comment", label: "Insert Review Comment", help: "Add an unresolved review comment marker.", run: () => insertBlock(commentSnippet) },
           { id: "ai-source", label: "Insert AI Source", help: "Add AI provenance metadata.", run: () => insertBlock(aiSnippet) },
           { id: "citation-audit", label: "Insert Citation TODO Audit", help: "Insert open citation TODOs.", run: () => insertBlock(citationTodoAuditMarkdown(citationTodoItems.value)) },
+          { id: "source-library-audit", label: "Insert Source Library Audit", help: "Insert saved source evidence, fit scores, hashes, and local paths.", disabled: !citationSourceLibrary.value.length, run: () => insertCitationSourceLibraryAudit() },
           { id: "automation-audit", label: "Insert Agent Automation Audit", help: "Append agent automation evidence if a run exists.", disabled: !agentRun.value, run: () => insertAgentAutomationAudit() },
         ],
       },
@@ -10105,6 +10096,21 @@ function insertCitationSourceBibliography(source: CitationSourceLibraryItem) {
 
 function insertCitationSourceReference(source: CitationSourceLibraryItem) {
   insertCitationReference(source.citation_key);
+}
+
+function insertCitationSourceLibraryAudit() {
+  insertBlock(citationSourceLibraryAuditMarkdown(citationSourceLibrary.value));
+  store.statusMessage = "Inserted source library audit";
+}
+
+async function copyCitationSourceLibraryAudit() {
+  const audit = citationSourceLibraryAuditMarkdown(citationSourceLibrary.value);
+  try {
+    await navigator.clipboard?.writeText(audit);
+    store.statusMessage = "Copied source library audit";
+  } catch {
+    store.statusMessage = "Source library audit is ready to copy";
+  }
 }
 
 async function copyCitationSourcePath(source: CitationSourceLibraryItem) {

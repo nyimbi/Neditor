@@ -81,6 +81,7 @@ import {
   extractCitationTodoItems,
   resolveCitationTodo,
 } from "../src/lib/citationTodoWorkflow.js";
+import { citationSourceLibraryAuditMarkdown } from "../src/lib/citationSourceLibrary.js";
 import { commandSearchText, compactCommandKeywords, joinCommandDescription } from "../src/lib/commandPalette.js";
 import { saveAiProviderDefaultsState, saveBusinessProfileState, saveTtsPreferencesState } from "../src/lib/configurationProfiles.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
@@ -4741,6 +4742,34 @@ test("Deep Research ranks stronger citation source candidates first", () => {
   equal(weak.label, "weak");
 });
 
+test("citation source library audit captures evidence metadata", () => {
+  const audit = citationSourceLibraryAuditMarkdown([
+    {
+      citation_key: "agency2026",
+      title: "AI Procurement | Controls",
+      url: "https://agency.gov/reports/ai-procurement-controls.pdf",
+      snippet: "Controls evidence.",
+      source: "SearXNG",
+      path: "/tmp/report.pdf",
+      relative_path: "proposal.neditor-sources/report.pdf",
+      sha256: "abcdef1234567890fedcba",
+      bytes: 2048,
+      downloaded_at: "2026-05-28T10:00:00+03:00",
+      media_type: "application/pdf",
+      fit_score: 91,
+      fit_label: "strong",
+      fit_reasons: ["government source domain", "downloadable PDF source"],
+    },
+  ]);
+  ok(audit.includes("## Source Library Audit"));
+  ok(audit.includes("Saved sources: 1"));
+  ok(audit.includes("@agency2026"));
+  ok(audit.includes("AI Procurement \\| Controls"));
+  ok(audit.includes("91/100 strong"));
+  ok(audit.includes("abcdef1234567890"));
+  ok(audit.includes("government source domain; downloadable PDF source"));
+});
+
 test("AI provider defaults normalize non-secret setup preferences", () => {
   deepEqual(
     normalizeAiProviderDefaults({
@@ -6607,6 +6636,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("citationSourceLibrary"));
   ok(app.includes("insertCitationSourceBibliography"));
   ok(app.includes("insertCitationSourceReference"));
+  ok(app.includes("insertCitationSourceLibraryAudit"));
+  ok(app.includes("copyCitationSourceLibraryAudit"));
+  ok(app.includes("Insert Source Library Audit"));
   ok(app.includes("copyCitationSourcePath"));
   ok(app.includes("revealCitationSource"));
   ok(app.includes('invoke("reveal_path", { path: source.path })'));
