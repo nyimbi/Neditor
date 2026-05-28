@@ -632,7 +632,12 @@ and an embedded NEditor manifest. Substack packages also include a minimal
 `substack-copy.html` fragment intended for paste/import workflows. Their
 `metadata.json` files name the primary publish file, fallback files, and
 target-specific publishing steps so the package remains self-describing outside
-NEditor.
+NEditor. For teams that publish through an internal CMS bridge, static-site
+automation, WordPress REST endpoint, or Ghost Admin proxy, the Export panel also
+has a **Publish and distribute** handoff. It builds a reviewable JSON payload,
+keeps endpoint tokens session-only, supports dry-run preview before sending,
+and blocks unsafe non-local HTTP endpoints so business users can post through an
+approved publishing bridge without copying files by hand.
 Google Docs package exports are ZIP files with `document.docx` as the primary
 Google Docs upload/import file, plus HTML, Markdown, plain text, metadata,
 assets, and an embedded manifest for auditability. Their metadata names

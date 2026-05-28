@@ -1797,6 +1797,68 @@
               <button type="button" @click="prepareForExport">Run readiness</button>
             </div>
           </section>
+          <section v-if="publishingPanelVisible" class="publishing-handoff-panel" aria-label="Publishing handoff">
+            <header>
+              <div>
+                <h3>Publish and distribute</h3>
+                <span>{{ publishingTargetHelpText }}</span>
+              </div>
+              <button type="button" :disabled="store.exportBusy" @click="preparePublishingHandoff">Prepare</button>
+            </header>
+            <div class="publishing-grid">
+              <label>
+                Destination
+                <select v-model="publishingTargetKind">
+                  <option v-for="target in publishingTargetOptions" :key="target.value" :value="target.value">{{ target.label }}</option>
+                </select>
+              </label>
+              <label>
+                Content
+                <select v-model="publishingContentFormat">
+                  <option value="html">HTML</option>
+                  <option value="markdown">Markdown</option>
+                  <option value="text">Plain text</option>
+                </select>
+              </label>
+              <label>
+                Endpoint URL
+                <input v-model="publishingEndpointUrl" type="url" placeholder="https://cms.example.com/webhook/neditor" />
+              </label>
+              <label>
+                Auth header
+                <input v-model="publishingAuthHeaderName" type="text" placeholder="Authorization" />
+              </label>
+              <label>
+                Session token
+                <input v-model="publishingAuthToken" type="password" autocomplete="off" placeholder="Stored only in this session" />
+              </label>
+              <label class="checkbox-row"><input v-model="publishingDryRun" type="checkbox" /> Dry run until I explicitly send</label>
+            </div>
+            <article class="publishing-summary" :data-status="publishingRequestPreview.canSend ? 'ready' : 'needs-review'">
+              <strong>{{ publishingHandoff.title }}</strong>
+              <p>{{ publishingHandoff.description || "No public summary yet." }}</p>
+              <small>Slug {{ publishingHandoff.slug }} | {{ publishingHandoff.readinessLabel }} | {{ publishingHandoff.tags.length ? publishingHandoff.tags.join(", ") : "no tags" }}</small>
+            </article>
+            <div class="publishing-checklist">
+              <article v-for="item in publishingHandoff.checklist" :key="item.id" class="snapshot-row" :data-status="item.status">
+                <strong>{{ item.label }}</strong>
+                <p>{{ item.detail }}</p>
+              </article>
+            </div>
+            <div class="reference-actions">
+              <button type="button" @click="copyPublishingPayload">Copy payload</button>
+              <button type="button" @click="copyPublishingContent">Copy content</button>
+              <button
+                type="button"
+                :disabled="publishingBusy || publishingDryRun || !publishingRequestPreview.canSend"
+                @click="sendPublishingPayload"
+              >
+                Send to endpoint
+              </button>
+            </div>
+            <p v-for="warning in publishingRequestPreview.warnings" :key="warning" class="sidebar-hint">{{ warning }}</p>
+            <textarea :value="publishingRequestPreview.bodyText" rows="7" readonly aria-label="Publishing payload preview"></textarea>
+          </section>
           <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
           <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Include styles</label>
           <label><input v-model="store.exportDefaults.includeSyntaxHighlighting" type="checkbox" /> Syntax highlighting</label>
@@ -5407,6 +5469,14 @@ import {
   type ExportStepAssistance,
 } from "./lib/exportMetadataChecklist";
 import {
+  buildPublishingHandoff,
+  buildPublishingRequestPreview,
+  publishingTargetHelp,
+  publishingTargetLabels,
+  type PublishingContentFormat,
+  type PublishingTargetKind,
+} from "./lib/publishingWorkflow";
+import {
   frontMatterAnyList,
   frontMatterAnyScalar,
   frontMatterListValues,
@@ -6066,6 +6136,14 @@ const rfpImportMessage = ref("");
 const draggedTabId = ref("");
 const exportProfileName = ref("Client delivery");
 const exportReadinessNotes = ref("");
+const publishingTargetKind = ref<PublishingTargetKind>("generic-webhook");
+const publishingContentFormat = ref<PublishingContentFormat>("html");
+const publishingEndpointUrl = ref("");
+const publishingAuthHeaderName = ref("Authorization");
+const publishingAuthToken = ref("");
+const publishingDryRun = ref(true);
+const publishingBusy = ref(false);
+const publishingTargetOptions = Object.entries(publishingTargetLabels).map(([value, label]) => ({ value: value as PublishingTargetKind, label }));
 const helpQuery = ref("");
 const helpCategory = ref<"all" | HelpCategory>("all");
 const selectedHelpTopicId = ref("getting-started");
@@ -6939,6 +7017,29 @@ const exportPreviewSummary = computed(() => {
     options,
   };
 });
+const publishingPanelVisible = computed(() => ["html", "blog", "substack"].includes(store.exportTarget));
+const publishingHandoff = computed(() =>
+  buildPublishingHandoff({
+    title: active.value.compile?.semantic.title || active.value.title,
+    compiledMarkdown: active.value.compile?.compiled_markdown || active.value.text,
+    html: active.value.compile?.html || "",
+    metadata: active.value.compile?.metadata,
+    exportTarget: store.exportTarget,
+    sourceHash: active.value.compile?.export_manifest.source_hash || store.exportReadiness?.manifest.source_hash || "",
+    appVersion: active.value.compile?.export_manifest.app_version || store.exportReadiness?.manifest.app_version || "",
+    readiness: store.exportReadiness?.readiness || null,
+  }),
+);
+const publishingRequestPreview = computed(() =>
+  buildPublishingRequestPreview(publishingHandoff.value, {
+    targetKind: publishingTargetKind.value,
+    endpointUrl: publishingEndpointUrl.value,
+    contentFormat: publishingContentFormat.value,
+    authHeaderName: publishingAuthHeaderName.value,
+    authToken: publishingAuthToken.value,
+  }),
+);
+const publishingTargetHelpText = computed(() => publishingTargetHelp(publishingTargetKind.value));
 const transformPreviewItems = computed<TransformPreviewItem[]>(() =>
   (active.value.compile?.transform_artifacts || []).map((artifact, index) => {
     const locationLabel = artifact.source_line
@@ -16761,6 +16862,53 @@ async function prepareForExport() {
   await store.prepareForExport();
 }
 
+async function preparePublishingHandoff() {
+  store.exportTarget = store.exportTarget === "substack" ? "substack" : store.exportTarget === "html" ? "html" : "blog";
+  await prepareForExport();
+  store.sidebar = "exports";
+  store.statusMessage = `Prepared ${publishingTargetLabels[publishingTargetKind.value]} publishing packet`;
+}
+
+async function copyPublishingPayload() {
+  const payload = publishingRequestPreview.value.bodyText;
+  try {
+    await navigator.clipboard?.writeText(payload);
+    store.statusMessage = "Copied publishing payload";
+  } catch {
+    store.statusMessage = "Publishing payload is ready to copy";
+  }
+}
+
+async function copyPublishingContent() {
+  const content = String(publishingRequestPreview.value.body.content || publishingHandoff.value.html || publishingHandoff.value.markdown);
+  try {
+    await navigator.clipboard?.writeText(content);
+    store.statusMessage = "Copied publishing content";
+  } catch {
+    store.statusMessage = "Publishing content is ready to copy";
+  }
+}
+
+async function sendPublishingPayload() {
+  if (publishingDryRun.value || !publishingRequestPreview.value.canSend || publishingBusy.value) return;
+  publishingBusy.value = true;
+  try {
+    const preview = publishingRequestPreview.value;
+    const response = await fetch(preview.url, {
+      method: preview.method,
+      headers: preview.headers,
+      body: preview.bodyText,
+    });
+    store.statusMessage = response.ok
+      ? `Published handoff accepted by ${publishingTargetLabels[publishingTargetKind.value]} (${response.status})`
+      : `Publishing endpoint returned ${response.status}`;
+  } catch (error) {
+    store.statusMessage = `Publishing failed: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    publishingBusy.value = false;
+  }
+}
+
 async function snapshotActive() {
   flushEditorTextToStore();
   await store.snapshotActive();
@@ -20609,6 +20757,84 @@ select:hover {
   color: #526171;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.publishing-handoff-panel {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #cad6e3;
+  border-radius: 7px;
+  background: #fbfcfe;
+}
+
+.publishing-handoff-panel header,
+.publishing-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.publishing-handoff-panel header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.publishing-handoff-panel h3,
+.publishing-handoff-panel p {
+  margin: 0;
+}
+
+.publishing-handoff-panel header span,
+.publishing-handoff-panel small {
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.publishing-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.publishing-grid label,
+.publishing-grid .checkbox-row {
+  display: grid;
+  gap: 4px;
+}
+
+.publishing-grid .checkbox-row {
+  align-content: end;
+  grid-template-columns: auto 1fr;
+}
+
+.publishing-summary {
+  padding: 9px;
+  border: 1px solid #d7dee7;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.publishing-summary[data-status="ready"] {
+  border-left: 3px solid #2f855a;
+}
+
+.publishing-summary[data-status="needs-review"] {
+  border-left: 3px solid #c68a1a;
+}
+
+.publishing-checklist {
+  display: grid;
+  gap: 8px;
+}
+
+.publishing-checklist .snapshot-row[data-status="ready"] {
+  border-left: 3px solid #2f855a;
+}
+
+.publishing-checklist .snapshot-row[data-status="needs-review"] {
+  border-left: 3px solid #c68a1a;
 }
 
 .release-readiness-checklist,

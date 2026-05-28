@@ -101,6 +101,11 @@ import {
   exportMetadataChecklistHelp,
   formatExportMetadataChecklistSummary,
 } from "../src/lib/exportMetadataChecklist.js";
+import {
+  buildPublishingHandoff,
+  buildPublishingRequestPreview,
+  publishingPrimaryContent,
+} from "../src/lib/publishingWorkflow.js";
 import { buildDocumentCompileOptions, buildDocumentExportOptions } from "../src/lib/documentExportOptions.js";
 import {
   applyExportFailureState,
@@ -3793,6 +3798,84 @@ test("export metadata checklist validates publishing and ebook handoff readiness
 
   deepEqual(epubChecklist.map((item) => item.status), ["complete", "complete", "complete", "complete"]);
   ok(epubChecklist.some((item) => item.id === "epub-outline" && item.detail.includes("4 heading entries")));
+});
+
+test("publishing workflow builds endpoint payloads without persisting secrets", () => {
+  const handoff = buildPublishingHandoff({
+    title: "Quarterly Launch Note",
+    compiledMarkdown: [
+      "---",
+      "title: Quarterly Launch Note",
+      "status: approved",
+      "slug: q3-launch",
+      "description: Public launch narrative for customers.",
+      "tags:",
+      "  - launch",
+      "  - customers",
+      "---",
+      "",
+      "# Quarterly Launch Note",
+      "",
+      "This is the first public paragraph.",
+    ].join("\n"),
+    html: "<h1>Quarterly Launch Note</h1><p>This is the first public paragraph.</p>",
+    metadata: {
+      title: "Quarterly Launch Note",
+      status: "approved",
+      slug: "q3-launch",
+      description: "Public launch narrative for customers.",
+      tags: ["launch", "customers"],
+      language: "en-US",
+    },
+    exportTarget: "blog",
+    sourceHash: "sha256:abc",
+    readiness: { ready: true, error_count: 0, warning_count: 0, info_count: 1 },
+    appVersion: "1.2.3",
+  });
+
+  equal(handoff.slug, "q3-launch");
+  equal(handoff.readinessLabel, "ready");
+  deepEqual(handoff.tags, ["launch", "customers"]);
+  equal(handoff.checklist.every((item) => item.status === "ready"), true);
+  equal(publishingPrimaryContent(handoff, "markdown").includes("# Quarterly Launch Note"), true);
+
+  const generic = buildPublishingRequestPreview(handoff, {
+    targetKind: "generic-webhook",
+    endpointUrl: "https://cms.example.com/hooks/neditor",
+    contentFormat: "html",
+    authHeaderName: "X-NEditor-Token",
+    authToken: "session-token",
+  });
+  equal(generic.canSend, true);
+  equal(generic.headers["X-NEditor-Token"], "session-token");
+  equal(generic.body.packageType, "neditor-publishing-handoff");
+  equal(generic.body.audit && typeof generic.body.audit === "object", true);
+  ok(generic.bodyText.includes("sha256:abc"));
+
+  const wordpress = buildPublishingRequestPreview(handoff, {
+    targetKind: "wordpress-rest",
+    endpointUrl: "http://localhost:8080/wp-json/wp/v2/posts",
+    contentFormat: "html",
+  });
+  equal(wordpress.canSend, true);
+  equal(wordpress.body.status, "draft");
+  equal(wordpress.body.content, handoff.html);
+
+  const unsafe = buildPublishingRequestPreview(handoff, {
+    targetKind: "generic-webhook",
+    endpointUrl: "http://example.com/hook",
+    contentFormat: "text",
+  });
+  equal(unsafe.canSend, false);
+  ok(unsafe.warnings.some((warning) => warning.includes("HTTPS")));
+
+  const substack = buildPublishingRequestPreview(handoff, {
+    targetKind: "substack-manual",
+    endpointUrl: "",
+    contentFormat: "html",
+  });
+  equal(substack.canSend, false);
+  ok(substack.warnings.some((warning) => warning.includes("Substack")));
 });
 
 test("agentic workflow planner coordinates creation revision review and distribution", () => {
