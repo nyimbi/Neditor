@@ -3969,6 +3969,9 @@ test("workspace persistence migration versions and normalizes saved settings", (
   equal(normalizeCitationStyle("numeric"), "numeric");
   equal(normalizeCitationStyle("ieee"), "ieee");
   equal(normalizeCitationStyle("mla"), "mla");
+  equal(normalizeCitationStyle("nature"), "nature");
+  equal(normalizeCitationStyle("AMA"), "ama");
+  equal(normalizeCitationStyle("elsevier-vancouver"), "elsevier-vancouver");
   equal(normalizeCitationStyle("unknown-style"), "title");
   equal(migrated.brandProfileDefaults?.color, "#123456");
   equal(migrated.brandProfileDefaults?.watermark, "Draft");

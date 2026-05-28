@@ -485,7 +485,7 @@ fn validate_default_citation_style_option(
             "defaultCitationStyle must be a supported citation style.",
             None,
             None,
-            Some("Choose title, author-year, key, numeric, apa, mla, chicago-author-date, ieee, vancouver, or remove the default."),
+            Some("Choose title, author-year, key, numeric, apa, mla, chicago-author-date, ieee, vancouver, nature, ama, elsevier-vancouver, or remove the default."),
         ));
     }
 }

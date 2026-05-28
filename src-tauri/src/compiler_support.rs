@@ -81,9 +81,10 @@ pub(crate) fn canonical_citation_style(style: &str) -> Option<&'static str> {
         "key" | "citation-key" | "citation_key" => Some("key"),
         "numeric" => Some("numeric"),
         "ieee" => Some("ieee"),
-        "vancouver" | "nature" | "american-medical-association" | "ama" | "elsevier-vancouver" => {
-            Some("vancouver")
-        }
+        "vancouver" => Some("vancouver"),
+        "nature" => Some("nature"),
+        "american-medical-association" | "ama" => Some("ama"),
+        "elsevier-vancouver" => Some("elsevier-vancouver"),
         _ => None,
     }
 }

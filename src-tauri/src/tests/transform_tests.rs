@@ -551,7 +551,7 @@ fn qr_matrix_reserves_finder_separators() {
 fn bibtex_transform_renders_bibliography_preview() {
     let artifact = run_transform(
         "bibtex".to_string(),
-        "@book{porter1985, title={Competitive Advantage}, author={Michael Porter}, year={1985}, publisher={Free Press}}\n@article{doe2026, title=\"Evidence Based Reports\", author=\"Jane Doe\", date=\"2026-05-21\", journal=\"Business Evidence Review\", volume={4}, number={2}, pages={10--18}, doi={10.1000/example}, url={https://example.test/evidence}}".to_string(),
+        "@book{porter1985, title={Competitive Advantage}, author={Michael Porter}, year={1985}, publisher={Free Press}, edition={2}, isbn={978-0-684-84146-5}}\n@article{doe2026, title=\"Evidence Based Reports\", author=\"Jane Doe\", date=\"2026-05-21\", journal=\"Business Evidence Review\", volume={4}, number={2}, pages={10--18}, doi={10.1000/example}, url={https://example.test/evidence}, issn={2049-3630}, abstract={Practical evidence review for business documents.}}".to_string(),
     )
     .expect("bibtex transform");
 
@@ -563,6 +563,8 @@ fn bibtex_transform_renders_bibliography_preview() {
     assert!(artifact.html.contains("1985"));
     assert!(artifact.html.contains("Publisher"));
     assert!(artifact.html.contains("Free Press"));
+    assert!(artifact.html.contains("Edition"));
+    assert!(artifact.html.contains("978-0-684-84146-5"));
     assert!(artifact.html.contains("<dt>doe2026</dt>"));
     assert!(artifact
         .html
@@ -572,6 +574,10 @@ fn bibtex_transform_renders_bibliography_preview() {
     assert!(artifact.html.contains("Business Evidence Review"));
     assert!(artifact.html.contains("10.1000/example"));
     assert!(artifact.html.contains("https://example.test/evidence"));
+    assert!(artifact.html.contains("2049-3630"));
+    assert!(artifact
+        .html
+        .contains("Practical evidence review for business documents."));
     assert!(artifact.html.contains("bibtex-entry-metadata"));
     assert!(artifact.diagnostics.is_empty());
 

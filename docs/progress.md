@@ -50,6 +50,14 @@ AI provenance native-smoke proof update:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked native_workflow_ai_provenance_fixture_exports_reviewed_appendix --lib` | Pass | Focused native artifact proof compiles the same reviewed AI provenance fixture, verifies export readiness with `includeProvenance`, checks semantic source/section records, and asserts HTML/text export appendices carry audit-readable source, section, reviewer, timestamp, and prompt summary evidence. |
 | `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS=120000 NEDITOR_DESKTOP_SMOKE_ATTEMPTS=1 pnpm run test:desktop-smoke` | Host launch failure before in-app report | The command path passed the native command workflow, but the launched app survived until timeout without writing `.tmp/desktop-smoke/native-window-report.json`, `.tmp/desktop-smoke/native-ui-report.json`, or `.tmp/desktop-smoke/native-workflow-report.json`; launch stderr showed macOS `-10827` and `com.apple.hiservices-xpcservice` connection errors before the WebView smoke code produced an accepted report. |
 
+BibTeX and CSL style fidelity:
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_preserves_scientific_and_medical_csl_alias_intent --lib` | Pass | Nature, AMA, and Elsevier-Vancouver aliases now stay distinct numeric citation styles and render bibliography entries with journal, volume, issue, page, year, and DOI metadata instead of collapsing to generic Vancouver output. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked bibtex_transform_renders_bibliography_preview --lib` | Pass | BibTeX transform previews now surface richer real-world metadata including edition, ISBN, ISSN, and abstract in addition to existing author/year/publisher/journal/volume/issue/pages/DOI/URL fields. |
+| `pnpm run test:unit` | Pass | 87 frontend unit/static tests passed, including citation-style preference normalization for `nature`, `AMA`, and `elsevier-vancouver`. |
+
 ## Completed Recently
 
 Recent pushed checkpoints visible in current git history:

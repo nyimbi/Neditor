@@ -66,6 +66,22 @@ fn bibtex_entry_metadata_html(entry: &BibliographyEntry) -> String {
         ("Pages", &["pages", "page"][..]),
         ("DOI", &["doi"][..]),
         ("URL", &["url", "URL"][..]),
+        ("Editor", &["editor"][..]),
+        ("Organization", &["organization"][..]),
+        ("Institution", &["institution"][..]),
+        ("School", &["school"][..]),
+        ("Series", &["series"][..]),
+        ("Edition", &["edition"][..]),
+        ("Address", &["address", "location"][..]),
+        ("ISBN", &["isbn", "ISBN"][..]),
+        ("ISSN", &["issn", "ISSN"][..]),
+        (
+            "Archive",
+            &["archiveprefix", "archivePrefix", "archive"][..],
+        ),
+        ("Eprint", &["eprint"][..]),
+        ("Note", &["note"][..]),
+        ("Abstract", &["abstract"][..]),
     ] {
         let value = fields.iter().find_map(|field| entry.fields.get(*field));
         push_bibtex_metadata_row(&mut rows, label, value.map(String::as_str));

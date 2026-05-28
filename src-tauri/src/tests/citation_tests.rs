@@ -305,6 +305,61 @@ fn compiler_preserves_common_citation_style_intent_in_bibliographies() {
 }
 
 #[test]
+fn compiler_preserves_scientific_and_medical_csl_alias_intent() {
+    let source = |style: &str| {
+        format!(
+            "---\ntitle: Scientific Style Fidelity\nstatus: approved\napprovedBy: QA\ncitationStyle: {style}\n---\n# Scientific Style Fidelity\nClaim [@doe2026, sec. 2].\n\n```bibtex\n@article{{doe2026,\n title={{Evidence Based Reports}},\n author={{Doe, Jane}},\n year={{2026}},\n journal={{Business Evidence Review}},\n volume={{4}},\n number={{2}},\n pages={{10--18}},\n doi={{10.1000/example}}\n}}\n```\n[BIBLIOGRAPHY]\n"
+        )
+    };
+
+    let nature = compile(CompileRequest {
+        text: source("nature"),
+        file_path: None,
+    });
+    assert!(nature.html.contains("[1, sec. 2]"));
+    assert!(
+        nature.compiled_markdown.contains(
+            "- [1] **doe2026**. Doe, Jane. Evidence Based Reports. Business Evidence Review 4, 10--18 (2026). doi: 10.1000/example"
+        ),
+        "{}",
+        nature.compiled_markdown
+    );
+
+    let ama = compile(CompileRequest {
+        text: source("ama"),
+        file_path: None,
+    });
+    assert!(ama.html.contains("[1, sec. 2]"));
+    assert!(
+        ama.compiled_markdown.contains(
+            "- [1] **doe2026**. Doe, Jane. Evidence Based Reports. Business Evidence Review. 2026;4(2):10--18. doi:10.1000/example"
+        ),
+        "{}",
+        ama.compiled_markdown
+    );
+
+    let elsevier = compile(CompileRequest {
+        text: source("elsevier-vancouver"),
+        file_path: None,
+    });
+    assert!(elsevier.html.contains("[1, sec. 2]"));
+    assert!(
+        elsevier.compiled_markdown.contains(
+            "- [1] **doe2026**. Doe, Jane. Evidence Based Reports. Business Evidence Review. 2026;4(2):10--18. doi:10.1000/example"
+        ),
+        "{}",
+        elsevier.compiled_markdown
+    );
+
+    for response in [nature, ama, elsevier] {
+        assert!(!response
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("Unsupported citation style")));
+    }
+}
+
+#[test]
 fn compiler_loads_csl_json_bibliography() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

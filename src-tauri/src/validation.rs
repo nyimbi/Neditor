@@ -393,7 +393,7 @@ fn validate_citation_style_metadata(metadata: &Value, diagnostics: &mut Vec<Docu
         format!("Unsupported citation style: {style}"),
         None,
         None,
-        Some("Use title, author-year, key, numeric, or a supported CSL alias such as apa, mla, chicago-author-date, ieee, or vancouver."),
+        Some("Use title, author-year, key, numeric, or a supported CSL alias such as apa, mla, chicago-author-date, ieee, vancouver, nature, ama, or elsevier-vancouver."),
     ));
 }
 

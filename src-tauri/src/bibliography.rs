@@ -1133,7 +1133,10 @@ fn citation_label(
 }
 
 pub(crate) fn is_numeric_citation_style(style: &str) -> bool {
-    matches!(style, "numeric" | "ieee" | "vancouver")
+    matches!(
+        style,
+        "numeric" | "ieee" | "vancouver" | "nature" | "ama" | "elsevier-vancouver"
+    )
 }
 
 pub(crate) fn citation_author_label(author: &str) -> String {
@@ -1169,6 +1172,24 @@ pub(crate) fn bibliography_entry_markdown(
             index + 1,
             entry.key,
             vancouver_reference(entry)
+        ),
+        "nature" => format!(
+            "- [{}] **{}**. {}",
+            index + 1,
+            entry.key,
+            nature_reference(entry)
+        ),
+        "ama" => format!(
+            "- [{}] **{}**. {}",
+            index + 1,
+            entry.key,
+            ama_reference(entry)
+        ),
+        "elsevier-vancouver" => format!(
+            "- [{}] **{}**. {}",
+            index + 1,
+            entry.key,
+            elsevier_vancouver_reference(entry)
         ),
         "apa" => format!("- **{}**. {}", entry.key, apa_reference(entry)),
         "chicago-author-date" => format!(
@@ -1273,6 +1294,158 @@ fn vancouver_reference(entry: &BibliographyEntry) -> String {
         (Some(author), None) => format!("{} {}.", sentence_author(author), entry.title),
         (None, Some(year)) => format!("{}. {year}.", entry.title),
         (None, None) => format!("{}.", entry.title),
+    }
+}
+
+fn nature_reference(entry: &BibliographyEntry) -> String {
+    let mut parts = Vec::new();
+    if let Some(author) = entry.author.as_deref() {
+        parts.push(sentence_author(author));
+    }
+    parts.push(ensure_period(&entry.title));
+    if let Some(container) = journal_or_container(entry) {
+        let mut source = container.to_string();
+        if let Some(volume) = entry_field(entry, &["volume"]) {
+            source.push(' ');
+            source.push_str(volume);
+        }
+        if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+            source.push_str(", ");
+            source.push_str(pages);
+        }
+        if let Some(year) = entry.issued.as_deref() {
+            source.push_str(&format!(" ({year})"));
+        }
+        parts.push(ensure_period(&source));
+    } else if let Some(year) = entry.issued.as_deref() {
+        parts.push(ensure_period(year));
+    }
+    if let Some(doi) = entry_field(entry, &["doi"]) {
+        parts.push(format!("doi: {}", clean_doi(doi)));
+    } else if let Some(url) = entry_field(entry, &["url", "URL"]) {
+        parts.push(url.to_string());
+    }
+    parts.join(" ")
+}
+
+fn ama_reference(entry: &BibliographyEntry) -> String {
+    let mut parts = Vec::new();
+    if let Some(author) = entry.author.as_deref() {
+        parts.push(sentence_author(author));
+    }
+    parts.push(ensure_period(&entry.title));
+    if let Some(container) = journal_or_container(entry) {
+        parts.push(ensure_period(container));
+    } else if let Some(publisher) = publisher_or_institution(entry) {
+        parts.push(ensure_period(publisher));
+    }
+    if let Some(source) = year_volume_issue_pages(entry) {
+        parts.push(ensure_period(&source));
+    } else if let Some(year) = entry.issued.as_deref() {
+        parts.push(ensure_period(year));
+    }
+    if let Some(doi) = entry_field(entry, &["doi"]) {
+        parts.push(format!("doi:{}", clean_doi(doi)));
+    } else if let Some(url) = entry_field(entry, &["url", "URL"]) {
+        parts.push(url.to_string());
+    }
+    parts.join(" ")
+}
+
+fn elsevier_vancouver_reference(entry: &BibliographyEntry) -> String {
+    let mut parts = Vec::new();
+    if let Some(author) = entry.author.as_deref() {
+        parts.push(sentence_author(author));
+    }
+    parts.push(ensure_period(&entry.title));
+    if let Some(container) = journal_or_container(entry) {
+        let mut source = container.to_string();
+        if let Some(year) = entry.issued.as_deref() {
+            source.push_str(&format!(". {year}"));
+        }
+        if let Some(volume) = entry_field(entry, &["volume"]) {
+            source.push(';');
+            source.push_str(volume);
+        }
+        if let Some(issue) = entry_field(entry, &["number", "issue"]) {
+            source.push('(');
+            source.push_str(issue);
+            source.push(')');
+        }
+        if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+            source.push(':');
+            source.push_str(pages);
+        }
+        parts.push(ensure_period(&source));
+    } else if let Some(year) = entry.issued.as_deref() {
+        parts.push(ensure_period(year));
+    }
+    if let Some(doi) = entry_field(entry, &["doi"]) {
+        parts.push(format!("doi:{}", clean_doi(doi)));
+    }
+    parts.join(" ")
+}
+
+fn journal_or_container(entry: &BibliographyEntry) -> Option<&str> {
+    entry_field(
+        entry,
+        &["journal", "journaltitle", "container-title", "booktitle"],
+    )
+}
+
+fn publisher_or_institution(entry: &BibliographyEntry) -> Option<&str> {
+    entry_field(
+        entry,
+        &["publisher", "institution", "organization", "school"],
+    )
+}
+
+fn year_volume_issue_pages(entry: &BibliographyEntry) -> Option<String> {
+    let mut value = String::new();
+    if let Some(year) = entry.issued.as_deref() {
+        value.push_str(year);
+    }
+    if let Some(volume) = entry_field(entry, &["volume"]) {
+        if !value.is_empty() {
+            value.push(';');
+        }
+        value.push_str(volume);
+    }
+    if let Some(issue) = entry_field(entry, &["number", "issue"]) {
+        value.push('(');
+        value.push_str(issue);
+        value.push(')');
+    }
+    if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+        value.push(':');
+        value.push_str(pages);
+    }
+    (!value.is_empty()).then_some(value)
+}
+
+fn entry_field<'a>(entry: &'a BibliographyEntry, fields: &[&str]) -> Option<&'a str> {
+    fields
+        .iter()
+        .find_map(|field| entry.fields.get(*field).map(String::as_str))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+}
+
+fn clean_doi(value: &str) -> &str {
+    value
+        .trim()
+        .trim_start_matches("https://doi.org/")
+        .trim_start_matches("http://doi.org/")
+        .trim_start_matches("doi:")
+        .trim()
+}
+
+fn ensure_period(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.ends_with(['.', '!', '?']) {
+        trimmed.to_string()
+    } else {
+        format!("{trimmed}.")
     }
 }
 
