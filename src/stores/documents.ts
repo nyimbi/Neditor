@@ -8,6 +8,13 @@ import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessD
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
 import { isAiSourceFenceOpener, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
 import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
+import {
+  clampTransformTimeout,
+  setTransformBooleanFlag,
+  setTransformInputModeState,
+  updateTransformEnginePathState,
+  type TransformProbeResult,
+} from "../lib/transformSettings";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "../lib/transformTemplates";
 import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../lib/watchPaths";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
@@ -97,13 +104,6 @@ interface WatchContext {
   openRootPaths: string[];
   includedPaths: string[];
   signature: string;
-}
-
-interface TransformProbeResult {
-  ok: boolean;
-  message: string;
-  diagnostics: string[];
-  cacheKey?: string;
 }
 
 const staleSaveConflictMessage = "File changed on disk since it was opened; resolve the external conflict before saving.";
@@ -1510,38 +1510,26 @@ export const useDocumentsStore = defineStore("documents", {
       }
     },
     async setTransformEnginePath(name: string, path: string) {
-      const previousPath = this.transformEnginePaths[name] || "";
-      const trustedAfterPathChange = previousPath === path ? Boolean(this.trustedTransformEngines[name]) : false;
-      const trustRequiresReview = Boolean(path) && !trustedAfterPathChange;
-      this.transformEnginePaths = { ...this.transformEnginePaths, [name]: path };
-      this.trustedTransformEngines = { ...this.trustedTransformEngines, [name]: trustedAfterPathChange };
-      this.transformProbeResults = {
-        ...this.transformProbeResults,
-        [name]: {
-          ok: false,
-          message: "Probe required after engine path change.",
-          diagnostics: [
-            ...(trustRequiresReview ? ["Trust was cleared because the executable path changed."] : []),
-            "Run a probe to verify the configured engine path.",
-          ],
-        },
-      };
+      const next = updateTransformEnginePathState(this, name, path);
+      this.transformEnginePaths = next.transformEnginePaths;
+      this.trustedTransformEngines = next.trustedTransformEngines;
+      this.transformProbeResults = next.transformProbeResults;
       await this.persistWorkspace();
     },
     async setTransformTrust(name: string, trusted: boolean) {
-      this.trustedTransformEngines = { ...this.trustedTransformEngines, [name]: trusted };
+      this.trustedTransformEngines = setTransformBooleanFlag(this.trustedTransformEngines, name, trusted);
       await this.persistWorkspace();
     },
     async setTransformDisabled(name: string, disabled: boolean) {
-      this.disabledTransformEngines = { ...this.disabledTransformEngines, [name]: disabled };
+      this.disabledTransformEngines = setTransformBooleanFlag(this.disabledTransformEngines, name, disabled);
       await this.persistWorkspace();
     },
     async setTransformInputMode(name: string, mode: "stdin" | "file") {
-      this.transformInputModes = { ...this.transformInputModes, [name]: mode };
+      this.transformInputModes = setTransformInputModeState(this.transformInputModes, name, mode);
       await this.persistWorkspace();
     },
     async setTransformTimeout(timeoutMs: number) {
-      this.transformTimeoutMs = Math.min(Math.max(Number(timeoutMs) || 1, 1), 30000);
+      this.transformTimeoutMs = clampTransformTimeout(timeoutMs);
       await this.persistWorkspace();
     },
     async saveCustomTransformTemplate(template: CustomTransformTemplate) {

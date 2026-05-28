@@ -119,6 +119,12 @@ import {
   releaseReadinessAuditMarkdown,
 } from "../src/lib/releaseReadiness.js";
 import {
+  clampTransformTimeout,
+  setTransformBooleanFlag,
+  setTransformInputModeState,
+  updateTransformEnginePathState,
+} from "../src/lib/transformSettings.js";
+import {
   buildTransformTemplateAssistance,
   builtinTransformTemplates,
   normalizeCustomTransformTemplates,
@@ -310,6 +316,44 @@ test("export profile helpers save apply and delete normalized profile state", ()
   equal(unchanged.profiles.length, 1);
   equal(unchanged.activeExportProfileId, "profile-1");
   equal(unchanged.statusMessage, "");
+});
+
+test("transform settings helpers clear trust and clamp runtime preferences", () => {
+  const changed = updateTransformEnginePathState(
+    {
+      transformEnginePaths: { dot: "/usr/bin/dot" },
+      trustedTransformEngines: { dot: true },
+      transformProbeResults: {
+        dot: { ok: true, message: "Graphviz ready", diagnostics: [], cacheKey: "old" },
+      },
+    },
+    "dot",
+    "/opt/homebrew/bin/dot",
+  );
+  equal(changed.transformEnginePaths.dot, "/opt/homebrew/bin/dot");
+  equal(changed.trustedTransformEngines.dot, false);
+  deepEqual(changed.transformProbeResults.dot.diagnostics, [
+    "Trust was cleared because the executable path changed.",
+    "Run a probe to verify the configured engine path.",
+  ]);
+
+  const unchangedPath = updateTransformEnginePathState(
+    {
+      ...changed,
+      trustedTransformEngines: { dot: true },
+    },
+    "dot",
+    "/opt/homebrew/bin/dot",
+  );
+  equal(unchangedPath.trustedTransformEngines.dot, true);
+  deepEqual(unchangedPath.transformProbeResults.dot.diagnostics, ["Run a probe to verify the configured engine path."]);
+
+  deepEqual(setTransformBooleanFlag({ dot: false }, "dot", true), { dot: true });
+  deepEqual(setTransformInputModeState({ plantuml: "file" }, "dot", "stdin"), { plantuml: "file", dot: "stdin" });
+  equal(clampTransformTimeout(-10), 1);
+  equal(clampTransformTimeout(Number.NaN), 1);
+  equal(clampTransformTimeout(45000), 30000);
+  equal(clampTransformTimeout(1200), 1200);
 });
 
 test("recent item helpers deduplicate limit and forget paths", () => {
