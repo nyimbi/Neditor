@@ -367,9 +367,10 @@ function appendDeepResearchEvidenceSections(
     ? withBibliographyMarker
     : `${withBibliographyMarker.trim()}\n\n${evidenceLogHeading}\n\n${missingEvidenceLog}\n`;
   const sourceLibraryAudit = normalizeSourceLibraryAudit(options.sourceLibraryAuditMarkdown);
-  return !sourceLibraryAudit || hasSourceLibraryAudit(withEvidenceLog)
+  const sourceLibraryAuditCompletion = sourceLibraryAuditCompletionMarkdown(withEvidenceLog, sourceLibraryAudit);
+  return !sourceLibraryAuditCompletion
     ? withEvidenceLog
-    : `${withEvidenceLog.trim()}\n\n${sourceLibraryAudit}\n`;
+    : `${withEvidenceLog.trim()}\n\n${sourceLibraryAuditCompletion}\n`;
 }
 
 export function deepResearchBibliographyMarkdown(
@@ -778,6 +779,53 @@ function deepResearchEvidenceLogContainsIteration(markdown: string, iteration: D
   return new RegExp(`^##\\s+Iteration\\s+${iteration.index}:\\s+${escapedQuery}\\s*$`, "im").test(markdown);
 }
 
+function sourceLibraryAuditCompletionMarkdown(markdown: string, audit: string) {
+  if (!audit) return "";
+  if (!hasSourceLibraryAudit(markdown)) return audit;
+  const existingSection = sectionText(markdown, "Source Library Audit");
+  const missingKeys = sourceLibraryAuditKeys(audit).filter(
+    (key) => !sourceLibraryAuditSectionContainsKey(existingSection, key),
+  );
+  if (!missingKeys.length) return "";
+  const addendum = sourceLibraryAuditRowsForKeys(audit, missingKeys);
+  if (!addendum) return "";
+  return `## Source Library Audit Addendum\n\n${addendum}`;
+}
+
+function sourceLibraryAuditKeys(markdown: string) {
+  const keys = new Set<string>();
+  for (const match of markdown.matchAll(/(?:^|\|)\s*@([A-Za-z0-9_.:-]+)\s*(?=\|)/gm)) {
+    keys.add(match[1]);
+  }
+  return Array.from(keys);
+}
+
+function sourceLibraryAuditRowsForKeys(markdown: string, keys: string[]) {
+  const keySet = new Set(keys);
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => /^\|\s*Citation key\s*\|/i.test(line));
+  const dividerIndex = headerIndex >= 0 ? headerIndex + 1 : -1;
+  const matchingRows = lines.filter((line) => {
+    const match = line.match(/^\|\s*@([A-Za-z0-9_.:-]+)\s*\|/);
+    return match ? keySet.has(match[1]) : false;
+  });
+  if (!matchingRows.length) return "";
+  const header = headerIndex >= 0 && dividerIndex < lines.length
+    ? [lines[headerIndex], lines[dividerIndex]]
+    : ["| Citation key | Audit row |", "| --- | --- |"];
+  return [
+    `Saved sources needing audit addendum: ${matchingRows.length}`,
+    "",
+    ...header,
+    ...matchingRows,
+    "",
+  ].join("\n");
+}
+
+function sourceLibraryAuditSectionContainsKey(section: string, key: string) {
+  return new RegExp(`(?:^|\\|)\\s*@${escapeRegExp(key)}\\s*(?:\\||$)`, "m").test(section);
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -885,7 +933,7 @@ function hasBibliographyMarker(markdown: string) {
 }
 
 function hasSourceLibraryAudit(markdown: string) {
-  return /^##\s+Source Library Audit\b/im.test(markdown);
+  return /^##\s+Source Library Audit\s*$/im.test(markdown);
 }
 
 function normalizeSourceLibraryAudit(markdown: string | undefined) {

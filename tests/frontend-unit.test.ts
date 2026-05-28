@@ -5290,6 +5290,80 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ok(!standaloneWithCompleteEvidenceLog.includes("## Deep Research Evidence Log Addendum"));
   equal((standaloneWithCompleteEvidenceLog.match(/## Iteration 1: AI procurement controls policy/g) || []).length, 1);
 
+  const fullSourceAudit = citationSourceLibraryAuditMarkdown([
+    {
+      citation_key: "agency2026",
+      title: "Policy Evidence",
+      url: "https://agency.gov/policy.pdf",
+      snippet: "Controls policy.",
+      source: "DuckDuckGo",
+      relative_path: "ai-procurement.neditor-sources/policy.pdf",
+      sha256: "abcdef1234567890",
+      bytes: 2048,
+    },
+    {
+      citation_key: "budget2026",
+      title: "Budget Evidence",
+      url: "https://agency.gov/budget.pdf",
+      snippet: "Budget controls.",
+      source: "DuckDuckGo",
+      relative_path: "ai-procurement.neditor-sources/budget.pdf",
+      sha256: "1111222233334444",
+      bytes: 4096,
+    },
+  ]);
+  const standaloneWithEmptySourceAudit = deepResearchDocumentMarkdown(
+    settings,
+    "# Draft\n\n## Source Library Audit\n\nNo saved citation sources are currently associated with this document.\n\nBody with source review.",
+    [],
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+      sourceLibraryAuditMarkdown: fullSourceAudit,
+    },
+  );
+  ok(standaloneWithEmptySourceAudit.includes("## Source Library Audit Addendum"));
+  ok(standaloneWithEmptySourceAudit.includes("Saved sources needing audit addendum: 2"));
+  ok(standaloneWithEmptySourceAudit.includes("@agency2026"));
+  ok(standaloneWithEmptySourceAudit.includes("@budget2026"));
+
+  const standaloneWithPartialSourceAudit = deepResearchDocumentMarkdown(
+    settings,
+    [
+      "# Draft",
+      "",
+      "## Source Library Audit",
+      "",
+      "Saved sources: 1",
+      "",
+      "| Citation key | Title | Fit | Local file | SHA-256 prefix | Review notes | URL |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
+      "| @agency2026 | Policy Evidence | not scored | ai-procurement.neditor-sources/policy.pdf | abcdef1234567890 | provider: DuckDuckGo | https://agency.gov/policy.pdf |",
+      "",
+      "Body with source review.",
+    ].join("\n"),
+    [],
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+      sourceLibraryAuditMarkdown: fullSourceAudit,
+    },
+  );
+  ok(standaloneWithPartialSourceAudit.includes("## Source Library Audit Addendum"));
+  equal((standaloneWithPartialSourceAudit.match(/\|\s*@agency2026\s*\|/g) || []).length, 1);
+  ok(standaloneWithPartialSourceAudit.includes("| @budget2026 | Budget Evidence | not scored | ai-procurement.neditor-sources/budget.pdf | 1111222233334444 | provider: DuckDuckGo | https://agency.gov/budget.pdf |"));
+
+  const standaloneWithCompleteSourceAudit = deepResearchDocumentMarkdown(
+    settings,
+    `# Draft\n\n${fullSourceAudit}\nBody with source review.`,
+    [],
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+      sourceLibraryAuditMarkdown: fullSourceAudit,
+    },
+  );
+  ok(!standaloneWithCompleteSourceAudit.includes("## Source Library Audit Addendum"));
+  equal((standaloneWithCompleteSourceAudit.match(/\|\s*@agency2026\s*\|/g) || []).length, 1);
+  equal((standaloneWithCompleteSourceAudit.match(/\|\s*@budget2026\s*\|/g) || []).length, 1);
+
   const reviewPackage = deepResearchReviewPackageMarkdown(
     settings,
     "# Draft\n\nBody with source review. [@agency2026]",

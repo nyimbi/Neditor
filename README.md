@@ -478,13 +478,14 @@ web app.
   complete; empty or partial Source Citation Index sections get a missing-key
   addendum instead of suppressing source review rows; empty or partial Deep
   Research Evidence Log sections get a missing-iteration addendum for the
-  research loops that still need review evidence. Drafting, expansion, QA, and
-  fallback generation receive the same citation-key map, preferring saved local
-  source-library keys and falling back to deterministic keys for unsaved
-  results. When the active document has been saved, Deep Research can also
-  preserve the source documents it found in the same local source library for
-  later review and carry the source-library audit into the standalone research
-  document. Quality recommendations flag Deep Research reports whose source
+  research loops that still need review evidence; empty or partial Source
+  Library Audit sections get missing saved-source rows. Drafting, expansion,
+  QA, and fallback generation receive the same citation-key map, preferring
+  saved local source-library keys and falling back to deterministic keys for
+  unsaved results. When the active document has been saved, Deep Research can
+  also preserve the source documents it found in the same local source library
+  for later review and carry the source-library audit into the standalone
+  research document. Quality recommendations flag Deep Research reports whose source
   index and bibliography exist but whose body prose never uses the provided
   inline citation keys. Inserting the draft into the current document appends
   the same editable review package used by standalone reports: AI provenance,
