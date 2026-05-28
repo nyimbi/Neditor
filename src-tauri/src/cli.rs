@@ -46,6 +46,9 @@ const NEW_DOCUMENT_TEMPLATES: &[&str] = &[
     "rfp-response",
     "rfq",
     "tender",
+    "sow",
+    "capability-statement",
+    "case-study",
     "report",
     "tutorial",
     "lesson-plan",
@@ -3824,6 +3827,27 @@ fn document_template_catalog() -> Vec<DocumentTemplateInfo> {
             best_for: &["public tenders", "formal bids", "regulated procurement"],
         },
         DocumentTemplateInfo {
+            id: "sow",
+            label: "Statement of Work",
+            category: "Business development",
+            summary: "Delivery-ready SOW with scope, deliverables, responsibilities, acceptance criteria, and change control.",
+            best_for: &["delivery kickoff", "contract attachments", "services governance"],
+        },
+        DocumentTemplateInfo {
+            id: "capability-statement",
+            label: "Capability Statement",
+            category: "Business development",
+            summary: "Company qualifications, differentiators, proof points, certifications, and relevant experience.",
+            best_for: &["vendor registration", "introductory submissions", "sales proof"],
+        },
+        DocumentTemplateInfo {
+            id: "case-study",
+            label: "Case Study",
+            category: "Marketing",
+            summary: "Customer proof story with challenge, solution, implementation, outcomes, quote prompts, and approvals.",
+            best_for: &["sales proof", "marketing collateral", "client success stories"],
+        },
+        DocumentTemplateInfo {
             id: "report",
             label: "Business Report",
             category: "Business analysis",
@@ -6399,6 +6423,15 @@ fn new_document_markdown(template: &str, title: &str) -> Result<String, String> 
         ),
         "tender" => format!(
             "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: tender\ntoc: true\n---\n\n# {title}\n\n## Tender Notice\n\nState the contracting authority, opportunity, procurement method, eligibility, and closing date.\n\n## Instructions To Tenderers\n\n- Tender reference: {{{{tender_reference}}}}\n- Submission portal/location: {{{{submission_location}}}}\n- Closing date and time: {{{{closing_datetime}}}}\n- Clarification process: {{{{clarification_process}}}}\n\n## Scope And Specifications\n\nDescribe mandatory specifications, service levels, deliverables, milestones, and acceptance tests.\n\n## Eligibility And Mandatory Documents\n\n| Document | Required | Notes |\n| --- | --- | --- |\n| Company registration | Yes | {{{{notes}}}} |\n| Tax compliance | Yes | {{{{notes}}}} |\n\n## Evaluation Method\n\n| Stage | Criteria | Pass Mark / Weight |\n| --- | --- | --- |\n| Administrative compliance | Mandatory documents | Pass/fail |\n| Technical evaluation | Methodology and capability | {{{{technical_weight}}}} |\n| Financial evaluation | Price and value | {{{{financial_weight}}}} |\n"
+        ),
+        "sow" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: project-plan\ntoc: true\n---\n\n# {title}\n\n## Purpose\n\nState the business outcome, contracting context, and decision this statement of work supports.\n\n## Scope\n\n| Workstream | Included Work | Deliverable | Acceptance Criteria |\n| --- | --- | --- | --- |\n| {{{{workstream}}}} | {{{{included_work}}}} | {{{{deliverable}}}} | {{{{acceptance_criteria}}}} |\n\n## Out Of Scope\n\nList excluded services, client-owned responsibilities, and assumptions that prevent scope drift.\n\n## Project Plan\n\n- Kickoff: {{{{kickoff_date}}}}\n- Draft milestone: {{{{draft_milestone}}}}\n- Final acceptance: {{{{final_acceptance_date}}}}\n\n## Roles And Responsibilities\n\n| Role | Organization | Responsibility | Decision Authority |\n| --- | --- | --- | --- |\n| {{{{role}}}} | {{{{organization}}}} | {{{{responsibility}}}} | {{{{authority}}}} |\n\n## Acceptance And Change Control\n\nDefine review windows, acceptance evidence, change request routing, pricing impacts, and approval owners.\n"
+        ),
+        "capability-statement" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: marketing-brief\ntoc: true\n---\n\n# {title}\n\n## Company Overview\n\nSummarize who you are, who you serve, and the business outcomes you reliably deliver.\n\n## Core Capabilities\n\n| Capability | What We Do | Proof Point | Relevant Buyer Need |\n| --- | --- | --- | --- |\n| {{{{capability}}}} | {{{{description}}}} | {{{{proof_point}}}} | {{{{buyer_need}}}} |\n\n## Differentiators\n\n- {{{{differentiator_1}}}}\n- {{{{differentiator_2}}}}\n- {{{{differentiator_3}}}}\n\n## Relevant Experience\n\n| Client Or Sector | Assignment | Outcome | Reference Status |\n| --- | --- | --- | --- |\n| {{{{client_or_sector}}}} | {{{{assignment}}}} | {{{{outcome}}}} | {{{{reference_status}}}} |\n\n## Certifications And Compliance\n\nList registrations, certifications, security posture, quality controls, insurance, and partner credentials.\n\n## Contact\n\n**Prepared by:** {{{{owner}}}}  \n**Email:** {{{{email}}}}  \n**Website:** {{{{website}}}}\n"
+        ),
+        "case-study" => format!(
+            "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: customer-case-study\ntoc: true\n---\n\n# {title}\n\n## Customer Snapshot\n\n| Field | Detail |\n| --- | --- |\n| Customer | {{{{customer_name}}}} |\n| Industry | {{{{industry}}}} |\n| Engagement | {{{{engagement_type}}}} |\n| Review status | {{{{approval_status}}}} |\n\n## Challenge\n\nDescribe the customer situation, stakes, constraints, and why the issue mattered.\n\n## Solution\n\nExplain the approach, implementation model, team roles, and why this solution fit the customer context.\n\n## Implementation\n\n| Phase | Action | Evidence | Owner |\n| --- | --- | --- | --- |\n| {{{{phase}}}} | {{{{action}}}} | {{{{evidence}}}} | {{{{owner}}}} |\n\n## Results\n\n| Metric | Before | After | Source |\n| --- | ---: | ---: | --- |\n| {{{{metric}}}} | {{{{before}}}} | {{{{after}}}} | {{{{source}}}} |\n\n## Quote Prompts\n\n- Customer quote to approve: {{{{customer_quote}}}}\n- Internal approver: {{{{approver}}}}\n\n## Review Approvals\n\nConfirm customer permission, claim evidence, logo usage, confidentiality, and distribution channels before publishing.\n"
         ),
         "report" => format!(
             "---\ntitle: {escaped_title}\nstatus: draft\ndocumentType: business-report\ntoc: true\n---\n\n# {title}\n\n## Executive Summary\n\nSummarize the finding, implication, and recommended decision.\n\n## Situation\n\nDescribe the context, evidence base, constraints, and stakeholders.\n\n## Analysis\n\n```calc\nrevenue = 0\ncost = 0\nprofit = revenue - cost\nmargin = profit / revenue\n```\n\nExpected margin: {{{{=margin | percent}}}}\n\n## Recommendations\n\n1. Recommendation one.\n2. Recommendation two.\n3. Recommendation three.\n\n## Risks And Next Steps\n\n| Risk | Impact | Mitigation | Owner |\n| --- | --- | --- | --- |\n| {{{{risk}}}} | {{{{impact}}}} | {{{{mitigation}}}} | {{{{owner}}}} |\n"

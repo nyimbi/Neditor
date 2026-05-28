@@ -166,6 +166,9 @@ to print it, and `ned outlines --workspace . --delete board-pack --json` to
 remove it. Outline entries also carry an explicit Docs Live workflow such as
 `rfp-response`, `technical-textbook`, `novel`, `podcast-script`, or
 `movie-script` so app and CLI selections open the right AI drafting path.
+The CLI starter library also includes the app's business-development staples:
+statements of work, capability statements, and case studies, so `ned new` and
+the visual Templates panel present the same common starting points.
 Specialist built-in outlines cover RFP technical proposals, compliance reviews,
 grant applications, SOPs, PRDs, project charters, QBRs, due-diligence memos,
 incident postmortems, meeting decision packs, market research, contract review

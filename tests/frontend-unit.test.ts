@@ -8217,6 +8217,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(cli.includes("neditor.ned-open.v1"));
   ok(cli.includes("neditor.ned-new.v1"));
   ok(cli.includes("templateDetails"));
+  ok(cli.includes('"sow"'));
+  ok(cli.includes('"capability-statement"'));
+  ok(cli.includes('"case-study"'));
   ok(cli.includes("neditor.ned-outlines.v1"));
   ok(cli.includes("neditor.workspace-outlines.v1"));
   ok(cli.includes("neditor.ned-outline-save.v1"));

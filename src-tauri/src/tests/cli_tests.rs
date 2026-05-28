@@ -542,6 +542,9 @@ fn ned_cli_creates_new_business_document_from_template() {
         ("rfp", "documentType: rfp"),
         ("rfq", "documentType: rfq"),
         ("tender", "documentType: tender"),
+        ("sow", "documentType: project-plan"),
+        ("capability-statement", "documentType: marketing-brief"),
+        ("case-study", "documentType: customer-case-study"),
         ("tutorial", "documentType: tutorial"),
         ("lesson-content", "documentType: lesson-content"),
         ("technical-textbook", "documentType: textbook"),
@@ -653,6 +656,8 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     assert!(templates.message.contains("proposal"));
     assert!(templates.message.contains("tender"));
     assert!(templates.message.contains("rfp-response"));
+    assert!(templates.message.contains("capability-statement"));
+    assert!(templates.message.contains("case-study"));
     assert!(templates.message.contains("podcast-script"));
 
     let templates_json = crate::cli::run_cli_with_args(&[
@@ -664,7 +669,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     let template_report: serde_json::Value =
         serde_json::from_str(&templates_json.message).expect("templates json");
     assert_eq!(template_report["schema"], "neditor.ned-templates.v1");
-    assert_eq!(template_report["count"], 17);
+    assert_eq!(template_report["count"], 20);
     assert!(template_report["templateDetails"]
         .as_array()
         .expect("template details")
@@ -678,6 +683,9 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "rfp",
         "rfq",
         "tender",
+        "sow",
+        "capability-statement",
+        "case-study",
         "tutorial",
         "podcast-script",
         "movie-script",
@@ -701,6 +709,28 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         serde_json::from_str(&filtered.message).expect("filtered templates json");
     assert_eq!(filtered_report["count"], 1);
     assert_eq!(filtered_report["templates"][0], "rfq");
+
+    let business_development = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "templates".to_string(),
+        "--category".to_string(),
+        "Business development".to_string(),
+        "--query".to_string(),
+        "statement".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("business development template ids");
+    assert_eq!(business_development.message, "sow\ncapability-statement");
+
+    let marketing = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "templates".to_string(),
+        "--category".to_string(),
+        "Marketing".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("marketing template ids only");
+    assert_eq!(marketing.message, "case-study");
 
     let ids_only = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
