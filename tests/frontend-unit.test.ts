@@ -8223,6 +8223,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(cli.includes("neditor.ned-outline-delete.v1"));
   ok(cli.includes("outlineDetails"));
   ok(cli.includes("run_outlines_command"));
+  ok(cli.includes('id: "grant-application"'));
+  ok(cli.includes('id: "standard-operating-procedure"'));
+  ok(cli.includes('id: "product-requirements-document"'));
+  ok(cli.includes('id: "contract-review-brief"'));
   ok(store.includes("loadWorkspaceDocumentOutlineTemplates"));
   ok(store.includes("workspaceDocumentOutlineTemplatesFromJson"));
   ok(store.includes("workspaceDocumentOutlineLibraryJson"));
