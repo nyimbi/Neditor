@@ -82,6 +82,17 @@ export function applyUntitledRevertState(document: OpenDocument, text: string, s
   };
 }
 
+export function applyUpdatedDocumentTextState(document: OpenDocument, text: string, hashText: (value: string) => string) {
+  const dirty = typeof document.savedText === "string" ? text !== document.savedText : hashText(text) !== document.savedHash;
+  return {
+    document: {
+      ...document,
+      text,
+      dirty,
+    },
+  };
+}
+
 export function applyRenamedDocumentState(document: OpenDocument, metadata: FileRenameMetadata) {
   const nextDocument: OpenDocument = {
     ...document,

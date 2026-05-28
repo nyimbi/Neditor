@@ -105,6 +105,7 @@ import {
   applyRevertedDocumentState,
   applySavedDocumentState,
   applyUntitledRevertState,
+  applyUpdatedDocumentTextState,
   createDuplicateDocumentState,
   createUntitledDocumentState,
   folderFromPath,
@@ -640,6 +641,25 @@ test("file lifecycle helpers update document state for rich file operations", ()
   equal(untitledRevert.document.text, "# Starter");
   equal(untitledRevert.document.dirty, true);
   equal(untitledRevert.statusMessage, "Reverted untitled document to starter content");
+
+  const cleanTextEdit = applyUpdatedDocumentTextState(reverted.document, "# Final", (value) => `hash:${value}`);
+  equal(cleanTextEdit.document.text, "# Final");
+  equal(cleanTextEdit.document.dirty, false);
+  const dirtyTextEdit = applyUpdatedDocumentTextState(reverted.document, "# Revised", (value) => `hash:${value}`);
+  equal(dirtyTextEdit.document.text, "# Revised");
+  equal(dirtyTextEdit.document.dirty, true);
+  const hashCleanEdit = applyUpdatedDocumentTextState(
+    { ...reverted.document, savedText: undefined, savedHash: "hash:# Hash only" },
+    "# Hash only",
+    (value) => `hash:${value}`,
+  );
+  equal(hashCleanEdit.document.dirty, false);
+  const hashDirtyEdit = applyUpdatedDocumentTextState(
+    { ...reverted.document, savedText: undefined, savedHash: "hash:# Hash only" },
+    "# Changed",
+    (value) => `hash:${value}`,
+  );
+  equal(hashDirtyEdit.document.dirty, true);
 
   const duplicate = createDuplicateDocumentState(
     {
@@ -6165,7 +6185,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("vimYankRegister"));
   ok(app.includes("Vim-style mode starts in insert mode"));
   ok(types.includes("savedText?: string"));
-  ok(store.includes('doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash'));
+  ok(store.includes("applyUpdatedDocumentTextState(doc, text, fallbackHash)"));
   ok(store.includes("acceptExternalRootConflictState(doc, response)"));
   ok(store.includes("keepLocalRootConflictState(doc, conflict)"));
   ok(store.includes("applyRootConflictMergeState(doc, conflict, text)"));

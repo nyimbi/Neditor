@@ -26,6 +26,7 @@ import {
   applyRevertedDocumentState,
   applySavedDocumentState,
   applyUntitledRevertState,
+  applyUpdatedDocumentTextState,
   createDuplicateDocumentState,
   createUntitledDocumentState,
   folderFromPath,
@@ -892,8 +893,8 @@ export const useDocumentsStore = defineStore("documents", {
     },
     updateText(text: string) {
       const doc = this.activeDocument;
-      doc.text = text;
-      doc.dirty = typeof doc.savedText === "string" ? text !== doc.savedText : fallbackHash(text) !== doc.savedHash;
+      const updated = applyUpdatedDocumentTextState(doc, text, fallbackHash);
+      Object.assign(doc, updated.document);
       void this.compileActive();
     },
     async compileActive() {
