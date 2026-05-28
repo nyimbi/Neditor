@@ -5363,6 +5363,13 @@ Missing bibliography diagnostic tightening:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_reports_missing_bibliography_file_with_front_matter_range --lib` | Pass | Focused Rust proof now reports missing external bibliography files at the front matter `bibliography` path in the root Markdown file, including exact line and column range plus requested and resolved path context. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_loads_external_bibliography_and_validates_cross_refs --lib` | Pass | Existing external bibliography loading and cross-reference validation still pass after threading source text into bibliography diagnostics. |
 
+Review diagnostic range tightening:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_parses_review_comment_metadata --lib` | Pass | Focused Rust proof now confirms unresolved review-comment diagnostics carry source file, line, and HTML-comment column range while retaining release-blocking severity and comment text context. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked prepare_for_export_reports_review_change_note_audit_metadata --lib` | Pass | Focused export-readiness proof now confirms review-comment and change-note audit metadata diagnostics carry source ranges into export readiness and manifest diagnostics. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

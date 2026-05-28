@@ -190,7 +190,9 @@ pub(crate) fn validate_document(
     {
         let (source_file, line) =
             diagnostic_location_for_generated_line(input.source_map, comment.line);
-        let mut diagnostic = diag(
+        let mut diagnostic = review_diagnostic_with_range(
+            comment.column,
+            comment.end_column,
             if release_status { "error" } else { "warning" },
             "Document has unresolved review comments.",
             source_file,
@@ -208,7 +210,9 @@ pub(crate) fn validate_document(
     }) {
         let (source_file, line) =
             diagnostic_location_for_generated_line(input.source_map, comment.line);
-        let mut diagnostic = diag(
+        let mut diagnostic = review_diagnostic_with_range(
+            comment.column,
+            comment.end_column,
             "warning",
             "Review comment is missing audit metadata.",
             source_file,
@@ -237,7 +241,9 @@ pub(crate) fn validate_document(
     {
         let (source_file, line) =
             diagnostic_location_for_generated_line(input.source_map, note.line);
-        let mut diagnostic = diag(
+        let mut diagnostic = review_diagnostic_with_range(
+            note.column,
+            note.end_column,
             "warning",
             "Change note is missing audit metadata.",
             source_file,
@@ -271,6 +277,22 @@ pub(crate) fn validate_document(
         ));
     }
     validate_ai_provenance_metadata(&input, diagnostics);
+}
+
+fn review_diagnostic_with_range(
+    column: Option<usize>,
+    end_column: Option<usize>,
+    severity: impl Into<String>,
+    message: impl Into<String>,
+    source_file: Option<String>,
+    line: Option<usize>,
+    suggestion: Option<&str>,
+) -> DocumentDiagnostic {
+    let diagnostic = diag(severity, message, source_file, line, suggestion);
+    if let (Some(column), Some(end_column)) = (column, end_column) {
+        return with_range(diagnostic, column, line, end_column);
+    }
+    diagnostic
 }
 
 fn validate_generated_reference_sections(

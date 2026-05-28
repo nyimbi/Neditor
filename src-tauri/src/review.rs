@@ -3,6 +3,10 @@ use serde::Serialize;
 #[derive(Debug, Serialize)]
 pub(crate) struct ReviewComment {
     pub(crate) line: usize,
+    #[serde(skip_serializing)]
+    pub(crate) column: Option<usize>,
+    #[serde(skip_serializing)]
+    pub(crate) end_column: Option<usize>,
     pub(crate) author: String,
     pub(crate) created_at: String,
     #[serde(skip_serializing)]
@@ -16,6 +20,10 @@ pub(crate) struct ReviewComment {
 #[derive(Debug, Serialize)]
 pub(crate) struct ChangeNote {
     pub(crate) line: usize,
+    #[serde(skip_serializing)]
+    pub(crate) column: Option<usize>,
+    #[serde(skip_serializing)]
+    pub(crate) end_column: Option<usize>,
     pub(crate) author: String,
     pub(crate) created_at: String,
     #[serde(skip_serializing)]
@@ -33,7 +41,11 @@ pub(crate) fn collect_comments(text: &str) -> Vec<ReviewComment> {
                 .trim()
                 .strip_prefix("<!-- comment:")?
                 .strip_suffix("-->")?;
-            Some(parse_review_comment(index + 1, content))
+            let mut comment = parse_review_comment(index + 1, content);
+            let (column, end_column) = html_comment_range(line, "<!-- comment:")?;
+            comment.column = Some(column);
+            comment.end_column = Some(end_column);
+            Some(comment)
         })
         .collect()
 }
@@ -46,7 +58,11 @@ pub(crate) fn collect_change_notes(text: &str) -> Vec<ChangeNote> {
                 .trim()
                 .strip_prefix("<!-- change:")?
                 .strip_suffix("-->")?;
-            Some(parse_change_note(index + 1, content))
+            let mut note = parse_change_note(index + 1, content);
+            let (column, end_column) = html_comment_range(line, "<!-- change:")?;
+            note.column = Some(column);
+            note.end_column = Some(end_column);
+            Some(note)
         })
         .collect()
 }
@@ -92,6 +108,8 @@ pub(crate) fn parse_review_comment(line: usize, content: &str) -> ReviewComment 
 
     ReviewComment {
         line,
+        column: None,
+        end_column: None,
         author,
         created_at,
         has_author,
@@ -134,10 +152,18 @@ pub(crate) fn parse_change_note(line: usize, content: &str) -> ChangeNote {
 
     ChangeNote {
         line,
+        column: None,
+        end_column: None,
         author,
         created_at,
         has_author,
         has_created_at,
         text: text_parts.join(" | "),
     }
+}
+
+fn html_comment_range(line: &str, prefix: &str) -> Option<(usize, usize)> {
+    let start = line.find(prefix)?;
+    let end = line[start..].find("-->")? + start + "-->".len();
+    Some((start + 1, end + 1))
 }

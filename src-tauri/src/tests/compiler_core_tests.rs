@@ -1255,6 +1255,10 @@ fn compiler_parses_review_comment_metadata() {
         .expect("unresolved comment diagnostic");
     assert_eq!(unresolved_comment_diagnostic.severity, "error");
     assert_eq!(unresolved_comment_diagnostic.line, Some(7));
+    assert_eq!(unresolved_comment_diagnostic.column, Some(1));
+    assert!(unresolved_comment_diagnostic.end_column.is_some_and(
+        |end_column| end_column > unresolved_comment_diagnostic.column.unwrap_or_default()
+    ));
     assert_eq!(
         unresolved_comment_diagnostic.source_file.as_deref(),
         Some("untitled.md")

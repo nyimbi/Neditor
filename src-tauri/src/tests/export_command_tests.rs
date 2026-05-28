@@ -386,6 +386,8 @@ fn prepare_for_export_reports_review_change_note_audit_metadata() {
             diagnostic.message == "Review comment is missing audit metadata."
                 && diagnostic.source_file.as_deref() == Some("untitled.md")
                 && diagnostic.line == Some(9)
+                && diagnostic.column == Some(1)
+                && diagnostic.end_column > diagnostic.column
                 && diagnostic
                     .related
                     .iter()
@@ -399,6 +401,8 @@ fn prepare_for_export_reports_review_change_note_audit_metadata() {
             diagnostic.message == "Change note is missing audit metadata."
                 && diagnostic.source_file.as_deref() == Some("untitled.md")
                 && diagnostic.line == Some(10)
+                && diagnostic.column == Some(1)
+                && diagnostic.end_column > diagnostic.column
                 && diagnostic
                     .related
                     .iter()
