@@ -196,6 +196,7 @@ import {
   removeTableDraftRow,
   serializeMarkdownTable,
   setTableCellSpan,
+  shouldSyncTableEditorFromSourceCursor,
   sortTableDraftRows,
   syncTableDraftFromDocumentText,
   tableCellSpanPreview,
@@ -472,6 +473,61 @@ test("table two-way state explains text and grid round trips", () => {
     statusClass: "attention",
     hint: "Create visually, insert as Markdown text, then continue editing either the source lines or the grid.",
   });
+
+  equal(
+    shouldSyncTableEditorFromSourceCursor({
+      followSourceCursor: true,
+      tablesSidebarActive: true,
+      cursorTableIndex: 1,
+      selectedTableIndex: 0,
+      hasDraft: true,
+    }),
+    true,
+  );
+  equal(
+    shouldSyncTableEditorFromSourceCursor({
+      followSourceCursor: true,
+      tablesSidebarActive: true,
+      cursorTableIndex: 0,
+      selectedTableIndex: 0,
+      hasDraft: true,
+    }),
+    false,
+  );
+  equal(
+    shouldSyncTableEditorFromSourceCursor({
+      followSourceCursor: true,
+      tablesSidebarActive: true,
+      cursorTableIndex: 0,
+      draftDirty: true,
+    }),
+    false,
+  );
+  equal(
+    shouldSyncTableEditorFromSourceCursor({
+      followSourceCursor: false,
+      tablesSidebarActive: true,
+      cursorTableIndex: 0,
+    }),
+    false,
+  );
+  equal(
+    shouldSyncTableEditorFromSourceCursor({
+      followSourceCursor: true,
+      tablesSidebarActive: false,
+      cursorTableIndex: 0,
+    }),
+    false,
+  );
+  equal(
+    shouldSyncTableEditorFromSourceCursor({
+      followSourceCursor: true,
+      tablesSidebarActive: true,
+      cursorTableIndex: null,
+      hasDraft: false,
+    }),
+    false,
+  );
 });
 
 test("table paste handles quoted CSV and markdown table captions", () => {
@@ -594,8 +650,17 @@ test("markdown table cell text edits locate and replace the cursor cell", () => 
   ].join("\n");
   const extraCellEdit = findMarkdownTableCellAtPosition(extraCellText, 3, extraCellText.split("\n")[2].indexOf("1000") + 2);
   if (!extraCellEdit) throw new Error("missing extra-cell edit");
+  equal(extraCellEdit.cellCount, 3);
+  equal(extraCellEdit.columnIndex, 1);
   const extraCellUpdated = replaceMarkdownTableCellInText(extraCellText, extraCellEdit, "1200");
   ok(extraCellUpdated.includes("ARR | 1200 | keep this review note"));
+
+  const authorNoteEdit = findMarkdownTableCellAtPosition(extraCellText, 3, extraCellText.split("\n")[2].indexOf("keep this") + 2);
+  if (!authorNoteEdit) throw new Error("missing author-note edit");
+  equal(authorNoteEdit.cellCount, 3);
+  equal(authorNoteEdit.columnIndex, 2);
+  const authorNoteUpdated = replaceMarkdownTableCellInText(extraCellText, authorNoteEdit, "reviewed");
+  ok(authorNoteUpdated.includes("ARR | 1000 | reviewed"));
 
   const indentedPipeTable = [
     "  | Metric | Value |",
@@ -4873,6 +4938,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("tableCursorCellPreview"));
   ok(app.includes("tableCursorCellSummary"));
   ok(app.includes("refreshTableCursorCellPreview(update.view)"));
+  ok(app.includes("Follow source cursor"));
+  ok(app.includes("tableFollowSourceCursor"));
+  ok(app.includes("syncTableEditorFromSourceCursor"));
+  ok(app.includes("shouldSyncTableEditorFromSourceCursor"));
+  ok(app.includes("Loaded the typed Markdown table into the visual table editor"));
   ok(app.includes("tableTextCellEdit"));
   ok(app.includes("findMarkdownTableCellAtPosition"));
   ok(app.includes("replaceMarkdownTableCellInText"));

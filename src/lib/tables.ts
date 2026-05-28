@@ -92,8 +92,19 @@ export interface MarkdownTableCellEdit {
   rowKind: MarkdownTableCellKind;
   rowIndex: number;
   columnIndex: number;
+  cellCount: number;
   columnLabel: string;
   value: string;
+}
+
+export interface TableSourceCursorSyncInput {
+  followSourceCursor?: boolean;
+  tablesSidebarActive?: boolean;
+  draftDirty?: boolean;
+  newDraft?: boolean;
+  cursorTableIndex?: number | null;
+  selectedTableIndex?: number;
+  hasDraft?: boolean;
 }
 
 export interface TableDraftFromRowsOptions {
@@ -196,6 +207,12 @@ export function buildTableTwoWayState(input: TableTwoWayStateInput): TableTwoWay
     statusClass: "ready",
     hint: "Grid and document text are synced; edit either the visual grid or the Markdown source lines.",
   };
+}
+
+export function shouldSyncTableEditorFromSourceCursor(input: TableSourceCursorSyncInput) {
+  if (!input.followSourceCursor || !input.tablesSidebarActive || input.draftDirty || input.newDraft) return false;
+  if (input.cursorTableIndex === null || input.cursorTableIndex === undefined || input.cursorTableIndex < 0) return false;
+  return !input.hasDraft || input.cursorTableIndex !== input.selectedTableIndex;
 }
 
 export function parseMarkdownTables(text: string): MarkdownTable[] {
@@ -579,6 +596,7 @@ export function findMarkdownTableCellAtPosition(text: string, lineNumber: number
     rowKind,
     rowIndex,
     columnIndex,
+    cellCount: cells.length,
     columnLabel: spreadsheetColumnName(columnIndex + 1),
     value: cells[columnIndex] || "",
   };

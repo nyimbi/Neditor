@@ -554,6 +554,10 @@
               <button type="button" :disabled="!tableDraft" title="Focus the editable Markdown source block in the Tables panel" @click="focusTableSourceEditor">
                 Source block
               </button>
+              <label class="compact-check table-follow-source-toggle" title="Automatically load the Markdown table under the source editor cursor when the Tables panel is open">
+                <input v-model="tableFollowSourceCursor" type="checkbox" />
+                Follow source cursor
+              </label>
               <button
                 type="button"
                 :disabled="!canGoToTableSource"
@@ -5413,6 +5417,7 @@ import {
   serializeMarkdownTable,
   sortTableDraftRows,
   spreadsheetColumnName,
+  shouldSyncTableEditorFromSourceCursor,
   syncTableDraftFromDocumentText,
   tableCellSpanPreview as tableDraftCellSpanPreview,
   tableDraftFromMarkdownSource,
@@ -5865,6 +5870,7 @@ const tableCursorCellPreview = ref<MarkdownTableCellEdit | null>(null);
 const tableTextCellEdit = ref<MarkdownTableCellEdit | null>(null);
 const tableTextCellValue = ref("");
 const tableTextCellError = ref("");
+const tableFollowSourceCursor = ref(true);
 const isNewTableDraft = ref(false);
 const tableDataBusy = ref(false);
 const tableFormulaFunction = ref<TableFormulaFunction>("SUM");
@@ -10837,6 +10843,10 @@ watch(
   () => active.value.text,
   (text) => {
     syncEditorViewsToText(text);
+    if (store.sidebar === "tables") {
+      refreshTableCursorCellPreview();
+      syncTableEditorFromSourceCursor("text-edit");
+    }
   },
 );
 
@@ -13492,7 +13502,10 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
     }),
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
     EditorView.updateListener.of((update) => {
-      if (update.docChanged || update.selectionSet) refreshTableCursorCellPreview(update.view);
+      if (update.docChanged || update.selectionSet) {
+        refreshTableCursorCellPreview(update.view);
+        if (update.selectionSet) syncTableEditorFromSourceCursor("selection");
+      }
       if (!update.docChanged) return;
       if (syncingEditorFromStore) return;
       const text = update.state.doc.toString();
@@ -17123,6 +17136,35 @@ function refreshTableCursorCellPreview(view = editorView) {
   );
 }
 
+function syncTableEditorFromSourceCursor(reason: "selection" | "text-edit" = "selection") {
+  const cursorCell = tableCursorCellPreview.value;
+  if (
+    !shouldSyncTableEditorFromSourceCursor({
+      followSourceCursor: tableFollowSourceCursor.value,
+      tablesSidebarActive: store.sidebar === "tables",
+      draftDirty: tableDraftDirty.value,
+      newDraft: isNewTableDraft.value,
+      cursorTableIndex: cursorCell?.tableIndex ?? null,
+      selectedTableIndex: selectedTableDraftMatch.value?.index ?? selectedTableIndex.value,
+      hasDraft: Boolean(tableDraft.value),
+    })
+  ) {
+    return false;
+  }
+  if (!cursorCell) return false;
+  const draft = markdownTableToDraft(cursorCell.table);
+  selectedTableIndex.value = cursorCell.tableIndex;
+  isNewTableDraft.value = false;
+  tableDraft.value = draft;
+  rememberTableSource(cursorCell.table, draft);
+  refreshTableSourceEditFromDraft();
+  store.statusMessage =
+    reason === "text-edit"
+      ? "Loaded the typed Markdown table into the visual table editor"
+      : "Loaded the table under the source cursor into the visual table editor";
+  return true;
+}
+
 function loadTableTextCellAtCursor() {
   flushEditorTextToStore();
   if (tableContextSwitchBlocked("loading a table cell text edit")) return false;
@@ -17160,7 +17202,7 @@ function applyTableTextCellEdit() {
     return;
   }
   const currentLineCell = findMarkdownTableCellAtPosition(active.value.text, edit.lineNumber, 1);
-  if (!currentLineCell || edit.columnIndex >= currentLineCell.table.headers.length) {
+  if (!currentLineCell || edit.columnIndex >= currentLineCell.cellCount) {
     tableTextCellError.value = "The original table row is no longer an editable Markdown table row.";
     store.statusMessage = "Reload the table cell from the current source text";
     return;
@@ -22851,6 +22893,18 @@ select:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 6px;
+}
+
+.table-follow-source-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 7px;
+  border: 1px solid #d8e0e8;
+  background: #fff;
+  color: #1b2733;
+  font-size: 12px;
 }
 
 .table-sync-chip {

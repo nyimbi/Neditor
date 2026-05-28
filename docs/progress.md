@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-27
+Updated: 2026-05-28
 
 ## Active Goal
 
@@ -27,10 +27,30 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Verification Update
+
+Table cursor-follow source editing verification:
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 87 frontend unit/static tests passed, including source-cursor sync gating, row cell-count tracking for author-added table cells, and static UI guards for **Follow source cursor** wiring. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the table source cursor-follow wiring. |
+| `pnpm run check:docs` | Pass | Checked 15 Markdown files; local links resolve after documenting cursor-follow table editing. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json` with status `partial-with-release-risks` after recording the table editor cursor-follow evidence. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow still passes for the broader two-way table workflow after the cursor-follow change. |
+
 ## Completed Recently
 
 Recent pushed checkpoints visible in current git history:
 
+- Table editing now follows the Markdown source cursor by default when the
+  Tables panel is open and no dirty table draft is waiting. This closes a
+  practical two-way editing gap: a user can type or select a Markdown pipe
+  table in the document text and have the visual table editor load that source
+  table automatically, while a visible **Follow source cursor** toggle lets
+  users opt out when they want manual table selection. Direct source-cell edits
+  also track the actual cell count on the row, so author-added extra cells can
+  be edited without being rejected as outside the normalized header count.
 - Editor keybinding proof now covers more of the Emacs/Vim muscle-memory
   surface. Emacs `Ctrl+K`/`Ctrl+Y`/`Ctrl+W` editor chords are reserved from the
   global command-palette shortcut while focus is in CodeMirror, and the focused
