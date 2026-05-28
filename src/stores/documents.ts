@@ -89,6 +89,7 @@ import {
   resetGuidedDemoProgressState,
 } from "../lib/workflowHistory";
 import { forgetWorkspaceFolderState, setDocumentScrollState } from "../lib/workspaceNavigation";
+import { buildPersistedWorkspaceState } from "../lib/workspacePersistenceState";
 import {
   clampPaneRatio,
   clampScrollRatio,
@@ -102,7 +103,6 @@ import {
   normalizeExportDefaults,
   normalizeExportProfiles,
   normalizeGitIntegrationPreferences,
-  normalizePersistedWorkspaceForSave,
   normalizeTtsPreferences,
   type DocsLiveDraftHistoryItem,
   type EditorKeymapMode,
@@ -112,7 +112,6 @@ import {
   type AgentRunHistoryItem,
   type AiProviderDefaults,
   type PersistedScrollPosition,
-  type PersistedWorkspace,
   type PreviewTheme,
   type SnapshotStorage,
   type ToolbarDisplay,
@@ -526,75 +525,8 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async persistWorkspace() {
       if (!preferencesStore) return;
-      const workspace: PersistedWorkspace = {
-        theme: this.theme,
-        previewTheme: this.previewTheme,
-        toolbarDisplay: this.toolbarDisplay,
-        toolbarTextSize: this.toolbarTextSize,
-        toolbarCollapsedRows: this.toolbarCollapsedRows,
-        editorPaneRatio: this.editorPaneRatio,
-        splitSourcePanes: this.splitSourcePanes,
-        editorKeymapMode: this.editorKeymapMode,
-        wordWrap: this.wordWrap,
-        lineNumbers: this.lineNumbers,
-        codeFolding: this.codeFolding,
-        highContrast: this.highContrast,
-        reducedMotion: this.reducedMotion,
-        autosave: this.autosave,
-        autosaveDelayMs: this.autosaveDelayMs,
-        autoSnapshot: this.autoSnapshot,
-        snapshotIntervalMs: this.snapshotIntervalMs,
-        snapshotStorage: this.snapshotStorage,
-        editorFont: this.editorFont,
-        previewFont: this.previewFont,
-        editorFontSize: this.editorFontSize,
-        previewFontSize: this.previewFontSize,
-        editorLineHeight: this.editorLineHeight,
-        previewLineHeight: this.previewLineHeight,
-        exportTarget: this.exportTarget,
-        exportDefaults: this.exportDefaults,
-        bibliographyDefaults: this.bibliographyDefaults,
-        brandProfileDefaults: this.brandProfileDefaults,
-        businessProfile: this.businessProfile,
-        aiProviderDefaults: this.aiProviderDefaults,
-        ttsPreferences: this.ttsPreferences,
-        exportProfiles: this.exportProfiles,
-        activeExportProfileId: this.activeExportProfileId,
-        gitIntegration: this.gitIntegration,
-        aiCleanupDefaults: this.aiCleanupDefaults,
-        agentRunHistory: this.agentRunHistory,
-        docsLiveDraftHistory: this.docsLiveDraftHistory,
-        guidedDemoCompletedStepIds: this.guidedDemoCompletedStepIds,
-        recentFiles: this.recentFiles.slice(0, 20),
-        recentFolders: this.recentFolders.slice(0, 12),
-        recentlyClosed: this.recentlyClosed.slice(0, 20),
-        workspaceRoot: this.workspaceRoot,
-        mode: this.mode,
-        sidebar: this.sidebar,
-        openFiles: this.documents.map((document) => document.path).filter((path): path is string => Boolean(path)),
-        scrollPositions: Object.fromEntries(
-          this.documents
-            .filter((document) => document.path)
-            .map((document) => [
-              document.path as string,
-              {
-                editor: clampScrollRatio(document.editorScrollRatio),
-                preview: clampScrollRatio(document.previewScrollRatio),
-              },
-            ]),
-        ),
-        pinnedFiles: this.documents
-          .filter((document) => document.pinned && document.path)
-          .map((document) => document.path as string),
-        activePath: this.activeDocument?.path || null,
-        transformEnginePaths: this.transformEnginePaths,
-        trustedTransformEngines: this.trustedTransformEngines,
-        disabledTransformEngines: this.disabledTransformEngines,
-        transformInputModes: this.transformInputModes,
-        transformTimeoutMs: this.transformTimeoutMs,
-        customTransformTemplates: this.customTransformTemplates,
-      };
-      await preferencesStore.set("workspace", normalizePersistedWorkspaceForSave(workspace));
+      const workspace = buildPersistedWorkspaceState(this);
+      await preferencesStore.set("workspace", workspace);
       await preferencesStore.save();
     },
     recordAgentRunHistory(item: AgentRunHistoryItem) {

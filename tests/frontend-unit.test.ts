@@ -236,6 +236,7 @@ import {
   resetGuidedDemoProgressState,
 } from "../src/lib/workflowHistory.js";
 import { forgetWorkspaceFolderState, setDocumentScrollState } from "../src/lib/workspaceNavigation.js";
+import { buildPersistedWorkspaceState } from "../src/lib/workspacePersistenceState.js";
 import {
   migratePersistedWorkspace,
   normalizeAgentRunHistory,
@@ -5238,6 +5239,112 @@ test("workspace persistence migration versions and normalizes saved settings", (
       tags: ["margin"],
     },
   ]);
+});
+
+test("workspace persistence state helper builds normalized store snapshots", () => {
+  const workspace = buildPersistedWorkspaceState({
+    documents: [
+      {
+        id: "a",
+        path: "/workspace/a.md",
+        title: "A",
+        text: "A",
+        savedHash: "hash-a",
+        dirty: false,
+        editorScrollRatio: 1.4,
+        previewScrollRatio: -0.2,
+      },
+      {
+        id: "b",
+        path: "/workspace/b.md",
+        title: "B",
+        text: "B",
+        savedHash: "hash-b",
+        dirty: false,
+        pinned: true,
+        editorScrollRatio: 0.25,
+        previewScrollRatio: 0.75,
+      },
+      {
+        id: "scratch",
+        path: null,
+        title: "Scratch",
+        text: "draft",
+        savedHash: "hash-scratch",
+        dirty: true,
+        pinned: true,
+      },
+    ],
+    activeId: "missing-active",
+    theme: "dark",
+    previewTheme: "match",
+    toolbarDisplay: "both",
+    toolbarTextSize: 99,
+    toolbarCollapsedRows: ["file", "view", "file", "unknown"],
+    editorPaneRatio: 0.9,
+    splitSourcePanes: true,
+    editorKeymapMode: "vim",
+    wordWrap: false,
+    lineNumbers: true,
+    codeFolding: true,
+    highContrast: false,
+    reducedMotion: true,
+    autosave: true,
+    autosaveDelayMs: 1200,
+    autoSnapshot: true,
+    snapshotIntervalMs: 60_000,
+    snapshotStorage: "project-local",
+    editorFont: "Menlo",
+    previewFont: "Inter",
+    editorFontSize: 16,
+    previewFontSize: 17,
+    editorLineHeight: 1.6,
+    previewLineHeight: 1.7,
+    exportTarget: "epub",
+    exportDefaults: { includeManifest: true, layoutPreset: "business" },
+    bibliographyDefaults: { citationStyle: "ieee" },
+    brandProfileDefaults: { name: "Acme", color: "#123456" },
+    businessProfile: normalizeBusinessProfile({ companyName: "Acme" }),
+    aiProviderDefaults: normalizeAiProviderDefaults({ profileId: "openai-compatible", model: "gpt-4.1" }),
+    ttsPreferences: normalizeTtsPreferences({ engine: "macos-say", voice: "Samantha" }),
+    exportProfiles: [],
+    activeExportProfileId: "profile-missing",
+    gitIntegration: { enabled: true },
+    aiCleanupDefaults: { preserveHeadings: true },
+    agentRunHistory: [],
+    docsLiveDraftHistory: [],
+    guidedDemoCompletedStepIds: ["intro", "ai-create"],
+    recentFiles: Array.from({ length: 25 }, (_, index) => `/recent/${index}.md`),
+    recentFolders: Array.from({ length: 16 }, (_, index) => `/workspace/${index}`),
+    recentlyClosed: Array.from({ length: 22 }, (_, index) => `/closed/${index}.md`),
+    workspaceRoot: "/workspace",
+    mode: "outline",
+    sidebar: "settings",
+    transformEnginePaths: { dot: "/usr/bin/dot" },
+    trustedTransformEngines: { dot: true },
+    disabledTransformEngines: { plantuml: true },
+    transformInputModes: { dot: "file" },
+    transformTimeoutMs: 45_000,
+    customTransformTemplates: [],
+  });
+
+  equal(workspace.schemaVersion, WORKSPACE_SCHEMA_VERSION);
+  equal(workspace.toolbarTextSize, 15);
+  deepEqual(workspace.toolbarCollapsedRows, ["file", "view"]);
+  deepEqual(workspace.openFiles, ["/workspace/a.md", "/workspace/b.md"]);
+  deepEqual(workspace.pinnedFiles, ["/workspace/b.md"]);
+  equal(workspace.activePath, "/workspace/a.md");
+  deepEqual(workspace.scrollPositions, {
+    "/workspace/a.md": { editor: 1, preview: 0 },
+    "/workspace/b.md": { editor: 0.25, preview: 0.75 },
+  });
+  equal(workspace.recentFiles?.length, 20);
+  equal(workspace.recentFolders?.length, 12);
+  equal(workspace.recentlyClosed?.length, 20);
+  equal(workspace.transformTimeoutMs, 30_000);
+  deepEqual(workspace.transformInputModes, { dot: "file" });
+  deepEqual(workspace.transformEnginePaths, { dot: "/usr/bin/dot" });
+  deepEqual(workspace.guidedDemoCompletedStepIds, ["intro", "ai-create"]);
 });
 
 test("transform template library covers reusable calculations and custom template normalization", () => {
