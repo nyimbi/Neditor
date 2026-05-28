@@ -13,6 +13,7 @@ export interface CitationSourceAuditItem {
   fit_score?: number;
   fit_label?: string;
   fit_reasons?: string[];
+  file_exists?: boolean;
 }
 
 export function citationSourceLibraryAuditMarkdown(sources: CitationSourceAuditItem[]) {
@@ -20,14 +21,16 @@ export function citationSourceLibraryAuditMarkdown(sources: CitationSourceAuditI
   const rows = sources.map((source) => {
     const fit = source.fit_score === undefined ? "not scored" : `${source.fit_score}/100 ${source.fit_label || ""}`.trim();
     const localPath = source.relative_path || source.path || "";
+    const localStatus = source.file_exists === false ? `missing: ${localPath}` : localPath;
     const hash = source.sha256 ? source.sha256.slice(0, 16) : "";
     const reviewNotes = [
       source.source ? `provider: ${source.source}` : "",
       source.media_type ? `type: ${source.media_type}` : "",
+      source.file_exists === false ? "local file missing" : "",
       source.fit_reasons?.length ? source.fit_reasons.join("; ") : "",
       source.downloaded_at ? `downloaded: ${source.downloaded_at}` : "",
     ].filter(Boolean).join("; ");
-    return `| @${escapeTableCell(source.citation_key)} | ${escapeTableCell(source.title)} | ${escapeTableCell(fit)} | ${escapeTableCell(localPath)} | ${escapeTableCell(hash)} | ${escapeTableCell(reviewNotes)} | ${escapeTableCell(source.url)} |`;
+    return `| @${escapeTableCell(source.citation_key)} | ${escapeTableCell(source.title)} | ${escapeTableCell(fit)} | ${escapeTableCell(localStatus)} | ${escapeTableCell(hash)} | ${escapeTableCell(reviewNotes)} | ${escapeTableCell(source.url)} |`;
   });
   return [
     "## Source Library Audit",

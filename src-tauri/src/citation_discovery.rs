@@ -165,6 +165,7 @@ pub(crate) fn download_citation_source(
                 .as_deref()
                 .and_then(normalize_manifest_text),
             fit_reasons: normalize_fit_reasons(request.fit_reasons.as_deref()),
+            file_exists: None,
         },
     )?;
     let item = read_source_manifest(&manifest_path)?
@@ -184,6 +185,9 @@ pub(crate) fn list_citation_sources(
     let associated_dir = associated_source_dir(document_path)?;
     let manifest_path = associated_dir.join("sources.json");
     let mut sources = read_source_manifest(&manifest_path)?;
+    for source in &mut sources {
+        source.file_exists = Some(Path::new(&source.path).exists());
+    }
     sources.sort_by(|left, right| {
         right
             .downloaded_at
@@ -405,7 +409,9 @@ fn associated_source_dir(document_path: &Path) -> Result<PathBuf, String> {
 fn write_source_manifest(path: &Path, item: &CitationManifestItem) -> Result<(), String> {
     let mut items = read_source_manifest(path)?;
     items.retain(|existing| existing.sha256 != item.sha256 && existing.url != item.url);
-    items.push(item.clone());
+    let mut persisted = item.clone();
+    persisted.file_exists = None;
+    items.push(persisted);
     let text = serde_json::to_string_pretty(&items)
         .map_err(|err| format!("Could not serialize citation source manifest: {err}"))?;
     fs::write(path, text).map_err(|err| format!("Could not write citation source manifest: {err}"))
@@ -442,6 +448,8 @@ pub(crate) struct CitationManifestItem {
     fit_label: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fit_reasons: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    file_exists: Option<bool>,
 }
 
 fn citation_download_response(
@@ -776,6 +784,7 @@ mod tests {
                 "government source domain".to_string(),
                 "downloadable PDF source".to_string(),
             ]),
+            file_exists: Some(true),
         };
         let second = CitationManifestItem {
             citation_key: "second".to_string(),
@@ -825,6 +834,7 @@ mod tests {
                 fit_score: Some(44),
                 fit_label: Some("review".to_string()),
                 fit_reasons: Some(vec!["reviewable text source".to_string()]),
+                file_exists: None,
             },
         )
         .expect("write older");
@@ -845,6 +855,7 @@ mod tests {
                 fit_score: Some(91),
                 fit_label: Some("strong".to_string()),
                 fit_reasons: Some(vec!["downloadable PDF source".to_string()]),
+                file_exists: None,
             },
         )
         .expect("write newer");
@@ -857,7 +868,53 @@ mod tests {
         assert_eq!(library.sources[0].citation_key, "newer");
         assert_eq!(library.sources[0].source.as_deref(), Some("SearXNG"));
         assert_eq!(library.sources[0].fit_label.as_deref(), Some("strong"));
+        assert_eq!(library.sources[0].file_exists, Some(true));
         assert_eq!(library.sources[1].citation_key, "older");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn citation_source_library_marks_missing_files_without_persisting_status() {
+        let dir =
+            std::env::temp_dir().join(format!("neditor-citation-missing-{}", std::process::id()));
+        fs::create_dir_all(&dir).expect("temp dir");
+        let document = dir.join("proposal.md");
+        fs::write(&document, "# Proposal\n").expect("document");
+        let source_dir = associated_source_dir(&document).expect("source dir");
+        fs::create_dir_all(&source_dir).expect("source dir create");
+        let missing_path = source_dir.join("missing.pdf");
+        let manifest = source_dir.join("sources.json");
+        write_source_manifest(
+            &manifest,
+            &CitationManifestItem {
+                citation_key: "missing".to_string(),
+                title: "Missing".to_string(),
+                url: "https://example.com/missing.pdf".to_string(),
+                snippet: String::new(),
+                path: path_to_string(&missing_path),
+                relative_path: relative_source_path(&document, &missing_path),
+                sha256: "missing-hash".to_string(),
+                bytes: 42,
+                downloaded_at: Some("2026-05-28T10:00:00+03:00".to_string()),
+                media_type: Some("application/pdf".to_string()),
+                source: Some("SearXNG".to_string()),
+                fit_score: Some(90),
+                fit_label: Some("strong".to_string()),
+                fit_reasons: Some(vec!["downloadable PDF source".to_string()]),
+                file_exists: Some(true),
+            },
+        )
+        .expect("write missing");
+
+        let library = list_citation_sources(CitationSourceLibraryRequest {
+            document_path: path_to_string(&document),
+        })
+        .expect("library");
+        assert_eq!(library.sources.len(), 1);
+        assert_eq!(library.sources[0].file_exists, Some(false));
+
+        let manifest_text = fs::read_to_string(&manifest).expect("manifest text");
+        assert!(!manifest_text.contains("file_exists"));
         let _ = fs::remove_dir_all(&dir);
     }
 

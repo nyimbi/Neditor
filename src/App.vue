@@ -1473,6 +1473,9 @@
                 <small>
                   @{{ source.citation_key }} | {{ source.source || "saved source" }}<template v-if="source.fit_score !== undefined"> | fit {{ source.fit_score }}/100 {{ source.fit_label }}</template> | {{ source.media_type || "source file" }} | {{ formatCitationSourceBytes(source.bytes) }}
                 </small>
+                <small v-if="source.file_exists === false" class="source-missing-warning">
+                  Local file missing; re-download before review, export, or evidence handoff.
+                </small>
                 <small v-if="source.fit_reasons?.length">{{ source.fit_reasons.join(" | ") }}</small>
                 <small>{{ source.relative_path }}</small>
                 <small>{{ source.url }}</small>
@@ -1480,8 +1483,11 @@
                   <button type="button" @click="insertCitationSourceReference(source)">Cite</button>
                   <button type="button" @click="insertCitationSourceBibliography(source)">Insert bibliography</button>
                   <button type="button" @click="insertBlock(`[${source.title}](${source.relative_path})`)">Insert local link</button>
+                  <button v-if="source.file_exists === false" type="button" :disabled="citationSourceBusyUrl === source.url" @click="redownloadCitationSource(source)">
+                    {{ citationSourceBusyUrl === source.url ? "Re-downloading..." : "Re-download" }}
+                  </button>
                   <button type="button" @click="copyCitationSourcePath(source)">Copy path</button>
-                  <button type="button" @click="revealCitationSource(source)">Reveal file</button>
+                  <button type="button" :disabled="source.file_exists === false" @click="revealCitationSource(source)">Reveal file</button>
                 </div>
               </article>
             </div>
@@ -10059,7 +10065,7 @@ async function searchCitationSources(query = citationSearchQuery.value) {
 
 async function saveCitationSourceToLibrary(
   source: DeepResearchSource,
-  options: { insertBibliography?: boolean; silent?: boolean } = {},
+  options: { insertBibliography?: boolean; silent?: boolean; forceRefresh?: boolean } = {},
 ) {
   if (!active.value.path) {
     if (!options.silent) store.statusMessage = "Save the document before downloading citation sources";
@@ -10077,6 +10083,7 @@ async function saveCitationSourceToLibrary(
         fit_score: source.fitScore,
         fit_label: source.fitLabel,
         fit_reasons: source.fitReasons,
+        force_refresh: options.forceRefresh || undefined,
       },
     });
     if (options.insertBibliography) insertBlock(response.bibliography_stub);
@@ -10101,6 +10108,24 @@ async function saveCitationSourceToLibrary(
 
 async function downloadCitationSource(source: DeepResearchSource) {
   await saveCitationSourceToLibrary(source, { insertBibliography: true });
+}
+
+async function redownloadCitationSource(source: CitationSourceLibraryItem) {
+  const response = await saveCitationSourceToLibrary(
+    {
+      title: source.title,
+      url: source.url,
+      snippet: source.snippet || "",
+      source: source.source || "Saved source",
+      fitScore: source.fit_score,
+      fitLabel: source.fit_label,
+      fitReasons: source.fit_reasons || [],
+    },
+    { forceRefresh: true },
+  );
+  if (response) {
+    store.statusMessage = `Re-downloaded source @${response.citation_key} at ${response.relative_path}`;
+  }
 }
 
 function uniqueResearchSources(sources: DeepResearchSource[]) {
@@ -21678,6 +21703,11 @@ select:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.source-missing-warning {
+  color: #8a4b0f;
+  font-weight: 650;
 }
 
 .reference-inline-form {

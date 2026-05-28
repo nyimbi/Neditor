@@ -4759,6 +4759,7 @@ test("citation source library audit captures evidence metadata", () => {
       fit_score: 91,
       fit_label: "strong",
       fit_reasons: ["government source domain", "downloadable PDF source"],
+      file_exists: false,
     },
   ]);
   ok(audit.includes("## Source Library Audit"));
@@ -4766,6 +4767,8 @@ test("citation source library audit captures evidence metadata", () => {
   ok(audit.includes("@agency2026"));
   ok(audit.includes("AI Procurement \\| Controls"));
   ok(audit.includes("91/100 strong"));
+  ok(audit.includes("missing: proposal.neditor-sources/report.pdf"));
+  ok(audit.includes("local file missing"));
   ok(audit.includes("abcdef1234567890"));
   ok(audit.includes("government source domain; downloadable PDF source"));
 });
@@ -6642,6 +6645,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("insertCitationSourceReference"));
   ok(app.includes("insertCitationSourceLibraryAudit"));
   ok(app.includes("copyCitationSourceLibraryAudit"));
+  ok(app.includes("redownloadCitationSource"));
+  ok(app.includes("force_refresh: options.forceRefresh"));
+  ok(app.includes("source.file_exists === false"));
   ok(app.includes("Insert Source Library Audit"));
   ok(app.includes("copyCitationSourcePath"));
   ok(app.includes("revealCitationSource"));
