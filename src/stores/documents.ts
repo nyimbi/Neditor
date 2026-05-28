@@ -44,6 +44,13 @@ import {
   type TransformProbeResult,
 } from "../lib/transformSettings";
 import {
+  applyRestoredGitRevisionState,
+  applyRestoredSnapshotState,
+  clearGitVersioningState,
+  gitStatusDetailsRequired,
+  snapshotTextForDocument,
+} from "../lib/versioningState";
+import {
   deleteCustomTransformTemplateState,
   normalizeCustomTransformTemplates,
   saveCustomTransformTemplateState,
@@ -1358,7 +1365,7 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async createSnapshot(label = "manual") {
       const doc = this.activeDocument;
-      const snapshotText = doc.dirty ? doc.text : doc.savedText || doc.text;
+      const snapshotText = snapshotTextForDocument(doc);
       return invoke<{ snapshot_path: string }>("create_snapshot", {
         request: { text: snapshotText, file_path: doc.path, label, storage: this.snapshotStorage },
       });
@@ -1387,9 +1394,9 @@ export const useDocumentsStore = defineStore("documents", {
         request: { snapshot_path: snapshotPath, file_path: this.activeDocument?.path, storage: this.snapshotStorage },
       });
       const doc = this.activeDocument;
-      doc.text = response.text;
-      doc.dirty = true;
-      this.statusMessage = `Restored snapshot ${snapshotPath}`;
+      const restored = applyRestoredSnapshotState(doc, response, snapshotPath);
+      Object.assign(doc, restored.document);
+      this.statusMessage = restored.statusMessage;
       await this.compileActive();
       await this.listSnapshots();
     },
@@ -1555,15 +1562,13 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async refreshGitStatus() {
       if (!this.gitIntegration.enabled) {
-        this.gitStatus = null;
-        this.gitHistory = [];
-        this.gitDiffText = "";
+        Object.assign(this, clearGitVersioningState());
         return;
       }
       try {
         const status = await invoke<GitStatus>("get_git_status", { path: this.activeDocument?.path });
         this.gitStatus = status;
-        if (status.inside_repo && this.activeDocument?.path) {
+        if (gitStatusDetailsRequired(status, this.activeDocument?.path)) {
           await this.refreshGitHistory();
           await this.refreshGitDiff();
         } else {
@@ -1571,9 +1576,7 @@ export const useDocumentsStore = defineStore("documents", {
           this.gitDiffText = "";
         }
       } catch {
-        this.gitStatus = null;
-        this.gitHistory = [];
-        this.gitDiffText = "";
+        Object.assign(this, clearGitVersioningState());
       }
     },
     async refreshGitHistory() {
@@ -1621,11 +1624,9 @@ export const useDocumentsStore = defineStore("documents", {
         request: { path, revision },
       });
       const doc = this.activeDocument;
-      doc.text = response.text;
-      doc.savedHash = response.hash;
-      doc.savedText = undefined;
-      doc.dirty = true;
-      this.statusMessage = `Restored revision ${revision.slice(0, 12)}`;
+      const restored = applyRestoredGitRevisionState(doc, response, revision);
+      Object.assign(doc, restored.document);
+      this.statusMessage = restored.statusMessage;
       await this.compileActive();
       await this.refreshGitStatus();
     },

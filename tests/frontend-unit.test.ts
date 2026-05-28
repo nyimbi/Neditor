@@ -208,6 +208,13 @@ import {
   watchedPathsForContext,
 } from "../src/lib/watchPaths.js";
 import {
+  applyRestoredGitRevisionState,
+  applyRestoredSnapshotState,
+  clearGitVersioningState,
+  gitStatusDetailsRequired,
+  snapshotTextForDocument,
+} from "../src/lib/versioningState.js";
+import {
   clearAgentRunHistoryState,
   clearDocsLiveDraftHistoryState,
   recordAgentRunHistoryState,
@@ -442,6 +449,49 @@ test("document export option helpers normalize compile export and transform sett
   });
   equal(reviewedExportOptions.warnOnDirtyGit, false);
   equal(reviewedExportOptions.watermark, "Confidential");
+});
+
+test("versioning state helpers preserve snapshot and git restore semantics", () => {
+  const document = {
+    id: "doc-1",
+    path: "/workspace/report.md",
+    title: "report.md",
+    text: "current draft",
+    savedHash: "hash-saved",
+    savedText: "saved text",
+    dirty: false,
+  };
+
+  equal(snapshotTextForDocument(document), "saved text");
+  equal(snapshotTextForDocument({ ...document, dirty: true }), "current draft");
+  equal(snapshotTextForDocument({ ...document, savedText: undefined }), "current draft");
+
+  const snapshotRestore = applyRestoredSnapshotState(
+    document,
+    { text: "snapshot text", hash: "hash-snapshot", modified: "2026-05-28T12:00:00.000Z" },
+    "/snapshots/report.json",
+  );
+  equal(snapshotRestore.document.text, "snapshot text");
+  equal(snapshotRestore.document.savedHash, "hash-saved");
+  equal(snapshotRestore.document.savedText, "saved text");
+  equal(snapshotRestore.document.dirty, true);
+  equal(snapshotRestore.statusMessage, "Restored snapshot /snapshots/report.json");
+
+  const gitRestore = applyRestoredGitRevisionState(
+    document,
+    { text: "git text", hash: "hash-git", modified: "2026-05-28T12:05:00.000Z" },
+    "abcdef0123456789",
+  );
+  equal(gitRestore.document.text, "git text");
+  equal(gitRestore.document.savedHash, "hash-git");
+  equal(gitRestore.document.savedText, undefined);
+  equal(gitRestore.document.dirty, true);
+  equal(gitRestore.statusMessage, "Restored revision abcdef012345");
+
+  deepEqual(clearGitVersioningState(), { gitStatus: null, gitHistory: [], gitDiffText: "" });
+  equal(gitStatusDetailsRequired({ inside_repo: true, dirty: false, summary: [] }, "/workspace/report.md"), true);
+  equal(gitStatusDetailsRequired({ inside_repo: true, dirty: false, summary: [] }, null), false);
+  equal(gitStatusDetailsRequired({ inside_repo: false, dirty: false, summary: [] }, "/workspace/report.md"), false);
 });
 
 test("transform settings helpers clear trust and clamp runtime preferences", () => {
@@ -5407,7 +5457,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("versioningModeLabel"));
   ok(app.includes("gitFreeVersioningPlan"));
   ok(app.includes("createRecoverySnapshot"));
-  ok(store.includes("if (status.inside_repo && this.activeDocument?.path)"));
+  ok(store.includes("gitStatusDetailsRequired(status, this.activeDocument?.path)"));
+  ok(store.includes("Object.assign(this, clearGitVersioningState())"));
   ok(store.includes(`this.gitHistory = [];
           this.gitDiffText = "";`));
   ok(app.includes("NEditor Guided Demo"));
