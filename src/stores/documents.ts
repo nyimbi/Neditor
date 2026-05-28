@@ -90,6 +90,9 @@ import {
 } from "../lib/workflowHistory";
 import {
   applyOpenedWorkspaceDocumentState,
+  applyOpenRecentWorkspaceFolderFailureState,
+  applyOpenWorkspaceFolderFailureState,
+  applyOpenWorkspaceFolderSuccessState,
   applyWorkspaceRestoreState,
   createRestoredWorkspaceDocumentState,
   forgetWorkspaceFolderState,
@@ -631,23 +634,28 @@ export const useDocumentsStore = defineStore("documents", {
       this.workspaceRoot = path;
       const opened = await this.refreshWorkspace();
       if (!opened) {
-        this.workspaceRoot = previousRoot;
-        this.workspaceFiles = previousFiles;
-        this.statusMessage = `Could not open workspace ${titleFromPath(path)}`;
+        const failed = applyOpenWorkspaceFolderFailureState(previousRoot, previousFiles, path);
+        this.workspaceRoot = failed.workspaceRoot;
+        this.workspaceFiles = failed.workspaceFiles;
+        this.statusMessage = failed.statusMessage;
         await this.persistWorkspace();
         return false;
       }
-      this.rememberFolder(path);
-      this.sidebar = "files";
-      this.statusMessage = `Opened workspace ${titleFromPath(path)}`;
+      const succeeded = applyOpenWorkspaceFolderSuccessState(this.recentFolders, path);
+      this.recentFolders = succeeded.recentFolders;
+      this.sidebar = succeeded.sidebar;
+      this.statusMessage = succeeded.statusMessage;
       await this.persistWorkspace();
       return true;
     },
     async openRecentFolder(path: string) {
       const opened = await this.openFolder(path);
       if (opened) return true;
-      this.forgetFolderPath(path);
-      this.statusMessage = `Removed missing recent folder ${titleFromPath(path)}`;
+      const failed = applyOpenRecentWorkspaceFolderFailureState(this.recentFolders, this.workspaceRoot, this.workspaceFiles, path);
+      this.recentFolders = failed.recentFolders;
+      this.workspaceRoot = failed.workspaceRoot;
+      this.workspaceFiles = failed.workspaceFiles;
+      this.statusMessage = failed.statusMessage;
       await this.persistWorkspace();
       return false;
     },

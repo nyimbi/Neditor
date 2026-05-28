@@ -47,6 +47,22 @@ export interface OpenedWorkspaceDocumentStateResult {
   statusMessage: string;
 }
 
+export interface OpenWorkspaceFolderSuccessStateResult {
+  recentFolders: string[];
+  sidebar: "files";
+  statusMessage: string;
+}
+
+export interface OpenWorkspaceFolderFailureStateResult<T> {
+  workspaceRoot: string | null;
+  workspaceFiles: T[];
+  statusMessage: string;
+}
+
+export interface OpenRecentWorkspaceFolderFailureStateResult<T> extends ForgetWorkspaceFolderResult<T> {
+  statusMessage: string;
+}
+
 export function setDocumentScrollState<T extends DocumentScrollState>(
   documents: T[],
   id: string,
@@ -87,6 +103,38 @@ export function forgetWorkspaceFolderState<T>(
     workspaceRoot: rootMatched ? null : workspaceRoot,
     workspaceFiles: rootMatched ? [] : workspaceFiles,
     changed: rootMatched || nextRecentFolders.length !== recentFolders.length,
+  };
+}
+
+export function applyOpenWorkspaceFolderSuccessState(recentFolders: string[], path: string): OpenWorkspaceFolderSuccessStateResult {
+  return {
+    recentFolders: rememberRecentItem(recentFolders, path, 12),
+    sidebar: "files",
+    statusMessage: `Opened workspace ${titleFromPath(path)}`,
+  };
+}
+
+export function applyOpenWorkspaceFolderFailureState<T>(
+  previousRoot: string | null,
+  previousFiles: T[],
+  path: string,
+): OpenWorkspaceFolderFailureStateResult<T> {
+  return {
+    workspaceRoot: previousRoot,
+    workspaceFiles: previousFiles,
+    statusMessage: `Could not open workspace ${titleFromPath(path)}`,
+  };
+}
+
+export function applyOpenRecentWorkspaceFolderFailureState<T>(
+  recentFolders: string[],
+  workspaceRoot: string | null,
+  workspaceFiles: T[],
+  path: string,
+): OpenRecentWorkspaceFolderFailureStateResult<T> {
+  return {
+    ...forgetWorkspaceFolderState(recentFolders, workspaceRoot, workspaceFiles, path),
+    statusMessage: `Removed missing recent folder ${titleFromPath(path)}`,
   };
 }
 

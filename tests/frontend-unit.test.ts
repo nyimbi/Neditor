@@ -238,6 +238,9 @@ import {
 } from "../src/lib/workflowHistory.js";
 import {
   applyOpenedWorkspaceDocumentState,
+  applyOpenRecentWorkspaceFolderFailureState,
+  applyOpenWorkspaceFolderFailureState,
+  applyOpenWorkspaceFolderSuccessState,
   applyWorkspaceRestoreState,
   createRestoredWorkspaceDocumentState,
   forgetWorkspaceFolderState,
@@ -796,6 +799,24 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   equal(missingFolder.changed, false);
   deepEqual(missingFolder.recentFolders, ["/other"]);
   equal(missingFolder.workspaceRoot, "/other");
+
+  const openFolderSuccess = applyOpenWorkspaceFolderSuccessState(["/old"], "/workspace/New Project");
+  deepEqual(openFolderSuccess.recentFolders, ["/workspace/New Project", "/old"]);
+  equal(openFolderSuccess.sidebar, "files");
+  equal(openFolderSuccess.statusMessage, "Opened workspace New Project");
+
+  const previousFiles = [{ path: "/old/a.md" }];
+  const openFolderFailure = applyOpenWorkspaceFolderFailureState("/old", previousFiles, "/missing/New Project");
+  equal(openFolderFailure.workspaceRoot, "/old");
+  equal(openFolderFailure.workspaceFiles, previousFiles);
+  equal(openFolderFailure.statusMessage, "Could not open workspace New Project");
+
+  const openRecentFailure = applyOpenRecentWorkspaceFolderFailureState(["/missing", "/old"], "/missing", previousFiles, "/missing");
+  deepEqual(openRecentFailure.recentFolders, ["/old"]);
+  equal(openRecentFailure.workspaceRoot, null);
+  deepEqual(openRecentFailure.workspaceFiles, []);
+  equal(openRecentFailure.changed, true);
+  equal(openRecentFailure.statusMessage, "Removed missing recent folder missing");
 
   let sequence = 0;
   const restored = createRestoredWorkspaceDocumentState(
