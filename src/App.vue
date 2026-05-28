@@ -4964,10 +4964,32 @@
                   <dd>{{ localAgentHandoffResult.handoff_path }}</dd>
                 </div>
                 <div>
+                  <dt>Response file</dt>
+                  <dd>{{ localAgentHandoffResult.response_path }}</dd>
+                </div>
+                <div>
                   <dt>Launch command</dt>
                   <dd>{{ localAgentHandoffResult.launch_command.join(" ") }}</dd>
                 </div>
               </dl>
+              <section class="agent-provider-grid" aria-label="Local agent response import">
+                <label class="wide-field">
+                  Response Markdown file
+                  <input v-model="localAgentResponsePath" placeholder=".neditor/agent-handoffs/neditor-codex-cli-...response.md" />
+                </label>
+                <div class="reference-actions">
+                  <button type="button" :disabled="!canImportLocalAgentResponse" @click="importLocalAgentResponse">
+                    {{ localAgentResponseBusy ? "Importing..." : "Import local response" }}
+                  </button>
+                  <button type="button" :disabled="!localAgentResponsePath" @click="copyLocalAgentResponsePath">Copy response path</button>
+                </div>
+              </section>
+              <p v-if="localAgentResponseImport" class="sidebar-hint">
+                Imported {{ localAgentResponseImport.characters }} characters from {{ localAgentResponseImport.label }}; sha256 {{ localAgentResponseImport.sha256.slice(0, 12) }}.
+              </p>
+              <ul v-if="localAgentResponseImport?.warnings.length">
+                <li v-for="item in localAgentResponseImport.warnings" :key="item">{{ item }}</li>
+              </ul>
               <ul v-if="localAgentHandoffResult">
                 <li v-for="item in localAgentHandoffResult.instructions" :key="item">{{ item }}</li>
                 <li v-for="item in localAgentHandoffResult.warnings" :key="item">{{ item }}</li>
@@ -5607,8 +5629,18 @@ type LocalAgentHandoffResponse = {
   executable_path?: string | null;
   workspace_path: string;
   handoff_path: string;
+  response_path: string;
   launch_command: string[];
   instructions: string[];
+  warnings: string[];
+};
+type LocalAgentResponseImport = {
+  profile_id: string;
+  label: string;
+  response_path: string;
+  markdown: string;
+  sha256: string;
+  characters: number;
   warnings: string[];
 };
 type NativeTtsResponse = {
@@ -5869,6 +5901,9 @@ let googleAuthPollTimer: ReturnType<typeof window.setInterval> | null = null;
 const localAgentHandoffBusy = ref(false);
 const localAgentHandoffResult = ref<LocalAgentHandoffResponse | null>(null);
 const localAgentHandoffError = ref("");
+const localAgentResponsePath = ref("");
+const localAgentResponseBusy = ref(false);
+const localAgentResponseImport = ref<LocalAgentResponseImport | null>(null);
 const agentTaskLaneFilter = ref<"all" | AgenticWorkflowLane>("all");
 const agentTaskStatusFilter = ref<"all" | AgentLifecycleExecutionStatus>("all");
 const agentTaskOwnerFilter = ref("all");
@@ -6634,6 +6669,9 @@ const canRunAgentProvider = computed(() => {
 });
 const currentLocalAgentProfile = computed<LocalAgentCliProfile | undefined>(() => localAgentCliProfileById(agentProviderPackage.value?.profile.id || agentProviderId.value));
 const canPrepareLocalAgentHandoff = computed(() => Boolean(agentProviderPackage.value && currentLocalAgentProfile.value && !localAgentHandoffBusy.value));
+const canImportLocalAgentResponse = computed(() =>
+  Boolean(agentProviderPackage.value && currentLocalAgentProfile.value && localAgentResponsePath.value.trim() && !localAgentResponseBusy.value),
+);
 const agentSourcePackPreview = computed(() => buildAgenticSourcePack(agentSourcePackText.value));
 const agentPlaybookFocusOptions = [
   { value: "all", label: "All workflows" },
@@ -9031,6 +9069,8 @@ function syncAgentProviderProfile() {
   agentProviderResult.value = null;
   localAgentHandoffResult.value = null;
   localAgentHandoffError.value = "";
+  localAgentResponsePath.value = "";
+  localAgentResponseImport.value = null;
 }
 
 function applyStoredAiProviderDefaults() {
@@ -9377,6 +9417,8 @@ function buildAgentWorkspacePlan() {
   agentProviderResult.value = null;
   localAgentHandoffResult.value = null;
   localAgentHandoffError.value = "";
+  localAgentResponsePath.value = "";
+  localAgentResponseImport.value = null;
   store.statusMessage = `Planned ${agentPlan.value.steps.length} agent workflow steps`;
 }
 function generateAgentWorkspaceRun() {
@@ -9404,6 +9446,8 @@ function generateAgentWorkspaceRun() {
   agentProviderResult.value = null;
   localAgentHandoffResult.value = null;
   localAgentHandoffError.value = "";
+  localAgentResponsePath.value = "";
+  localAgentResponseImport.value = null;
   recordAgentRunHistory(agentRun.value, "generated");
   store.statusMessage = `Generated agent packet for ${agentRun.value.plan.lanes.length} workflow lanes`;
 }
@@ -9827,6 +9871,8 @@ function buildAgentProviderPackage() {
   agentProviderResult.value = null;
   localAgentHandoffResult.value = null;
   localAgentHandoffError.value = "";
+  localAgentResponsePath.value = "";
+  localAgentResponseImport.value = null;
   store.statusMessage = `Built ${agentProviderPackage.value.profile.label} request package`;
 }
 async function prepareLocalAgentHandoff() {
@@ -9842,6 +9888,8 @@ async function prepareLocalAgentHandoff() {
         workspace_path: localAgentWorkspacePath(),
       },
     });
+    localAgentResponsePath.value = localAgentHandoffResult.value.response_path;
+    localAgentResponseImport.value = null;
     const availability = localAgentHandoffResult.value.available ? "is available" : "was not found on PATH";
     store.statusMessage = `Prepared ${localAgentHandoffResult.value.label} handoff; ${localAgentHandoffResult.value.command} ${availability}`;
   } catch (error) {
@@ -9850,6 +9898,36 @@ async function prepareLocalAgentHandoff() {
     store.statusMessage = "Local agent handoff could not be prepared";
   } finally {
     localAgentHandoffBusy.value = false;
+  }
+}
+async function importLocalAgentResponse() {
+  if (!agentProviderPackage.value || !isLocalAgentCliProfile(agentProviderPackage.value.profile.id) || localAgentResponseBusy.value) return;
+  localAgentResponseBusy.value = true;
+  localAgentHandoffError.value = "";
+  try {
+    const imported = await invoke<LocalAgentResponseImport>("import_local_agent_response", {
+      request: {
+        profile_id: agentProviderPackage.value.profile.id,
+        workspace_path: localAgentWorkspacePath(),
+        response_path: localAgentResponsePath.value,
+      },
+    });
+    localAgentResponseImport.value = imported;
+    localAgentResponsePath.value = imported.response_path;
+    agentProviderResult.value = {
+      ok: true,
+      status: 200,
+      statusText: `Imported from ${imported.label}`,
+      markdown: imported.markdown,
+      rawText: imported.markdown,
+    };
+    store.statusMessage = `Imported ${imported.label} response for review`;
+  } catch (error) {
+    localAgentHandoffError.value = error instanceof Error ? error.message : String(error);
+    store.lastError = localAgentHandoffError.value;
+    store.statusMessage = "Local agent response could not be imported";
+  } finally {
+    localAgentResponseBusy.value = false;
   }
 }
 async function runAgentProviderRequest() {
@@ -9896,6 +9974,15 @@ async function copyAgentProviderSourcePack() {
     store.statusMessage = "Copied provider source evidence pack";
   } catch {
     store.statusMessage = "Provider source evidence pack is ready to copy";
+  }
+}
+async function copyLocalAgentResponsePath() {
+  if (!localAgentResponsePath.value) return;
+  try {
+    await navigator.clipboard?.writeText(localAgentResponsePath.value);
+    store.statusMessage = "Copied local agent response path";
+  } catch {
+    store.statusMessage = "Local agent response path is ready to copy";
   }
 }
 function localAgentWorkspacePath() {

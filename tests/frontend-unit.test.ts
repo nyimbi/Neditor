@@ -4537,7 +4537,9 @@ test("AI provider packages redact secrets and preserve agent governance context"
     equal(cliPackage.profile.authHeader, "");
     ok(cliPackage.markdown.includes("## Local Agent Handoff"));
     ok(cliPackage.markdown.includes(localAgentCliProfileById(profileId)?.command || ""));
+    ok(cliPackage.markdown.includes("prepared response-file path"));
     ok(cliPackage.checklist.some((item) => item.includes("approved provider workspace")));
+    ok(cliPackage.checklist.some((item) => item.includes("import that response back into NEditor")));
     ok(isLocalAgentCliProfile(profileId));
   }
   equal(localAgentCliProfiles.length, 4);
@@ -6047,6 +6049,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(businessDocs.includes("Codex"));
   ok(businessDocs.includes("OpenCode"));
   ok(businessDocs.includes("Google Antigravity"));
+  ok(app.includes("Import local response"));
+  ok(app.includes("import_local_agent_response"));
+  ok(app.includes("Local agent response import"));
+  ok(app.includes("localAgentResponsePath"));
   ok(app.includes('aria-label="Help center"'));
   ok(app.includes("filteredHelpTopics"));
   ok(app.includes("External transform troubleshooting"));

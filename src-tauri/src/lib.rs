@@ -104,7 +104,7 @@ use google_auth::{
     cancel_google_oauth_sign_in, poll_google_oauth_sign_in, start_google_oauth_sign_in,
     GoogleAuthState,
 };
-use local_agents::prepare_local_agent_handoff;
+use local_agents::{import_local_agent_response, prepare_local_agent_handoff};
 use rfp_import::import_rfp_source;
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
 use tauri::{
@@ -181,6 +181,7 @@ pub fn run() {
             cancel_google_oauth_sign_in,
             import_rfp_source,
             prepare_local_agent_handoff,
+            import_local_agent_response,
             create_snapshot,
             list_snapshots,
             restore_snapshot,

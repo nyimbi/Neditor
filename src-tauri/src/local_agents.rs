@@ -1,4 +1,4 @@
-use crate::path_to_string;
+use crate::{path_to_string, sha256_hex};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -13,6 +13,13 @@ pub(crate) struct PrepareLocalAgentHandoffRequest {
     pub(crate) workspace_path: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct ImportLocalAgentResponseRequest {
+    pub(crate) profile_id: String,
+    pub(crate) workspace_path: Option<String>,
+    pub(crate) response_path: String,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct LocalAgentHandoffResponse {
     pub(crate) profile_id: String,
@@ -22,8 +29,20 @@ pub(crate) struct LocalAgentHandoffResponse {
     pub(crate) executable_path: Option<String>,
     pub(crate) workspace_path: String,
     pub(crate) handoff_path: String,
+    pub(crate) response_path: String,
     pub(crate) launch_command: Vec<String>,
     pub(crate) instructions: Vec<String>,
+    pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct LocalAgentResponseImport {
+    pub(crate) profile_id: String,
+    pub(crate) label: String,
+    pub(crate) response_path: String,
+    pub(crate) markdown: String,
+    pub(crate) sha256: String,
+    pub(crate) characters: usize,
     pub(crate) warnings: Vec<String>,
 }
 
@@ -71,15 +90,19 @@ pub(crate) fn prepare_local_agent_handoff(
     }
 
     let workspace_path = resolve_workspace_path(request.workspace_path.as_deref())?;
-    let handoff_dir = workspace_path.join(".neditor").join("agent-handoffs");
+    let handoff_dir = agent_handoff_dir(&workspace_path);
     fs::create_dir_all(&handoff_dir).map_err(|err| {
         format!(
             "Cannot create local agent handoff folder {}: {err}",
             path_to_string(&handoff_dir)
         )
     })?;
-    let handoff_path = handoff_dir.join(handoff_file_name(spec.profile_id));
-    fs::write(&handoff_path, prompt.as_bytes()).map_err(|err| {
+    let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
+    let handoff_path = handoff_dir.join(agent_file_name(spec.profile_id, &timestamp, "prompt"));
+    let response_path = handoff_dir.join(agent_file_name(spec.profile_id, &timestamp, "response"));
+    let response_path_text = path_to_string(&response_path);
+    let handoff_markdown = local_agent_handoff_markdown(spec, prompt, &response_path_text);
+    fs::write(&handoff_path, handoff_markdown.as_bytes()).map_err(|err| {
         format!(
             "Cannot write local agent handoff {}: {err}",
             path_to_string(&handoff_path)
@@ -104,15 +127,83 @@ pub(crate) fn prepare_local_agent_handoff(
         executable_path: executable_path.as_deref().map(path_to_string),
         workspace_path: path_to_string(&workspace_path),
         handoff_path: path_to_string(&handoff_path),
+        response_path: response_path_text.clone(),
         launch_command: vec![spec.command.to_string()],
         instructions: vec![
             format!("Start {} from the workspace path below.", spec.label),
             "Open or paste the prepared Markdown handoff file into the local agent.".to_string(),
-            "Ask the agent to return Markdown only, with provenance and review notes preserved."
-                .to_string(),
-            "Import the response into NEditor as a needs-review provider response before accepting it."
-                .to_string(),
+            format!("Ask the agent to write Markdown only to {response_path_text}."),
+            "Return provenance, review notes, unresolved assumptions, and QA checklist items with the response.".to_string(),
+            "Use Import local response in NEditor before accepting any returned content.".to_string(),
         ],
+        warnings,
+    })
+}
+
+#[tauri::command]
+pub(crate) fn import_local_agent_response(
+    request: ImportLocalAgentResponseRequest,
+) -> Result<LocalAgentResponseImport, String> {
+    let spec = local_agent_spec(&request.profile_id).ok_or_else(|| {
+        "Unsupported local agent profile. Choose Claude Code, Codex, OpenCode, or Google Antigravity."
+            .to_string()
+    })?;
+    let workspace_path = resolve_workspace_path(request.workspace_path.as_deref())?;
+    let handoff_dir = agent_handoff_dir(&workspace_path)
+        .canonicalize()
+        .map_err(|err| format!("Cannot resolve local agent handoff folder: {err}"))?;
+    let response_path = PathBuf::from(request.response_path.trim());
+    if response_path.as_os_str().is_empty() {
+        return Err("Choose the local agent response Markdown file to import.".to_string());
+    }
+    let canonical_response = response_path.canonicalize().map_err(|err| {
+        format!(
+            "Cannot read local agent response {}: {err}",
+            path_to_string(&response_path)
+        )
+    })?;
+    if !canonical_response.starts_with(&handoff_dir) {
+        return Err(format!(
+            "Local agent response must stay inside {}.",
+            path_to_string(&handoff_dir)
+        ));
+    }
+    if canonical_response
+        .extension()
+        .and_then(|value| value.to_str())
+        != Some("md")
+    {
+        return Err("Local agent responses must be Markdown .md files.".to_string());
+    }
+    let markdown = fs::read_to_string(&canonical_response).map_err(|err| {
+        format!(
+            "Cannot read local agent response {}: {err}",
+            path_to_string(&canonical_response)
+        )
+    })?;
+    if markdown.trim().is_empty() {
+        return Err("Local agent response file is empty.".to_string());
+    }
+    let mut warnings = Vec::new();
+    if !markdown.contains("```ai-source") && !markdown.contains("<!-- ai-assisted:") {
+        warnings.push(
+            "Response did not include explicit AI provenance; NEditor will wrap it before apply."
+                .to_string(),
+        );
+    }
+    if !markdown.to_ascii_lowercase().contains("review") {
+        warnings.push(
+            "Response did not mention review; confirm claims and assumptions before accepting."
+                .to_string(),
+        );
+    }
+    Ok(LocalAgentResponseImport {
+        profile_id: spec.profile_id.to_string(),
+        label: spec.label.to_string(),
+        response_path: path_to_string(&canonical_response),
+        sha256: sha256_hex(markdown.as_bytes()),
+        characters: markdown.chars().count(),
+        markdown,
         warnings,
     })
 }
@@ -154,9 +245,39 @@ fn resolve_workspace_path(workspace_path: Option<&str>) -> Result<PathBuf, Strin
         .map_err(|err| format!("Cannot resolve local agent workspace: {err}"))
 }
 
-fn handoff_file_name(profile_id: &str) -> String {
-    let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ");
-    format!("neditor-{profile_id}-{timestamp}.md")
+fn agent_handoff_dir(workspace_path: &Path) -> PathBuf {
+    workspace_path.join(".neditor").join("agent-handoffs")
+}
+
+fn agent_file_name(profile_id: &str, timestamp: &str, role: &str) -> String {
+    format!("neditor-{profile_id}-{timestamp}.{role}.md")
+}
+
+fn local_agent_handoff_markdown(
+    spec: &LocalAgentSpec,
+    prompt: &str,
+    response_path: &str,
+) -> String {
+    [
+        "# NEditor Local Agent Handoff".to_string(),
+        String::new(),
+        format!("Agent: {}", spec.label),
+        format!("Command: {}", spec.command),
+        format!("Required response file: `{response_path}`"),
+        String::new(),
+        "## Response Contract".to_string(),
+        String::new(),
+        "- Return Markdown only.".to_string(),
+        "- Write the final response to the required response file path above.".to_string(),
+        "- Preserve source-sensitive claims, citations, unresolved assumptions, AI provenance, QA notes, and review handoff instructions.".to_string(),
+        "- Do not mark content final; NEditor will import the response as needs-review material.".to_string(),
+        String::new(),
+        "## Request Package".to_string(),
+        String::new(),
+        prompt.to_string(),
+        String::new(),
+    ]
+    .join("\n")
 }
 
 fn find_executable(command: &str) -> Option<PathBuf> {
@@ -257,6 +378,7 @@ mod tests {
         let handoff_path = PathBuf::from(&response.handoff_path);
         assert_eq!(response.command, "codex");
         assert_eq!(response.launch_command, vec!["codex".to_string()]);
+        assert!(response.response_path.ends_with(".response.md"));
         assert!(handoff_path.starts_with(
             workspace
                 .canonicalize()
@@ -264,11 +386,68 @@ mod tests {
                 .join(".neditor")
                 .join("agent-handoffs")
         ));
+        assert!(fs::read_to_string(&handoff_path)
+            .unwrap()
+            .contains("Required response file"));
         assert!(fs::read_to_string(handoff_path)
             .unwrap()
             .contains("Return Markdown only."));
 
         let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn imports_local_agent_response_from_handoff_folder() {
+        let workspace = unique_temp_workspace("neditor-local-agent-response");
+        fs::create_dir_all(&workspace).unwrap();
+
+        let handoff = prepare_local_agent_handoff(PrepareLocalAgentHandoffRequest {
+            profile_id: "opencode-cli".to_string(),
+            prompt_markdown: "# OpenCode handoff\n\nReturn Markdown only.".to_string(),
+            workspace_path: Some(path_to_string(&workspace)),
+        })
+        .unwrap();
+        fs::write(
+            &handoff.response_path,
+            "## Revised Draft\n\n```ai-source\nprovider: OpenCode\nstatus: needs-review\n```\n\nReview notes included.",
+        )
+        .unwrap();
+
+        let response = import_local_agent_response(ImportLocalAgentResponseRequest {
+            profile_id: "opencode-cli".to_string(),
+            workspace_path: Some(path_to_string(&workspace)),
+            response_path: handoff.response_path,
+        })
+        .unwrap();
+
+        assert_eq!(response.profile_id, "opencode-cli");
+        assert_eq!(response.label, "OpenCode");
+        assert!(response.markdown.contains("Revised Draft"));
+        assert_eq!(response.sha256.len(), 64);
+        assert!(response.warnings.is_empty());
+
+        let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn blocks_local_agent_response_outside_handoff_folder() {
+        let workspace = unique_temp_workspace("neditor-local-agent-response-boundary");
+        fs::create_dir_all(&workspace).unwrap();
+        fs::create_dir_all(agent_handoff_dir(&workspace)).unwrap();
+        let outside = workspace.with_extension("md");
+        fs::write(&outside, "# Outside").unwrap();
+
+        let error = import_local_agent_response(ImportLocalAgentResponseRequest {
+            profile_id: "codex-cli".to_string(),
+            workspace_path: Some(path_to_string(&workspace)),
+            response_path: path_to_string(&outside),
+        })
+        .unwrap_err();
+
+        assert!(error.contains("must stay inside"));
+
+        let _ = fs::remove_dir_all(workspace);
+        let _ = fs::remove_file(outside);
     }
 
     #[test]
@@ -318,6 +497,7 @@ mod tests {
         assert_eq!(response.label, "Google Antigravity");
         assert_eq!(response.command, "antigravity");
         assert_eq!(response.launch_command, vec!["antigravity".to_string()]);
+        assert!(response.response_path.contains("google-antigravity-cli"));
         assert!(handoff_path
             .file_name()
             .unwrap()
