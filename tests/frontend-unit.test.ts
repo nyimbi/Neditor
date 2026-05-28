@@ -117,6 +117,7 @@ import {
   applyUntitledRevertState,
   applyUpdatedDocumentTextState,
   createDuplicateDocumentState,
+  createOpenedDocumentState,
   createUntitledDocumentState,
   folderFromPath,
   titleFromPath,
@@ -235,7 +236,13 @@ import {
   removeDocsLiveDraftHistoryState,
   resetGuidedDemoProgressState,
 } from "../src/lib/workflowHistory.js";
-import { forgetWorkspaceFolderState, setDocumentScrollState } from "../src/lib/workspaceNavigation.js";
+import {
+  applyOpenedWorkspaceDocumentState,
+  applyWorkspaceRestoreState,
+  createRestoredWorkspaceDocumentState,
+  forgetWorkspaceFolderState,
+  setDocumentScrollState,
+} from "../src/lib/workspaceNavigation.js";
 import { applyPersistedWorkspacePreferenceState, buildPersistedWorkspaceState } from "../src/lib/workspacePersistenceState.js";
 import {
   migratePersistedWorkspace,
@@ -789,6 +796,77 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   equal(missingFolder.changed, false);
   deepEqual(missingFolder.recentFolders, ["/other"]);
   equal(missingFolder.workspaceRoot, "/other");
+
+  let sequence = 0;
+  const restored = createRestoredWorkspaceDocumentState(
+    {
+      path: "/workspace/b.md",
+      text: "# B",
+      hash: "hash-b",
+      modified: "2026-05-28T11:00:00.000Z",
+    },
+    "/legacy/b.md",
+    ["/workspace/b.md"],
+    { "/legacy/b.md": { editor: 1.5, preview: -0.4 } },
+    () => `restored-${(sequence += 1).toString()}`,
+  );
+  equal(restored.id, "restored-1");
+  equal(restored.title, "b.md");
+  equal(restored.pinned, true);
+  equal(restored.editorScrollRatio, 1);
+  equal(restored.previewScrollRatio, 0);
+
+  const restoreResult = applyWorkspaceRestoreState(
+    [{ id: "old", path: "/old.md", title: "Old", text: "", savedHash: "old", dirty: false }],
+    "old",
+    ["/missing.md", "/keep.md"],
+    ["/missing.md", "/closed.md"],
+    [restored],
+    ["/missing.md"],
+    "/workspace/b.md",
+  );
+  deepEqual(restoreResult.documents, [restored]);
+  equal(restoreResult.activeId, "restored-1");
+  deepEqual(restoreResult.recentFiles, ["/keep.md"]);
+  deepEqual(restoreResult.recentlyClosed, ["/closed.md"]);
+  deepEqual(restoreResult.missingWorkspaceFiles, ["/missing.md"]);
+  equal(restoreResult.statusMessage, "1 restored document was missing");
+  equal(restoreResult.persistRequired, true);
+
+  const noRestoredResult = applyWorkspaceRestoreState(
+    restoreResult.documents,
+    restoreResult.activeId,
+    restoreResult.recentFiles,
+    restoreResult.recentlyClosed,
+    [],
+    ["/gone.md", "/closed.md"],
+    "/workspace/b.md",
+  );
+  equal(noRestoredResult.documents, restoreResult.documents);
+  equal(noRestoredResult.activeId, "restored-1");
+  deepEqual(noRestoredResult.recentlyClosed, []);
+  equal(noRestoredResult.statusMessage, "2 restored documents were missing");
+
+  const opened = applyOpenedWorkspaceDocumentState(
+    [restored],
+    ["/old.md"],
+    ["/workspace/c.md", "/old.md"],
+    ["/workspace/c.md", "/missing.md"],
+    {
+      id: "opened-1",
+      path: "/workspace/c.md",
+      title: "c.md",
+      text: "# C",
+      savedHash: "hash-c",
+      dirty: false,
+    },
+  );
+  equal(opened.activeId, "opened-1");
+  deepEqual(opened.documents.map((document) => document.id), ["restored-1", "opened-1"]);
+  deepEqual(opened.recentFiles, ["/workspace/c.md", "/old.md"]);
+  deepEqual(opened.recentlyClosed, ["/old.md"]);
+  deepEqual(opened.missingWorkspaceFiles, ["/missing.md"]);
+  equal(opened.statusMessage, "Opened c.md");
 });
 
 test("file lifecycle helpers update document state for rich file operations", () => {
@@ -870,6 +948,20 @@ test("file lifecycle helpers update document state for rich file operations", ()
   equal(duplicate.title, "Board-copy.md");
   equal(duplicate.dirty, false);
   equal(duplicate.savedText, "# Copy");
+
+  const opened = createOpenedDocumentState(
+    {
+      path: "/workspace/Reports/Open.md",
+      text: "# Open",
+      hash: "hash-open",
+      modified: "2026-05-28T10:20:00.000Z",
+    },
+    createId,
+  );
+  equal(opened.id, "doc-3");
+  equal(opened.title, "Open.md");
+  equal(opened.dirty, false);
+  equal(opened.savedText, "# Open");
 });
 
 test("review marker helpers append and resolve review workflow comments", () => {

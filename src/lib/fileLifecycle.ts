@@ -119,3 +119,7 @@ export function createDuplicateDocumentState(response: FileContentResponse, crea
     modified: response.modified,
   };
 }
+
+export function createOpenedDocumentState(response: FileContentResponse, createId: () => string): OpenDocument {
+  return createDuplicateDocumentState(response, createId);
+}

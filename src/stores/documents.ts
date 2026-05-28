@@ -38,6 +38,7 @@ import {
   applyUntitledRevertState,
   applyUpdatedDocumentTextState,
   createDuplicateDocumentState,
+  createOpenedDocumentState,
   createUntitledDocumentState,
   folderFromPath,
   titleFromPath,
@@ -87,11 +88,16 @@ import {
   removeDocsLiveDraftHistoryState,
   resetGuidedDemoProgressState,
 } from "../lib/workflowHistory";
-import { forgetWorkspaceFolderState, setDocumentScrollState } from "../lib/workspaceNavigation";
+import {
+  applyOpenedWorkspaceDocumentState,
+  applyWorkspaceRestoreState,
+  createRestoredWorkspaceDocumentState,
+  forgetWorkspaceFolderState,
+  setDocumentScrollState,
+} from "../lib/workspaceNavigation";
 import { applyPersistedWorkspacePreferenceState, buildPersistedWorkspaceState } from "../lib/workspacePersistenceState";
 import {
   clampPaneRatio,
-  clampScrollRatio,
   migratePersistedWorkspace,
   normalizeAiCleanupDefaults,
   normalizeAiProviderDefaults,
@@ -539,37 +545,31 @@ export const useDocumentsStore = defineStore("documents", {
         seen.add(path);
         try {
           const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
-          const scrollPosition = scrollPositions[response.path] || scrollPositions[path] || {};
-          restored.push({
-            id: crypto.randomUUID(),
-            path: response.path,
-            title: titleFromPath(response.path),
-            text: response.text,
-            savedHash: response.hash,
-            savedText: response.text,
-            dirty: false,
-            pinned: pinnedFiles.includes(response.path),
-            modified: response.modified,
-            editorScrollRatio: clampScrollRatio(scrollPosition.editor),
-            previewScrollRatio: clampScrollRatio(scrollPosition.preview),
-          });
+          restored.push(createRestoredWorkspaceDocumentState(response, path, pinnedFiles, scrollPositions, () => crypto.randomUUID()));
         } catch {
           missing.push(path);
-          this.recentFiles = forgetRecentItem(this.recentFiles, path);
-          this.recentlyClosed = forgetRecentItem(this.recentlyClosed, path);
         }
       }
-      this.missingWorkspaceFiles = missing;
-      if (missing.length) {
-        this.statusMessage = `${missing.length} restored ${missing.length === 1 ? "document was" : "documents were"} missing`;
-      }
+      const result = applyWorkspaceRestoreState(
+        this.documents,
+        this.activeId,
+        this.recentFiles,
+        this.recentlyClosed,
+        restored,
+        missing,
+        activePath,
+      );
+      this.recentFiles = result.recentFiles;
+      this.recentlyClosed = result.recentlyClosed;
+      this.missingWorkspaceFiles = result.missingWorkspaceFiles;
+      if (result.statusMessage) this.statusMessage = result.statusMessage;
       if (!restored.length) {
-        if (missing.length) await this.persistWorkspace();
+        if (result.persistRequired) await this.persistWorkspace();
         return;
       }
-      this.documents = restored;
-      this.activeId = restored.find((document) => document.path === activePath)?.id || restored[0].id;
-      if (missing.length) await this.persistWorkspace();
+      this.documents = result.documents;
+      this.activeId = result.activeId;
+      if (result.persistRequired) await this.persistWorkspace();
     },
     newDocument() {
       const document = createUntitledDocumentState(starterDocument, fallbackHash(starterDocument), () => crypto.randomUUID());
@@ -586,22 +586,20 @@ export const useDocumentsStore = defineStore("documents", {
         return;
       }
       const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
-      const document: OpenDocument = {
-        id: crypto.randomUUID(),
-        path: response.path,
-        title: titleFromPath(response.path),
-        text: response.text,
-        savedHash: response.hash,
-        savedText: response.text,
-        dirty: false,
-        modified: response.modified,
-      };
-      this.documents.push(document);
-      this.activeId = document.id;
-      this.statusMessage = `Opened ${document.title}`;
-      this.rememberFile(document.path);
-      this.recentlyClosed = forgetRecentItem(this.recentlyClosed, document.path);
-      this.missingWorkspaceFiles = this.missingWorkspaceFiles.filter((missing) => missing !== document.path);
+      const document = createOpenedDocumentState(response, () => crypto.randomUUID());
+      const opened = applyOpenedWorkspaceDocumentState(
+        this.documents,
+        this.recentFiles,
+        this.recentlyClosed,
+        this.missingWorkspaceFiles,
+        document,
+      );
+      this.documents = opened.documents;
+      this.activeId = opened.activeId;
+      this.recentFiles = opened.recentFiles;
+      this.recentlyClosed = opened.recentlyClosed;
+      this.missingWorkspaceFiles = opened.missingWorkspaceFiles;
+      this.statusMessage = opened.statusMessage;
       if (!this.workspaceRoot) {
         const folder = folderFromPath(document.path);
         if (folder) await this.openFolder(folder);

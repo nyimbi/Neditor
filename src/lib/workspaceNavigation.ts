@@ -1,4 +1,6 @@
-import { forgetRecentItem } from "./recentItems.js";
+import type { OpenDocument } from "../types.js";
+import { titleFromPath } from "./fileLifecycle.js";
+import { forgetRecentItem, rememberRecentItem } from "./recentItems.js";
 import { clampScrollRatio } from "./workspacePersistence.js";
 
 export interface DocumentScrollState {
@@ -17,6 +19,32 @@ export interface ForgetWorkspaceFolderResult<T> {
   workspaceRoot: string | null;
   workspaceFiles: T[];
   changed: boolean;
+}
+
+export interface WorkspaceRestoreFileResponse {
+  path: string;
+  text: string;
+  hash: string;
+  modified?: string | null;
+}
+
+export interface WorkspaceRestoreStateResult {
+  documents: OpenDocument[];
+  activeId: string;
+  recentFiles: string[];
+  recentlyClosed: string[];
+  missingWorkspaceFiles: string[];
+  statusMessage?: string;
+  persistRequired: boolean;
+}
+
+export interface OpenedWorkspaceDocumentStateResult {
+  documents: OpenDocument[];
+  activeId: string;
+  recentFiles: string[];
+  recentlyClosed: string[];
+  missingWorkspaceFiles: string[];
+  statusMessage: string;
 }
 
 export function setDocumentScrollState<T extends DocumentScrollState>(
@@ -59,5 +87,81 @@ export function forgetWorkspaceFolderState<T>(
     workspaceRoot: rootMatched ? null : workspaceRoot,
     workspaceFiles: rootMatched ? [] : workspaceFiles,
     changed: rootMatched || nextRecentFolders.length !== recentFolders.length,
+  };
+}
+
+export function createRestoredWorkspaceDocumentState(
+  response: WorkspaceRestoreFileResponse,
+  requestedPath: string,
+  pinnedFiles: string[],
+  scrollPositions: Record<string, { editor?: number; preview?: number }>,
+  createId: () => string,
+): OpenDocument {
+  const scrollPosition = scrollPositions[response.path] || scrollPositions[requestedPath] || {};
+  return {
+    id: createId(),
+    path: response.path,
+    title: titleFromPath(response.path),
+    text: response.text,
+    savedHash: response.hash,
+    savedText: response.text,
+    dirty: false,
+    pinned: pinnedFiles.includes(response.path),
+    modified: response.modified,
+    editorScrollRatio: clampScrollRatio(scrollPosition.editor),
+    previewScrollRatio: clampScrollRatio(scrollPosition.preview),
+  };
+}
+
+export function applyWorkspaceRestoreState(
+  currentDocuments: OpenDocument[],
+  currentActiveId: string,
+  recentFiles: string[],
+  recentlyClosed: string[],
+  restored: OpenDocument[],
+  missing: string[],
+  activePath: string | null,
+): WorkspaceRestoreStateResult {
+  const nextRecentFiles = missing.reduce((items, path) => forgetRecentItem(items, path), recentFiles);
+  const nextRecentlyClosed = missing.reduce((items, path) => forgetRecentItem(items, path), recentlyClosed);
+  const missingStatus = missing.length
+    ? `${missing.length} restored ${missing.length === 1 ? "document was" : "documents were"} missing`
+    : undefined;
+  if (!restored.length) {
+    return {
+      documents: currentDocuments,
+      activeId: currentActiveId,
+      recentFiles: nextRecentFiles,
+      recentlyClosed: nextRecentlyClosed,
+      missingWorkspaceFiles: missing,
+      statusMessage: missingStatus,
+      persistRequired: Boolean(missing.length),
+    };
+  }
+  return {
+    documents: restored,
+    activeId: restored.find((document) => document.path === activePath)?.id || restored[0].id,
+    recentFiles: nextRecentFiles,
+    recentlyClosed: nextRecentlyClosed,
+    missingWorkspaceFiles: missing,
+    statusMessage: missingStatus,
+    persistRequired: Boolean(missing.length),
+  };
+}
+
+export function applyOpenedWorkspaceDocumentState(
+  documents: OpenDocument[],
+  recentFiles: string[],
+  recentlyClosed: string[],
+  missingWorkspaceFiles: string[],
+  document: OpenDocument,
+): OpenedWorkspaceDocumentStateResult {
+  return {
+    documents: [...documents, document],
+    activeId: document.id,
+    recentFiles: rememberRecentItem(recentFiles, document.path, 20),
+    recentlyClosed: forgetRecentItem(recentlyClosed, document.path),
+    missingWorkspaceFiles: missingWorkspaceFiles.filter((missing) => missing !== document.path),
+    statusMessage: `Opened ${document.title}`,
   };
 }
