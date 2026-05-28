@@ -27,6 +27,20 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Transform Architecture Closure
+
+`10.1 Architecture | Registry, option validation, artifact cache, diagnostics`
+is now marked complete in `docs/spec-completion-matrix.md`. The closure is
+based on the Rust transform registry, option validation, embedded/external
+renderer paths, cache-key artifact model, source-mapped diagnostics, semantic
+AST/bundle artifact proof, and browser template-management workflow.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked external_transform_tests --lib` | Pass | 16 external-transform tests passed, covering trust gating, no-shell adapter shaping, missing/disabled engine diagnostics, option aliases, cache reuse/invalidation, timeout handling, and installed-engine conformance when available. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked transform_tests --lib` | Pass | 54 transform tests passed, covering registry coverage, aliases, fence parsing, diagnostics, semantic AST/bundle artifacts, embedded fallbacks, structured data, diagrams, charts, visual data, and business transforms. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "manages transform templates" --project chromium` | Pass | Focused Chromium workflow passed on 2026-05-28, proving built-in/custom transform template filtering, preview, insertion, edit/duplicate/delete, persistence, command-palette access, and artifact preview routing. |
+
 ## 2026-05-28 Compiler Output Closure
 
 `7.2 Outputs | Compiled Markdown, HTML, semantic model, diagnostics, include
