@@ -8094,6 +8094,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned new podcast.md --template podcast-script --json"));
   ok(app.includes("ned outlines --category Procurement --query RFP --json"));
   ok(app.includes("ned outlines --markdown rfp-technical-proposal"));
+  ok(app.includes("customOutlineBestFor"));
+  ok(app.includes("docsLiveTypeForOutlineTemplate"));
+  ok(app.includes("normalizeDocsLiveDocumentType(signals)"));
   ok(app.includes("ned evidence --json"));
   ok(app.includes("ned default-reader --status --json"));
   ok(app.includes("ned support-bundle --output support.json"));

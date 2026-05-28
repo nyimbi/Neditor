@@ -533,6 +533,10 @@
               Custom tags
               <input v-model="customOutlineTags" placeholder="board, decision, quarterly" />
             </label>
+            <label>
+              Best for
+              <input v-model="customOutlineBestFor" placeholder="Board packs, client reviews, technical chapters" />
+            </label>
             <p class="sidebar-hint">Saving uses the current planner outline so users can adapt a built-in outline and keep it for future documents.</p>
             <div class="outline-template-list" role="list" aria-label="Selectable document outlines">
               <article v-for="template in filteredDocumentOutlineTemplates" :key="`${template.source}-${template.id}`" role="listitem" class="outline-template-card">
@@ -8352,6 +8356,15 @@ const customOutlineTags = computed({
     customOutlineDraft.value.tags = value
       .split(",")
       .map((tag) => tag.trim())
+      .filter(Boolean);
+  },
+});
+const customOutlineBestFor = computed({
+  get: () => customOutlineDraft.value.bestFor.join(", "),
+  set: (value: string) => {
+    customOutlineDraft.value.bestFor = value
+      .split(",")
+      .map((item) => item.trim())
       .filter(Boolean);
   },
 });
@@ -16644,7 +16657,7 @@ function sendOutlineTemplateToDocsLive(template: DocumentOutlineTemplate) {
   docsLiveTargetSection.value = null;
   docsLiveOutlineText.value = documentOutlineTemplateToPlannerText(template);
   docsLiveTitle.value = outlineDraftTitle.value || template.name;
-  docsLiveDocumentType.value = template.tags.includes("rfp") ? "rfp-response" : "business-brief";
+  docsLiveDocumentType.value = docsLiveTypeForOutlineTemplate(template);
   docsLiveContext.value = [
     `Selected outline template: ${template.name}`,
     `Category: ${template.category}`,
@@ -16657,6 +16670,11 @@ function sendOutlineTemplateToDocsLive(template: DocumentOutlineTemplate) {
   openDocsLive();
   refreshDocsLiveQuestionnaire();
   store.statusMessage = `Sent ${template.name} outline to Docs Live`;
+}
+
+function docsLiveTypeForOutlineTemplate(template: DocumentOutlineTemplate): DocsLiveDocumentType {
+  const signals = [template.id, template.name, template.category, ...template.tags, ...template.bestFor].join(" ");
+  return normalizeDocsLiveDocumentType(signals);
 }
 
 function resetCustomOutlineDraft() {
