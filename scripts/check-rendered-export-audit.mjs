@@ -1500,6 +1500,15 @@ function collectAutomatedVisualReviewEvidence(_issues, assertions, report) {
   const reviewEvidenceComplete = reviewCases.every((reviewCase) =>
     reviewCase.targets.every((target) => target.passedEvidenceCount > 0),
   );
+  const browserScreenshotHostLimited = !browserVisualComplete && hasHostLimitedBrowserAssertion(assertionList, "browser-visual-proof");
+  const officeScreenshotHostLimited = !officeScreenshotsComplete && hasHostLimitedBrowserAssertion(assertionList, "office-preview-browser");
+  const hostLimitedScreenshotOnly =
+    hardFailures.length === 0 &&
+    officePreviewComplete &&
+    pdfRasterComplete &&
+    primaryEvidenceComplete &&
+    reviewEvidenceComplete &&
+    (browserScreenshotHostLimited || officeScreenshotHostLimited);
   const status =
     hardFailures.length === 0 &&
     browserVisualComplete &&
@@ -1509,16 +1518,22 @@ function collectAutomatedVisualReviewEvidence(_issues, assertions, report) {
     primaryEvidenceComplete &&
     reviewEvidenceComplete
       ? "automated-reviewed"
+      : hostLimitedScreenshotOnly
+        ? "host-limited"
       : "needs-review";
-  const blockers = [
-    ...hardFailures.map((assertion) => `Failed proof: ${assertion.scope} - ${assertion.assertion}`),
-    ...(!browserVisualComplete ? ["Chromium visual screenshots are incomplete."] : []),
-    ...(!officePreviewComplete ? ["Office XML preview extraction is incomplete."] : []),
-    ...(!officeScreenshotsComplete ? ["Office preview screenshots are incomplete."] : []),
-    ...(!pdfRasterComplete ? ["PDF raster thumbnail proof is unavailable on this host."] : []),
-    ...(!primaryEvidenceComplete ? ["One or more primary export targets lacks mapped proof."] : []),
-    ...(!reviewEvidenceComplete ? ["One or more rendered review-case targets lacks mapped proof."] : []),
-  ];
+  const hostLimitations = hostLimitedBrowserAssertions(assertionList);
+  const blockers =
+    status === "host-limited"
+      ? hostLimitations.map((assertion) => `Host-limited browser screenshot proof: ${assertion.scope} - ${hostLimitReason(assertion)}`)
+      : [
+          ...hardFailures.map((assertion) => `Failed proof: ${assertion.scope} - ${assertion.assertion}`),
+          ...(!browserVisualComplete ? ["Chromium visual screenshots are incomplete."] : []),
+          ...(!officePreviewComplete ? ["Office XML preview extraction is incomplete."] : []),
+          ...(!officeScreenshotsComplete ? ["Office preview screenshots are incomplete."] : []),
+          ...(!pdfRasterComplete ? ["PDF raster thumbnail proof is unavailable on this host."] : []),
+          ...(!primaryEvidenceComplete ? ["One or more primary export targets lacks mapped proof."] : []),
+          ...(!reviewEvidenceComplete ? ["One or more rendered review-case targets lacks mapped proof."] : []),
+        ];
   const reportPath = join(auditDir, "automated-visual-review.json");
   const automatedReport = {
     generatedAt: new Date().toISOString(),
@@ -1534,9 +1549,16 @@ function collectAutomatedVisualReviewEvidence(_issues, assertions, report) {
       browserVisualComplete,
       officePreviewComplete,
       officeScreenshotsComplete,
+      browserScreenshotHostLimited,
+      officeScreenshotHostLimited,
       pdfRasterComplete,
       primaryEvidenceComplete,
       reviewEvidenceComplete,
+      hostLimitations: hostLimitations.map((assertion) => ({
+        scope: assertion.scope,
+        assertion: assertion.assertion,
+        reason: hostLimitReason(assertion),
+      })),
       blockers,
     },
     primaryTargets,
@@ -1557,6 +1579,33 @@ function collectAutomatedVisualReviewEvidence(_issues, assertions, report) {
     path: "automated-visual-review.json",
     blockers,
   };
+}
+
+function hasHostLimitedBrowserAssertion(assertions, scope) {
+  return assertions.some((assertion) => assertion.scope === scope && isHostLimitedBrowserAssertion(assertion));
+}
+
+function hostLimitedBrowserAssertions(assertions) {
+  return assertions.filter(isHostLimitedBrowserAssertion);
+}
+
+function isHostLimitedBrowserAssertion(assertion) {
+  const reason = String(assertion.reason || "");
+  const browserScreenshotScopes = new Set(["browser-visual-proof", "office-preview-browser"]);
+  return Boolean(
+    browserScreenshotScopes.has(String(assertion.scope || "")) &&
+      assertion.skipped &&
+      /(?:EPERM|SIGABRT|sandbox|host-level|Operation not permitted)/i.test(reason),
+  );
+}
+
+function hostLimitReason(assertion) {
+  return String(assertion.reason || "Browser automation is unavailable on this verifier host.")
+    .replace(/\x1B\[[0-9;]*m/g, "")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(" ");
 }
 
 function automatedTargetEvidence(target, evidence) {
@@ -1953,7 +2002,7 @@ function verifyVisualReviewSummary(issues, report, assertions) {
   if (summary.humanSignoff?.template !== "visual-review-signoff.template.json") {
     issues.push("visual-review-summary.json does not link the structured human sign-off template");
   }
-  if (!["automated-reviewed", "needs-review"].includes(summary.automatedVisualReview?.status)) {
+  if (!["automated-reviewed", "host-limited", "needs-review"].includes(summary.automatedVisualReview?.status)) {
     issues.push("visual-review-summary.json has an invalid automated visual review status");
   }
   if (summary.automatedVisualReview?.report !== "automated-visual-review.json") {

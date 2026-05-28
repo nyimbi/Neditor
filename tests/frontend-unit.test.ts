@@ -8823,6 +8823,9 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("accessibility-assistive-technology-human-signoff"));
   ok(script.includes("rendered-export-automated-visual-proof"));
   ok(script.includes("pending-automated-visual-review"));
+  ok(script.includes('"host-limited"'));
+  ok(script.includes("complete non-browser proof"));
+  ok(script.includes("browser-capable host"));
   ok(script.includes("rendered-export-native-viewer-human-signoff"));
   ok(script.includes("renderedExportAuditAccepted"));
   ok(script.includes('"markdown-bundle", "blog", "substack", "latex", "google-docs", "epub"'));
@@ -8920,6 +8923,11 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
   ok(script.includes("renderPdfCairoPage"));
   ok(script.includes("automated-visual-review.json"));
   ok(script.includes('"automated-reviewed"'));
+  ok(script.includes('"host-limited"'));
+  ok(script.includes("hostLimitedScreenshotOnly"));
+  ok(script.includes("hasHostLimitedBrowserAssertion"));
+  ok(script.includes("browserScreenshotScopes"));
+  ok(script.includes("Host-limited browser screenshot proof"));
   ok(script.includes("office-preview-docx"));
   ok(script.includes("office-preview-pptx"));
   ok(script.includes("Office preview screenshots"));

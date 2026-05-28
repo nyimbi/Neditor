@@ -237,11 +237,16 @@ function collectEvidenceGaps(checks) {
   const renderedSummary = reports["rendered-export-visual-summary"];
   const googleDocsImport = reports["google-docs-import-evidence"];
   if (renderedSummary?.automatedVisualReview?.status !== "automated-reviewed") {
+    const status = renderedSummary?.automatedVisualReview?.status || "pending-automated-visual-review";
+    const blockers = renderedSummary?.automatedVisualReview?.blockers || [];
     gaps.push({
       id: "rendered-export-automated-visual-proof",
-      status: renderedSummary?.automatedVisualReview?.status || "pending-automated-visual-review",
+      status,
       evidence: ".tmp/rendered-export-audit/visual-review-summary.json",
-      detail: `Current-host rendered export visual automation is incomplete: ${(renderedSummary?.automatedVisualReview?.blockers || []).join("; ") || "no automated visual review blockers were recorded"}.`,
+      detail:
+        status === "host-limited"
+          ? `Rendered export visual automation has complete non-browser proof, but screenshot capture is host-limited on this verifier: ${blockers.join("; ") || "browser automation was unavailable"}. Rerun pnpm run test:rendered-exports on a browser-capable host and ingest the accepted summary.`
+          : `Current-host rendered export visual automation is incomplete: ${blockers.join("; ") || "no automated visual review blockers were recorded"}.`,
     });
   }
   if (googleDocsImport?.importEvidence?.status !== "accepted") {
@@ -597,7 +602,7 @@ function statFile(path) {
 
 function visualSummaryPassed(report) {
   const status = report.automatedVisualReview?.status || "missing-automated-review";
-  const validStatus = status === "automated-reviewed" || status === "needs-review";
+  const validStatus = status === "automated-reviewed" || status === "needs-review" || status === "host-limited";
   return {
     accepted: validStatus,
     status,
