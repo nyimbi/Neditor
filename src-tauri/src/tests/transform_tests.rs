@@ -407,6 +407,69 @@ flowchart LR
     let exported = export::export_text(&response, &json!({}));
     assert!(exported.contains("Transform: roadmap"));
     assert!(exported.contains("Transform: mermaid"));
+
+    let bundle = render_markdown_bundle_bytes(&response, &response.export_manifest)
+        .expect("transform metadata bundle");
+    let bundled_ast: Value = serde_json::from_str(&zip_entry_text(&bundle, "document-ast.json"))
+        .expect("document ast json");
+    let bundled_roadmap = bundled_ast
+        .get("blocks")
+        .and_then(Value::as_array)
+        .and_then(|blocks| {
+            blocks.iter().find(|block| {
+                block.get("kind").and_then(Value::as_str) == Some("transform")
+                    && block.get("name").and_then(Value::as_str) == Some("roadmap")
+            })
+        })
+        .expect("bundled roadmap transform block");
+    assert_eq!(
+        bundled_roadmap.get("output_kind").and_then(Value::as_str),
+        Some("html")
+    );
+    assert_eq!(
+        bundled_roadmap
+            .get("execution_kind")
+            .and_then(Value::as_str),
+        Some("embedded")
+    );
+    assert_eq!(
+        bundled_roadmap.get("output_hash").and_then(Value::as_str),
+        Some(roadmap_artifact.output_hash.as_str())
+    );
+    assert!(bundled_roadmap
+        .get("cache_key")
+        .and_then(Value::as_str)
+        .is_some_and(|key| key.len() == 64));
+
+    let bundled_artifacts: Value =
+        serde_json::from_str(&zip_entry_text(&bundle, "transform-artifacts.json"))
+            .expect("transform artifacts json");
+    let bundled_mermaid = bundled_artifacts
+        .as_array()
+        .and_then(|artifacts| {
+            artifacts
+                .iter()
+                .find(|artifact| artifact.get("name").and_then(Value::as_str) == Some("mermaid"))
+        })
+        .expect("bundled mermaid artifact");
+    assert_eq!(
+        bundled_mermaid.get("output_kind").and_then(Value::as_str),
+        Some("svg")
+    );
+    assert_eq!(
+        bundled_mermaid.get("source_line").and_then(Value::as_u64),
+        mermaid_artifact.source_line.map(|line| line as u64)
+    );
+    assert_eq!(
+        bundled_mermaid
+            .get("end_source_line")
+            .and_then(Value::as_u64),
+        mermaid_artifact.end_source_line.map(|line| line as u64)
+    );
+    assert_eq!(
+        bundled_mermaid.get("output_hash").and_then(Value::as_str),
+        Some(mermaid_artifact.output_hash.as_str())
+    );
 }
 
 #[test]

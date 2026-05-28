@@ -5076,6 +5076,12 @@ File watcher shutdown command coverage:
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked stop_file_watcher_clears_active_watcher_state --lib` | Pass | Focused Rust proof now constructs active watcher state for the default native-watch build, clears it through the same helper used by the `stop_file_watcher` IPC command, and verifies the active watcher slot is released. |
 
+Structured transform artifact export proof:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked document_ast_models_transform_artifacts_semantically --lib` | Pass | Focused transform architecture proof now verifies Markdown bundle `document-ast.json` and `transform-artifacts.json` preserve transform output kinds, source ranges, cache keys, execution kind, and output hashes alongside the in-memory document AST. |
+
 Vim punctuation word-motion parity:
 
 | Command | Result | Evidence |
