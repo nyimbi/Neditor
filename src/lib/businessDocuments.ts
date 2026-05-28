@@ -45,6 +45,21 @@ export interface BusinessDocumentTemplate {
   outline: string[];
 }
 
+export type DocumentOutlineTemplateSource = "builtin" | "custom";
+
+export interface DocumentOutlineTemplate {
+  id: string;
+  source: DocumentOutlineTemplateSource;
+  name: string;
+  category: string;
+  summary: string;
+  outline: string[];
+  tags: string[];
+  bestFor: string[];
+}
+
+export type CustomDocumentOutlineTemplate = Omit<DocumentOutlineTemplate, "source">;
+
 export type BusinessSnippetKind =
   | "identity"
   | "proposal"
@@ -431,6 +446,105 @@ export const businessDocumentTemplates: BusinessDocumentTemplate[] = [
   },
 ];
 
+const specialistDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
+  {
+    id: "outline-rfp-technical-proposal",
+    source: "builtin",
+    name: "RFP technical proposal",
+    category: "Procurement",
+    summary: "Compliance-first technical proposal outline for evaluated RFP responses.",
+    outline: [
+      "Cover",
+      "Compliance Checklist",
+      "Table of Contents",
+      "Executive Summary",
+      "Assignment Understanding",
+      "Proposed Methodology",
+      "Work Plan and Timeline",
+      "Team Organization",
+      "Past Performance",
+      "Risk and Quality Management",
+      "Sustainability and Transition",
+      "Required Annexes",
+    ],
+    tags: ["rfp", "proposal", "compliance", "technical"],
+    bestFor: ["Competitive RFPs", "Technical proposals", "Compliance-heavy bids"],
+  },
+  {
+    id: "outline-rfp-compliance-review",
+    source: "builtin",
+    name: "RFP compliance review pack",
+    category: "Procurement",
+    summary: "Reviewer-focused outline for compliance checks, attachments, disqualifiers, and owner sign-off.",
+    outline: [
+      "Source Intake Summary",
+      "Critical Disqualifiers",
+      "Mandatory Submission Checklist",
+      "Compliance Matrix",
+      "Attachment Register",
+      "Evidence Owner Map",
+      "Open Clarifications",
+      "Submission QA Sign-off",
+    ],
+    tags: ["rfp", "compliance", "qa", "attachments"],
+    bestFor: ["Bid QA", "Procurement review", "Submission readiness"],
+  },
+  {
+    id: "outline-board-decision-memo",
+    source: "builtin",
+    name: "Board decision memo",
+    category: "Executive",
+    summary: "Decision-oriented outline for board or executive approval papers.",
+    outline: ["Decision Requested", "Executive Summary", "Strategic Context", "Options Considered", "Financial Case", "Risk Assessment", "Implementation Plan", "Recommendation", "Appendices"],
+    tags: ["board", "decision", "executive", "memo"],
+    bestFor: ["Board packs", "Investment approvals", "Executive decisions"],
+  },
+  {
+    id: "outline-policy-brief",
+    source: "builtin",
+    name: "Policy brief",
+    category: "Policy",
+    summary: "Evidence-led policy outline with options, impacts, risks, and recommendation.",
+    outline: ["Executive Summary", "Problem Definition", "Policy Context", "Evidence Base", "Options", "Impact Assessment", "Risks and Tradeoffs", "Recommendation", "Implementation Considerations"],
+    tags: ["policy", "brief", "evidence", "recommendation"],
+    bestFor: ["Public policy", "Research translation", "Advisory briefs"],
+  },
+  {
+    id: "outline-research-report",
+    source: "builtin",
+    name: "Research report",
+    category: "Research",
+    summary: "Structured research report outline with methodology, findings, citations, and recommendations.",
+    outline: ["Abstract", "Introduction", "Research Questions", "Methodology", "Literature and Source Review", "Findings", "Analysis", "Limitations", "Recommendations", "Bibliography"],
+    tags: ["research", "report", "citations", "analysis"],
+    bestFor: ["Deep research", "Evidence reports", "Analyst deliverables"],
+  },
+  {
+    id: "outline-implementation-playbook",
+    source: "builtin",
+    name: "Implementation playbook",
+    category: "Delivery",
+    summary: "Operational outline for implementing a project, tool, process, or platform.",
+    outline: ["Purpose", "Operating Model", "Scope", "Roles and Responsibilities", "Implementation Phases", "Change Management", "Training Plan", "Risks and Controls", "Success Metrics", "Runbook"],
+    tags: ["implementation", "delivery", "playbook", "operations"],
+    bestFor: ["Delivery teams", "Rollouts", "Internal operating guides"],
+  },
+];
+
+export const builtInDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
+  ...businessDocumentTemplates.map((template) => ({
+    id: `business-${template.id}`,
+    source: "builtin" as const,
+    name: template.label,
+    category: documentOutlineCategoryForTemplate(template),
+    summary: template.summary,
+    outline: template.outline,
+    tags: [template.id, template.docsLiveType, ...template.bestFor].map((item) => item.toLowerCase().replace(/\s+/g, "-")),
+    bestFor: template.bestFor,
+  })),
+  ...specialistDocumentOutlineTemplates,
+];
+
 export const businessDocumentSnippets: BusinessDocumentSnippet[] = [
   {
     id: "company-contact-block",
@@ -671,6 +785,96 @@ export function businessProfilePlaceholderText(profile: Partial<BusinessProfile>
   return Object.entries(placeholders)
     .map(([key, value]) => `${key}: ${value}`)
     .join("\n");
+}
+
+export function documentOutlineTemplateToPlannerText(template: Pick<DocumentOutlineTemplate, "outline">) {
+  return template.outline
+    .map((heading) => heading.replace(/\t/g, "  ").replace(/\s+$/g, ""))
+    .filter(Boolean)
+    .map((heading) => {
+      const indent = heading.match(/^\s*/)?.[0] || "";
+      const title = heading.trim();
+      return `${indent}- ${title}`;
+    })
+    .join("\n");
+}
+
+export function createCustomDocumentOutlineTemplateId() {
+  return `custom-outline-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function blankCustomDocumentOutlineTemplate(): CustomDocumentOutlineTemplate {
+  return {
+    id: createCustomDocumentOutlineTemplateId(),
+    name: "Custom outline",
+    category: "Custom",
+    summary: "Reusable document outline.",
+    outline: ["Executive Summary", "Main Section", "Review Notes"],
+    tags: ["custom"],
+    bestFor: ["Reusable planning"],
+  };
+}
+
+export function normalizeCustomDocumentOutlineTemplates(value: unknown): CustomDocumentOutlineTemplate[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const templates: CustomDocumentOutlineTemplate[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const id = outlineStringValue(record.id) || createCustomDocumentOutlineTemplateId();
+    const outline = outlineStringArray(record.outline, 80, true);
+    if (!outline.length || seen.has(id)) continue;
+    seen.add(id);
+    templates.push({
+      id,
+      name: outlineStringValue(record.name) || "Custom outline",
+      category: outlineStringValue(record.category) || "Custom",
+      summary: outlineStringValue(record.summary) || "Reusable document outline.",
+      outline,
+      tags: outlineStringArray(record.tags, 16),
+      bestFor: outlineStringArray(record.bestFor, 12),
+    });
+  }
+  return templates.slice(0, 100);
+}
+
+export interface SaveCustomDocumentOutlineTemplateStateResult {
+  templates: CustomDocumentOutlineTemplate[];
+  template: CustomDocumentOutlineTemplate | null;
+  changed: boolean;
+}
+
+export interface DeleteCustomDocumentOutlineTemplateStateResult {
+  templates: CustomDocumentOutlineTemplate[];
+  changed: boolean;
+}
+
+export function saveCustomDocumentOutlineTemplateState(
+  templates: CustomDocumentOutlineTemplate[],
+  template: CustomDocumentOutlineTemplate,
+): SaveCustomDocumentOutlineTemplateStateResult {
+  const normalizedTemplates = normalizeCustomDocumentOutlineTemplates(templates);
+  const [normalized] = normalizeCustomDocumentOutlineTemplates([template]);
+  if (!normalized) return { templates: normalizedTemplates, template: null, changed: false };
+  const existingIndex = normalizedTemplates.findIndex((candidate) => candidate.id === normalized.id);
+  if (existingIndex >= 0) {
+    return {
+      templates: normalizedTemplates.map((candidate, index) => (index === existingIndex ? normalized : candidate)),
+      template: normalized,
+      changed: true,
+    };
+  }
+  return { templates: [...normalizedTemplates, normalized], template: normalized, changed: true };
+}
+
+export function deleteCustomDocumentOutlineTemplateState(
+  templates: CustomDocumentOutlineTemplate[],
+  id: string,
+): DeleteCustomDocumentOutlineTemplateStateResult {
+  const normalizedTemplates = normalizeCustomDocumentOutlineTemplates(templates);
+  const nextTemplates = normalizedTemplates.filter((template) => template.id !== id);
+  return { templates: nextTemplates, changed: nextTemplates.length !== normalizedTemplates.length };
 }
 
 export function fillBusinessTemplate(markdown: string, profile: Partial<BusinessProfile> = {}, extra: Record<string, string> = {}) {
@@ -1864,6 +2068,34 @@ function normalizeRfpText(text: string) {
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function outlineStringValue(value: unknown) {
+  return typeof value === "string" ? value.trim().slice(0, 500) : "";
+}
+
+function outlineStringArray(value: unknown, limit: number, preserveLeadingWhitespace = false) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const item of value) {
+    const normalized = preserveLeadingWhitespace && typeof item === "string" ? item.replace(/\t/g, "  ").replace(/\s+$/g, "").slice(0, 500) : outlineStringValue(item);
+    const key = normalized.toLowerCase();
+    if (!normalized || seen.has(key)) continue;
+    seen.add(key);
+    output.push(normalized);
+    if (output.length >= limit) break;
+  }
+  return output;
+}
+
+function documentOutlineCategoryForTemplate(template: BusinessDocumentTemplate) {
+  if (["rfp", "rfq", "tender"].includes(template.id)) return "Procurement";
+  if (["tutorial", "lesson-plan", "lesson-content", "technical-textbook"].includes(template.id)) return "Learning";
+  if (["novel", "podcast-script", "movie-script"].includes(template.id)) return "Creative";
+  if (["proposal", "sow", "capability-statement", "case-study"].includes(template.id)) return "Business Development";
+  if (["business-case", "executive-brief"].includes(template.id)) return "Executive";
+  return "General";
 }
 
 function isRequirementLine(line: string) {

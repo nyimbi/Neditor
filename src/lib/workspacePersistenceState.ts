@@ -1,5 +1,5 @@
 import { activeDocumentState } from "./documentSelectors.js";
-import { normalizeBusinessProfile } from "./businessDocuments.js";
+import { normalizeBusinessProfile, normalizeCustomDocumentOutlineTemplates } from "./businessDocuments.js";
 import { normalizeGoogleIntegrationPreferences } from "./googleAuth.js";
 import { normalizeCustomTransformTemplates } from "./transformTemplates.js";
 import { applyPersistedUiPreferences } from "./uiPreferences.js";
@@ -80,6 +80,7 @@ export interface WorkspacePersistenceStateInput {
   transformInputModes: RequiredPersistedValue<"transformInputModes">;
   transformTimeoutMs: number;
   customTransformTemplates: RequiredPersistedValue<"customTransformTemplates">;
+  customDocumentOutlineTemplates: RequiredPersistedValue<"customDocumentOutlineTemplates">;
 }
 
 export type WorkspacePreferenceStateInput = Omit<WorkspacePersistenceStateInput, "documents" | "activeId">;
@@ -142,6 +143,7 @@ export function applyPersistedWorkspacePreferenceState(
     transformTimeoutMs:
       typeof persisted.transformTimeoutMs === "number" ? Math.min(Math.max(persisted.transformTimeoutMs, 1), 30000) : current.transformTimeoutMs,
     customTransformTemplates: normalizeCustomTransformTemplates(persisted.customTransformTemplates),
+    customDocumentOutlineTemplates: normalizeCustomDocumentOutlineTemplates(persisted.customDocumentOutlineTemplates),
   };
   const restoreRequest = persisted.openFiles?.length
     ? {
@@ -224,5 +226,6 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     transformInputModes: state.transformInputModes,
     transformTimeoutMs: state.transformTimeoutMs,
     customTransformTemplates: state.customTransformTemplates,
+    customDocumentOutlineTemplates: state.customDocumentOutlineTemplates,
   });
 }

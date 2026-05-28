@@ -4,7 +4,13 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/plugin-fs";
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
-import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessDocuments";
+import {
+  deleteCustomDocumentOutlineTemplateState,
+  normalizeBusinessProfile,
+  saveCustomDocumentOutlineTemplateState,
+  type BusinessProfile,
+  type CustomDocumentOutlineTemplate,
+} from "../lib/businessDocuments";
 import {
   saveAiProviderDefaultsState,
   saveBusinessProfileState,
@@ -404,6 +410,7 @@ export const useDocumentsStore = defineStore("documents", {
     transformInputModes: {} as Record<string, "stdin" | "file">,
     transformTimeoutMs: 5000,
     customTransformTemplates: [] as CustomTransformTemplate[],
+    customDocumentOutlineTemplates: [] as CustomDocumentOutlineTemplate[],
     transformProbeResults: {} as Record<string, TransformProbeResult>,
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
@@ -1361,6 +1368,18 @@ export const useDocumentsStore = defineStore("documents", {
       const next = deleteCustomTransformTemplateState(this.customTransformTemplates, id);
       if (!next.changed) return;
       this.customTransformTemplates = next.templates;
+      await this.persistWorkspace();
+    },
+    async saveCustomDocumentOutlineTemplate(template: CustomDocumentOutlineTemplate) {
+      const next = saveCustomDocumentOutlineTemplateState(this.customDocumentOutlineTemplates, template);
+      if (!next.changed) return;
+      this.customDocumentOutlineTemplates = next.templates;
+      await this.persistWorkspace();
+    },
+    async deleteCustomDocumentOutlineTemplate(id: string) {
+      const next = deleteCustomDocumentOutlineTemplateState(this.customDocumentOutlineTemplates, id);
+      if (!next.changed) return;
+      this.customDocumentOutlineTemplates = next.templates;
       await this.persistWorkspace();
     },
     setEditorPaneRatio(value: number, persist = true) {

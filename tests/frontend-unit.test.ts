@@ -71,9 +71,13 @@ import {
 import {
   agenticCliIntegrations,
   analyzeRfpSource,
+  builtInDocumentOutlineTemplates,
   businessDocumentSnippets,
   businessDocumentTemplates,
   businessProfilePlaceholderText,
+  documentOutlineTemplateToPlannerText,
+  saveCustomDocumentOutlineTemplateState,
+  deleteCustomDocumentOutlineTemplateState,
   buildBusinessWizardStepAssistance,
   buildRfpWizardStepAssistance,
   businessSnippetMarkdown,
@@ -2867,6 +2871,40 @@ test("editable outline planner creates document skeletons before drafting conten
   ok(markdown.includes("<!-- Draft this section. -->"));
 
   equal(outlinePlanFromMarkdown(markdown), "- Board Brief\n  - Executive Summary\n    - Decision Needed\n    - Key Risks\n  - Financial Case\n    - Launch Plan");
+});
+
+test("document outline library exposes built-ins and managed custom outlines", () => {
+  ok(builtInDocumentOutlineTemplates.length >= businessDocumentTemplates.length);
+  ok(builtInDocumentOutlineTemplates.some((template) => template.name === "RFP technical proposal" && template.category === "Procurement"));
+  const rfpOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "outline-rfp-technical-proposal")!;
+  const plannerText = documentOutlineTemplateToPlannerText(rfpOutline);
+  ok(plannerText.includes("- Compliance Checklist"));
+  ok(plannerText.includes("- Table of Contents"));
+
+  const saved = saveCustomDocumentOutlineTemplateState([], {
+    id: "custom-qbr",
+    name: "Quarterly business review",
+    category: "Executive",
+    summary: "Reusable QBR outline.",
+    outline: ["Executive Summary", "  Revenue Review", "  Risk Review", "Next Quarter Plan"],
+    tags: ["qbr", "executive"],
+    bestFor: ["Quarterly reviews"],
+  });
+  equal(saved.changed, true);
+  equal(saved.templates.length, 1);
+  ok(documentOutlineTemplateToPlannerText({ outline: saved.templates[0].outline }).includes("  - Revenue Review"));
+
+  const updated = saveCustomDocumentOutlineTemplateState(saved.templates, {
+    ...saved.templates[0],
+    summary: "Updated reusable QBR outline.",
+    outline: ["Executive Summary", "Customer Health", "Financial Review"],
+  });
+  equal(updated.templates.length, 1);
+  equal(updated.templates[0].summary, "Updated reusable QBR outline.");
+
+  const deleted = deleteCustomDocumentOutlineTemplateState(updated.templates, "custom-qbr");
+  equal(deleted.changed, true);
+  equal(deleted.templates.length, 0);
 });
 
 test("Docs Live turns outline, voice context, and placeholders into a reviewable draft", () => {
@@ -6419,6 +6457,18 @@ test("workspace persistence migration versions and normalizes saved settings", (
       },
       { id: "missing-body", name: "Ignored" },
     ],
+    customDocumentOutlineTemplates: [
+      {
+        id: "outline-qbr",
+        name: "QBR",
+        category: "Executive",
+        summary: "Quarterly review outline.",
+        outline: ["Executive Summary", "  Revenue Review", ""],
+        tags: ["qbr", 42],
+        bestFor: ["Reviews", ""],
+      },
+      { id: "missing-outline", name: "Ignored" },
+    ],
   });
 
   equal(migrated.schemaVersion, WORKSPACE_SCHEMA_VERSION);
@@ -6769,6 +6819,17 @@ test("workspace persistence migration versions and normalizes saved settings", (
       tags: ["margin"],
     },
   ]);
+  deepEqual(migrated.customDocumentOutlineTemplates, [
+    {
+      id: "outline-qbr",
+      name: "QBR",
+      category: "Executive",
+      summary: "Quarterly review outline.",
+      outline: ["Executive Summary", "  Revenue Review"],
+      tags: ["qbr"],
+      bestFor: ["Reviews"],
+    },
+  ]);
 });
 
 test("workspace persistence state helper builds normalized store snapshots", () => {
@@ -6868,6 +6929,7 @@ test("workspace persistence state helper builds normalized store snapshots", () 
     transformInputModes: { dot: "file" },
     transformTimeoutMs: 45_000,
     customTransformTemplates: [],
+    customDocumentOutlineTemplates: [],
   });
 
   equal(workspace.schemaVersion, WORKSPACE_SCHEMA_VERSION);
@@ -6947,6 +7009,7 @@ test("workspace persistence state helper applies persisted preferences and resto
     transformInputModes: {},
     transformTimeoutMs: 5000,
     customTransformTemplates: [],
+    customDocumentOutlineTemplates: [],
   } satisfies Parameters<typeof applyPersistedWorkspacePreferenceState>[0];
 
   const result = applyPersistedWorkspacePreferenceState(
@@ -6980,6 +7043,7 @@ test("workspace persistence state helper applies persisted preferences and resto
       disabledTransformEngines: { plantuml: true },
       transformInputModes: { dot: "file" },
       transformTimeoutMs: 45_000,
+      customDocumentOutlineTemplates: [{ id: "outline-qbr", name: "QBR", category: "Executive", summary: "QBR outline", outline: ["Executive Summary"], tags: ["qbr"], bestFor: ["Reviews"] }],
       guidedDemoCompletedStepIds: ["ai-create"],
     }),
   );
@@ -7005,6 +7069,7 @@ test("workspace persistence state helper applies persisted preferences and resto
   equal(result.state.transformTimeoutMs, 30_000);
   deepEqual(result.state.transformInputModes, { dot: "file" });
   deepEqual(result.state.guidedDemoCompletedStepIds, ["ai-create"]);
+  equal(result.state.customDocumentOutlineTemplates[0]?.name, "QBR");
   deepEqual(result.restoreRequest, {
     openFiles: ["/a.md", "/b.md"],
     activePath: "/b.md",

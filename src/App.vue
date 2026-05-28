@@ -494,6 +494,66 @@
             </div>
             <p class="sidebar-hint">{{ outlineDraftItems.length }} planned sections. Use indentation, bullets, numbers, or Markdown heading marks.</p>
           </section>
+          <section class="outline-library" aria-label="Document outline library">
+            <header>
+              <div>
+                <h3>Outline Library</h3>
+                <small>{{ filteredDocumentOutlineTemplates.length }} of {{ allDocumentOutlineTemplates.length }} outlines</small>
+              </div>
+            </header>
+            <div class="outline-library-filters">
+              <label>
+                Search outlines
+                <input v-model="outlineLibraryQuery" type="search" placeholder="RFP, board, textbook, policy" />
+              </label>
+              <label>
+                Category
+                <select v-model="outlineLibraryCategory">
+                  <option v-for="category in outlineLibraryCategories" :key="category" :value="category">{{ category === "all" ? "All categories" : category }}</option>
+                </select>
+              </label>
+            </div>
+            <div class="outline-library-actions">
+              <button type="button" :disabled="!outlineDraftItems.length" @click="saveCurrentOutlineTemplate">Save planner outline</button>
+              <button type="button" @click="resetCustomOutlineDraft">New custom outline</button>
+            </div>
+            <label>
+              Custom outline name
+              <input v-model="customOutlineDraft.name" placeholder="Quarterly business review" />
+            </label>
+            <label>
+              Custom category
+              <input v-model="customOutlineDraft.category" placeholder="Executive" />
+            </label>
+            <label>
+              Custom summary
+              <input v-model="customOutlineDraft.summary" placeholder="Reusable outline for recurring documents" />
+            </label>
+            <label>
+              Custom tags
+              <input v-model="customOutlineTags" placeholder="board, decision, quarterly" />
+            </label>
+            <p class="sidebar-hint">Saving uses the current planner outline so users can adapt a built-in outline and keep it for future documents.</p>
+            <div class="outline-template-list" role="list" aria-label="Selectable document outlines">
+              <article v-for="template in filteredDocumentOutlineTemplates" :key="`${template.source}-${template.id}`" role="listitem" class="outline-template-card">
+                <header>
+                  <div>
+                    <strong>{{ template.name }}</strong>
+                    <small>{{ template.category }} | {{ template.source }} | {{ template.outline.length }} sections</small>
+                  </div>
+                  <button type="button" title="Load this outline into the planner" @click="useDocumentOutlineTemplate(template)">Use</button>
+                </header>
+                <p>{{ template.summary }}</p>
+                <pre>{{ documentOutlineTemplateToPlannerText(template) }}</pre>
+                <div class="outline-template-actions">
+                  <button type="button" title="Send this outline to Docs Live" @click="sendOutlineTemplateToDocsLive(template)">Docs Live</button>
+                  <button type="button" title="Append this outline skeleton to the active document" @click="appendDocumentOutlineTemplate(template)">Append</button>
+                  <button v-if="template.source === 'custom'" type="button" title="Edit this custom outline's metadata using the current planner" @click="editCustomOutlineTemplate(template)">Edit</button>
+                  <button v-if="template.source === 'custom'" class="danger-action" type="button" title="Delete this custom outline" @click="store.deleteCustomDocumentOutlineTemplate(template.id)">Delete</button>
+                </div>
+              </article>
+            </div>
+          </section>
           <p v-if="!outlineHeadings.length" class="sidebar-hint">Add headings directly or create a document from an outline plan.</p>
           <button
             v-for="heading in outlineHeadings"
@@ -5758,6 +5818,8 @@ import {
   agenticCliIntegrations,
   analyzeRfpSource,
   aiDocumentWizardSteps,
+  blankCustomDocumentOutlineTemplate,
+  builtInDocumentOutlineTemplates,
   businessDocumentSnippets,
   businessDocumentTemplates,
   businessProfileFields,
@@ -5767,6 +5829,7 @@ import {
   businessWizardContext,
   buildBusinessWizardStepAssistance,
   buildRfpWizardStepAssistance,
+  documentOutlineTemplateToPlannerText,
   normalizeBusinessProfile,
   rfpComplianceMatrixMarkdown,
   rfpProposalOutlineBullets,
@@ -5775,6 +5838,8 @@ import {
   type BusinessDocumentSnippet,
   type BusinessDocumentTemplate,
   type BusinessProfile,
+  type CustomDocumentOutlineTemplate,
+  type DocumentOutlineTemplate,
   type RfpAnalysis,
   type RfpWizardStepAssistance,
   type RfpSourceKind,
@@ -6506,6 +6571,10 @@ const selectedTableIndex = ref(0);
 const outlineDraftText = ref("- Executive Summary\n  - Decision Needed\n  - Key Risks\n- Financial Case\n- Next Steps");
 const outlineDraftTitle = ref("");
 const outlineDraftIncludeToc = ref(true);
+const outlineLibraryQuery = ref("");
+const outlineLibraryCategory = ref("all");
+const customOutlineDraft = ref<CustomDocumentOutlineTemplate>(blankCustomDocumentOutlineTemplate());
+const editingCustomOutlineId = ref("");
 const outlineModeNewTitle = ref("New chapter");
 const outlineModeNewLevel = ref(1);
 const documentSetDraft = ref("");
@@ -8096,6 +8165,21 @@ const filteredBusinessTemplates = computed(() => {
     return [template.label, template.summary, template.docsLiveType, ...template.bestFor, ...template.outline].join(" ").toLowerCase().includes(query);
   });
 });
+const allDocumentOutlineTemplates = computed<DocumentOutlineTemplate[]>(() => [
+  ...builtInDocumentOutlineTemplates,
+  ...store.customDocumentOutlineTemplates.map((template) => ({ ...template, source: "custom" as const })),
+]);
+const outlineLibraryCategories = computed(() =>
+  ["all", ...new Set(allDocumentOutlineTemplates.value.map((template) => template.category).filter(Boolean))].sort((a, b) => (a === "all" ? -1 : b === "all" ? 1 : a.localeCompare(b))),
+);
+const filteredDocumentOutlineTemplates = computed(() => {
+  const query = outlineLibraryQuery.value.trim().toLowerCase();
+  return allDocumentOutlineTemplates.value.filter((template) => {
+    if (outlineLibraryCategory.value !== "all" && template.category !== outlineLibraryCategory.value) return false;
+    if (!query) return true;
+    return [template.name, template.category, template.summary, ...template.bestFor, ...template.tags, ...template.outline].join(" ").toLowerCase().includes(query);
+  });
+});
 const filteredBusinessSnippets = computed(() => {
   const query = businessSnippetQuery.value.trim().toLowerCase();
   return businessDocumentSnippets.filter((snippet) => {
@@ -8257,6 +8341,15 @@ const customTemplateTags = computed({
   get: () => customTemplateDraft.value.tags.join(", "),
   set: (value: string) => {
     customTemplateDraft.value.tags = value
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  },
+});
+const customOutlineTags = computed({
+  get: () => customOutlineDraft.value.tags.join(", "),
+  set: (value: string) => {
+    customOutlineDraft.value.tags = value
       .split(",")
       .map((tag) => tag.trim())
       .filter(Boolean);
@@ -11970,6 +12063,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   },
   { name: "Show document outline", group: "Navigate", run: () => showOutline() },
   { name: "Open outline mode", group: "Navigate", run: () => (store.mode = "outline") },
+  { name: "Open outline library", group: "Templates", description: "Browse built-in and custom document outlines, then load one into the planner or Docs Live.", run: () => planDocumentOutline() },
   { name: "Plan document from outline", group: "Navigate", run: () => planDocumentOutline() },
   { name: "Fold all sections", group: "Navigate", run: () => runEditorCommand(foldAll) },
   { name: "Unfold all sections", group: "Navigate", run: () => runEditorCommand(unfoldAll) },
@@ -16524,6 +16618,86 @@ function appendOutlineToDocument() {
   store.updateText(`${active.value.text.trimEnd()}\n\n${body}\n`);
   store.sidebar = "outline";
   store.statusMessage = "Appended outline skeleton to document";
+}
+
+function useDocumentOutlineTemplate(template: DocumentOutlineTemplate) {
+  outlineDraftTitle.value = template.name;
+  outlineDraftText.value = documentOutlineTemplateToPlannerText(template);
+  outlineLibraryQuery.value = "";
+  store.sidebar = "outline";
+  store.statusMessage = `Loaded ${template.name} outline into planner`;
+}
+
+function appendDocumentOutlineTemplate(template: DocumentOutlineTemplate) {
+  const markdown = outlinePlanToMarkdown(documentOutlineTemplateToPlannerText(template), {
+    title: template.name,
+    includeToc: false,
+  });
+  if (!markdown) return;
+  const body = markdown.replace(/^---[\s\S]*?---\n+#[^\n]+\n+/, "").trim();
+  store.updateText(`${active.value.text.trimEnd()}\n\n${body}\n`);
+  store.sidebar = "outline";
+  store.statusMessage = `Appended ${template.name} outline skeleton`;
+}
+
+function sendOutlineTemplateToDocsLive(template: DocumentOutlineTemplate) {
+  docsLiveTargetSection.value = null;
+  docsLiveOutlineText.value = documentOutlineTemplateToPlannerText(template);
+  docsLiveTitle.value = outlineDraftTitle.value || template.name;
+  docsLiveDocumentType.value = template.tags.includes("rfp") ? "rfp-response" : "business-brief";
+  docsLiveContext.value = [
+    `Selected outline template: ${template.name}`,
+    `Category: ${template.category}`,
+    `Summary: ${template.summary}`,
+    `Best for: ${template.bestFor.join(", ") || "Reusable document planning"}`,
+    "Use this outline as the approved structure before drafting body text section by section.",
+  ].join("\n");
+  docsLiveDraftingDepth.value = "detailed";
+  docsLiveInsertMode.value = "replace";
+  openDocsLive();
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = `Sent ${template.name} outline to Docs Live`;
+}
+
+function resetCustomOutlineDraft() {
+  customOutlineDraft.value = blankCustomDocumentOutlineTemplate();
+  editingCustomOutlineId.value = "";
+  store.statusMessage = "Started a new custom outline library entry";
+}
+
+function editCustomOutlineTemplate(template: DocumentOutlineTemplate) {
+  customOutlineDraft.value = {
+    id: template.id,
+    name: template.name,
+    category: template.category,
+    summary: template.summary,
+    outline: template.outline,
+    tags: [...template.tags],
+    bestFor: [...template.bestFor],
+  };
+  editingCustomOutlineId.value = template.id;
+  useDocumentOutlineTemplate(template);
+  store.statusMessage = `Editing ${template.name}; update the planner outline and save when ready`;
+}
+
+async function saveCurrentOutlineTemplate() {
+  const items = parseOutlinePlan(outlineDraftText.value);
+  if (!items.length) return;
+  const outline = items.map((item) => `${"  ".repeat(Math.max(0, item.level - 1))}${item.title}`);
+  const template: CustomDocumentOutlineTemplate = {
+    ...customOutlineDraft.value,
+    id: editingCustomOutlineId.value || customOutlineDraft.value.id || blankCustomDocumentOutlineTemplate().id,
+    name: customOutlineDraft.value.name.trim() || outlineDraftTitle.value.trim() || "Custom outline",
+    category: customOutlineDraft.value.category.trim() || "Custom",
+    summary: customOutlineDraft.value.summary.trim() || `Reusable outline with ${items.length} planned section${items.length === 1 ? "" : "s"}.`,
+    outline,
+    tags: customOutlineDraft.value.tags.length ? customOutlineDraft.value.tags : ["custom"],
+    bestFor: customOutlineDraft.value.bestFor.length ? customOutlineDraft.value.bestFor : ["Reusable planning"],
+  };
+  await store.saveCustomDocumentOutlineTemplate(template);
+  customOutlineDraft.value = template;
+  editingCustomOutlineId.value = template.id;
+  store.statusMessage = `Saved ${template.name} to the outline library`;
 }
 
 function openDocsLiveFromOutline() {
@@ -21829,6 +22003,69 @@ select:hover {
   display: grid;
   grid-template-columns: 1fr;
   gap: 6px;
+}
+
+.outline-library {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #d7dee7;
+}
+
+.outline-library header,
+.outline-template-card header,
+.outline-template-actions,
+.outline-library-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.outline-library h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.outline-library-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.outline-template-list {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.outline-template-card {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #d7dee7;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.outline-template-card p {
+  margin: 0;
+  color: #526171;
+}
+
+.outline-template-card pre {
+  max-height: 140px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 11px;
+}
+
+.outline-template-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .outline-row {
