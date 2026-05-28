@@ -192,7 +192,9 @@ Packaging targets:
 Packaged builds must also include the `ned` command-line helper for scriptable
 file-open handoff previews, business-template document creation, workspace
 initialization, reusable business-profile setup, document inspection, export
-conversion, default Markdown reader setup guidance and machine-readable status
+conversion, redaction-safe publishing payload preparation for blog, Substack,
+HTML, WordPress REST, Ghost Admin proxy, generic webhook, and manual publishing
+handoffs, default Markdown reader setup guidance and machine-readable status
 reporting, setup diagnostics, transform handler discovery, release-readiness
 report inspection, release evidence report status inspection, and a
 redaction-safe support bundle that combines setup diagnostics with release

@@ -1318,6 +1318,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("support-bundle"));
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
+    assert!(bash.message.contains("publish"));
+    assert!(bash.message.contains("--token-env"));
     assert!(bash.message.contains("--matrix-output"));
     assert!(bash.message.contains("markdown-bundle"));
 
@@ -1342,6 +1344,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--fill-profile"));
     assert!(zsh.message.contains("--fields"));
     assert!(zsh.message.contains("--get"));
+    assert!(zsh.message.contains("--endpoint"));
+    assert!(zsh.message.contains("--allow-not-ready"));
     assert!(zsh.message.contains("--matrix-output"));
 
     let fish = crate::cli::run_cli_with_args(&[
@@ -1364,6 +1368,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("matrix-output"));
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
+    assert!(fish.message.contains("publish"));
+    assert!(fish.message.contains("token-env"));
     assert!(fish.message.contains("epub"));
 
     let unsupported = crate::cli::run_cli_with_args(&[
@@ -1396,6 +1402,95 @@ fn ned_cli_converts_markdown_to_html_export() {
     let html = fs::read_to_string(&output).expect("html output");
     assert!(html.contains("Test Report"));
     assert!(!output.with_extension("html.manifest.json").exists());
+}
+
+#[test]
+fn ned_cli_prepares_publish_payload_without_persisting_secrets() {
+    let source = temp_markdown_path("publish");
+    let output = source.with_extension("publish.json");
+    fs::write(&source, super::sample_document()).expect("write source markdown");
+    let args = vec![
+        "ned".to_string(),
+        "publish".to_string(),
+        source.to_string_lossy().to_string(),
+        "--target".to_string(),
+        "blog".to_string(),
+        "--destination".to_string(),
+        "wordpress-rest".to_string(),
+        "--endpoint".to_string(),
+        "https://cms.example.com/wp-json/wp/v2/posts".to_string(),
+        "--format".to_string(),
+        "markdown".to_string(),
+        "--auth-header".to_string(),
+        "X-NEditor-Token".to_string(),
+        "--token-env".to_string(),
+        "NEDITOR_TEST_PUBLISH_TOKEN".to_string(),
+        "--output".to_string(),
+        output.to_string_lossy().to_string(),
+        "--allow-not-ready".to_string(),
+        "--json".to_string(),
+    ];
+    let outcome = crate::cli::run_cli_with_args(&args).expect("publish payload");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("publish json");
+    assert_eq!(report["schema"], "neditor.ned-publish.v1");
+    assert_eq!(report["payload"]["schema"], "neditor.publish-payload.v1");
+    assert_eq!(report["payload"]["target"], "blog");
+    assert_eq!(report["payload"]["destinationKind"], "wordpress-rest");
+    assert_eq!(report["payload"]["contentFormat"], "markdown");
+    assert_eq!(report["payload"]["title"], "Test Report");
+    assert_eq!(report["payload"]["auth"]["headerName"], "X-NEditor-Token");
+    assert_eq!(
+        report["payload"]["auth"]["tokenEnv"],
+        "NEDITOR_TEST_PUBLISH_TOKEN"
+    );
+    assert_eq!(report["payload"]["auth"]["tokenPersisted"], false);
+    assert_eq!(report["payload"]["auth"]["tokenPresent"], false);
+    assert!(report["payload"]["content"]
+        .as_str()
+        .unwrap()
+        .contains("# Test Report"));
+    assert!(report["payload"]["curlTemplate"]
+        .as_str()
+        .unwrap()
+        .contains("${NEDITOR_TEST_PUBLISH_TOKEN}"));
+    assert!(!outcome.message.contains("secret-token-value"));
+
+    let written = fs::read_to_string(&output).expect("written publish payload");
+    let payload: serde_json::Value = serde_json::from_str(&written).expect("payload json");
+    assert_eq!(payload["schema"], "neditor.publish-payload.v1");
+    assert_eq!(
+        payload["endpointUrl"],
+        "https://cms.example.com/wp-json/wp/v2/posts"
+    );
+    assert!(!written.contains("secret-token-value"));
+}
+
+#[test]
+fn ned_cli_rejects_unsafe_publish_endpoint_and_token_env() {
+    let source = temp_markdown_path("publish-reject");
+    fs::write(&source, super::sample_document()).expect("write source markdown");
+    let unsafe_endpoint = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "publish".to_string(),
+        source.to_string_lossy().to_string(),
+        "--endpoint".to_string(),
+        "http://example.com/hook".to_string(),
+    ])
+    .expect_err("unsafe endpoint rejected");
+    assert!(unsafe_endpoint.contains("HTTPS"));
+
+    let bad_token_env = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "publish".to_string(),
+        source.to_string_lossy().to_string(),
+        "--endpoint".to_string(),
+        "https://cms.example.com/hook".to_string(),
+        "--token-env".to_string(),
+        "bad-name".to_string(),
+    ])
+    .expect_err("bad token env rejected");
+    assert!(bad_token_env.contains("environment variable"));
 }
 
 #[test]
@@ -1600,6 +1695,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     let outcome = crate::cli::run_cli_with_args(&args).expect("help");
     assert_eq!(outcome.exit_code, 0);
     assert!(outcome.message.contains("ned convert"));
+    assert!(outcome.message.contains("ned publish"));
     assert!(outcome.message.contains("--output-dir"));
     assert!(outcome.message.contains("--stdout"));
     assert!(outcome.message.contains("ned init"));

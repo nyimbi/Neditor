@@ -90,6 +90,7 @@ ned convert board-paper.md --to pdf --output board-paper.pdf
 ned convert board-paper.md --to pdf,docx,html --output-dir exports
 ned convert board-paper.md --to html --stdout
 cat board-paper.md | ned convert - --to latex --stdout
+ned publish announcement.md --target blog --destination wordpress-rest --endpoint https://cms.example.com/wp-json/wp/v2/posts --token-env CMS_TOKEN --output publish-payload.json --json
 ned inspect board-paper.md --json
 ned validate board-paper.md --to pdf --json
 ned export proposal.md --to docx --output proposal.docx
@@ -130,8 +131,13 @@ outputs. Use comma-separated targets, or `--to all`, with `--output-dir` when
 you need a complete delivery pack for review, legal, publishing, and archive
 handoff. Text-safe exports such as HTML and LaTeX can write to stdout,
 including piped Markdown input with `ned convert - --to html --stdout`; binary
-package formats stay file-based to avoid corrupt terminal output. `ned
-validate` and its alias `ned check` run the export-readiness
+package formats stay file-based to avoid corrupt terminal output. `ned publish`
+prepares a reviewable blog, Substack, or HTML publishing JSON payload from a
+Markdown document or stdin for WordPress REST, Ghost Admin proxy, generic
+webhook, or Substack manual handoff workflows. It references endpoint tokens by
+environment variable name only, refuses unsafe non-local HTTP endpoints, and can
+write the payload to disk for an approved bridge without persisting secrets.
+`ned validate` and its alias `ned check` run the export-readiness
 pipeline without writing an artifact; use `--json` for CI, and `--strict` when
 warnings should fail a release gate. `ned inspect` reads a document or stdin
 and reports title, status, outline, word counts, includes, transforms,

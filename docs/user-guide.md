@@ -639,6 +639,14 @@ automation, WordPress REST endpoint, or Ghost Admin proxy, the toolbar
 endpoint tokens session-only, supports dry-run preview before sending, and
 blocks unsafe non-local HTTP endpoints so business users can post through an
 approved publishing bridge without copying files by hand.
+The packaged CLI exposes the same handoff for automation:
+
+```sh
+ned publish document.md --target blog --destination wordpress-rest --endpoint https://cms.example.com/wp-json/wp/v2/posts --token-env CMS_TOKEN --output publish-payload.json --json
+```
+
+The payload references the token environment variable but never stores the
+token value.
 Google Docs package exports are ZIP files with `document.docx` as the primary
 Google Docs upload/import file, plus HTML, Markdown, plain text, metadata,
 assets, and an embedded manifest for auditability. Their metadata names

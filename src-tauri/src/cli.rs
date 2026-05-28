@@ -4,7 +4,7 @@ use crate::{
         export_document, prepare_for_export, ExportReadinessReport, ExportRequest,
         PrepareExportRequest,
     },
-    metadata_string,
+    metadata_string, metadata_string_list,
     rfp_import::{import_rfp_source, ImportRfpSourceRequest},
     transform_install::{
         installable_external_transform_engines, transform_handler_installer_plans_for_platform,
@@ -64,6 +64,7 @@ const CLI_COMMANDS: &[&str] = &[
     "open",
     "convert",
     "export",
+    "publish",
     "inspect",
     "validate",
     "check",
@@ -277,6 +278,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "new" => run_new_command(&args[2..]),
         "open" => run_open_command(&args[2..]),
         "convert" | "export" => run_convert_command(&args[2..], stdin_text),
+        "publish" => run_publish_command(&args[2..], stdin_text),
         "inspect" => run_inspect_command(&args[2..], stdin_text),
         "validate" | "check" => run_validate_command(&args[2..], stdin_text),
         "templates" => run_templates_command(&args[2..]),
@@ -782,6 +784,170 @@ fn run_convert_command(args: &[String], stdin_text: Option<&str>) -> Result<CliO
     }
     Ok(CliOutcome {
         message: messages.join("\n"),
+        exit_code: 0,
+    })
+}
+
+fn run_publish_command(args: &[String], stdin_text: Option<&str>) -> Result<CliOutcome, String> {
+    let mut input: Option<String> = None;
+    let mut export_target = "blog".to_string();
+    let mut destination_kind = "generic-webhook".to_string();
+    let mut endpoint_url = String::new();
+    let mut content_format = "html".to_string();
+    let mut auth_header_name = "Authorization".to_string();
+    let mut token_env = String::new();
+    let mut output: Option<String> = None;
+    let mut json_output = false;
+    let mut allow_not_ready = false;
+    let mut options = json!({});
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--target" | "--to" | "-t" => {
+                index += 1;
+                export_target = args
+                    .get(index)
+                    .ok_or_else(|| "--target requires blog, substack, or html".to_string())?
+                    .to_string();
+            }
+            "--destination" | "--kind" => {
+                index += 1;
+                destination_kind = args
+                    .get(index)
+                    .ok_or_else(|| "--destination requires generic-webhook, wordpress-rest, ghost-admin, or substack-manual".to_string())?
+                    .to_string();
+            }
+            "--endpoint" => {
+                index += 1;
+                endpoint_url = args
+                    .get(index)
+                    .ok_or_else(|| "--endpoint requires a URL".to_string())?
+                    .to_string();
+            }
+            "--format" => {
+                index += 1;
+                content_format = args
+                    .get(index)
+                    .ok_or_else(|| "--format requires html, markdown, or text".to_string())?
+                    .to_string();
+            }
+            "--auth-header" => {
+                index += 1;
+                auth_header_name = args
+                    .get(index)
+                    .ok_or_else(|| "--auth-header requires a header name".to_string())?
+                    .to_string();
+            }
+            "--token-env" => {
+                index += 1;
+                token_env = args
+                    .get(index)
+                    .ok_or_else(|| "--token-env requires an environment variable name".to_string())?
+                    .to_string();
+            }
+            "--output" | "-o" => {
+                index += 1;
+                output = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--output requires a path".to_string())?
+                        .to_string(),
+                );
+            }
+            "--json" => json_output = true,
+            "--allow-not-ready" => allow_not_ready = true,
+            "--option" => {
+                index += 1;
+                let pair = args
+                    .get(index)
+                    .ok_or_else(|| "--option requires key=value".to_string())?;
+                apply_cli_option(&mut options, pair)?;
+            }
+            value => {
+                if value.starts_with('-') && value != "-" {
+                    return Err(format!("Unsupported publish option '{value}'"));
+                }
+                if input.is_some() {
+                    return Err("Only one input document can be published at a time.".to_string());
+                }
+                input = Some(value.to_string());
+            }
+        }
+        index += 1;
+    }
+
+    validate_publish_target(&export_target)?;
+    validate_publish_destination(&destination_kind)?;
+    validate_publish_content_format(&content_format)?;
+    validate_publish_auth_header(&auth_header_name)?;
+    validate_publish_token_env(&token_env)?;
+    if !endpoint_url.trim().is_empty() && !publish_endpoint_is_allowed(&endpoint_url) {
+        return Err("Publishing endpoint must use HTTPS, or HTTP only for localhost/private development endpoints.".to_string());
+    }
+
+    let input_arg = input.ok_or_else(|| {
+        "Usage: ned publish <file.md|-> --target blog --endpoint https://cms.example/hook --json".to_string()
+    })?;
+    let (text, file_path, input_path) = read_cli_input_document(&input_arg, stdin_text)?;
+    let mut options_object = options.as_object().cloned().unwrap_or_default();
+    options_object.insert("includeManifest".to_string(), Value::Bool(true));
+    let options = Value::Object(options_object);
+
+    let response = compile_with_options(
+        CompileRequest {
+            text: text.clone(),
+            file_path: file_path.clone(),
+        },
+        &options,
+    );
+    let readiness = prepare_for_export(PrepareExportRequest {
+        text,
+        file_path,
+        target: export_target.clone(),
+        options: options.clone(),
+    });
+    if !allow_not_ready && readiness.error_count > 0 {
+        return Err(format!(
+            "Publish payload blocked by {} export readiness error(s). Re-run with --allow-not-ready to inspect the payload.",
+            readiness.error_count
+        ));
+    }
+
+    let payload = build_cli_publish_payload(
+        &response,
+        &readiness,
+        &CliPublishPayloadOptions {
+            input_path,
+            export_target,
+            destination_kind,
+            endpoint_url,
+            content_format,
+            auth_header_name,
+            token_env,
+        },
+    );
+    let payload_text = serde_json::to_string_pretty(&payload).map_err(|err| err.to_string())?;
+    let output_path = if let Some(path) = output {
+        fs::write(&path, &payload_text)
+            .map_err(|err| format!("Could not write publishing payload {path}: {err}"))?;
+        Some(path)
+    } else {
+        None
+    };
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-publish.v1",
+                "ready": readiness.ready,
+                "output": output_path,
+                "payload": payload,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: cli_publish_text_report(&payload, output_path.as_deref()),
         exit_code: 0,
     })
 }
@@ -2917,6 +3083,291 @@ fn is_markdown_like_output_path(path: &Path) -> bool {
     )
 }
 
+struct CliPublishPayloadOptions {
+    input_path: String,
+    export_target: String,
+    destination_kind: String,
+    endpoint_url: String,
+    content_format: String,
+    auth_header_name: String,
+    token_env: String,
+}
+
+fn build_cli_publish_payload(
+    response: &CompileResponse,
+    readiness: &ExportReadinessReport,
+    options: &CliPublishPayloadOptions,
+) -> Value {
+    let title = response.semantic.title.clone();
+    let description = first_cli_metadata_string(
+        &response.metadata,
+        &["description", "summary", "subtitle", "excerpt"],
+    )
+    .unwrap_or_else(|| first_markdown_paragraph(&response.compiled_markdown));
+    let tags = {
+        let tags = metadata_string_list(&response.metadata, "tags");
+        if tags.is_empty() {
+            metadata_string_list(&response.metadata, "keywords")
+        } else {
+            tags
+        }
+    };
+    let status = response.semantic.status.clone();
+    let slug = metadata_string(&response.metadata, "slug")
+        .map(|value| cli_slugify(&value))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| cli_slugify(&title));
+    let canonical_url = first_cli_metadata_string(
+        &response.metadata,
+        &["canonicalUrl", "canonical_url", "url"],
+    );
+    let language = first_cli_metadata_string(&response.metadata, &["language", "lang", "locale"])
+        .unwrap_or_else(|| "en".to_string());
+    let markdown = response.compiled_markdown.clone();
+    let html = response.html.clone();
+    let text = markdown_to_plain_text(&markdown);
+    let content = match options.content_format.as_str() {
+        "markdown" => markdown.clone(),
+        "text" => text.clone(),
+        _ => html.clone(),
+    };
+    let token_present = if options.token_env.trim().is_empty() {
+        false
+    } else {
+        env::var(options.token_env.trim())
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false)
+    };
+    json!({
+        "schema": "neditor.publish-payload.v1",
+        "packageType": "neditor-publishing-handoff",
+        "input": options.input_path,
+        "target": options.export_target,
+        "destinationKind": options.destination_kind,
+        "method": "POST",
+        "endpointUrl": options.endpoint_url.trim(),
+        "title": title,
+        "slug": slug,
+        "status": status,
+        "description": description,
+        "canonicalUrl": canonical_url,
+        "language": language,
+        "tags": tags,
+        "contentFormat": options.content_format,
+        "content": content,
+        "markdown": markdown,
+        "html": html,
+        "text": text,
+        "auth": {
+            "headerName": options.auth_header_name.trim(),
+            "tokenEnv": options.token_env.trim(),
+            "tokenPresent": token_present,
+            "tokenPersisted": false
+        },
+        "audit": {
+            "sourceHash": response.export_manifest.source_hash,
+            "appVersion": response.export_manifest.app_version,
+            "readiness": readiness.readiness,
+            "diagnosticCount": readiness.diagnostics.len(),
+            "generatedAt": response.export_manifest.exported_at
+        },
+        "curlTemplate": cli_publish_curl_template(options),
+    })
+}
+
+fn cli_publish_text_report(payload: &Value, output_path: Option<&str>) -> String {
+    let title = payload
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or("Untitled");
+    let destination = payload
+        .get("destinationKind")
+        .and_then(Value::as_str)
+        .unwrap_or("generic-webhook");
+    let endpoint = payload
+        .get("endpointUrl")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let output = output_path
+        .map(|path| format!("\nPayload: {path}"))
+        .unwrap_or_default();
+    format!(
+        "Prepared publishing payload for {title}\nDestination: {destination}\nEndpoint: {}{output}\nSecrets: not persisted; token is referenced by environment variable only",
+        if endpoint.is_empty() { "(not set)" } else { endpoint }
+    )
+}
+
+fn cli_publish_curl_template(options: &CliPublishPayloadOptions) -> String {
+    if options.endpoint_url.trim().is_empty() {
+        return "Set --endpoint before posting this payload.".to_string();
+    }
+    let auth = if options.token_env.trim().is_empty() {
+        String::new()
+    } else {
+        format!(
+            " -H '{}: ${{{}}}'",
+            shell_single_quote(options.auth_header_name.trim()),
+            options.token_env.trim()
+        )
+    };
+    format!(
+        "curl -X POST -H 'Content-Type: application/json'{auth} --data @payload.json '{}'",
+        shell_single_quote(options.endpoint_url.trim())
+    )
+}
+
+fn shell_single_quote(value: &str) -> String {
+    value.replace('\'', "'\\''")
+}
+
+fn first_cli_metadata_string(metadata: &Value, keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .find_map(|key| metadata_string(metadata, key))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn first_markdown_paragraph(markdown: &str) -> String {
+    markdown
+        .split("\n\n")
+        .map(str::trim)
+        .find(|block| !block.is_empty() && !block.starts_with('#') && !block.starts_with("---"))
+        .unwrap_or("")
+        .replace('\n', " ")
+        .chars()
+        .take(280)
+        .collect()
+}
+
+fn markdown_to_plain_text(markdown: &str) -> String {
+    markdown
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("```"))
+        .map(|line| {
+            line.trim_start_matches('#')
+                .trim_start_matches('>')
+                .trim_start_matches("- ")
+                .trim()
+                .replace("**", "")
+                .replace('*', "")
+                .replace('`', "")
+        })
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn cli_slugify(value: &str) -> String {
+    let mut output = String::new();
+    let mut previous_dash = false;
+    for ch in value.chars().flat_map(char::to_lowercase) {
+        if ch.is_ascii_alphanumeric() {
+            output.push(ch);
+            previous_dash = false;
+        } else if !previous_dash && !output.is_empty() {
+            output.push('-');
+            previous_dash = true;
+        }
+    }
+    output.trim_matches('-').to_string()
+}
+
+fn validate_publish_target(target: &str) -> Result<(), String> {
+    if matches!(target, "blog" | "substack" | "html") {
+        Ok(())
+    } else {
+        Err("Publish target must be blog, substack, or html.".to_string())
+    }
+}
+
+fn validate_publish_destination(destination: &str) -> Result<(), String> {
+    if matches!(
+        destination,
+        "generic-webhook" | "wordpress-rest" | "ghost-admin" | "substack-manual"
+    ) {
+        Ok(())
+    } else {
+        Err("Publish destination must be generic-webhook, wordpress-rest, ghost-admin, or substack-manual.".to_string())
+    }
+}
+
+fn validate_publish_content_format(format: &str) -> Result<(), String> {
+    if matches!(format, "html" | "markdown" | "text") {
+        Ok(())
+    } else {
+        Err("Publish format must be html, markdown, or text.".to_string())
+    }
+}
+
+fn validate_publish_auth_header(header: &str) -> Result<(), String> {
+    let header = header.trim();
+    if header.is_empty() {
+        return Err("Publish auth header cannot be blank.".to_string());
+    }
+    if header.chars().all(|ch| {
+        ch.is_ascii_alphanumeric()
+            || matches!(
+                ch,
+                '!' | '#'
+                    | '$'
+                    | '%'
+                    | '&'
+                    | '\''
+                    | '*'
+                    | '+'
+                    | '-'
+                    | '.'
+                    | '^'
+                    | '_'
+                    | '`'
+                    | '|'
+                    | '~'
+            )
+    }) {
+        Ok(())
+    } else {
+        Err("Publish auth header must be a valid HTTP header name.".to_string())
+    }
+}
+
+fn validate_publish_token_env(token_env: &str) -> Result<(), String> {
+    let token_env = token_env.trim();
+    if token_env.is_empty() {
+        return Ok(());
+    }
+    let mut chars = token_env.chars();
+    let Some(first) = chars.next() else {
+        return Ok(());
+    };
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return Err(
+            "Publish token environment variable must start with a letter or underscore."
+                .to_string(),
+        );
+    }
+    if chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric()) {
+        Ok(())
+    } else {
+        Err("Publish token environment variable may only contain letters, numbers, and underscores.".to_string())
+    }
+}
+
+fn publish_endpoint_is_allowed(value: &str) -> bool {
+    let trimmed = value.trim().to_ascii_lowercase();
+    if trimmed.starts_with("https://") {
+        return true;
+    }
+    if !trimmed.starts_with("http://") {
+        return false;
+    }
+    let host = trimmed
+        .trim_start_matches("http://")
+        .split(['/', ':'])
+        .next()
+        .unwrap_or("");
+    host == "localhost" || host == "127.0.0.1" || host == "::1" || host.ends_with(".local")
+}
+
 fn read_cli_input_document(
     input_arg: &str,
     stdin_text: Option<&str>,
@@ -4633,6 +5084,9 @@ fn bash_completion_script() -> String {
     let commands = CLI_COMMANDS.join(" ");
     let templates = NEW_DOCUMENT_TEMPLATES.join(" ");
     let targets = format!("{} all", SUPPORTED_EXPORT_TARGETS.join(" "));
+    let publish_targets = "blog substack html";
+    let publish_destinations = "generic-webhook wordpress-rest ghost-admin substack-manual";
+    let publish_formats = "html markdown text";
     let shells = COMPLETION_SHELLS.join(" ");
     let handler_platforms = "macos windows linux manual";
     format!(
@@ -4645,12 +5099,36 @@ _ned() {{
   command="${{COMP_WORDS[1]}}"
 
   case "$prev" in
-    --template|-t)
+    --template)
       COMPREPLY=( $(compgen -W "{templates}" -- "$cur") )
       return 0
       ;;
+    -t)
+      if [[ "$command" == "publish" ]]; then
+        COMPREPLY=( $(compgen -W "{publish_targets}" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "{templates}" -- "$cur") )
+      fi
+      return 0
+      ;;
+    --target)
+      COMPREPLY=( $(compgen -W "{publish_targets}" -- "$cur") )
+      return 0
+      ;;
     --to)
-      COMPREPLY=( $(compgen -W "{targets}" -- "$cur") )
+      if [[ "$command" == "publish" ]]; then
+        COMPREPLY=( $(compgen -W "{publish_targets}" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "{targets}" -- "$cur") )
+      fi
+      return 0
+      ;;
+    --destination|--kind)
+      COMPREPLY=( $(compgen -W "{publish_destinations}" -- "$cur") )
+      return 0
+      ;;
+    --format)
+      COMPREPLY=( $(compgen -W "{publish_formats}" -- "$cur") )
       return 0
       ;;
     completions|completion)
@@ -4676,6 +5154,9 @@ _ned() {{
         ;;
       convert|export)
         COMPREPLY=( $(compgen -W "--to --output --output-dir --stdout --no-manifest --option" -- "$cur") )
+        ;;
+      publish)
+        COMPREPLY=( $(compgen -W "--target --to --destination --kind --endpoint --format --auth-header --token-env --output --json --allow-not-ready --option" -- "$cur") )
         ;;
       inspect)
         COMPREPLY=( $(compgen -W "--json --option" -- "$cur") )
@@ -4740,16 +5221,22 @@ fn zsh_completion_script() -> String {
         .join(" ");
     let templates = NEW_DOCUMENT_TEMPLATES.join(" ");
     let targets = format!("{} all", SUPPORTED_EXPORT_TARGETS.join(" "));
+    let publish_targets = "blog substack html";
+    let publish_destinations = "generic-webhook wordpress-rest ghost-admin substack-manual";
+    let publish_formats = "html markdown text";
     let shells = COMPLETION_SHELLS.join(" ");
     let handler_platforms = "macos windows linux manual";
     format!(
         r#"#compdef ned
 # zsh completion for ned
 _ned() {{
-  local -a commands templates targets shells handler_platforms
+  local -a commands templates targets publish_targets publish_destinations publish_formats shells handler_platforms
   commands=({commands})
   templates=({templates})
   targets=({targets})
+  publish_targets=({publish_targets})
+  publish_destinations=({publish_destinations})
+  publish_formats=({publish_formats})
   shells=({shells})
   handler_platforms=({handler_platforms})
 
@@ -4765,6 +5252,9 @@ _ned() {{
       ;;
     convert|export)
       _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--output[output file, or - for text stdout]:file:_files' '--output-dir[output directory]:directory:_files -/' '--stdout[write supported text export to stdout]' '--no-manifest[skip sidecar manifest]' '--option[set export option key=value]:option:'
+      ;;
+    publish)
+      _arguments '*:markdown file:_files -g "*.md"' '--target[publishing target]:target:($publish_targets)' '--to[publishing target alias]:target:($publish_targets)' '--destination[publishing destination]:destination:($publish_destinations)' '--kind[publishing destination alias]:destination:($publish_destinations)' '--endpoint[HTTPS publishing endpoint]:url:' '--format[payload content format]:format:($publish_formats)' '--auth-header[header name for token at handoff time]:header:' '--token-env[environment variable containing token at handoff time]:name:' '--output[write JSON payload]:file:_files' '--json[print machine-readable JSON]' '--allow-not-ready[prepare payload despite readiness errors]' '--option[set export option key=value]:option:'
       ;;
     inspect)
       _arguments '*:markdown file:_files -g "*.md"' '--json[print machine-readable JSON]' '--option[set compile option key=value]:option:'
@@ -4841,6 +5331,32 @@ fn fish_completion_script() -> String {
             "complete -c ned -n '__fish_seen_subcommand_from validate check' -l to -s t -a '{target}'"
         ));
     }
+    for target in ["blog", "substack", "html"] {
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from publish' -l target -s t -a '{target}'"
+        ));
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from publish' -l to -a '{target}'"
+        ));
+    }
+    for destination in [
+        "generic-webhook",
+        "wordpress-rest",
+        "ghost-admin",
+        "substack-manual",
+    ] {
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from publish' -l destination -a '{destination}'"
+        ));
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from publish' -l kind -a '{destination}'"
+        ));
+    }
+    for format in ["html", "markdown", "text"] {
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from publish' -l format -a '{format}'"
+        ));
+    }
     for shell in COMPLETION_SHELLS {
         lines.push(format!(
             "complete -c ned -n '__fish_seen_subcommand_from completions completion' -a '{shell}'"
@@ -4868,6 +5384,13 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l no-manifest"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from convert export' -l option -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from publish' -l endpoint -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from publish' -l auth-header -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from publish' -l token-env -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from publish' -l output -s o -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from publish' -l json".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from publish' -l allow-not-ready".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from publish' -l option -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates targets inspect doctor' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
@@ -5301,6 +5824,7 @@ fn help_text() -> String {
         "  ned open <file.md> [more.md] [--dry-run] [--json]".to_string(),
         "  ned convert <file.md|-> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
         "  ned convert <file.md|-> --to html --stdout".to_string(),
+        "  ned publish <file.md|-> --target blog --endpoint https://cms.example/hook --output payload.json [--json]".to_string(),
         "  ned inspect <file.md|-> [--json]".to_string(),
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
