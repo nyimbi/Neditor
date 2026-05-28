@@ -239,6 +239,10 @@ pub(crate) fn start_file_watcher(
 
 #[tauri::command]
 pub(crate) fn stop_file_watcher(state: State<FileWatcherState>) -> Result<(), String> {
+    clear_file_watcher_state(&state)
+}
+
+fn clear_file_watcher_state(state: &FileWatcherState) -> Result<(), String> {
     let mut active = state
         .watcher
         .lock()
@@ -250,4 +254,30 @@ pub(crate) fn stop_file_watcher(state: State<FileWatcherState>) -> Result<(), St
 #[cfg(feature = "native-watch")]
 pub(crate) fn notify_event_should_emit(kind: &EventKind) -> bool {
     !matches!(kind, EventKind::Access(_))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stop_file_watcher_clears_active_watcher_state() {
+        let state = FileWatcherState::default();
+        {
+            let mut active = state.watcher.lock().expect("watcher lock");
+            #[cfg(feature = "native-watch")]
+            let watcher =
+                RecommendedWatcher::new(|_result: notify::Result<Event>| {}, Config::default())
+                    .expect("native watcher");
+            *active = Some(ActiveFileWatcher {
+                #[cfg(feature = "native-watch")]
+                _watcher: watcher,
+                signature: "watched/document.md".to_string(),
+            });
+        }
+
+        clear_file_watcher_state(&state).expect("stop watcher");
+
+        assert!(state.watcher.lock().expect("watcher lock").is_none());
+    }
 }

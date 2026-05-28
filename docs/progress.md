@@ -5070,6 +5070,12 @@ Local-agent handoff command coverage:
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked local_agents --lib` | Pass | Local-agent handoff command tests now prove the profile allowlist, unsupported-profile rejection, empty-prompt rejection, workspace-contained handoff file creation, document-path-to-parent workspace resolution, Google Antigravity profile support, and PATH executable probing. |
 
+File watcher shutdown command coverage:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked stop_file_watcher_clears_active_watcher_state --lib` | Pass | Focused Rust proof now constructs active watcher state for the default native-watch build, clears it through the same helper used by the `stop_file_watcher` IPC command, and verifies the active watcher slot is released. |
+
 Vim punctuation word-motion parity:
 
 | Command | Result | Evidence |
