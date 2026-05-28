@@ -16,7 +16,6 @@ import {
 } from "../lib/conflict";
 import {
   closeDocumentTabState,
-  forgetDocumentPathState,
   moveDocumentTabState,
   setPinnedDocumentState,
 } from "../lib/documentTabs";
@@ -43,7 +42,6 @@ import {
   titleFromPath,
 } from "../lib/fileLifecycle";
 import { isAiSourceFenceOpener, rewriteAiAssistedMarker, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
-import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
 import { appendChangeNoteMarker, appendReviewCommentMarker, resolveReviewCommentAtLine } from "../lib/reviewMarkers";
 import {
   applyTransformProbeFailureState,
@@ -103,7 +101,6 @@ import {
   applySavedWorkspaceDocumentState,
   clearWorkspaceRefreshState,
   createRestoredWorkspaceDocumentState,
-  forgetWorkspaceFolderState,
   setDocumentScrollState,
 } from "../lib/workspaceNavigation";
 import { applyPersistedWorkspacePreferenceState, buildPersistedWorkspaceState } from "../lib/workspacePersistenceState";
@@ -1514,27 +1511,6 @@ export const useDocumentsStore = defineStore("documents", {
       this.documents = result.documents;
       this.statusMessage = result.statusMessage;
       void this.persistWorkspace();
-    },
-    rememberFile(path: string | null) {
-      if (!path) return;
-      this.recentFiles = rememberRecentItem(this.recentFiles, path, 20);
-    },
-    forgetFilePath(path: string | null) {
-      const result = forgetDocumentPathState(this.recentFiles, this.recentlyClosed, this.missingWorkspaceFiles, path);
-      this.recentFiles = result.recentFiles;
-      this.recentlyClosed = result.recentlyClosed;
-      this.missingWorkspaceFiles = result.missingWorkspaceFiles;
-    },
-    rememberFolder(path: string | null) {
-      if (!path) return;
-      this.recentFolders = rememberRecentItem(this.recentFolders, path, 12);
-    },
-    forgetFolderPath(path: string | null) {
-      const result = forgetWorkspaceFolderState(this.recentFolders, this.workspaceRoot, this.workspaceFiles, path);
-      if (!result.changed) return;
-      this.recentFolders = result.recentFolders;
-      this.workspaceRoot = result.workspaceRoot;
-      this.workspaceFiles = result.workspaceFiles;
     },
   },
 });
