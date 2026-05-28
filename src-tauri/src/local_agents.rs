@@ -229,6 +229,20 @@ mod tests {
     }
 
     #[test]
+    fn rejects_empty_local_agent_handoff_prompts() {
+        let result = prepare_local_agent_handoff(PrepareLocalAgentHandoffRequest {
+            profile_id: "codex-cli".to_string(),
+            prompt_markdown: " \n\t ".to_string(),
+            workspace_path: None,
+        });
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("Cannot prepare an empty local agent handoff"));
+    }
+
+    #[test]
     fn prepares_handoff_file_inside_workspace() {
         let workspace = unique_temp_workspace("neditor-local-agent");
         fs::create_dir_all(&workspace).unwrap();
@@ -253,6 +267,36 @@ mod tests {
         assert!(fs::read_to_string(handoff_path)
             .unwrap()
             .contains("Return Markdown only."));
+
+        let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn document_workspace_paths_resolve_to_their_parent_folder() {
+        let workspace = unique_temp_workspace("neditor-local-agent-document-parent");
+        fs::create_dir_all(&workspace).unwrap();
+        let document_path = workspace.join("proposal.md");
+        fs::write(&document_path, "# Proposal").unwrap();
+
+        let response = prepare_local_agent_handoff(PrepareLocalAgentHandoffRequest {
+            profile_id: "claude-code-cli".to_string(),
+            prompt_markdown: "# Claude handoff\n\nReview this proposal.".to_string(),
+            workspace_path: Some(path_to_string(&document_path)),
+        })
+        .unwrap();
+
+        assert_eq!(response.command, "claude");
+        assert_eq!(
+            response.workspace_path,
+            path_to_string(&workspace.canonicalize().unwrap())
+        );
+        assert!(PathBuf::from(&response.handoff_path).starts_with(
+            workspace
+                .canonicalize()
+                .unwrap()
+                .join(".neditor")
+                .join("agent-handoffs")
+        ));
 
         let _ = fs::remove_dir_all(workspace);
     }

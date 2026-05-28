@@ -5064,6 +5064,12 @@ RFP import command coverage:
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked rfp_import --lib` | Pass | 7 RFP import tests passed, including direct command-level Markdown/text alias import, pasted-source normalization, metadata trimming, unsupported source-type rejection, DOCX XML text/table handling, and URL HTML cleanup/title extraction. |
 
+Local-agent handoff command coverage:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked local_agents --lib` | Pass | Local-agent handoff command tests now prove the profile allowlist, unsupported-profile rejection, empty-prompt rejection, workspace-contained handoff file creation, document-path-to-parent workspace resolution, Google Antigravity profile support, and PATH executable probing. |
+
 Vim punctuation word-motion parity:
 
 | Command | Result | Evidence |
