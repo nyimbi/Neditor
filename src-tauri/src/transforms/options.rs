@@ -37,57 +37,33 @@ impl TransformExecutionOptions {
     }
 
     pub(crate) fn engine_path(&self, name: &str) -> Option<String> {
-        self.engine_paths
-            .get(name)
-            .or_else(|| {
-                if name == "graphviz" {
-                    self.engine_paths.get("dot")
-                } else {
-                    None
-                }
-            })
+        option_lookup_keys(name)
+            .iter()
+            .find_map(|key| self.engine_paths.get(*key))
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
     }
 
     pub(crate) fn trusted(&self, name: &str) -> bool {
-        self.trusted_engines
-            .get(name)
-            .or_else(|| {
-                if name == "graphviz" {
-                    self.trusted_engines.get("dot")
-                } else {
-                    None
-                }
-            })
+        option_lookup_keys(name)
+            .iter()
+            .find_map(|key| self.trusted_engines.get(*key))
             .copied()
             .unwrap_or(false)
     }
 
     pub(crate) fn disabled(&self, name: &str) -> bool {
-        self.disabled_engines
-            .get(name)
-            .or_else(|| {
-                if name == "graphviz" {
-                    self.disabled_engines.get("dot")
-                } else {
-                    None
-                }
-            })
+        option_lookup_keys(name)
+            .iter()
+            .find_map(|key| self.disabled_engines.get(*key))
             .copied()
             .unwrap_or(false)
     }
 
     pub(crate) fn input_mode(&self, name: &str) -> Option<String> {
-        self.input_modes
-            .get(name)
-            .or_else(|| {
-                if name == "graphviz" {
-                    self.input_modes.get("dot")
-                } else {
-                    None
-                }
-            })
+        option_lookup_keys(name)
+            .iter()
+            .find_map(|key| self.input_modes.get(*key))
             .cloned()
     }
 
@@ -117,6 +93,34 @@ impl TransformExecutionOptions {
                 .components()
                 .any(|component| matches!(component, std::path::Component::ParentDir)),
         }
+    }
+}
+
+fn option_lookup_keys(name: &str) -> Vec<&str> {
+    let aliases = transform_option_aliases(name);
+    if aliases.is_empty() {
+        vec![name]
+    } else {
+        aliases.to_vec()
+    }
+}
+
+fn transform_option_aliases(name: &str) -> &'static [&'static str] {
+    match name {
+        "dot" | "graphviz" | "graph" => &["dot", "graphviz", "graph"],
+        "vega-lite" | "vegalite" => &["vega-lite", "vegalite"],
+        "json-schema" | "jsonschema" | "schema" => &["json-schema", "jsonschema", "schema"],
+        "yaml" | "yml" => &["yaml", "yml"],
+        "plantuml" => &["plantuml"],
+        "d2" => &["d2"],
+        "pikchr" => &["pikchr"],
+        "circo" => &["circo"],
+        "neato" => &["neato"],
+        "fdp" => &["fdp"],
+        "osage" => &["osage"],
+        "twopi" => &["twopi"],
+        "sql" => &["sql"],
+        _ => &[],
     }
 }
 

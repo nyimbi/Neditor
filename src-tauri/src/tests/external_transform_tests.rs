@@ -755,6 +755,47 @@ fn compiler_uses_dot_settings_for_graphviz_alias() {
 
 #[cfg(unix)]
 #[test]
+fn compiler_resolves_transform_option_aliases_for_graph_fences() {
+    let graph = write_executable_script(
+        "compiler-graph-option-alias-adapter",
+        "#!/bin/sh\nprintf '<svg data-args=\"%s\">' \"$*\"\ncat\nprintf '</svg>'\n",
+    );
+    let response = compile_with_options(
+        CompileRequest {
+            text:
+                "---\ntitle: Graph Alias\n---\n# Graph Alias\n```graph\ndigraph { alias -> settings }\n```\n"
+                    .to_string(),
+            file_path: None,
+        },
+        &json!({
+            "transformEnginePaths": { "graph": path_to_string(&graph) },
+            "trustedTransformEngines": { "graph": true },
+            "transformInputModes": { "graph": "stdin" },
+            "transformTimeoutMs": 1000
+        }),
+    );
+
+    let artifact = response
+        .transform_artifacts
+        .iter()
+        .find(|artifact| artifact.name == "dot")
+        .expect("canonical dot artifact from graph fence");
+    assert_eq!(artifact.execution_kind, "external");
+    assert_eq!(artifact.input_mode, "stdin");
+    assert!(artifact
+        .engine_path
+        .as_deref()
+        .is_some_and(|path| path == path_to_string(&graph)));
+    assert!(artifact.html.contains("digraph { alias -> settings }"));
+    assert!(artifact.html.contains("-Tsvg"));
+    assert!(response.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("dot external transform completed")));
+    let _ = fs::remove_file(graph);
+}
+
+#[cfg(unix)]
+#[test]
 fn compiler_uses_trusted_graphviz_variant_transform_preferences() {
     let neato = write_executable_script(
         "compiler-neato-adapter",

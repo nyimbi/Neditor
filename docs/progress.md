@@ -58,6 +58,14 @@ BibTeX and CSL style fidelity:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked bibtex_transform_renders_bibliography_preview --lib` | Pass | BibTeX transform previews now surface richer real-world metadata including edition, ISBN, ISSN, and abstract in addition to existing author/year/publisher/journal/volume/issue/pages/DOI/URL fields. |
 | `pnpm run test:unit` | Pass | 87 frontend unit/static tests passed, including citation-style preference normalization for `nature`, `AMA`, and `elsevier-vancouver`. |
 
+Transform option alias architecture:
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_resolves_transform_option_aliases_for_graph_fences --lib` | Pass | Transform engine path, trust, and input-mode settings keyed as `graph` now resolve through the canonical `dot` artifact for a `graph` fence, proving preference aliases follow the same transform alias model as rendered fences. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked external_transform_tests --lib` | Pass | All 16 external-transform tests passed, including trust gating, cache reuse/invalidation, Graphviz alias inheritance, graph option aliases, adapter argument shaping, missing/disabled engine diagnostics, timeout handling, and installed-engine conformance when available. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked transform_tests --lib` | Pass | All 54 transform tests passed after the option alias change, covering first-release transform registry behavior, aliases, embedded fallbacks, structured data, diagrams, charts, visual data, and business transforms. |
+
 ## Completed Recently
 
 Recent pushed checkpoints visible in current git history:
