@@ -27,6 +27,30 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Master Include Evidence Closure
+
+`5.4 Master Documents And Includes | Include syntaxes, relative resolution,
+strip child front matter, circular diagnostics` is now marked complete in
+`docs/spec-completion-matrix.md`. The closure reuses the current include proof
+from `9.6 Includes`: documented include directive forms, relative expansion,
+child front matter stripping, circular/depth/read diagnostics, source maps,
+bundle include maps, browser watcher/navigation workflows, and native include
+watch recompilation are all covered by current evidence.
+
+Focused table verification also confirms the user's requested two-way table
+workflow is implemented: users can create a table visually, insert it as
+Markdown text, edit the pipe-table text directly, sync text into the visual
+grid, apply edited source text back into the document, export edited source to
+CSV, and edit a single table cell directly in Markdown. The remaining table row
+gap is not implementation: `pnpm run check:tables:manual` still writes a
+pending human-review summary until a supported-host table-editor sign-off file
+is supplied.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs command palette insertion and table editor workflows" --project chromium` | Pass | Focused Chromium workflow passed on 2026-05-28, proving table creation, direct Markdown source editing, text-to-grid sync, source-text apply, edited-source CSV export, source range selection, and direct cell-to-text editing. |
+| `pnpm run check:tables:manual` | Pass with pending human sign-off | The table editor manual-review template and pending summary were regenerated; no `NEDITOR_TABLE_EDITOR_SIGNOFF` file was supplied in this session. |
+
 ## 2026-05-28 Multi-Cursor Evidence Closure
 
 `6.3 Editor | Multi-cursor support` is now marked complete in
