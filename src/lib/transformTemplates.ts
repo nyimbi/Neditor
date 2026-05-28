@@ -929,6 +929,32 @@ y: risk
     ["vega-lite", "text", "readiness", "qa"],
   ),
   template(
+    "vega-lite-sla-thresholds",
+    "Charts",
+    "vega-lite",
+    "SLA threshold rules",
+    "Creates Vega-Lite rule marks for target, warning, or compliance threshold lines.",
+    fenced(
+      "vega-lite",
+      `{
+  "mark": "rule",
+  "title": "SLA threshold rules",
+  "data": {
+    "values": [
+      { "threshold": 95, "lane": "Target", "label": "Committed SLA" },
+      { "threshold": 80, "lane": "Watch", "label": "Review floor" }
+    ]
+  },
+  "encoding": {
+    "y": { "field": "threshold", "type": "quantitative", "title": "Score" },
+    "color": { "field": "lane" },
+    "text": { "field": "label" }
+  }
+}`,
+    ),
+    ["vega-lite", "rule", "threshold", "sla", "qa"],
+  ),
+  template(
     "timeline-launch",
     "Business",
     "timeline",

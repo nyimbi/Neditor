@@ -6018,6 +6018,11 @@ test("transform template library covers reusable calculations and custom templat
   if (!vegaTextTemplate) throw new Error("missing Vega-Lite text template");
   ok(vegaTextTemplate.body.includes('"mark": "text"'));
   ok(vegaTextTemplate.body.includes('"text": { "field": "label" }'));
+  const vegaRuleTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-sla-thresholds");
+  if (!vegaRuleTemplate) throw new Error("missing Vega-Lite rule template");
+  ok(vegaRuleTemplate.body.includes('"mark": "rule"'));
+  ok(vegaRuleTemplate.body.includes('"text": { "field": "label" }'));
+  ok(vegaRuleTemplate.tags.includes("threshold"));
   deepEqual(
     transformTemplateFillFields({
       transform: "calc",

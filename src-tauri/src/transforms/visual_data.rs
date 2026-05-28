@@ -24,18 +24,29 @@ pub(crate) fn render_vega_lite_svg(
     let mark = vega_lite_mark(&spec);
     if !matches!(
         mark.as_str(),
-        "bar" | "line" | "point" | "circle" | "square" | "area" | "tick" | "text"
+        "bar" | "line" | "point" | "circle" | "square" | "area" | "tick" | "text" | "rule"
     ) {
         let diagnostic = diag(
             "warning",
             format!("Unsupported Vega-Lite mark for native preview: {mark}"),
             None,
             None,
-            Some("Use bar, line, point, circle, square, area, tick, or text marks for the native static preview."),
+            Some("Use bar, line, point, circle, square, area, tick, text, or rule marks for the native static preview."),
         );
         artifact_diags.push(diagnostic.clone());
         diagnostics.push(diagnostic);
         return "<section class=\"transform transform-vega-lite transform-error\">Unsupported Vega-Lite mark</section>".to_string();
+    }
+    let color_field = vega_lite_encoding_field(&spec, "color");
+    let text_field = vega_lite_encoding_field(&spec, "text");
+    if mark == "rule" {
+        return render_vega_lite_rule_svg(
+            &spec,
+            color_field.as_deref(),
+            text_field.as_deref(),
+            artifact_diags,
+            diagnostics,
+        );
     }
     let Some(x_field) = vega_lite_encoding_field(&spec, "x") else {
         return vega_lite_missing_field("x", artifact_diags, diagnostics);
@@ -43,8 +54,6 @@ pub(crate) fn render_vega_lite_svg(
     let Some(y_field) = vega_lite_encoding_field(&spec, "y") else {
         return vega_lite_missing_field("y", artifact_diags, diagnostics);
     };
-    let color_field = vega_lite_encoding_field(&spec, "color");
-    let text_field = vega_lite_encoding_field(&spec, "text");
     let size_field = vega_lite_encoding_field(&spec, "size");
     let y_aggregate = vega_lite_encoding_aggregate(&spec, "y");
     let values = vega_lite_values(
@@ -289,6 +298,12 @@ fn vega_lite_encoding_aggregate(spec: &Value, channel: &str) -> Option<String> {
         .filter(|value| matches!(value.as_str(), "sum" | "mean" | "average" | "min" | "max"))
 }
 
+fn vega_lite_encoding_numeric_datum(spec: &Value, channel: &str) -> Option<f64> {
+    spec.pointer(&format!("/encoding/{channel}/datum"))
+        .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))
+        .filter(|value| value.is_finite())
+}
+
 #[derive(Clone, Debug)]
 struct VegaLiteDatum {
     label: String,
@@ -296,6 +311,26 @@ struct VegaLiteDatum {
     series: Option<String>,
     text: Option<String>,
     size: Option<f64>,
+}
+
+#[derive(Clone, Debug)]
+struct VegaLiteRuleDatum {
+    label: String,
+    value: f64,
+    series: Option<String>,
+    text: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum VegaLiteRuleOrientation {
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Clone, Debug)]
+enum VegaLiteRuleSource {
+    Field(String),
+    Datum(f64),
 }
 
 fn vega_lite_values(
@@ -342,6 +377,129 @@ fn vega_lite_values(
     match y_aggregate {
         Some(aggregate) => aggregate_vega_lite_values(values, aggregate),
         None => values,
+    }
+}
+
+fn render_vega_lite_rule_svg(
+    spec: &Value,
+    color_field: Option<&str>,
+    text_field: Option<&str>,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let title = spec
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or("Vega-Lite rule");
+    let Some((orientation, source, axis_title)) = vega_lite_rule_source(spec) else {
+        let diagnostic = diag(
+            "warning",
+            "Vega-Lite rule native preview is missing a numeric x or y field/datum.",
+            None,
+            None,
+            Some("Set encoding.y.field, encoding.y.datum, encoding.x.field, or encoding.x.datum for rule marks."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-vega-lite transform-error\">Missing rule encoding</section>".to_string();
+    };
+    let values = vega_lite_rule_values(spec, &source, color_field, text_field);
+    if values.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "Vega-Lite rule native preview did not find numeric rule values.",
+            None,
+            None,
+            Some("Use numeric rule field values in data.values, or a numeric encoding datum."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-vega-lite transform-error\">No drawable Vega-Lite rules</section>".to_string();
+    }
+    render_vega_lite_rule_chart_svg(title, orientation, &values, &axis_title)
+}
+
+fn vega_lite_rule_source(
+    spec: &Value,
+) -> Option<(VegaLiteRuleOrientation, VegaLiteRuleSource, String)> {
+    if let Some(field) = vega_lite_encoding_field(spec, "y") {
+        let title = vega_lite_encoding_title(spec, "y").unwrap_or_else(|| field.clone());
+        return Some((
+            VegaLiteRuleOrientation::Horizontal,
+            VegaLiteRuleSource::Field(field),
+            title,
+        ));
+    }
+    if let Some(value) = vega_lite_encoding_numeric_datum(spec, "y") {
+        let title = vega_lite_encoding_title(spec, "y").unwrap_or_else(|| "y datum".to_string());
+        return Some((
+            VegaLiteRuleOrientation::Horizontal,
+            VegaLiteRuleSource::Datum(value),
+            title,
+        ));
+    }
+    if let Some(field) = vega_lite_encoding_field(spec, "x") {
+        let title = vega_lite_encoding_title(spec, "x").unwrap_or_else(|| field.clone());
+        return Some((
+            VegaLiteRuleOrientation::Vertical,
+            VegaLiteRuleSource::Field(field),
+            title,
+        ));
+    }
+    if let Some(value) = vega_lite_encoding_numeric_datum(spec, "x") {
+        let title = vega_lite_encoding_title(spec, "x").unwrap_or_else(|| "x datum".to_string());
+        return Some((
+            VegaLiteRuleOrientation::Vertical,
+            VegaLiteRuleSource::Datum(value),
+            title,
+        ));
+    }
+    None
+}
+
+fn vega_lite_rule_values(
+    spec: &Value,
+    source: &VegaLiteRuleSource,
+    color_field: Option<&str>,
+    text_field: Option<&str>,
+) -> Vec<VegaLiteRuleDatum> {
+    match source {
+        VegaLiteRuleSource::Datum(value) if value.is_finite() => vec![VegaLiteRuleDatum {
+            label: format_vega_value(*value),
+            value: *value,
+            series: None,
+            text: None,
+        }],
+        VegaLiteRuleSource::Datum(_) => Vec::new(),
+        VegaLiteRuleSource::Field(field) => spec
+            .pointer("/data/values")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|row| {
+                let value = row
+                    .get(field)
+                    .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))?;
+                let series = color_field
+                    .and_then(|field| row.get(field))
+                    .map(value_to_axis_label)
+                    .filter(|value| !value.trim().is_empty());
+                let text = text_field
+                    .and_then(|field| row.get(field))
+                    .map(value_to_axis_label)
+                    .filter(|value| !value.trim().is_empty());
+                let label = text
+                    .clone()
+                    .or_else(|| series.clone())
+                    .unwrap_or_else(|| format!("{} {}", field, format_vega_value(value)));
+                Some(VegaLiteRuleDatum {
+                    label,
+                    value,
+                    series,
+                    text,
+                })
+            })
+            .collect(),
     }
 }
 
@@ -605,6 +763,95 @@ fn render_vega_lite_chart_svg(
     svg
 }
 
+fn render_vega_lite_rule_chart_svg(
+    title: &str,
+    orientation: VegaLiteRuleOrientation,
+    values: &[VegaLiteRuleDatum],
+    axis_title: &str,
+) -> String {
+    let min = values
+        .iter()
+        .map(|datum| datum.value)
+        .filter(|value| value.is_finite())
+        .fold(0.0_f64, f64::min);
+    let mut max = values
+        .iter()
+        .map(|datum| datum.value)
+        .filter(|value| value.is_finite())
+        .fold(0.0_f64, f64::max);
+    let mut min = min;
+    if (max - min).abs() < f64::EPSILON {
+        max = (max + 1.0).max(1.0);
+        min = min.min(0.0);
+    }
+    let series = unique_vega_rule_series(values);
+    let orientation_attr = match orientation {
+        VegaLiteRuleOrientation::Horizontal => "horizontal",
+        VegaLiteRuleOrientation::Vertical => "vertical",
+    };
+    let mut svg = format!(
+        "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 820 340\" role=\"img\" data-vega-mark=\"rule\" data-rule-orientation=\"{orientation_attr}\"><text x=\"72\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><rect x=\"72\" y=\"54\" width=\"698\" height=\"208\" fill=\"#f8fafc\" stroke=\"#cbd5e1\"/><line x1=\"72\" y1=\"262\" x2=\"770\" y2=\"262\" stroke=\"#94a3b8\"/><line x1=\"72\" y1=\"54\" x2=\"72\" y2=\"262\" stroke=\"#94a3b8\"/>",
+        escape_html(title),
+    );
+    match orientation {
+        VegaLiteRuleOrientation::Horizontal => {
+            let zero_y = chart_value_y(0.0, min, max);
+            svg.push_str(&format!(
+                "<line class=\"vega-zero-line\" x1=\"72\" y1=\"{zero_y:.1}\" x2=\"770\" y2=\"{zero_y:.1}\" stroke=\"#64748b\" stroke-dasharray=\"4 3\"/>"
+            ));
+            render_vega_axis_titles(&mut svg, "", axis_title);
+            for (index, datum) in values.iter().enumerate() {
+                let y = chart_value_y(datum.value, min, max);
+                let color = VEGA_SERIES_COLORS[index % VEGA_SERIES_COLORS.len()];
+                let label = datum.text.as_deref().unwrap_or(&datum.label);
+                let value_label = format_vega_value(datum.value);
+                let series_attr = datum
+                    .series
+                    .as_deref()
+                    .map(|series| format!(" data-series=\"{}\"", escape_html(series)))
+                    .unwrap_or_default();
+                svg.push_str(&format!(
+                    "<line class=\"vega-rule-mark\" x1=\"72\" y1=\"{y:.1}\" x2=\"770\" y2=\"{y:.1}\" stroke=\"{color}\" stroke-width=\"3\" stroke-dasharray=\"8 5\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}/><text class=\"vega-rule-label\" x=\"762\" y=\"{:.1}\" font-size=\"12\" text-anchor=\"end\" fill=\"{color}\">{}</text>",
+                    y - 6.0,
+                    escape_html(label),
+                    escape_html(&value_label),
+                    escape_html(&value_label),
+                    escape_html(label)
+                ));
+            }
+        }
+        VegaLiteRuleOrientation::Vertical => {
+            let zero_x = chart_value_x(0.0, min, max);
+            svg.push_str(&format!(
+                "<line class=\"vega-zero-line\" x1=\"{zero_x:.1}\" y1=\"54\" x2=\"{zero_x:.1}\" y2=\"262\" stroke=\"#64748b\" stroke-dasharray=\"4 3\"/>"
+            ));
+            render_vega_axis_titles(&mut svg, axis_title, "");
+            for (index, datum) in values.iter().enumerate() {
+                let x = chart_value_x(datum.value, min, max);
+                let color = VEGA_SERIES_COLORS[index % VEGA_SERIES_COLORS.len()];
+                let label = datum.text.as_deref().unwrap_or(&datum.label);
+                let value_label = format_vega_value(datum.value);
+                let series_attr = datum
+                    .series
+                    .as_deref()
+                    .map(|series| format!(" data-series=\"{}\"", escape_html(series)))
+                    .unwrap_or_default();
+                svg.push_str(&format!(
+                    "<line class=\"vega-rule-mark\" x1=\"{x:.1}\" y1=\"54\" x2=\"{x:.1}\" y2=\"262\" stroke=\"{color}\" stroke-width=\"3\" stroke-dasharray=\"8 5\" aria-label=\"{} {}\" data-value=\"{}\"{series_attr}/><text class=\"vega-rule-label\" x=\"{:.1}\" y=\"72\" font-size=\"12\" text-anchor=\"middle\" fill=\"{color}\">{}</text>",
+                    x + 4.0,
+                    escape_html(label),
+                    escape_html(&value_label),
+                    escape_html(&value_label),
+                    escape_html(label)
+                ));
+            }
+        }
+    }
+    render_vega_legend(&mut svg, &series);
+    svg.push_str("</svg>");
+    svg
+}
+
 #[derive(Clone, Debug)]
 struct VegaLiteSizeDomain {
     min: f64,
@@ -676,6 +923,13 @@ fn chart_value_y(value: f64, min: f64, max: f64) -> f64 {
     plot_top + ((max - value) / range) * (plot_bottom - plot_top)
 }
 
+fn chart_value_x(value: f64, min: f64, max: f64) -> f64 {
+    let plot_left = 72.0_f64;
+    let plot_right = 770.0_f64;
+    let range = (max - min).abs().max(1.0);
+    plot_left + ((value - min) / range) * (plot_right - plot_left)
+}
+
 fn format_vega_value(value: f64) -> String {
     let rounded = (value * 100.0).round() / 100.0;
     if (rounded.fract()).abs() < 0.001 {
@@ -700,6 +954,18 @@ fn unique_vega_labels(values: &[VegaLiteDatum]) -> Vec<String> {
 }
 
 fn unique_vega_series(values: &[VegaLiteDatum]) -> Vec<String> {
+    let mut series = Vec::new();
+    for datum in values {
+        if let Some(name) = &datum.series {
+            if !series.iter().any(|series| series == name) {
+                series.push(name.clone());
+            }
+        }
+    }
+    series
+}
+
+fn unique_vega_rule_series(values: &[VegaLiteRuleDatum]) -> Vec<String> {
     let mut series = Vec::new();
     for datum in values {
         if let Some(name) = &datum.series {

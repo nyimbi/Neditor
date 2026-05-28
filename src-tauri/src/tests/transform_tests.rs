@@ -1395,6 +1395,42 @@ fn vega_lite_preview_preserves_negative_values_aggregation_and_axis_titles() {
 }
 
 #[test]
+fn vega_lite_rule_mark_renders_reference_lines() {
+    let horizontal = run_transform(
+            "vega-lite".to_string(),
+            r##"{"mark":"rule","title":"SLA Thresholds","data":{"values":[{"threshold":95,"lane":"Target","label":"Committed SLA"},{"threshold":80,"lane":"Watch","label":"Review floor"}]},"encoding":{"y":{"field":"threshold","type":"quantitative","title":"Score"},"color":{"field":"lane"},"text":{"field":"label"}}}"##.to_string(),
+        )
+        .expect("vega-lite horizontal rule transform");
+
+    assert_eq!(horizontal.output_kind, "svg");
+    assert!(horizontal.html.contains("SLA Thresholds"));
+    assert!(horizontal.html.contains("data-vega-mark=\"rule\""));
+    assert!(horizontal
+        .html
+        .contains("data-rule-orientation=\"horizontal\""));
+    assert!(horizontal.html.contains("vega-rule-mark"));
+    assert!(horizontal.html.contains("Committed SLA"));
+    assert!(horizontal.html.contains("Review floor"));
+    assert!(horizontal.html.contains("data-series=\"Target\""));
+    assert!(horizontal.html.contains("data-value=\"95\""));
+    assert!(horizontal.diagnostics.is_empty());
+
+    let vertical = run_transform(
+            "vega-lite".to_string(),
+            r##"{"mark":{"type":"rule"},"title":"Budget Gate","encoding":{"x":{"datum":120000,"type":"quantitative","title":"Budget"}}}"##.to_string(),
+        )
+        .expect("vega-lite vertical datum rule transform");
+
+    assert_eq!(vertical.output_kind, "svg");
+    assert!(vertical.html.contains("Budget Gate"));
+    assert!(vertical.html.contains("data-rule-orientation=\"vertical\""));
+    assert!(vertical.html.contains("data-value=\"120000\""));
+    assert!(vertical.html.contains(">120000<"));
+    assert!(vertical.html.contains(">Budget<"));
+    assert!(vertical.diagnostics.is_empty());
+}
+
+#[test]
 fn vega_lite_unsupported_marks_report_supported_static_subset() {
     let artifact = run_transform(
             "vega-lite".to_string(),
@@ -1408,7 +1444,7 @@ fn vega_lite_unsupported_marks_report_supported_static_subset() {
         .suggestion
         .as_deref()
         .is_some_and(|suggestion| suggestion
-            .contains("bar, line, point, circle, square, area, tick, or text"))));
+            .contains("bar, line, point, circle, square, area, tick, text, or rule"))));
 }
 
 #[test]
