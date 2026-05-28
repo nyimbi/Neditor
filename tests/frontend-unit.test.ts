@@ -3598,6 +3598,11 @@ test("quality recommendations flag Deep Research sources that are indexed but no
       "",
       "Research loop evidence.",
       "",
+      "## Quality Assurance & Review Handoff",
+      "",
+      "- [ ] Resolve citation TODOs before external distribution.",
+      "- [ ] Preserve source-library audit evidence with the final review packet.",
+      "",
     ].join("\n"),
     semantic: {
       title: "Report",
@@ -3610,6 +3615,42 @@ test("quality recommendations flag Deep Research sources that are indexed but no
 
   ok(recommendations.some((item) => item.id === "deep-research-citation-grounding" && item.severity === "risk"));
   ok(!recommendations.some((item) => item.id === "citation-evidence"));
+});
+
+test("quality recommendations accept Deep Research body citation TODOs as grounding work", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "# Report",
+      "",
+      "## Findings",
+      "",
+      "The reviewed document needs a source before release. Citation TODO: verify against the saved source.",
+      "",
+      "## Source Citation Index",
+      "",
+      "| Citation | Source | Evidence | Local copy |",
+      "| --- | --- | --- | --- |",
+      "| [@agency2026] | [Policy Evidence](https://agency.gov/policy.pdf) | Controls policy. | report.neditor-sources/policy.pdf |",
+      "",
+      "## Bibliography",
+      "",
+      "[BIBLIOGRAPHY]",
+      "",
+      "## Quality Assurance & Review Handoff",
+      "",
+      "- [ ] Resolve citation TODOs before external distribution.",
+      "",
+    ].join("\n"),
+    semantic: {
+      title: "Report",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  ok(!recommendations.some((item) => item.id === "deep-research-citation-grounding"));
 });
 
 test("quality recommendations accept Deep Research body citations backed by bibliography", () => {

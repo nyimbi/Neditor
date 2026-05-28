@@ -56,10 +56,11 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
   const citationCount = (analysisText.match(CITATION_RE) || []).length;
   const bibliographyPresent = hasBibliographyEvidence(text);
   const deepResearchDocument = DEEP_RESEARCH_MARKER_RE.test(text);
-  const deepResearchBodyCitationCount = deepResearchDocument
-    ? ((documentBodyForInlineCitationReview(analysisText).match(CITATION_RE) || []).length)
-    : citationCount;
-  const citationTodoCount = (analysisText.match(CITATION_TODO_RE) || []).length;
+  const inlineCitationReviewText = deepResearchDocument
+    ? documentBodyForInlineCitationReview(analysisText)
+    : analysisText;
+  const deepResearchBodyCitationCount = (inlineCitationReviewText.match(CITATION_RE) || []).length;
+  const citationTodoCount = (inlineCitationReviewText.match(CITATION_TODO_RE) || []).length;
   const headings = (analysisText.match(HEADING_RE) || []).length;
   const longParagraphs = longParagraphCount(analysisText);
   const genericPhrases = analysisText.match(GENERIC_AI_PHRASE_RE) || [];
