@@ -245,6 +245,7 @@ import {
   applyWorkspaceRefreshFailureState,
   applyWorkspaceRefreshSuccessState,
   applyWorkspaceRestoreState,
+  applySavedWorkspaceDocumentState,
   clearWorkspaceRefreshState,
   createRestoredWorkspaceDocumentState,
   forgetWorkspaceFolderState,
@@ -919,6 +920,24 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   deepEqual(duplicated.documents.map((document) => document.id), ["restored-1", "copy-1"]);
   deepEqual(duplicated.recentFiles, ["/workspace/copy.md", "/old.md"]);
   equal(duplicated.statusMessage, "Duplicated copy.md");
+
+  const savedWorkspace = applySavedWorkspaceDocumentState(
+    { ...restored, text: "# Draft", dirty: true, savedHash: "old-hash" },
+    {
+      path: "/workspace/saved.md",
+      text: "# Saved",
+      hash: "hash-saved",
+      modified: "2026-05-28T12:00:00.000Z",
+    },
+    ["/old.md", "/workspace/saved.md"],
+  );
+  equal(savedWorkspace.document.path, "/workspace/saved.md");
+  equal(savedWorkspace.document.title, "saved.md");
+  equal(savedWorkspace.document.dirty, false);
+  equal(savedWorkspace.document.savedText, "# Saved");
+  deepEqual(savedWorkspace.recentFiles, ["/workspace/saved.md", "/old.md"]);
+  deepEqual(savedWorkspace.ignoredConflictHashes, {});
+  equal(savedWorkspace.statusMessage, "Saved saved.md");
 });
 
 test("file lifecycle helpers update document state for rich file operations", () => {

@@ -34,7 +34,6 @@ import {
 import {
   applyRenamedDocumentState,
   applyRevertedDocumentState,
-  applySavedDocumentState,
   applyUntitledRevertState,
   applyUpdatedDocumentTextState,
   createDuplicateDocumentState,
@@ -97,6 +96,7 @@ import {
   applyWorkspaceRefreshFailureState,
   applyWorkspaceRefreshSuccessState,
   applyWorkspaceRestoreState,
+  applySavedWorkspaceDocumentState,
   clearWorkspaceRefreshState,
   createRestoredWorkspaceDocumentState,
   forgetWorkspaceFolderState,
@@ -713,11 +713,11 @@ export const useDocumentsStore = defineStore("documents", {
         }
         throw error;
       }
-      const saved = applySavedDocumentState(doc, response);
+      const saved = applySavedWorkspaceDocumentState(doc, response, this.recentFiles);
       Object.assign(doc, saved.document);
-      this.clearIgnoredConflicts();
+      this.ignoredConflictHashes = saved.ignoredConflictHashes;
+      this.recentFiles = saved.recentFiles;
       this.statusMessage = saved.statusMessage;
-      this.rememberFile(doc.path);
       if (this.workspaceRoot) await this.refreshWorkspace();
       await this.refreshGitStatus();
       await this.persistWorkspace();

@@ -1,5 +1,5 @@
 import type { OpenDocument } from "../types.js";
-import { titleFromPath } from "./fileLifecycle.js";
+import { applySavedDocumentState, titleFromPath, type FileContentResponse } from "./fileLifecycle.js";
 import { forgetRecentItem, rememberRecentItem } from "./recentItems.js";
 import { clampScrollRatio } from "./workspacePersistence.js";
 
@@ -51,6 +51,13 @@ export interface DuplicatedWorkspaceDocumentStateResult {
   documents: OpenDocument[];
   activeId: string;
   recentFiles: string[];
+  statusMessage: string;
+}
+
+export interface SavedWorkspaceDocumentStateResult {
+  document: OpenDocument;
+  recentFiles: string[];
+  ignoredConflictHashes: Record<string, string>;
   statusMessage: string;
 }
 
@@ -251,5 +258,19 @@ export function applyDuplicatedWorkspaceDocumentState(
     activeId: document.id,
     recentFiles: rememberRecentItem(recentFiles, document.path, 20),
     statusMessage: `Duplicated ${document.title}`,
+  };
+}
+
+export function applySavedWorkspaceDocumentState(
+  document: OpenDocument,
+  response: FileContentResponse,
+  recentFiles: string[],
+): SavedWorkspaceDocumentStateResult {
+  const saved = applySavedDocumentState(document, response);
+  return {
+    document: saved.document,
+    recentFiles: rememberRecentItem(recentFiles, saved.document.path, 20),
+    ignoredConflictHashes: {},
+    statusMessage: saved.statusMessage,
   };
 }
