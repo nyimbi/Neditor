@@ -142,6 +142,160 @@ fn compiler_resolves_metadata_variables_transforms_and_manifest() {
 }
 
 #[test]
+fn compiler_pipeline_orders_source_semantic_preview_and_manifest_phases() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-pipeline-test-{unique}"));
+    let chapters = root.join("chapters");
+    fs::create_dir_all(&chapters).expect("create pipeline chapters");
+    fs::create_dir_all(root.join(".neditor")).expect("create pipeline settings");
+    fs::write(
+        root.join(".neditor").join("variables.yaml"),
+        "profile:\n  owner: Strategy Office\n",
+    )
+    .expect("write project variables");
+    let child_path = chapters.join("findings.md");
+    fs::write(
+        &child_path,
+        "## Included Findings {#sec:findings}\n\nIncluded ARR evidence is cited [@doe2026]. Working capital{#index:Liquidity} matters.\n",
+    )
+    .expect("write included findings");
+    let root_path = root.join("pipeline.md");
+    let root_text = r#"---
+title: Pipeline Proof
+version: 2.0.0
+status: approved
+approvedBy: QA
+toc: true
+client: Acme Holdings
+citationStyle: author-year
+index:
+  enabled: true
+  terms:
+    - Liquidity
+---
+# Pipeline Proof
+
+[TOC]
+
+Owner: {{profile.owner}}
+Client: {{client}}
+
+!include chapters/findings.md
+
+See {@sec:findings}.
+
+```calc
+revenue = 250
+cost = 100
+profit = revenue - cost
+```
+
+Profit: {{=profit | currency}}
+
+```csv caption="Pipeline table"
+Metric,Value
+Revenue,250
+Cost,100
+```
+
+[INDEX]
+
+[BIBLIOGRAPHY]
+
+```bibtex
+@article{doe2026,
+ title={Pipeline Evidence},
+ author={Doe},
+ year={2026}
+}
+```
+"#;
+    fs::write(&root_path, root_text).expect("write pipeline root");
+
+    let response = compile(CompileRequest {
+        text: root_text.to_string(),
+        file_path: Some(path_to_string(&root_path)),
+    });
+
+    assert_eq!(response.semantic.title, "Pipeline Proof");
+    assert_eq!(response.semantic.status, "approved");
+    assert!(response
+        .diagnostics
+        .iter()
+        .all(|diagnostic| diagnostic.severity != "error"));
+    assert!(response
+        .compiled_markdown
+        .contains("Owner: Strategy Office"));
+    assert!(response.compiled_markdown.contains("Client: Acme Holdings"));
+    assert!(response.compiled_markdown.contains("Included ARR evidence"));
+    assert!(response.compiled_markdown.contains("Profit: $150.00"));
+    assert!(response.compiled_markdown.contains("## Table of Contents"));
+    assert!(response.compiled_markdown.contains("## Index"));
+    assert!(response
+        .compiled_markdown
+        .contains("- **doe2026**. Doe 2026. Pipeline Evidence"));
+    assert!(response
+        .compiled_markdown
+        .contains("See [Section findings](#sec:findings)."));
+    assert!(response.html.contains("<h1 id=\"pipeline-proof\">"));
+    assert!(response.html.contains("transform-table"));
+    assert!(response.html.contains("Pipeline Evidence"));
+    assert!(response
+        .include_graph
+        .iter()
+        .any(|edge| edge.child == path_to_string(&child_path) && edge.depth == 1));
+    assert!(response
+        .source_map
+        .iter()
+        .any(|entry| entry.source_file == path_to_string(&child_path)));
+    assert!(response
+        .semantic
+        .headings
+        .iter()
+        .any(|heading| heading.text == "Included Findings" && heading.anchor == "sec:findings"));
+    assert!(response
+        .semantic
+        .citations
+        .iter()
+        .any(|citation| citation == "doe2026"));
+    assert!(response
+        .semantic
+        .cross_references
+        .iter()
+        .any(|reference| reference.key == "sec:findings" && reference.resolved));
+    assert!(response.index_terms.iter().any(|term| term == "Liquidity"));
+    assert!(response
+        .formula_graph
+        .iter()
+        .any(|formula| formula.name == "profit" && formula.value == Some(150.0)));
+    assert!(response
+        .transform_artifacts
+        .iter()
+        .any(|artifact| artifact.name == "csv"
+            && artifact.options.get("caption").and_then(Value::as_str) == Some("Pipeline table")));
+    assert_eq!(response.export_manifest.document_title, "Pipeline Proof");
+    assert_eq!(response.export_manifest.document_version, "2.0.0");
+    assert!(response
+        .export_manifest
+        .included_files
+        .iter()
+        .any(|file| file.path == path_to_string(&child_path)));
+    assert_eq!(
+        response.export_manifest.source_map.len(),
+        response.source_map.len()
+    );
+    assert_eq!(
+        response.export_manifest.transform_artifacts.len(),
+        response.transform_artifacts.len()
+    );
+
+    fs::remove_dir_all(root).expect("clean pipeline test dir");
+}
+
+#[test]
 fn compiler_renders_empty_bibliography_placeholder() {
     let response = compile(CompileRequest {
         text: "---\ntitle: Empty Bibliography\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-20\n---\n# Empty Bibliography\n\n[BIBLIOGRAPHY]\n"
