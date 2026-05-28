@@ -2074,13 +2074,13 @@ test("keeps primary workbench regions accessible across desktop and narrow viewp
   const editor = page.getByRole("region", { name: "Markdown source" });
   const preview = page.getByRole("region", { name: "Live preview" });
 
-  await expect(sidebar.getByRole("heading", { name: "Outline" })).toBeVisible();
+  await expect(sidebar.getByRole("heading", { level: 2, name: /Outline/ })).toBeVisible();
   await expect(editor).toBeVisible();
   await expect(preview).toBeVisible();
   await expect.poll(() => workspace.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBeGreaterThan(1);
 
   await page.setViewportSize({ width: 390, height: 820 });
-  await expect(sidebar.getByRole("heading", { name: "Outline" })).toBeVisible();
+  await expect(sidebar.getByRole("heading", { level: 2, name: /Outline/ })).toBeVisible();
   await expect(editor).toBeVisible();
   await expect(preview).toBeVisible();
   await expect.poll(() => workspace.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(1);
