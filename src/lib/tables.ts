@@ -97,6 +97,17 @@ export interface MarkdownTableCellEdit {
   value: string;
 }
 
+export interface MarkdownTableCellNavigationTarget {
+  tableIndex: number;
+  lineNumber: number;
+  columnNumber: number;
+  rowKind: MarkdownTableCellKind;
+  rowIndex: number;
+  columnIndex: number;
+  columnLabel: string;
+  value: string;
+}
+
 export interface TableSourceCursorSyncInput {
   followSourceCursor?: boolean;
   tablesSidebarActive?: boolean;
@@ -613,6 +624,52 @@ export function replaceMarkdownTableCellInText(text: string, edit: MarkdownTable
   return lines.join("\n");
 }
 
+export function findAdjacentMarkdownTableCellPosition(
+  text: string,
+  lineNumber: number,
+  columnNumber: number,
+  direction: -1 | 1,
+): MarkdownTableCellNavigationTarget | null {
+  const edit = findMarkdownTableCellAtPosition(text, lineNumber, columnNumber);
+  if (!edit) return null;
+  const lines = text.split("\n");
+  const table = edit.table;
+  const rowSlots = [
+    { lineNumber: table.startLine, rowKind: "header" as const, rowIndex: -1 },
+    ...table.rows.map((_, rowIndex) => ({
+      lineNumber: table.startLine + rowIndex + 2,
+      rowKind: "body" as const,
+      rowIndex,
+    })),
+  ];
+  const columnCount = Math.max(
+    table.headers.length,
+    edit.cellCount,
+    ...table.rows.map((row) => row.length),
+  );
+  if (columnCount <= 0) return null;
+  const currentRowSlot = edit.rowKind === "header" ? 0 : edit.rowIndex + 1;
+  const targetLinearIndex = currentRowSlot * columnCount + edit.columnIndex + direction;
+  if (targetLinearIndex < 0 || targetLinearIndex >= rowSlots.length * columnCount) return null;
+  const targetRowSlot = Math.floor(targetLinearIndex / columnCount);
+  const targetColumn = targetLinearIndex % columnCount;
+  const target = rowSlots[targetRowSlot];
+  if (!target) return null;
+  const line = lines[target.lineNumber - 1] || "";
+  const cells = splitMarkdownTableRow(line);
+  const value = cells[targetColumn] || "";
+  return {
+    tableIndex: edit.tableIndex,
+    lineNumber: target.lineNumber,
+    columnNumber: markdownTableCellCursorColumn(line, targetColumn),
+    rowKind: target.rowKind,
+    rowIndex: target.rowIndex,
+    columnIndex: targetColumn,
+    columnLabel: spreadsheetColumnName(targetColumn + 1),
+    value,
+  };
+}
+
 function formatMarkdownTableRowLike(sourceLine: string, cells: string[]) {
   const leadingWhitespace = sourceLine.match(/^\s*/)?.[0] || "";
   const trimmed = sourceLine.trim();
@@ -648,6 +705,15 @@ function markdownTableCellRanges(line: string) {
 
 function markdownTableCellRange(start: number, end: number) {
   return { start, end: Math.max(start, end - 1) };
+}
+
+function markdownTableCellCursorColumn(line: string, columnIndex: number) {
+  const ranges = markdownTableCellRanges(line);
+  const range = ranges[columnIndex] || ranges[ranges.length - 1];
+  if (!range) return 1;
+  const raw = line.slice(range.start, range.end + 1);
+  const leadingWhitespace = raw.match(/^\s*/)?.[0].length || 0;
+  return Math.min(range.end + 1, range.start + leadingWhitespace) + 1;
 }
 
 function unescapedPipeIndexes(line: string) {

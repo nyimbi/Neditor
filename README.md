@@ -535,14 +535,15 @@ web app.
   through the visual grid, the editable Markdown source block beside it, the
   **New table in text**/**Insert draft in text** path for immediate Markdown
   editing, or the explicit **Edit Markdown in text** action that can load the
-  table at the cursor and select the exact table lines in the editor. Source
-  text edits can be parsed back into the grid, and grid edits can regenerate
-  readable Markdown before applying to
-  the document. If
-  the Markdown source table changes while the grid is open, NEditor syncs a clean visual
-  draft from the source and protects dirty visual drafts from silently
-  overwriting text edits until the user reloads or explicitly applies the draft
-  over the current source. If a user temporarily breaks the pipe-table syntax
+  table at the cursor and select the exact table lines in the editor. The
+  Markdown editor highlights detected table source lines, and `Tab` /
+  `Shift-Tab` move between editable cells while the cursor is inside a table.
+  Source text edits can be parsed back into the grid, and grid edits can
+  regenerate readable Markdown before applying to the document. If the Markdown
+  source table changes while the grid is open, NEditor syncs a clean visual draft
+  from the source and protects dirty visual drafts from silently overwriting text
+  edits until the user reloads or explicitly applies the draft over the current
+  source. If a user temporarily breaks the pipe-table syntax
   while editing in the main text, the table editor keeps the last visual draft,
   marks the source range as not currently parseable, and offers recovery by
   fixing the text or applying the draft back over the original range. Unsaved

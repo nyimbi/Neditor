@@ -179,6 +179,7 @@ import {
   createTableSourceSnapshot,
   duplicateTableDraftColumn,
   duplicateTableDraftRow,
+  findAdjacentMarkdownTableCellPosition,
   findMarkdownTableCellAtPosition,
   formatTableTotal,
   findMarkdownTableIndexForLineRange,
@@ -674,6 +675,46 @@ test("markdown table cell text edits locate and replace the cursor cell", () => 
 
   equal(findMarkdownTableCellAtPosition(text, 5, 3), null);
   equal(findMarkdownTableCellAtPosition(text, 3, 3), null);
+});
+
+test("markdown table text navigation moves between editable cells", () => {
+  const text = [
+    "# Sales",
+    "",
+    "Table: Regional revenue {#tbl:revenue}",
+    "| Region | Revenue | Note |",
+    "| :--- | ---: | --- |",
+    "| East | 1200 | margin\\|stable |",
+    "| West | 900 | review |",
+  ].join("\n");
+
+  const headerLine = text.split("\n")[3];
+  const revenueColumn = headerLine.indexOf("Revenue") + 1;
+  const noteColumn = headerLine.indexOf("Note") + 1;
+  const firstHeader = findAdjacentMarkdownTableCellPosition(text, 4, headerLine.indexOf("Region") + 1, 1);
+  if (!firstHeader) throw new Error("missing first header navigation");
+  equal(firstHeader.lineNumber, 4);
+  equal(firstHeader.columnIndex, 1);
+  equal(firstHeader.columnLabel, "B");
+  equal(firstHeader.columnNumber, revenueColumn);
+
+  const firstBody = findAdjacentMarkdownTableCellPosition(text, 4, noteColumn, 1);
+  if (!firstBody) throw new Error("missing body navigation");
+  equal(firstBody.lineNumber, 6);
+  equal(firstBody.rowKind, "body");
+  equal(firstBody.rowIndex, 0);
+  equal(firstBody.columnIndex, 0);
+  equal(firstBody.value, "East");
+
+  const backToHeader = findAdjacentMarkdownTableCellPosition(text, 6, text.split("\n")[5].indexOf("East") + 1, -1);
+  if (!backToHeader) throw new Error("missing reverse navigation");
+  equal(backToHeader.lineNumber, 4);
+  equal(backToHeader.rowKind, "header");
+  equal(backToHeader.columnIndex, 2);
+  equal(backToHeader.value, "Note");
+
+  equal(findAdjacentMarkdownTableCellPosition(text, 4, headerLine.indexOf("Region") + 1, -1), null);
+  equal(findAdjacentMarkdownTableCellPosition(text, 5, 2, 1), null);
 });
 
 test("table export markdown selection honors dirty source edits", () => {
@@ -4938,6 +4979,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Edit Table Cell at Cursor"));
   ok(app.includes("Edit cell at cursor"));
   ok(app.includes("Apply cell to text"));
+  ok(app.includes("moveMarkdownTableTextCell"));
+  ok(app.includes("findAdjacentMarkdownTableCellPosition"));
+  ok(app.includes('key: "Tab"'));
+  ok(app.includes('key: "Shift-Tab"'));
+  ok(app.includes("cm-neditor-table-source-line"));
+  ok(app.includes("cm-neditor-table-source-line-active"));
   ok(app.includes("tableCursorCellPreview"));
   ok(app.includes("tableCursorCellSummary"));
   ok(app.includes("refreshTableCursorCellPreview(update.view)"));

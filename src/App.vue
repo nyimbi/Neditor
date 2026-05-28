@@ -5399,6 +5399,7 @@ import {
   duplicateTableDraftColumn,
   duplicateTableDraftRow,
   findMarkdownTableCellAtPosition,
+  findAdjacentMarkdownTableCellPosition,
   findMarkdownTableIndexForLineRange,
   findMarkdownTableForSourceSnapshot,
   formatTableTotal,
@@ -13595,6 +13596,8 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
     }),
     keymap.of([
       { key: "Enter", run: continueMarkdownList },
+      { key: "Tab", run: (view: EditorView) => moveMarkdownTableTextCell(view, 1) },
+      { key: "Shift-Tab", run: (view: EditorView) => moveMarkdownTableTextCell(view, -1) },
       ...(store.editorKeymapMode === "emacs" ? emacsSupplementalKeymap(emacsKillRing) : []),
       ...(store.editorKeymapMode === "emacs" ? emacsStyleKeymap : []),
       ...(store.editorKeymapMode === "vim" ? [{ key: "Escape", run: (view: EditorView) => {
@@ -13679,6 +13682,20 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
         color: "#166534",
         backgroundColor: "rgba(34, 197, 94, 0.12)",
       },
+      ".cm-line.cm-neditor-table-source-line": {
+        backgroundColor: "rgba(13, 148, 136, 0.07)",
+        boxShadow: "inset 3px 0 0 rgba(13, 148, 136, 0.35)",
+      },
+      ".cm-line.cm-neditor-table-source-line-active": {
+        backgroundColor: "rgba(13, 148, 136, 0.14)",
+        boxShadow: "inset 3px 0 0 rgba(13, 148, 136, 0.72)",
+      },
+      ".cm-line.cm-neditor-table-source-caption": {
+        fontWeight: "650",
+      },
+      ".cm-line.cm-neditor-table-source-separator": {
+        color: "#64748b",
+      },
     }),
   ];
 }
@@ -13692,7 +13709,7 @@ const semanticEditorDecorations = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged) {
+      if (update.docChanged || update.viewportChanged || update.selectionSet) {
         this.decorations = buildSemanticEditorDecorations(update.view);
       }
     }
@@ -13707,9 +13724,14 @@ function buildSemanticEditorDecorations(view: EditorView) {
   const source = view.state.doc.toString();
   const knownReferences = collectKnownReferenceAnchors(source);
   const frontMatterEndLine = frontMatterBoundaryLine(source);
+  const tableLineClasses = markdownTableSourceLineClasses(source, view.state.doc.lineAt(view.state.selection.main.head).number);
   for (let lineNumber = 1; lineNumber <= view.state.doc.lines; lineNumber += 1) {
     const line = view.state.doc.line(lineNumber);
     const text = line.text;
+    const tableLineClass = tableLineClasses.get(lineNumber);
+    if (tableLineClass) {
+      builder.add(line.from, line.from, Decoration.line({ class: tableLineClass }));
+    }
     if (frontMatterEndLine && lineNumber <= frontMatterEndLine) {
       builder.add(line.from, line.to, Decoration.mark({ class: "cm-neditor-front-matter" }));
       continue;
@@ -13750,6 +13772,24 @@ function buildSemanticEditorDecorations(view: EditorView) {
     }
   }
   return builder.finish();
+}
+
+function markdownTableSourceLineClasses(source: string, cursorLineNumber: number) {
+  const classes = new Map<number, string>();
+  const tables = parseMarkdownTables(source);
+  const activeTableIndex = findMarkdownTableIndexForLineRange(tables, cursorLineNumber);
+  tables.forEach((table, tableIndex) => {
+    const firstLine = table.captionLine || table.startLine;
+    for (let lineNumber = firstLine; lineNumber <= table.endLine; lineNumber += 1) {
+      const lineClasses = ["cm-neditor-table-source-line"];
+      if (tableIndex === activeTableIndex) lineClasses.push("cm-neditor-table-source-line-active");
+      if (lineNumber === table.captionLine) lineClasses.push("cm-neditor-table-source-caption");
+      if (lineNumber === table.startLine) lineClasses.push("cm-neditor-table-source-header");
+      if (lineNumber === table.startLine + 1) lineClasses.push("cm-neditor-table-source-separator");
+      classes.set(lineNumber, lineClasses.join(" "));
+    }
+  });
+  return classes;
 }
 
 function frontMatterBoundaryLine(source: string) {
@@ -17252,6 +17292,28 @@ function refreshTableCursorCellPreview(view = editorView) {
     line.number,
     selection.from - line.from + 1,
   );
+}
+
+function moveMarkdownTableTextCell(view: EditorView, direction: -1 | 1) {
+  const selection = view.state.selection.main;
+  const line = view.state.doc.lineAt(selection.head);
+  const target = findAdjacentMarkdownTableCellPosition(
+    view.state.doc.toString(),
+    line.number,
+    selection.head - line.from + 1,
+    direction,
+  );
+  if (!target) return false;
+  const targetLine = view.state.doc.line(target.lineNumber);
+  const position = Math.min(targetLine.to, targetLine.from + Math.max(0, target.columnNumber - 1));
+  view.dispatch({
+    selection: EditorSelection.cursor(position),
+    scrollIntoView: true,
+  });
+  refreshTableCursorCellPreview(view);
+  if (store.sidebar === "tables") syncTableEditorFromSourceCursor("selection");
+  store.statusMessage = `Moved to table cell ${target.columnLabel}${target.rowKind === "header" ? " header" : target.rowIndex + 1}`;
+  return true;
 }
 
 function syncTableEditorFromSourceCursor(reason: "selection" | "text-edit" = "selection") {
