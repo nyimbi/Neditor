@@ -27,6 +27,19 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Split Editor Pane Closure
+
+`5.6 Native Tab Organization | Split editor panes` is now marked complete in
+`docs/spec-completion-matrix.md`. The closure is based on persisted Dual source
+configuration, synchronized CodeMirror mounting for primary and secondary
+source panes, focused browser proof for bidirectional editing plus live preview
+and scroll behavior, and native smoke evidence for launched-webview split-pane
+mounting and synchronization.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "syncs split source panes" --project chromium` | Pass | Focused Chromium workflow passed on 2026-05-28, proving Dual source enablement, secondary-to-primary edit sync, primary-to-secondary edit sync, live preview refresh from both panes, primary-scroll-to-preview sync, and secondary scroll isolation. |
+
 ## 2026-05-28 Included-File Watch Closure
 
 `5.1 External File Refresh | Watch included files and recompile master docs`
