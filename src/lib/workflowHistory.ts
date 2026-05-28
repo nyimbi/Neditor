@@ -16,6 +16,10 @@ export function removeAgentRunHistoryState(history: AgentRunHistoryItem[], runId
   return history.filter((entry) => entry.runId !== runId);
 }
 
+export function clearAgentRunHistoryState(history: AgentRunHistoryItem[]) {
+  return history.length ? [] : history;
+}
+
 export function recordDocsLiveDraftHistoryState(
   history: DocsLiveDraftHistoryItem[],
   item: DocsLiveDraftHistoryItem,
@@ -30,8 +34,16 @@ export function removeDocsLiveDraftHistoryState(
   return history.filter((entry) => entry.draftId !== draftId);
 }
 
+export function clearDocsLiveDraftHistoryState(history: DocsLiveDraftHistoryItem[]) {
+  return history.length ? [] : history;
+}
+
 export function recordGuidedDemoStepState(stepIds: string[], stepId: string): string[] {
   const normalizedStepId = stepId.trim();
   if (!normalizedStepId || stepIds.includes(normalizedStepId)) return stepIds;
   return [...stepIds, normalizedStepId].slice(0, 40);
+}
+
+export function resetGuidedDemoProgressState(stepIds: string[]) {
+  return stepIds.length ? [] : stepIds;
 }

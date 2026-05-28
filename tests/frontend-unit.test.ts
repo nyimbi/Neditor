@@ -180,11 +180,14 @@ import {
 } from "../src/lib/ttsSetup.js";
 import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../src/lib/watchPaths.js";
 import {
+  clearAgentRunHistoryState,
+  clearDocsLiveDraftHistoryState,
   recordAgentRunHistoryState,
   recordDocsLiveDraftHistoryState,
   recordGuidedDemoStepState,
   removeAgentRunHistoryState,
   removeDocsLiveDraftHistoryState,
+  resetGuidedDemoProgressState,
 } from "../src/lib/workflowHistory.js";
 import { forgetWorkspaceFolderState, setDocumentScrollState } from "../src/lib/workspaceNavigation.js";
 import {
@@ -420,6 +423,9 @@ test("workflow history helpers deduplicate runs drafts and guided demo progress"
     ["run-1:Updated board packet:applied", "run-2:RFP response:generated"],
   );
   deepEqual(removeAgentRunHistoryState(runHistory, "run-2").map((item) => item.runId), ["run-1"]);
+  deepEqual(clearAgentRunHistoryState(runHistory), []);
+  const emptyRunHistory: typeof runHistory = [];
+  equal(clearAgentRunHistoryState(emptyRunHistory), emptyRunHistory);
 
   const firstDraft = {
     draftId: "draft-1",
@@ -440,11 +446,17 @@ test("workflow history helpers deduplicate runs drafts and guided demo progress"
     ["draft-1:Updated market plan", "draft-2:Lesson plan"],
   );
   deepEqual(removeDocsLiveDraftHistoryState(draftHistory, "draft-2").map((item) => item.draftId), ["draft-1"]);
+  deepEqual(clearDocsLiveDraftHistoryState(draftHistory), []);
+  const emptyDraftHistory: typeof draftHistory = [];
+  equal(clearDocsLiveDraftHistoryState(emptyDraftHistory), emptyDraftHistory);
 
   let steps = recordGuidedDemoStepState([], " ai-create ");
   steps = recordGuidedDemoStepState(steps, "export");
   steps = recordGuidedDemoStepState(steps, "ai-create");
   deepEqual(steps, ["ai-create", "export"]);
+  deepEqual(resetGuidedDemoProgressState(steps), []);
+  const emptySteps: string[] = [];
+  equal(resetGuidedDemoProgressState(emptySteps), emptySteps);
   equal(recordGuidedDemoStepState(steps, ""), steps);
   const capped = Array.from({ length: 42 }, (_, index) => `step-${index}`);
   equal(recordGuidedDemoStepState(capped.slice(0, 39), "final").length, 40);

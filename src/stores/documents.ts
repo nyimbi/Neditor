@@ -32,11 +32,14 @@ import {
 import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../lib/watchPaths";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import {
+  clearAgentRunHistoryState,
+  clearDocsLiveDraftHistoryState,
   recordAgentRunHistoryState,
   recordDocsLiveDraftHistoryState,
   recordGuidedDemoStepState,
   removeAgentRunHistoryState,
   removeDocsLiveDraftHistoryState,
+  resetGuidedDemoProgressState,
 } from "../lib/workflowHistory";
 import { forgetWorkspaceFolderState, setDocumentScrollState } from "../lib/workspaceNavigation";
 import {
@@ -584,7 +587,9 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     clearAgentRunHistory() {
-      this.agentRunHistory = [];
+      const next = clearAgentRunHistoryState(this.agentRunHistory);
+      if (next === this.agentRunHistory) return;
+      this.agentRunHistory = next;
       void this.persistWorkspace();
     },
     recordDocsLiveDraftHistory(item: DocsLiveDraftHistoryItem) {
@@ -596,7 +601,9 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     clearDocsLiveDraftHistory() {
-      this.docsLiveDraftHistory = [];
+      const next = clearDocsLiveDraftHistoryState(this.docsLiveDraftHistory);
+      if (next === this.docsLiveDraftHistory) return;
+      this.docsLiveDraftHistory = next;
       void this.persistWorkspace();
     },
     saveBusinessProfile(profile: Partial<BusinessProfile>) {
@@ -624,7 +631,9 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     resetGuidedDemoProgress() {
-      this.guidedDemoCompletedStepIds = [];
+      const next = resetGuidedDemoProgressState(this.guidedDemoCompletedStepIds);
+      if (next === this.guidedDemoCompletedStepIds) return;
+      this.guidedDemoCompletedStepIds = next;
       void this.persistWorkspace();
     },
     async restoreWorkspace(
