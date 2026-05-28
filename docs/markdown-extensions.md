@@ -386,7 +386,7 @@ Common transform names:
 | `mermaid`, `pikchr`, `dot`, `graphviz`, `circo`, `neato`, `fdp`, `osage`, `twopi`, `d2`, `plantuml` | Diagrams with native fallback or trusted external engine support. |
 | `csv`, `tsv`, `json`, `yaml` | Structured data rendering. |
 | `sql` | Read-only SQLite query results rendered as Markdown tables. |
-| `openapi`, `json-schema` | API metadata, terms/contact/license details, tags, external documentation, API operations, security requirements, request/response contracts, response headers/links/examples, callbacks, webhooks, discriminators, component schemas, nested fields, composition, object/conditional/content keywords, draft-07 tuple `items`, draft 2020-12 metadata/anchors/vocabulary, `prefixItems` tuple summaries, dynamic/recursive refs, boolean schemas, definitions, and schema constraints. |
+| `openapi`, `json-schema` | API metadata, terms/contact/license details, tags, external documentation, API operations, security requirements, request/response contracts, response headers/links/examples, callbacks, webhooks, reusable component libraries, discriminators, component schemas, nested fields, composition, object/conditional/content keywords, draft-07 tuple `items`, draft 2020-12 metadata/anchors/vocabulary, `prefixItems` tuple summaries, dynamic/recursive refs, boolean schemas, definitions, and schema constraints. |
 | `bibtex`, `glossary`, `timeline`, `roadmap`, `adr`, `diff`, `qr` | Business-document artifacts and generated sections. |
 | `vega-lite`, `geojson`, `topojson`, `stl` | Visual data previews with static export fallbacks. |
 
@@ -481,7 +481,7 @@ The same Templates panel also includes starter blocks for chart, a styled
 board scorecard chart, Vega-Lite grouped bars, opportunity scatter plots,
 risk-score tick plots, and readiness label plots,
 timeline, roadmap, ADR, Mermaid, Pikchr, DOT, PlantUML, CSV, JSON Schema,
-OpenAPI, and QR transforms. Duplicate any built-in template to create a
+OpenAPI endpoints, OpenAPI reusable component libraries, and QR transforms. Duplicate any built-in template to create a
 workspace custom template, then edit the name, category, transform, tags, and
 fenced body. Template cards expose detected fill values, such as literal `calc`
 inputs or top-level structured fields, so reusable workflows are easier to

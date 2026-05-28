@@ -6013,6 +6013,11 @@ test("transform template library covers reusable calculations and custom templat
   if (!modernSchemaTemplate) throw new Error("missing modern JSON Schema template");
   ok(modernSchemaTemplate.body.includes('"$schema": "https://json-schema.org/draft/2020-12/schema"'));
   ok(modernSchemaTemplate.body.includes('"prefixItems"'));
+  const openApiComponentsTemplate = builtinTransformTemplates.find((template) => template.id === "openapi-components-library");
+  if (!openApiComponentsTemplate) throw new Error("missing OpenAPI component library template");
+  ok(openApiComponentsTemplate.body.includes("parameters:"));
+  ok(openApiComponentsTemplate.body.includes("responses:"));
+  ok(openApiComponentsTemplate.tags.includes("components"));
   const vegaTickTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-risk-ticks");
   if (!vegaTickTemplate) throw new Error("missing Vega-Lite tick template");
   ok(vegaTickTemplate.body.includes('"type": "tick"'));

@@ -1236,6 +1236,78 @@ paths:
     ["openapi", "api"],
   ),
   template(
+    "openapi-components-library",
+    "Data",
+    "openapi",
+    "OpenAPI component library",
+    "Creates reusable OpenAPI parameters, responses, request bodies, headers, examples, and links for API documentation.",
+    fenced(
+      "openapi",
+      `
+openapi: 3.1.0
+info:
+  title: Partner Integration API
+  version: 1.0.0
+paths:
+  /partners/{partnerId}:
+    get:
+      summary: Get partner
+      parameters:
+        - $ref: "#/components/parameters/PartnerId"
+      responses:
+        "200":
+          description: Partner profile
+        "429":
+          $ref: "#/components/responses/RateLimited"
+components:
+  parameters:
+    PartnerId:
+      name: partnerId
+      in: path
+      required: true
+      description: Partner identifier
+      schema:
+        type: string
+  requestBodies:
+    PartnerUpdate:
+      description: Partner update payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+  responses:
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After:
+          description: Seconds to wait
+          schema:
+            type: integer
+      links:
+        retryStatus:
+          operationId: getPartner
+          description: Check partner status
+  headers:
+    RequestCost:
+      description: API cost units
+      schema:
+        type: number
+  examples:
+    PartnerExample:
+      summary: Example partner payload
+      value:
+        id: partner-123
+  links:
+    PartnerLink:
+      operationId: getPartner
+      parameters:
+        partnerId: "$response.body#/id"
+`,
+    ),
+    ["openapi", "api", "components", "reusable"],
+  ),
+  template(
     "qr-release",
     "Business",
     "qr",

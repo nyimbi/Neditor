@@ -138,6 +138,7 @@ pub(crate) fn render_openapi_html(
     html.push_str(&render_openapi_webhook_rows(&value));
     html.push_str("</tbody></table>");
     html.push_str(&render_openapi_security_schemes(&value));
+    html.push_str(&render_openapi_reusable_components(&value));
     html.push_str(&render_openapi_components(&value));
     html.push_str("</section>");
     html
@@ -864,36 +865,10 @@ fn render_openapi_responses(responses: Option<&Value>) -> String {
     let items = responses
         .iter()
         .map(|(status, response)| {
-            if let Some(reference) = response.get("$ref").and_then(Value::as_str) {
-                return format!(
-                    "<li><code>{}</code>: <code>{}</code></li>",
-                    escape_html(status),
-                    escape_html(reference)
-                );
-            }
-            let description = response
-                .get("description")
-                .and_then(Value::as_str)
-                .unwrap_or("");
-            let content = render_openapi_content(response.get("content"));
-            let detail = [
-                escape_html(description),
-                content,
-                render_openapi_headers(response.get("headers")),
-                render_openapi_links(response.get("links")),
-            ]
-            .into_iter()
-            .filter(|part| !part.is_empty())
-            .collect::<Vec<_>>()
-            .join(" ");
             format!(
                 "<li><code>{}</code>: {}</li>",
                 escape_html(status),
-                if detail.is_empty() {
-                    "&nbsp;".to_string()
-                } else {
-                    detail
-                }
+                openapi_response_summary(response)
             )
         })
         .collect::<Vec<_>>()
@@ -902,6 +877,32 @@ fn render_openapi_responses(responses: Option<&Value>) -> String {
         "&nbsp;".to_string()
     } else {
         format!("<ul>{items}</ul>")
+    }
+}
+
+fn openapi_response_summary(response: &Value) -> String {
+    if let Some(reference) = response.get("$ref").and_then(Value::as_str) {
+        return format!("<code>{}</code>", escape_html(reference));
+    }
+    let description = response
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let content = render_openapi_content(response.get("content"));
+    let detail = [
+        escape_html(description),
+        content,
+        render_openapi_headers(response.get("headers")),
+        render_openapi_links(response.get("links")),
+    ]
+    .into_iter()
+    .filter(|part| !part.is_empty())
+    .collect::<Vec<_>>()
+    .join(" ");
+    if detail.is_empty() {
+        "&nbsp;".to_string()
+    } else {
+        detail
     }
 }
 
@@ -959,32 +960,7 @@ fn render_openapi_headers(headers: Option<&Value>) -> String {
     };
     let items = headers
         .iter()
-        .map(|(name, header)| {
-            if let Some(reference) = header.get("$ref").and_then(Value::as_str) {
-                return format!(
-                    "<li><code>{}</code>: ref {}</li>",
-                    escape_html(name),
-                    escape_html(&reference_tail(reference))
-                );
-            }
-            let description = header
-                .get("description")
-                .and_then(Value::as_str)
-                .unwrap_or("");
-            let schema = header
-                .get("schema")
-                .map(schema_type_summary)
-                .unwrap_or_default();
-            [
-                format!("<code>{}</code>", escape_html(name)),
-                escape_html(description),
-                escape_html(&schema),
-            ]
-            .into_iter()
-            .filter(|part| !part.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join(" ")
-        })
+        .map(|(name, header)| openapi_header_summary(Some(name), header))
         .filter(|item| !item.is_empty())
         .map(|item| format!("<li>{item}</li>"))
         .collect::<Vec<_>>()
@@ -996,39 +972,48 @@ fn render_openapi_headers(headers: Option<&Value>) -> String {
     }
 }
 
+fn openapi_header_summary(name: Option<&str>, header: &Value) -> String {
+    let prefix = name
+        .map(|name| format!("<code>{}</code>", escape_html(name)))
+        .unwrap_or_default();
+    if let Some(reference) = header.get("$ref").and_then(Value::as_str) {
+        return [
+            prefix,
+            format!("ref {}", escape_html(&reference_tail(reference))),
+        ]
+        .into_iter()
+        .filter(|part| !part.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(": ");
+    }
+    let description = header
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let schema = header
+        .get("schema")
+        .map(schema_type_summary)
+        .unwrap_or_default();
+    let examples = render_openapi_media_examples(header);
+    [
+        prefix,
+        escape_html(description),
+        escape_html(&schema),
+        examples,
+    ]
+    .into_iter()
+    .filter(|part| !part.trim().is_empty())
+    .collect::<Vec<_>>()
+    .join(" ")
+}
+
 fn render_openapi_links(links: Option<&Value>) -> String {
     let Some(links) = links.and_then(Value::as_object) else {
         return String::new();
     };
     let items = links
         .iter()
-        .map(|(name, link)| {
-            if let Some(reference) = link.get("$ref").and_then(Value::as_str) {
-                return format!(
-                    "<li><code>{}</code>: ref {}</li>",
-                    escape_html(name),
-                    escape_html(&reference_tail(reference))
-                );
-            }
-            let target = link
-                .get("operationId")
-                .or_else(|| link.get("operationRef"))
-                .and_then(Value::as_str)
-                .unwrap_or("");
-            let description = link
-                .get("description")
-                .and_then(Value::as_str)
-                .unwrap_or("");
-            [
-                format!("<code>{}</code>", escape_html(name)),
-                escape_html(target),
-                escape_html(description),
-            ]
-            .into_iter()
-            .filter(|part| !part.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join(" ")
-        })
+        .map(|(name, link)| openapi_link_summary(Some(name), link))
         .filter(|item| !item.is_empty())
         .map(|item| format!("<li>{item}</li>"))
         .collect::<Vec<_>>()
@@ -1038,6 +1023,90 @@ fn render_openapi_links(links: Option<&Value>) -> String {
     } else {
         format!("links:<ul>{items}</ul>")
     }
+}
+
+fn openapi_link_summary(name: Option<&str>, link: &Value) -> String {
+    let prefix = name
+        .map(|name| format!("<code>{}</code>", escape_html(name)))
+        .unwrap_or_default();
+    if let Some(reference) = link.get("$ref").and_then(Value::as_str) {
+        return [
+            prefix,
+            format!("ref {}", escape_html(&reference_tail(reference))),
+        ]
+        .into_iter()
+        .filter(|part| !part.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(": ");
+    }
+    let target = link
+        .get("operationId")
+        .or_else(|| link.get("operationRef"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let description = link
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let parameters = link
+        .get("parameters")
+        .and_then(Value::as_object)
+        .map(|parameters| parameters.keys().cloned().collect::<Vec<_>>().join(", "))
+        .unwrap_or_default();
+    [
+        prefix,
+        escape_html(target),
+        if parameters.is_empty() {
+            String::new()
+        } else {
+            format!("parameters: {}", escape_html(&parameters))
+        },
+        escape_html(description),
+    ]
+    .into_iter()
+    .filter(|part| !part.trim().is_empty())
+    .collect::<Vec<_>>()
+    .join(" ")
+}
+
+fn openapi_example_summary(example: &Value) -> String {
+    if let Some(reference) = example.get("$ref").and_then(Value::as_str) {
+        return format!("ref {}", escape_html(&reference_tail(reference)));
+    }
+    let summary = example.get("summary").and_then(Value::as_str).unwrap_or("");
+    let description = example
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let external_value = example
+        .get("externalValue")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let value_summary = example
+        .get("value")
+        .map(structured_value_summary)
+        .unwrap_or_default();
+    [
+        escape_html(summary),
+        escape_html(description),
+        if external_value.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "externalValue: <code>{}</code>",
+                escape_html(external_value)
+            )
+        },
+        if value_summary.is_empty() {
+            String::new()
+        } else {
+            format!("value: {}", escape_html(&value_summary))
+        },
+    ]
+    .into_iter()
+    .filter(|part| !part.trim().is_empty())
+    .collect::<Vec<_>>()
+    .join(" ")
 }
 
 fn render_openapi_security_schemes(value: &Value) -> String {
@@ -1080,6 +1149,120 @@ fn render_openapi_security_schemes(value: &Value) -> String {
         .collect::<Vec<_>>()
         .join("");
     format!("<section class=\"api-security\"><h4>Security schemes</h4><ul>{items}</ul></section>")
+}
+
+fn render_openapi_reusable_components(value: &Value) -> String {
+    [
+        render_openapi_named_component_section(
+            value,
+            "/components/parameters",
+            "Reusable parameters",
+            |component| render_openapi_parameters(&[component]),
+        ),
+        render_openapi_named_component_section(
+            value,
+            "/components/requestBodies",
+            "Reusable request bodies",
+            |component| render_openapi_request_body(Some(component)),
+        ),
+        render_openapi_named_component_section(
+            value,
+            "/components/responses",
+            "Reusable responses",
+            |component| openapi_response_summary(component),
+        ),
+        render_openapi_named_component_section(
+            value,
+            "/components/headers",
+            "Reusable headers",
+            |component| openapi_header_summary(None, component),
+        ),
+        render_openapi_named_component_section(
+            value,
+            "/components/examples",
+            "Reusable examples",
+            |component| openapi_example_summary(component),
+        ),
+        render_openapi_named_component_section(
+            value,
+            "/components/links",
+            "Reusable links",
+            |component| openapi_link_summary(None, component),
+        ),
+        render_openapi_callback_component_section(value),
+    ]
+    .into_iter()
+    .filter(|section| !section.is_empty())
+    .collect::<Vec<_>>()
+    .join("")
+}
+
+fn render_openapi_named_component_section(
+    value: &Value,
+    pointer: &str,
+    heading: &str,
+    render: fn(&Value) -> String,
+) -> String {
+    let Some(components) = value.pointer(pointer).and_then(Value::as_object) else {
+        return String::new();
+    };
+    if components.is_empty() {
+        return String::new();
+    }
+    let items = components
+        .iter()
+        .map(|(name, component)| {
+            let summary = render(component);
+            format!(
+                "<li><code>{}</code> {}</li>",
+                escape_html(name),
+                if summary.is_empty() || summary == "&nbsp;" {
+                    "&nbsp;".to_string()
+                } else {
+                    summary
+                }
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    format!(
+        "<section class=\"api-components api-component-library\"><h4>{}</h4><ul>{items}</ul></section>",
+        escape_html(heading)
+    )
+}
+
+fn render_openapi_callback_component_section(value: &Value) -> String {
+    let Some(callbacks) = value
+        .pointer("/components/callbacks")
+        .and_then(Value::as_object)
+    else {
+        return String::new();
+    };
+    if callbacks.is_empty() {
+        return String::new();
+    }
+    let items = callbacks
+        .iter()
+        .map(|(name, callback)| {
+            let mut wrapper = Map::new();
+            wrapper.insert(name.clone(), callback.clone());
+            let wrapped = Value::Object(wrapper);
+            let summary = render_openapi_callbacks(Some(&wrapped));
+            format!(
+                "<li><code>{}</code> {}</li>",
+                escape_html(name),
+                if summary.is_empty() {
+                    "&nbsp;".to_string()
+                } else {
+                    summary
+                }
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    format!(
+        "<section class=\"api-components api-component-library\"><h4>Reusable callbacks</h4><ul>{items}</ul></section>"
+    )
 }
 
 fn render_openapi_components(value: &Value) -> String {

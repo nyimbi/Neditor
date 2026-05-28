@@ -1148,6 +1148,60 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      description: Request correlation id
+      schema:
+        type: string
+  requestBodies:
+    AccountImport:
+      description: Bulk account import
+      required: true
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/Account"
+  responses:
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After:
+          description: Seconds to wait
+          schema:
+            type: integer
+      links:
+        retryStatus:
+          operationId: getAccount
+          description: Check account status
+  headers:
+    RequestCost:
+      description: API cost units
+      schema:
+        type: number
+  examples:
+    AccountExample:
+      summary: Example account payload
+      value:
+        id: "11111111-1111-1111-1111-111111111111"
+  links:
+    AccountLink:
+      operationId: getAccount
+      parameters:
+        id: "$response.body#/id"
+      description: Follow up account fetch
+  callbacks:
+    AccountAuditCallback:
+      '{$request.body#/auditUrl}':
+        post:
+          summary: Account audit callback
+          operationId: accountAuditCallback
+          responses:
+            "204":
+              description: Audit accepted
   schemas:
     Account:
       type: object
@@ -1322,6 +1376,29 @@ components:
     assert!(response.html.contains("ApiKeyAuth"));
     assert!(response.html.contains("Security schemes"));
     assert!(response.html.contains("X-API-Key"));
+    assert!(response.html.contains("Reusable parameters"));
+    assert!(response.html.contains("CorrelationId"));
+    assert!(response.html.contains("X-Correlation-Id"));
+    assert!(response.html.contains("Request correlation id"));
+    assert!(response.html.contains("Reusable request bodies"));
+    assert!(response.html.contains("AccountImport"));
+    assert!(response.html.contains("Bulk account import"));
+    assert!(response.html.contains("Reusable responses"));
+    assert!(response.html.contains("RateLimited"));
+    assert!(response.html.contains("Too many requests"));
+    assert!(response.html.contains("Retry-After"));
+    assert!(response.html.contains("Reusable headers"));
+    assert!(response.html.contains("RequestCost"));
+    assert!(response.html.contains("API cost units"));
+    assert!(response.html.contains("Reusable examples"));
+    assert!(response.html.contains("AccountExample"));
+    assert!(response.html.contains("Example account payload"));
+    assert!(response.html.contains("Reusable links"));
+    assert!(response.html.contains("AccountLink"));
+    assert!(response.html.contains("parameters: id"));
+    assert!(response.html.contains("Reusable callbacks"));
+    assert!(response.html.contains("AccountAuditCallback"));
+    assert!(response.html.contains("accountAuditCallback"));
     assert!(response.html.contains("tenant"));
     assert!(response.html.contains("limit"));
     assert!(response.html.contains("filter"));
