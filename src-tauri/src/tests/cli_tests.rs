@@ -376,6 +376,10 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
             "3. Vendor must demonstrate SOC 2 security controls and data protection practices.",
             "4. Submit signed insurance certificate and three relevant customer references.",
             "Evaluation criteria: technical merit 40 points, price 30 points, experience 30 points.",
+            "| Role | Minimum Requirements | Points |",
+            "| --- | --- | ---: |",
+            "| Software Architect | 5+ years, Bachelor's degree, cloud integration experience | 20 points |",
+            "| Legal/IPR Expert | Intellectual property review experience and bilingual EN/FR workshop support | Mandatory |",
         ]
         .join("\n"),
     )
@@ -410,8 +414,26 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
             .as_array()
             .expect("requirements")
             .len(),
-        4
+        7
     );
+    assert!(report["analysis"]["requirements"]
+        .as_array()
+        .expect("requirements")
+        .iter()
+        .any(|item| item["text"]
+            .as_str()
+            .is_some_and(|value| value.contains("Software Architect")
+                && value.contains("5+ years")
+                && value.contains("20 points"))));
+    assert!(report["analysis"]["requirements"]
+        .as_array()
+        .expect("requirements")
+        .iter()
+        .any(|item| item["text"]
+            .as_str()
+            .is_some_and(|value| value.contains("Legal/IPR Expert")
+                && value.contains("bilingual EN/FR")
+                && value.contains("Mandatory"))));
     assert!(report["analysis"]["evaluationCriteria"]
         .as_array()
         .expect("criteria")
@@ -484,6 +506,8 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     assert!(response_text.contains("## Requirement Response Drafts"));
     assert!(response_text.contains("Win theme: reduce implementation risk."));
     assert!(response_text.contains("SOC 2 security controls"));
+    assert!(response_text.contains("Software Architect"));
+    assert!(response_text.contains("Legal/IPR Expert"));
     assert!(response_text.contains("Acme Advisory"));
     assert!(response_text.contains("Globex"));
     assert!(response_text

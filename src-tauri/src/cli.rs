@@ -6060,13 +6060,26 @@ fn analyze_rfp_text(
         .collect::<Vec<_>>();
     let mut requirements = significant_lines
         .iter()
-        .filter(|(_, line)| is_rfp_requirement_line(line))
+        .filter_map(|(line_number, line)| {
+            let normalized = normalize_rfp_table_like_line(line);
+            if is_rfp_table_header_line(&normalized) || is_rfp_table_separator_line(&normalized) {
+                return None;
+            }
+            if is_rfp_requirement_line(&normalized)
+                || is_rfp_table_requirement_line(&normalized)
+                || is_rfp_explicit_constraint_line(&normalized)
+            {
+                let text = rfp_requirement_candidate_text(&normalized);
+                return Some((*line_number, text));
+            }
+            None
+        })
         .enumerate()
-        .map(|(index, (line_number, line))| RfpCliRequirement {
+        .map(|(index, (line_number, text))| RfpCliRequirement {
             id: format!("RFP-REQ-{:03}", index + 1),
-            text: trim_requirement_marker(line),
-            category: rfp_requirement_category(line),
-            source_line: *line_number,
+            text: trim_requirement_marker(&text),
+            category: rfp_requirement_category(&text),
+            source_line: line_number,
         })
         .collect::<Vec<_>>();
     requirements = dedupe_rfp_requirements(requirements);
@@ -6235,6 +6248,184 @@ fn analyze_rfp_text(
 
 fn normalize_cli_whitespace(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn normalize_rfp_table_like_line(line: &str) -> String {
+    let trimmed = line.trim();
+    if !(trimmed.contains('|') || trimmed.contains('\t')) {
+        return trimmed.to_string();
+    }
+    let cells = trimmed
+        .split(['|', '\t'])
+        .map(normalize_cli_whitespace)
+        .filter(|cell| !cell.is_empty())
+        .collect::<Vec<_>>();
+    if cells.len() < 2 {
+        trimmed.to_string()
+    } else {
+        cells.join(" | ")
+    }
+}
+
+fn rfp_table_cells(line: &str) -> Vec<String> {
+    line.split('|')
+        .map(normalize_cli_whitespace)
+        .filter(|cell| !cell.is_empty())
+        .collect()
+}
+
+fn is_rfp_table_separator_line(line: &str) -> bool {
+    if !line.contains('|') {
+        return false;
+    }
+    rfp_table_cells(line).iter().all(|cell| {
+        cell.chars()
+            .all(|ch| matches!(ch, '-' | ':' | ' ' | '\u{2013}' | '\u{2014}'))
+    })
+}
+
+fn is_rfp_table_header_line(line: &str) -> bool {
+    if !line.contains('|') {
+        return false;
+    }
+    let lower = line.to_ascii_lowercase();
+    let first_cell = rfp_table_cells(&lower).first().cloned().unwrap_or_default();
+    matches!(
+        first_cell.as_str(),
+        "requirement"
+            | "requirements"
+            | "description"
+            | "item"
+            | "criterion"
+            | "criteria"
+            | "role"
+            | "position"
+            | "key personnel"
+            | "document"
+            | "attachment"
+            | "deliverable"
+    ) && contains_any(
+        &lower,
+        &[
+            "mandatory",
+            "required",
+            "minimum",
+            "evidence",
+            "response",
+            "owner",
+            "status",
+            "weight",
+            "points",
+            "qualification",
+            "experience",
+        ],
+    )
+}
+
+fn is_rfp_table_requirement_line(line: &str) -> bool {
+    if !line.contains('|') || is_rfp_table_header_line(line) || is_rfp_table_separator_line(line) {
+        return false;
+    }
+    let lower = line.to_ascii_lowercase();
+    let has_compliance_signal = contains_any(
+        &lower,
+        &[
+            "mandatory",
+            "required",
+            "minimum",
+            "yes",
+            "pass/fail",
+            "compliant",
+            "non-compliant",
+            "disqualif",
+            "reject",
+            "scored",
+            "points",
+            "weight",
+            "deadline",
+            "attachment",
+            "certificate",
+            "form",
+            "submission",
+            "years",
+            "degree",
+            "cv",
+            "resume",
+        ],
+    );
+    let has_requirement_subject = contains_any(
+        &lower,
+        &[
+            "requirement",
+            "description",
+            "response",
+            "vendor",
+            "bidder",
+            "proposer",
+            "contractor",
+            "document",
+            "evidence",
+            "deliverable",
+            "criteria",
+            "proof",
+            "section",
+            "architect",
+            "expert",
+            "lead",
+            "specialist",
+            "manager",
+        ],
+    );
+    has_compliance_signal && has_requirement_subject
+}
+
+fn is_rfp_explicit_constraint_line(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    contains_any(
+        &lower,
+        &[
+            "submission deadline",
+            "deadline for submission",
+            "due no later than",
+            "will be rejected",
+            "automatic exclusion",
+            "non-responsive",
+            "maximum ",
+            "page limit",
+            "limit of ",
+            "font size",
+            "times new roman",
+            "arial",
+            "calibri",
+            "scoring",
+            "weighted",
+            "points",
+        ],
+    )
+}
+
+fn rfp_requirement_candidate_text(line: &str) -> String {
+    if !line.contains('|') {
+        return line.to_string();
+    }
+    let cells = rfp_table_cells(line);
+    match cells.as_slice() {
+        [] => line.to_string(),
+        [only] => only.to_string(),
+        [head, rest @ ..] => {
+            let details = rest
+                .iter()
+                .filter(|cell| !cell.trim().is_empty())
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("; ");
+            if details.is_empty() {
+                head.to_string()
+            } else {
+                format!("{head}: {details}")
+            }
+        }
+    }
 }
 
 fn is_rfp_requirement_line(line: &str) -> bool {
