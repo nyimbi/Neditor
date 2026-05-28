@@ -2418,10 +2418,16 @@
                 {{ googleAuthBusy ? "Waiting..." : "Sign in with Google" }}
               </button>
               <button type="button" :disabled="!googleAuthSession" @click="pollGoogleSignIn">Check callback</button>
+              <button type="button" :disabled="!googleAccessToken || googleDocsImportBusy" @click="importCurrentDocumentToGoogleDocs">
+                {{ googleDocsImportBusy ? "Importing..." : "Import current document" }}
+              </button>
+              <button type="button" :disabled="!googleAccessToken || !googleDocsLiveDocumentId || googleDocsImportBusy" @click="readBackGoogleDocsImport">
+                Read back
+              </button>
               <button type="button" :disabled="!googleAccessToken" @click="copyGoogleAccessToken">Copy session token</button>
               <button type="button" :disabled="!googleAccessToken && !googleAuthSession" @click="clearGoogleSession">Clear session</button>
             </div>
-            <p class="sidebar-hint">{{ googleAuthStatus || googleAuthSummary }}</p>
+            <p class="sidebar-hint">{{ googleDocsImportStatus || googleAuthStatus || googleAuthSummary }}</p>
             <div class="agent-cli-list" aria-label="Google authorization status">
               <span>
                 Token storage
@@ -2443,7 +2449,22 @@
                 Granted scope
                 <code>{{ googleTokenScope }}</code>
               </span>
+              <span v-if="googleDocsLiveDocumentId">
+                Google Doc ID
+                <code>{{ googleDocsLiveDocumentId }}</code>
+              </span>
+              <span v-if="googleDocsLiveDocumentUrl">
+                Google Doc URL
+                <code>{{ googleDocsLiveDocumentUrl }}</code>
+              </span>
             </div>
+            <textarea
+              v-if="googleDocsReadbackPreview"
+              :value="googleDocsReadbackPreview"
+              rows="5"
+              readonly
+              aria-label="Google Docs readback preview"
+            ></textarea>
           </section>
           <h3>Bibliography defaults</h3>
           <label>
@@ -5364,10 +5385,15 @@ import {
   upsertFrontMatterListField,
 } from "./lib/frontMatter";
 import {
+  GOOGLE_DRIVE_UPLOAD_URL,
   googleOAuthScopesText,
   googleOAuthTokenRequestBody,
+  googleDocsMultipartUploadBody,
+  googleDriveExportTextUrl,
   normalizeGoogleIntegrationPreferences,
   normalizeGoogleOAuthScopes,
+  type GoogleDocsLiveImportPreparation,
+  type GoogleDriveImportResponse,
   type GoogleOAuthCallbackResponse,
   type GoogleOAuthStartResponse,
   type GoogleOAuthTokenResponse,
@@ -5821,6 +5847,11 @@ const googleAccessToken = ref("");
 const googleTokenScope = ref("");
 const googleTokenExpiresAt = ref(store.googleIntegration.tokenExpiresAt);
 const googleAuthPollStartedAt = ref("");
+const googleDocsImportBusy = ref(false);
+const googleDocsImportStatus = ref("");
+const googleDocsLiveDocumentId = ref("");
+const googleDocsLiveDocumentUrl = ref("");
+const googleDocsReadbackPreview = ref("");
 let googleAuthPollTimer: ReturnType<typeof window.setInterval> | null = null;
 const localAgentHandoffBusy = ref(false);
 const localAgentHandoffResult = ref<LocalAgentHandoffResponse | null>(null);
@@ -9154,6 +9185,72 @@ async function copyGoogleAccessToken() {
   }
 }
 
+async function importCurrentDocumentToGoogleDocs() {
+  if (!googleAccessToken.value) {
+    googleDocsImportStatus.value = "Sign in with Google before importing";
+    return;
+  }
+  flushEditorTextToStore();
+  googleDocsImportBusy.value = true;
+  googleDocsImportStatus.value = "Preparing Google Docs import package";
+  googleDocsReadbackPreview.value = "";
+  try {
+    const preparation = await invoke<GoogleDocsLiveImportPreparation>("prepare_google_docs_live_import", {
+      request: {
+        text: active.value.text,
+        file_path: active.value.path,
+        options: store.exportOptionsForActive(),
+      },
+    });
+    const boundary = `neditor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    const docxBytes = new Uint8Array(preparation.docx_bytes);
+    const body = googleDocsMultipartUploadBody(preparation.file_name, docxBytes, boundary);
+    googleDocsImportStatus.value = `Uploading ${preparation.file_name} to Google Docs`;
+    const response = await fetch(GOOGLE_DRIVE_UPLOAD_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${googleAccessToken.value}`,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    });
+    const uploaded = (await response.json()) as GoogleDriveImportResponse;
+    if (!response.ok || uploaded.error || !uploaded.id) {
+      throw new Error(uploaded.error?.message || `Google Docs import failed with HTTP ${response.status}`);
+    }
+    googleDocsLiveDocumentId.value = uploaded.id;
+    googleDocsLiveDocumentUrl.value = uploaded.webViewLink || "";
+    googleDocsImportStatus.value = `Imported ${uploaded.name || preparation.document_title} to Google Docs`;
+    store.statusMessage = `Google Docs import complete: ${uploaded.name || preparation.document_title}`;
+  } catch (error) {
+    googleDocsImportStatus.value = appErrorText(error);
+  } finally {
+    googleDocsImportBusy.value = false;
+  }
+}
+
+async function readBackGoogleDocsImport() {
+  if (!googleAccessToken.value || !googleDocsLiveDocumentId.value) return;
+  googleDocsImportBusy.value = true;
+  googleDocsImportStatus.value = "Reading back Google Docs text";
+  try {
+    const response = await fetch(googleDriveExportTextUrl(googleDocsLiveDocumentId.value), {
+      headers: { Authorization: `Bearer ${googleAccessToken.value}` },
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(text || `Google Docs readback failed with HTTP ${response.status}`);
+    }
+    googleDocsReadbackPreview.value = text.slice(0, 4000);
+    googleDocsImportStatus.value = "Google Docs readback complete";
+    store.statusMessage = "Google Docs readback complete";
+  } catch (error) {
+    googleDocsImportStatus.value = appErrorText(error);
+  } finally {
+    googleDocsImportBusy.value = false;
+  }
+}
+
 async function clearGoogleSession() {
   const sessionState = googleAuthSession.value?.state;
   stopGoogleAuthPolling();
@@ -9163,6 +9260,10 @@ async function clearGoogleSession() {
   googleAuthSession.value = null;
   googleAuthPollStartedAt.value = "";
   googleTokenExpiresAt.value = "";
+  googleDocsImportStatus.value = "";
+  googleDocsLiveDocumentId.value = "";
+  googleDocsLiveDocumentUrl.value = "";
+  googleDocsReadbackPreview.value = "";
   if (sessionState) {
     try {
       await invoke("cancel_google_oauth_sign_in", { stateId: sessionState });
@@ -10554,6 +10655,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     keywords: ["google", "login", "oauth", "token", "docs", "drive"],
     run: () => startGoogleSignIn(),
   },
+  {
+    name: "Import current document to Google Docs",
+    group: "Export",
+    description: "Upload the current document as a Google Docs file using the active session token.",
+    keywords: ["google", "docs", "drive", "import", "upload", "readback"],
+    run: () => importCurrentDocumentToGoogleDocs(),
+  },
   { name: "Set up business identity", group: "Templates", run: () => openBusinessProfile() },
   { name: "Insert company contact block", group: "Templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
   ...businessDocumentTemplates.map((template) => ({
@@ -10850,6 +10958,9 @@ async function runNativeMenuCommand(command: string) {
       break;
     case "neditor-sign-in-google":
       await startGoogleSignIn();
+      break;
+    case "neditor-import-google-docs":
+      await importCurrentDocumentToGoogleDocs();
       break;
     case "neditor-open-folder":
       await openFolder();

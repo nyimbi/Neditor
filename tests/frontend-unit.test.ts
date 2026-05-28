@@ -199,8 +199,12 @@ import {
   isConfigurationSetupStepId,
 } from "../src/lib/configurationSetup.js";
 import {
+  GOOGLE_DRIVE_UPLOAD_URL,
+  GOOGLE_DOCS_MIME_TYPE,
   googleOAuthScopesText,
   googleOAuthTokenRequestBody,
+  googleDocsImportMetadata,
+  googleDriveExportTextUrl,
   normalizeGoogleIntegrationPreferences,
   normalizeGoogleOAuthScopes,
   type GoogleOAuthStartResponse,
@@ -4813,6 +4817,12 @@ test("Google OAuth helpers normalize setup without exposing stored tokens", () =
   equal(body.get("grant_type"), "authorization_code");
   equal(body.get("code_verifier"), "verifier");
   equal(body.get("redirect_uri"), session.redirect_uri);
+  equal(GOOGLE_DRIVE_UPLOAD_URL.includes("uploadType=multipart"), true);
+  deepEqual(googleDocsImportMetadata("Board Pack.docx"), {
+    name: "Board Pack",
+    mimeType: GOOGLE_DOCS_MIME_TYPE,
+  });
+  equal(googleDriveExportTextUrl("abc/123"), "https://www.googleapis.com/drive/v3/files/abc%2F123/export?mimeType=text/plain");
 });
 
 test("AI provider execution extracts Markdown without persisting secrets", async () => {
@@ -6491,7 +6501,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Sign in with Google"));
   ok(app.includes("start_google_oauth_sign_in"));
   ok(app.includes("poll_google_oauth_sign_in"));
+  ok(app.includes("prepare_google_docs_live_import"));
+  ok(app.includes("Import current document"));
+  ok(app.includes("Google Docs readback preview"));
   ok(app.includes("oauth2.googleapis.com/token"));
+  ok(app.includes("GOOGLE_DRIVE_UPLOAD_URL"));
   ok(app.includes("session-only Google access token"));
   ok(app.includes("Open configuration setup wizard"));
   ok(app.includes("saveAgentProviderDefaults"));
@@ -6849,6 +6863,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-export-epub", "EPUB Export"'));
   ok(tauriLib.includes('"neditor-configure-google-docs"'));
   ok(tauriLib.includes('"neditor-sign-in-google"'));
+  ok(tauriLib.includes('"neditor-import-google-docs"'));
   ok(tauriLib.includes('"neditor-open-docs-live", "Docs Live"'));
   ok(tauriLib.includes('"neditor-open-table-editor",'));
   ok(tauriLib.includes('"neditor-edit-table-at-cursor",'));
@@ -6876,6 +6891,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('case "neditor-mode-outline"'));
   ok(app.includes('case "neditor-configure-google-docs"'));
   ok(app.includes('case "neditor-sign-in-google"'));
+  ok(app.includes('case "neditor-import-google-docs"'));
   ok(app.includes('case "neditor-open-table-editor"'));
   ok(app.includes('case "neditor-edit-table-at-cursor"'));
   ok(app.includes('case "neditor-go-to-source-table"'));

@@ -42,11 +42,29 @@ pub(crate) struct PrepareExportRequest {
     pub(crate) options: Value,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct GoogleDocsLiveImportRequest {
+    pub(crate) text: String,
+    pub(crate) file_path: Option<String>,
+    pub(crate) options: Value,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct ExportResponse {
     pub(crate) output_path: String,
     pub(crate) manifest_path: Option<String>,
     pub(crate) manifest: ExportManifest,
+    pub(crate) diagnostics: Vec<DocumentDiagnostic>,
+    pub(crate) progress_steps: Vec<ExportProgressStep>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct GoogleDocsLiveImportPreparation {
+    pub(crate) file_name: String,
+    pub(crate) document_title: String,
+    pub(crate) mime_type: String,
+    pub(crate) docx_bytes: Vec<u8>,
+    pub(crate) docx_hash: String,
     pub(crate) diagnostics: Vec<DocumentDiagnostic>,
     pub(crate) progress_steps: Vec<ExportProgressStep>,
 }
@@ -271,11 +289,92 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
     }
 }
 
+#[tauri::command]
+pub(crate) fn prepare_google_docs_live_import(
+    request: GoogleDocsLiveImportRequest,
+) -> Result<GoogleDocsLiveImportPreparation, String> {
+    let file_path = request.file_path.clone();
+    let mut response = compile_with_options(
+        CompileRequest {
+            text: request.text,
+            file_path,
+        },
+        &request.options,
+    );
+    response.export_manifest.export_target = "google-docs".to_string();
+    response.export_manifest.export_options = request.options.clone();
+    validate_export_settings("google-docs", &request.options, &mut response.diagnostics);
+    validate_target_specific_export_readiness(
+        "google-docs",
+        &response.metadata,
+        &mut response.diagnostics,
+    );
+    validate_captioned_business_objects(&response.document_ast.blocks, &mut response.diagnostics);
+    validate_content_sensitive_export_options(
+        "google-docs",
+        &request.options,
+        &response.semantic,
+        &mut response.diagnostics,
+    );
+    if git_export_warnings_enabled(&request.options) {
+        validate_git_export_cleanliness(request.file_path.as_deref(), &mut response.diagnostics);
+    }
+    if let Some(error) = response
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.severity == "error")
+    {
+        return Err(format!(
+            "Google Docs live import blocked by validation error: {}",
+            error.message
+        ));
+    }
+    let docx_bytes = render_docx_bytes(&response, &request.options)?;
+    let document_title = response.semantic.title.trim().to_string();
+    let file_name = format!("{}.docx", export_safe_file_stem(&document_title));
+    Ok(GoogleDocsLiveImportPreparation {
+        file_name,
+        document_title,
+        mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            .to_string(),
+        docx_hash: sha256_uri(&docx_bytes),
+        docx_bytes,
+        diagnostics: response.diagnostics.clone(),
+        progress_steps: export_progress_steps(
+            "google-docs",
+            response.transform_artifacts.len(),
+            true,
+            None,
+            false,
+        ),
+    })
+}
+
 fn git_export_warnings_enabled(options: &Value) -> bool {
     options
         .get("warnOnDirtyGit")
         .and_then(Value::as_bool)
         .unwrap_or(true)
+}
+
+fn export_safe_file_stem(title: &str) -> String {
+    let mut stem = String::new();
+    for ch in title.chars() {
+        if ch.is_ascii_alphanumeric() {
+            stem.push(ch);
+        } else if matches!(ch, ' ' | '-' | '_' | '.') && !stem.ends_with('-') {
+            stem.push('-');
+        }
+        if stem.len() >= 80 {
+            break;
+        }
+    }
+    let stem = stem.trim_matches('-');
+    if stem.is_empty() {
+        "neditor-document".to_string()
+    } else {
+        stem.to_string()
+    }
 }
 
 fn validate_git_export_cleanliness(

@@ -78,9 +78,9 @@ use export::{
     render_google_docs_package_bytes, render_latex_bytes, render_markdown_bundle_bytes,
     render_pdf_bytes, render_pptx_bytes,
 };
-use export_commands::{export_document, prepare_for_export};
+use export_commands::{export_document, prepare_for_export, prepare_google_docs_live_import};
 #[cfg(test)]
-use export_commands::{ExportRequest, PrepareExportRequest};
+use export_commands::{ExportRequest, GoogleDocsLiveImportRequest, PrepareExportRequest};
 use filesystem::{
     duplicate_file, file_metadata, open_file, read_file, rename_file, reveal_path, save_file,
     save_file_as, FileResponse,
@@ -173,6 +173,7 @@ pub fn run() {
             compile_document_with_options,
             export_document,
             prepare_for_export,
+            prepare_google_docs_live_import,
             import_spreadsheet_table,
             export_markdown_tables,
             start_google_oauth_sign_in,
@@ -256,6 +257,11 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
             app,
             "neditor-sign-in-google",
             "Sign in with Google",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-import-google-docs",
+            "Import Current Document to Google Docs",
         )?)
         .separator()
         .item(&menu_item(

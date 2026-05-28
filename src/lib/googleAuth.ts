@@ -3,6 +3,11 @@ export const GOOGLE_DOCS_OAUTH_SCOPES = [
   "https://www.googleapis.com/auth/documents",
 ] as const;
 
+export const GOOGLE_DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+export const GOOGLE_DOCS_MIME_TYPE = "application/vnd.google-apps.document";
+export const GOOGLE_DRIVE_UPLOAD_URL =
+  "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,mimeType";
+
 export interface GoogleIntegrationPreferences {
   clientId: string;
   scopes: string[];
@@ -34,6 +39,24 @@ export interface GoogleOAuthTokenResponse {
   token_type?: string;
   error?: string;
   error_description?: string;
+}
+
+export interface GoogleDocsLiveImportPreparation {
+  file_name: string;
+  document_title: string;
+  mime_type: string;
+  docx_bytes: number[];
+  docx_hash: string;
+  diagnostics: Array<{ severity: string; message: string }>;
+  progress_steps: Array<{ id: string; label: string; status: string }>;
+}
+
+export interface GoogleDriveImportResponse {
+  id?: string;
+  name?: string;
+  webViewLink?: string;
+  mimeType?: string;
+  error?: { message?: string };
 }
 
 function normalizedString(value: unknown, limit: number) {
@@ -73,4 +96,33 @@ export function googleOAuthTokenRequestBody(session: GoogleOAuthStartResponse, c
   body.set("grant_type", "authorization_code");
   body.set("redirect_uri", session.redirect_uri);
   return body;
+}
+
+export function googleDriveExportTextUrl(fileId: string) {
+  return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain`;
+}
+
+export function googleDocsImportMetadata(fileName: string) {
+  return {
+    name: fileName.replace(/\.docx$/i, ""),
+    mimeType: GOOGLE_DOCS_MIME_TYPE,
+  };
+}
+
+export function googleDocsMultipartUploadBody(fileName: string, docxBytes: Uint8Array, boundary: string) {
+  const metadata = JSON.stringify(googleDocsImportMetadata(fileName));
+  return new Blob(
+    [
+      `--${boundary}\r\n`,
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n",
+      metadata,
+      "\r\n",
+      `--${boundary}\r\n`,
+      `Content-Type: ${GOOGLE_DOCX_MIME_TYPE}\r\n\r\n`,
+      docxBytes,
+      "\r\n",
+      `--${boundary}--\r\n`,
+    ],
+    { type: `multipart/related; boundary=${boundary}` },
+  );
 }

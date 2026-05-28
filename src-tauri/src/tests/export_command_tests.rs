@@ -17,6 +17,29 @@ fn prepare_for_export_blocks_warning_cleanliness() {
 }
 
 #[test]
+fn prepare_google_docs_live_import_returns_docx_payload_without_writing_files() {
+    let preparation = prepare_google_docs_live_import(GoogleDocsLiveImportRequest {
+        text: "---\ntitle: Live Import Proof\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-28\nowner: Release\nreleaseTarget: Google Docs\n---\n# Live Import Proof\n\nReady for upload.".to_string(),
+        file_path: None,
+        options: json!({ "includeManifest": true }),
+    })
+    .expect("google docs import preparation");
+
+    assert_eq!(
+        preparation.mime_type,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+    assert_eq!(preparation.file_name, "Live-Import-Proof.docx");
+    assert_eq!(preparation.document_title, "Live Import Proof");
+    assert!(preparation.docx_bytes.starts_with(b"PK"));
+    assert!(preparation.docx_hash.starts_with("sha256:"));
+    assert!(preparation
+        .progress_steps
+        .iter()
+        .any(|step| step.id == "render" && step.label.contains("google-docs")));
+}
+
+#[test]
 fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

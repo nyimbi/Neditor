@@ -639,7 +639,10 @@ is enabled.
 For live Google Docs actions, open **Settings** -> **Google Docs**, add a
 desktop OAuth client ID, and choose **Sign in with Google**. NEditor opens the
 system browser, receives the loopback callback locally, and keeps the access
-token in session memory rather than writing it to workspace preferences.
+token in session memory rather than writing it to workspace preferences. After
+sign-in, choose **Import current document** to upload the active document as a
+Google Docs file, then choose **Read back** to export plain text from the created
+Google Doc for verification.
 EPUB exports write a direct `.epub` package with the required `mimetype`,
 container file, OPF metadata, navigation document, XHTML body, stylesheet, text
 fallback, packaged media, and embedded NEditor manifest. Use **Export EPUB**
