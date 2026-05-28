@@ -435,7 +435,9 @@ web app.
   request bodies, headers, cURL starters, and safety checklists for
   approved AI providers, Ollama local endpoints, Ollama cloud or remote
   endpoints, localhost gateways, or private-network model gateways without storing secrets in the
-  document. If policy allows direct calls, users can run the
+  document. For native Ollama profiles, users can refresh the installed model
+  list from the configured Ollama `/api/tags` endpoint and select one of the
+  returned models instead of typing model names from memory. If policy allows direct calls, users can run the
   request with a session-only API key, preview the provider's Markdown response,
   and apply it as review material without persisting the secret; imported
   provider responses are wrapped in local `ai-source` and `ai-assisted`

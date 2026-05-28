@@ -6230,6 +6230,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Toolbar text size"'));
   ok(app.includes('aria-label="Deep research target report pages"'));
   ok(app.includes('aria-label="Exact deep research target pages"'));
+  ok(app.includes('aria-label="Ollama model discovery"'));
+  ok(app.includes('aria-label="Ollama model"'));
+  ok(app.includes("Refresh Ollama models"));
+  ok(app.includes('invoke<OllamaModelListResponse>("list_ollama_models"'));
+  ok(app.includes("ollamaModelOptions"));
+  ok(app.includes("currentModelMissingFromOllamaList"));
   ok(app.includes('aria-label="Application menus"'));
   ok(app.includes("appMenus"));
   ok(app.includes("openAppMenuId"));
@@ -7180,6 +7186,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes("stop_text_aloud"));
   ok(tauriLib.includes("inspect_native_tts"));
   ok(tauriLib.includes("download_tts_model"));
+  ok(tauriLib.includes("list_ollama_models"));
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
   ok(tauriLib.includes('"neditor-open-deep-research",'));
   ok(tauriLib.includes('"neditor-open-agent-workspace",'));

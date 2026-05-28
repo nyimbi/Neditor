@@ -2731,8 +2731,20 @@
               </label>
               <label>
                 Model
-                <input v-model="agentProviderModel" placeholder="Approved model or deployment name" />
+                <select v-if="isOllamaProvider && ollamaModelOptions.length" v-model="agentProviderModel" aria-label="Ollama model">
+                  <option v-if="currentModelMissingFromOllamaList" :value="agentProviderModel">{{ agentProviderModel }} (current)</option>
+                  <option v-for="model in ollamaModelOptions" :key="model.name" :value="model.name">
+                    {{ model.name }}{{ model.parameter_size ? ` | ${model.parameter_size}` : "" }}{{ model.quantization_level ? ` | ${model.quantization_level}` : "" }}
+                  </option>
+                </select>
+                <input v-else v-model="agentProviderModel" placeholder="Approved model or deployment name" />
               </label>
+              <div v-if="isOllamaProvider" class="ollama-model-picker" aria-label="Ollama model discovery">
+                <button type="button" :disabled="ollamaModelBusy || !agentProviderEndpoint.trim()" @click="refreshOllamaModels">
+                  {{ ollamaModelBusy ? "Loading models..." : "Refresh Ollama models" }}
+                </button>
+                <small>{{ ollamaModelPickerHelp }}</small>
+              </div>
               <label>
                 Endpoint
                 <input v-model="agentProviderEndpoint" placeholder="https://provider.example/v1/messages" />
@@ -3386,8 +3398,20 @@
               </label>
               <label>
                 Model
-                <input v-model="agentProviderModel" />
+                <select v-if="isOllamaProvider && ollamaModelOptions.length" v-model="agentProviderModel" aria-label="Ollama model">
+                  <option v-if="currentModelMissingFromOllamaList" :value="agentProviderModel">{{ agentProviderModel }} (current)</option>
+                  <option v-for="model in ollamaModelOptions" :key="model.name" :value="model.name">
+                    {{ model.name }}{{ model.parameter_size ? ` | ${model.parameter_size}` : "" }}{{ model.quantization_level ? ` | ${model.quantization_level}` : "" }}
+                  </option>
+                </select>
+                <input v-else v-model="agentProviderModel" />
               </label>
+              <div v-if="isOllamaProvider" class="ollama-model-picker" aria-label="Ollama model discovery">
+                <button type="button" :disabled="ollamaModelBusy || !agentProviderEndpoint.trim()" @click="refreshOllamaModels">
+                  {{ ollamaModelBusy ? "Loading models..." : "Refresh Ollama models" }}
+                </button>
+                <small>{{ ollamaModelPickerHelp }}</small>
+              </div>
               <label>
                 Endpoint
                 <input v-model="agentProviderEndpoint" />
@@ -5087,8 +5111,20 @@
               </label>
               <label>
                 Model
-                <input v-model="agentProviderModel" placeholder="Approved model or deployment name" />
+                <select v-if="isOllamaProvider && ollamaModelOptions.length" v-model="agentProviderModel" aria-label="Ollama model">
+                  <option v-if="currentModelMissingFromOllamaList" :value="agentProviderModel">{{ agentProviderModel }} (current)</option>
+                  <option v-for="model in ollamaModelOptions" :key="model.name" :value="model.name">
+                    {{ model.name }}{{ model.parameter_size ? ` | ${model.parameter_size}` : "" }}{{ model.quantization_level ? ` | ${model.quantization_level}` : "" }}
+                  </option>
+                </select>
+                <input v-else v-model="agentProviderModel" placeholder="Approved model or deployment name" />
               </label>
+              <div v-if="isOllamaProvider" class="ollama-model-picker" aria-label="Ollama model discovery">
+                <button type="button" :disabled="ollamaModelBusy || !agentProviderEndpoint.trim()" @click="refreshOllamaModels">
+                  {{ ollamaModelBusy ? "Loading models..." : "Refresh Ollama models" }}
+                </button>
+                <small>{{ ollamaModelPickerHelp }}</small>
+              </div>
               <label>
                 Endpoint
                 <input v-model="agentProviderEndpoint" placeholder="https://provider.example/v1/messages" />
@@ -5849,6 +5885,21 @@ type LocalAgentResponseImport = {
   characters: number;
   warnings: string[];
 };
+type OllamaModelSummary = {
+  name: string;
+  modified_at: string;
+  size: number;
+  digest: string;
+  family: string;
+  parameter_size: string;
+  quantization_level: string;
+};
+type OllamaModelListResponse = {
+  endpoint: string;
+  models: OllamaModelSummary[];
+  count: number;
+  warnings: string[];
+};
 type NativeTtsResponse = {
   engine: string;
   characters: number;
@@ -6086,6 +6137,10 @@ const agentProviderPackage = ref<AiProviderRequestPackage | null>(null);
 const agentProviderApiKey = ref("");
 const agentProviderBusy = ref(false);
 const agentProviderResult = ref<AiProviderExecutionResult | null>(null);
+const ollamaModelBusy = ref(false);
+const ollamaModelStatus = ref("");
+const ollamaModelOptions = ref<OllamaModelSummary[]>([]);
+const ollamaModelEndpoint = ref("");
 const citationSearchQuery = ref("");
 const citationSearchProvider = ref<DeepResearchSearchProvider>("duckduckgo");
 const citationSearxngUrl = ref("http://127.0.0.1:8080");
@@ -6903,6 +6958,18 @@ const docsLiveSuggestedAnswers = computed(() =>
 const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
+});
+const currentAgentProviderProfile = computed(() => providerProfileById(agentProviderId.value));
+const isOllamaProvider = computed(() => agentProviderId.value === "ollama-local" || agentProviderId.value === "ollama-cloud");
+const ollamaModelNames = computed(() => new Set(ollamaModelOptions.value.map((model) => model.name)));
+const currentModelMissingFromOllamaList = computed(() =>
+  Boolean(isOllamaProvider.value && agentProviderModel.value.trim() && ollamaModelOptions.value.length && !ollamaModelNames.value.has(agentProviderModel.value.trim())),
+);
+const ollamaModelPickerHelp = computed(() => {
+  if (!isOllamaProvider.value) return "";
+  if (ollamaModelBusy.value) return "Loading models from Ollama...";
+  if (ollamaModelStatus.value) return ollamaModelStatus.value;
+  return "Refresh to load installed models from the configured Ollama /api/tags endpoint.";
 });
 const currentLocalAgentProfile = computed<LocalAgentCliProfile | undefined>(() => localAgentCliProfileById(agentProviderPackage.value?.profile.id || agentProviderId.value));
 const canPrepareLocalAgentHandoff = computed(() => Boolean(agentProviderPackage.value && currentLocalAgentProfile.value && !localAgentHandoffBusy.value));
@@ -9352,6 +9419,9 @@ function syncAgentProviderProfile() {
   agentProviderEndpoint.value = profile.endpoint;
   agentProviderModel.value = profile.model;
   agentProviderKeyEnv.value = aiProviderDefaultKeyEnv(profile.id);
+  ollamaModelOptions.value = [];
+  ollamaModelEndpoint.value = "";
+  ollamaModelStatus.value = isOllamaProvider.value ? "Refresh to load installed Ollama models." : "";
   agentProviderPackage.value = null;
   agentProviderResult.value = null;
   localAgentHandoffResult.value = null;
@@ -9367,6 +9437,48 @@ function applyStoredAiProviderDefaults() {
   agentProviderEndpoint.value = defaults.endpoint || profile.endpoint;
   agentProviderModel.value = defaults.model || profile.model;
   agentProviderKeyEnv.value = defaults.keyEnv || aiProviderDefaultKeyEnv(defaults.profileId);
+}
+
+async function refreshOllamaModels() {
+  if (!isOllamaProvider.value) {
+    ollamaModelStatus.value = "Select an Ollama provider profile before listing models.";
+    return;
+  }
+  const endpoint = agentProviderEndpoint.value.trim();
+  if (!endpoint) {
+    ollamaModelStatus.value = "Enter an Ollama endpoint before listing models.";
+    return;
+  }
+  ollamaModelBusy.value = true;
+  ollamaModelStatus.value = "Loading models from Ollama...";
+  try {
+    const response = await invoke<OllamaModelListResponse>("list_ollama_models", {
+      request: {
+        endpoint,
+        auth_header: currentAgentProviderProfile.value.authHeader,
+        api_key: agentProviderApiKey.value,
+        key_env: agentProviderKeyEnv.value,
+      },
+    });
+    ollamaModelOptions.value = response.models || [];
+    ollamaModelEndpoint.value = response.endpoint;
+    if (!agentProviderModel.value.trim() && ollamaModelOptions.value[0]) {
+      agentProviderModel.value = ollamaModelOptions.value[0].name;
+    }
+    const warning = response.warnings?.[0] ? ` ${response.warnings[0]}` : "";
+    ollamaModelStatus.value = `Loaded ${response.count} Ollama model${response.count === 1 ? "" : "s"} from ${response.endpoint}.${warning}`;
+    store.statusMessage = response.count
+      ? `Loaded ${response.count} Ollama model${response.count === 1 ? "" : "s"}`
+      : "Ollama returned no installed models";
+  } catch (error) {
+    ollamaModelOptions.value = [];
+    ollamaModelEndpoint.value = "";
+    ollamaModelStatus.value = appErrorText(error);
+    store.lastError = ollamaModelStatus.value;
+    store.statusMessage = "Could not load Ollama models";
+  } finally {
+    ollamaModelBusy.value = false;
+  }
 }
 
 function saveAgentProviderDefaults() {
@@ -11931,6 +12043,12 @@ watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteD
 watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
 watch(() => store.aiProviderDefaults, applyStoredAiProviderDefaults, { deep: true });
 watch(() => store.googleIntegration, syncGoogleIntegrationFields, { deep: true });
+watch([agentProviderId, agentProviderEndpoint], () => {
+  if (!ollamaModelOptions.value.length && !ollamaModelEndpoint.value) return;
+  ollamaModelOptions.value = [];
+  ollamaModelEndpoint.value = "";
+  ollamaModelStatus.value = isOllamaProvider.value ? "Refresh to load installed Ollama models for this endpoint." : "";
+});
 
 watch(
   () => active.value.id,
@@ -23989,6 +24107,20 @@ select:hover {
   grid-column: 1 / -1;
 }
 
+.ollama-model-picker {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.ollama-model-picker small {
+  color: #526171;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .tts-model-download-notice {
   display: grid;
   grid-column: 1 / -1;
@@ -25895,6 +26027,7 @@ select:hover {
   .agent-run-columns,
   .agent-distribution-runbooks,
   .agent-provider-grid,
+  .ollama-model-picker,
   .agent-step-list li {
     grid-template-columns: 1fr;
   }

@@ -35,6 +35,7 @@ mod link_validation;
 mod local_agents;
 mod manifest;
 mod markdown_tables;
+mod ollama_models;
 mod paged_document;
 mod provenance;
 mod references;
@@ -107,6 +108,7 @@ use google_auth::{
     GoogleAuthState,
 };
 use local_agents::{import_local_agent_response, prepare_local_agent_handoff};
+use ollama_models::list_ollama_models;
 use rfp_import::import_rfp_source;
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
 use tauri::{
@@ -201,6 +203,7 @@ pub fn run() {
             cleanup_ai_paste,
             search_citation_sources,
             download_citation_source,
+            list_ollama_models,
             inspect_native_tts,
             download_tts_model,
             read_text_aloud,
