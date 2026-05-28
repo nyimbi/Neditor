@@ -259,8 +259,8 @@ export function buildConfigurationSetupStepAssistance(input: ConfigurationSetupA
       break;
     case "google-auth":
       suggestedAnswer = input.googleAuthorized
-        ? `Google authorization is ready for this session with ${input.googleScopeCount} scope(s). Keep the access token session-only, use the configured desktop OAuth client, and reauthorize before Google Docs import/export evidence if the token expires at ${input.googleTokenExpiresAt || "session end"}.`
-        : `Add a desktop OAuth client ID, keep the Google Docs and Drive scopes least-privilege, then sign in with Google before exporting or verifying Google Docs collaboration packages.`;
+        ? `Google authorization is ready for this session with ${input.googleScopeCount} scope(s). Keep Google tokens session-only, use the configured desktop OAuth client, and request in-memory session refresh when long Google Docs import/readback evidence may outlive the access token expiry at ${input.googleTokenExpiresAt || "session end"}.`
+        : `Add a desktop OAuth client ID, keep the Google Docs and Drive scopes least-privilege, request session refresh for longer import/readback workflows, then sign in with Google before exporting or verifying Google Docs collaboration packages.`;
       rationale = "Google Docs distribution needs an explicit user grant; NEditor should never store Google access tokens in workspace preferences.";
       contextSignals.push(
         `Google client ID: ${input.googleClientId ? "configured" : "missing"}`,

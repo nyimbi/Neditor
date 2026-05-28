@@ -36,6 +36,7 @@ pub(crate) struct GoogleAuthStartRequest {
     pub(crate) client_id: String,
     pub(crate) scopes: Vec<String>,
     pub(crate) login_hint: Option<String>,
+    pub(crate) offline_access: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -45,6 +46,7 @@ pub(crate) struct GoogleAuthStartResponse {
     state: String,
     code_verifier: String,
     scopes: Vec<String>,
+    offline_access: bool,
     expires_in_seconds: u64,
 }
 
@@ -113,6 +115,7 @@ pub(crate) fn start_google_oauth_sign_in(
         &code_challenge,
         &scopes,
         request.login_hint.as_deref().unwrap_or(""),
+        request.offline_access.unwrap_or(false),
     );
     Ok(GoogleAuthStartResponse {
         authorization_url,
@@ -120,6 +123,7 @@ pub(crate) fn start_google_oauth_sign_in(
         state: state_id,
         code_verifier,
         scopes,
+        offline_access: request.offline_access.unwrap_or(false),
         expires_in_seconds: SESSION_TTL_SECONDS,
     })
 }
@@ -300,6 +304,7 @@ fn google_authorization_url(
     code_challenge: &str,
     scopes: &[String],
     login_hint: &str,
+    offline_access: bool,
 ) -> String {
     let mut params = vec![
         ("client_id", client_id.to_string()),
@@ -311,6 +316,10 @@ fn google_authorization_url(
         ("code_challenge_method", "S256".to_string()),
         ("include_granted_scopes", "true".to_string()),
     ];
+    if offline_access {
+        params.push(("access_type", "offline".to_string()));
+        params.push(("prompt", "consent".to_string()));
+    }
     if !login_hint.trim().is_empty() {
         params.push(("login_hint", login_hint.trim().to_string()));
     }
@@ -421,9 +430,12 @@ mod tests {
             "challenge-123",
             &scopes,
             "user@example.com",
+            true,
         );
         assert!(url.starts_with(GOOGLE_AUTH_ENDPOINT));
         assert!(url.contains("response_type=code"));
+        assert!(url.contains("access_type=offline"));
+        assert!(url.contains("prompt=consent"));
         assert!(url.contains("code_challenge=challenge-123"));
         assert!(url.contains("code_challenge_method=S256"));
         assert!(url.contains("redirect_uri=http%3A%2F%2F127.0.0.1%3A1234%2Fgoogle-oauth-callback"));

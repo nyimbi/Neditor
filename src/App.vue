@@ -2412,6 +2412,10 @@
                 Google scopes
                 <textarea v-model="googleScopesText" rows="3"></textarea>
               </label>
+              <label class="wide-field">
+                <input v-model="googleOfflineAccess" type="checkbox" />
+                Request session refresh so Google Docs actions can renew expired access tokens without storing secrets.
+              </label>
             </section>
             <div class="reference-actions">
               <button type="button" :disabled="googleAuthBusy || !googleClientId.trim()" @click="startGoogleSignIn">
@@ -2424,6 +2428,7 @@
               <button type="button" :disabled="!googleAccessToken || !googleDocsLiveDocumentId || googleDocsImportBusy" @click="readBackGoogleDocsImport">
                 Read back
               </button>
+              <button type="button" :disabled="!googleRefreshToken || googleAuthBusy" @click="refreshGoogleAccessTokenNow">Refresh token</button>
               <button type="button" :disabled="!googleAccessToken" @click="copyGoogleAccessToken">Copy session token</button>
               <button type="button" :disabled="!googleAccessToken && !googleAuthSession" @click="clearGoogleSession">Clear session</button>
             </div>
@@ -2448,6 +2453,10 @@
               <span v-if="googleTokenScope">
                 Granted scope
                 <code>{{ googleTokenScope }}</code>
+              </span>
+              <span>
+                Session refresh
+                <code>{{ googleRefreshToken ? "available in memory" : googleOfflineAccess ? "requested" : "off" }}</code>
               </span>
               <span v-if="googleDocsLiveDocumentId">
                 Google Doc ID
@@ -5387,6 +5396,8 @@ import {
 import {
   GOOGLE_DRIVE_UPLOAD_URL,
   googleOAuthScopesText,
+  googleOAuthRefreshTokenRequestBody,
+  googleOAuthTokenNeedsRefresh,
   googleOAuthTokenRequestBody,
   googleDocsMultipartUploadBody,
   googleDriveExportTextUrl,
@@ -5840,10 +5851,12 @@ const agentProviderResult = ref<AiProviderExecutionResult | null>(null);
 const googleClientId = ref(store.googleIntegration.clientId);
 const googleAccountHint = ref(store.googleIntegration.accountHint);
 const googleScopesText = ref(googleOAuthScopesText(store.googleIntegration.scopes));
+const googleOfflineAccess = ref(store.googleIntegration.requestOfflineAccess);
 const googleAuthBusy = ref(false);
 const googleAuthStatus = ref("");
 const googleAuthSession = ref<GoogleOAuthStartResponse | null>(null);
 const googleAccessToken = ref("");
+const googleRefreshToken = ref("");
 const googleTokenScope = ref("");
 const googleTokenExpiresAt = ref(store.googleIntegration.tokenExpiresAt);
 const googleAuthPollStartedAt = ref("");
@@ -9045,6 +9058,7 @@ function syncGoogleIntegrationFields() {
   googleClientId.value = store.googleIntegration.clientId;
   googleAccountHint.value = store.googleIntegration.accountHint;
   googleScopesText.value = googleOAuthScopesText(store.googleIntegration.scopes);
+  googleOfflineAccess.value = store.googleIntegration.requestOfflineAccess;
   googleTokenExpiresAt.value = store.googleIntegration.tokenExpiresAt;
 }
 
@@ -9053,6 +9067,7 @@ function saveGoogleIntegrationSetup() {
     clientId: googleClientId.value,
     accountHint: googleAccountHint.value,
     scopes: googleScopeList.value,
+    requestOfflineAccess: googleOfflineAccess.value,
     lastAuthorizedAt: store.googleIntegration.lastAuthorizedAt,
     tokenExpiresAt: googleTokenExpiresAt.value,
   });
@@ -9084,6 +9099,7 @@ async function startGoogleSignIn() {
   googleAuthBusy.value = true;
   googleAuthStatus.value = "Opening Google sign-in in the system browser";
   googleAccessToken.value = "";
+  googleRefreshToken.value = "";
   googleTokenScope.value = "";
   try {
     const session = await invoke<GoogleOAuthStartResponse>("start_google_oauth_sign_in", {
@@ -9091,6 +9107,7 @@ async function startGoogleSignIn() {
         client_id: preferences.clientId,
         scopes: preferences.scopes,
         login_hint: preferences.accountHint || null,
+        offline_access: preferences.requestOfflineAccess,
       },
     });
     googleAuthSession.value = session;
@@ -9155,6 +9172,7 @@ async function exchangeGoogleAuthorizationCode(session: GoogleOAuthStartResponse
     }
     const expiresAt = token.expires_in ? new Date(Date.now() + token.expires_in * 1000).toISOString() : "";
     googleAccessToken.value = token.access_token;
+    googleRefreshToken.value = token.refresh_token || "";
     googleTokenScope.value = token.scope || session.scopes.join(" ");
     googleTokenExpiresAt.value = expiresAt;
     googleAuthSession.value = null;
@@ -9163,15 +9181,68 @@ async function exchangeGoogleAuthorizationCode(session: GoogleOAuthStartResponse
       clientId: googleClientId.value,
       accountHint: googleAccountHint.value,
       scopes: session.scopes,
+      requestOfflineAccess: session.offline_access,
       lastAuthorizedAt: new Date().toISOString(),
       tokenExpiresAt: expiresAt,
     });
-    googleAuthStatus.value = "Google session token is ready for Docs and Drive actions";
-    store.statusMessage = "Google Docs sign-in complete; token kept in session memory";
+    googleAuthStatus.value = googleRefreshToken.value
+      ? "Google session token and in-memory refresh token are ready for Docs and Drive actions"
+      : "Google session token is ready; sign in again if it expires before Google returns a refresh token";
+    store.statusMessage = googleRefreshToken.value
+      ? "Google Docs sign-in complete; access and refresh tokens kept in session memory"
+      : "Google Docs sign-in complete; access token kept in session memory";
   } catch (error) {
     googleAuthStatus.value = appErrorText(error);
   } finally {
     googleAuthBusy.value = false;
+  }
+}
+
+async function refreshGoogleAccessTokenIfNeeded(force = false) {
+  if (!googleAccessToken.value) return false;
+  if (!force && !googleOAuthTokenNeedsRefresh(googleTokenExpiresAt.value)) return true;
+  if (!googleRefreshToken.value) {
+    throw new Error("Google access token is expired or near expiry. Sign in with Google again to continue Docs actions.");
+  }
+  googleAuthBusy.value = true;
+  googleAuthStatus.value = "Refreshing Google session token";
+  try {
+    const body = googleOAuthRefreshTokenRequestBody(googleClientId.value, googleRefreshToken.value);
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    const token = (await response.json()) as GoogleOAuthTokenResponse;
+    if (!response.ok || token.error || !token.access_token) {
+      throw new Error(token.error_description || token.error || `Google token refresh failed with HTTP ${response.status}`);
+    }
+    const expiresAt = token.expires_in ? new Date(Date.now() + token.expires_in * 1000).toISOString() : "";
+    googleAccessToken.value = token.access_token;
+    if (token.refresh_token) googleRefreshToken.value = token.refresh_token;
+    googleTokenScope.value = token.scope || googleTokenScope.value;
+    googleTokenExpiresAt.value = expiresAt;
+    store.saveGoogleIntegrationPreferences({
+      clientId: googleClientId.value,
+      accountHint: googleAccountHint.value,
+      scopes: googleScopeList.value,
+      requestOfflineAccess: googleOfflineAccess.value,
+      lastAuthorizedAt: store.googleIntegration.lastAuthorizedAt,
+      tokenExpiresAt: expiresAt,
+    });
+    googleAuthStatus.value = "Google session token refreshed";
+    store.statusMessage = "Google session token refreshed in memory";
+    return true;
+  } finally {
+    googleAuthBusy.value = false;
+  }
+}
+
+async function refreshGoogleAccessTokenNow() {
+  try {
+    await refreshGoogleAccessTokenIfNeeded(true);
+  } catch (error) {
+    googleAuthStatus.value = appErrorText(error);
   }
 }
 
@@ -9195,6 +9266,7 @@ async function importCurrentDocumentToGoogleDocs() {
   googleDocsImportStatus.value = "Preparing Google Docs import package";
   googleDocsReadbackPreview.value = "";
   try {
+    await refreshGoogleAccessTokenIfNeeded();
     const preparation = await invoke<GoogleDocsLiveImportPreparation>("prepare_google_docs_live_import", {
       request: {
         text: active.value.text,
@@ -9234,6 +9306,7 @@ async function readBackGoogleDocsImport() {
   googleDocsImportBusy.value = true;
   googleDocsImportStatus.value = "Reading back Google Docs text";
   try {
+    await refreshGoogleAccessTokenIfNeeded();
     const response = await fetch(googleDriveExportTextUrl(googleDocsLiveDocumentId.value), {
       headers: { Authorization: `Bearer ${googleAccessToken.value}` },
     });
@@ -9256,6 +9329,7 @@ async function clearGoogleSession() {
   stopGoogleAuthPolling();
   googleAuthBusy.value = false;
   googleAccessToken.value = "";
+  googleRefreshToken.value = "";
   googleTokenScope.value = "";
   googleAuthSession.value = null;
   googleAuthPollStartedAt.value = "";

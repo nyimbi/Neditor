@@ -202,6 +202,8 @@ import {
   GOOGLE_DRIVE_UPLOAD_URL,
   GOOGLE_DOCS_MIME_TYPE,
   googleOAuthScopesText,
+  googleOAuthRefreshTokenRequestBody,
+  googleOAuthTokenNeedsRefresh,
   googleOAuthTokenRequestBody,
   googleDocsImportMetadata,
   googleDriveExportTextUrl,
@@ -4799,11 +4801,14 @@ test("Google OAuth helpers normalize setup without exposing stored tokens", () =
     lastAuthorizedAt: "2026-05-28T10:00:00.000Z",
     tokenExpiresAt: "2026-05-28T11:00:00.000Z",
     accessToken: "must-not-persist",
+    refreshToken: "must-not-persist",
   });
   deepEqual(preferences.scopes, ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/documents"]);
   equal(preferences.clientId, "desktop-client.apps.googleusercontent.com");
+  equal(preferences.requestOfflineAccess, true);
   equal(googleOAuthScopesText(preferences.scopes), "https://www.googleapis.com/auth/drive.file\nhttps://www.googleapis.com/auth/documents");
   deepEqual(normalizeGoogleOAuthScopes("profile"), ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/documents"]);
+  equal(normalizeGoogleIntegrationPreferences({ requestOfflineAccess: false }).requestOfflineAccess, false);
 
   const session: GoogleOAuthStartResponse = {
     authorization_url: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -4811,12 +4816,18 @@ test("Google OAuth helpers normalize setup without exposing stored tokens", () =
     state: "state",
     code_verifier: "verifier",
     scopes: preferences.scopes,
+    offline_access: true,
     expires_in_seconds: 300,
   };
   const body = googleOAuthTokenRequestBody(session, preferences.clientId, "code 123");
   equal(body.get("grant_type"), "authorization_code");
   equal(body.get("code_verifier"), "verifier");
   equal(body.get("redirect_uri"), session.redirect_uri);
+  const refreshBody = googleOAuthRefreshTokenRequestBody(preferences.clientId, "refresh-123");
+  equal(refreshBody.get("grant_type"), "refresh_token");
+  equal(refreshBody.get("refresh_token"), "refresh-123");
+  equal(googleOAuthTokenNeedsRefresh("2026-05-28T11:00:30.000Z", Date.parse("2026-05-28T11:00:00.000Z")), true);
+  equal(googleOAuthTokenNeedsRefresh("2026-05-28T11:10:00.000Z", Date.parse("2026-05-28T11:00:00.000Z")), false);
   equal(GOOGLE_DRIVE_UPLOAD_URL.includes("uploadType=multipart"), true);
   deepEqual(googleDocsImportMetadata("Board Pack.docx"), {
     name: "Board Pack",
@@ -4986,6 +4997,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       lastAuthorizedAt: "2026-05-28T10:00:00.000Z",
       tokenExpiresAt: "2026-05-28T11:00:00.000Z",
       accessToken: "not-persisted",
+      refreshToken: "not-persisted",
     },
     ttsPreferences: {
       engine: "supertonic-cli",
@@ -5331,6 +5343,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     clientId: "desktop-client.apps.googleusercontent.com",
     scopes: ["https://www.googleapis.com/auth/drive.file"],
     accountHint: "user@example.com",
+    requestOfflineAccess: true,
     lastAuthorizedAt: "2026-05-28T10:00:00.000Z",
     tokenExpiresAt: "2026-05-28T11:00:00.000Z",
   });
@@ -5777,6 +5790,7 @@ test("workspace persistence state helper applies persisted preferences and resto
   equal(result.state.aiProviderDefaults.model, "gpt-4.1");
   equal(result.state.googleIntegration.clientId, "desktop-client");
   deepEqual(result.state.googleIntegration.scopes, ["https://www.googleapis.com/auth/documents"]);
+  equal(result.state.googleIntegration.requestOfflineAccess, true);
   equal(result.state.ttsPreferences.voice, "Samantha");
   equal(result.state.aiCleanupDefaults.preserveHeadings, true);
   deepEqual(result.state.recentFiles, ["/a.md", "/b.md"]);
@@ -6504,6 +6518,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("prepare_google_docs_live_import"));
   ok(app.includes("Import current document"));
   ok(app.includes("Google Docs readback preview"));
+  ok(app.includes("Request session refresh"));
+  ok(app.includes("Refresh token"));
+  ok(app.includes("googleOAuthRefreshTokenRequestBody"));
   ok(app.includes("oauth2.googleapis.com/token"));
   ok(app.includes("GOOGLE_DRIVE_UPLOAD_URL"));
   ok(app.includes("session-only Google access token"));

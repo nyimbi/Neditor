@@ -12,6 +12,7 @@ export interface GoogleIntegrationPreferences {
   clientId: string;
   scopes: string[];
   accountHint: string;
+  requestOfflineAccess: boolean;
   lastAuthorizedAt: string;
   tokenExpiresAt: string;
 }
@@ -22,6 +23,7 @@ export interface GoogleOAuthStartResponse {
   state: string;
   code_verifier: string;
   scopes: string[];
+  offline_access: boolean;
   expires_in_seconds: number;
 }
 
@@ -37,6 +39,7 @@ export interface GoogleOAuthTokenResponse {
   expires_in?: number;
   scope?: string;
   token_type?: string;
+  refresh_token?: string;
   error?: string;
   error_description?: string;
 }
@@ -79,6 +82,7 @@ export function normalizeGoogleIntegrationPreferences(value: unknown): GoogleInt
     clientId: normalizedString(record.clientId, 240),
     scopes: normalizeGoogleOAuthScopes(record.scopes),
     accountHint: normalizedString(record.accountHint, 160),
+    requestOfflineAccess: record.requestOfflineAccess !== false,
     lastAuthorizedAt: normalizedString(record.lastAuthorizedAt, 40),
     tokenExpiresAt: normalizedString(record.tokenExpiresAt, 40),
   };
@@ -96,6 +100,20 @@ export function googleOAuthTokenRequestBody(session: GoogleOAuthStartResponse, c
   body.set("grant_type", "authorization_code");
   body.set("redirect_uri", session.redirect_uri);
   return body;
+}
+
+export function googleOAuthRefreshTokenRequestBody(clientId: string, refreshToken: string) {
+  const body = new URLSearchParams();
+  body.set("client_id", clientId.trim());
+  body.set("grant_type", "refresh_token");
+  body.set("refresh_token", refreshToken);
+  return body;
+}
+
+export function googleOAuthTokenNeedsRefresh(expiresAt: string, now = Date.now(), skewMs = 120_000) {
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresMs)) return false;
+  return expiresMs <= now + skewMs;
 }
 
 export function googleDriveExportTextUrl(fileId: string) {

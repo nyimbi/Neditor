@@ -834,10 +834,11 @@ import/readback proof. Missing Drive authorization remains a release gap;
 malformed supplied import evidence fails the check.
 NEditor also has a Settings -> Google Docs sign-in panel for desktop OAuth:
 business users add a Google Cloud desktop client ID, sign in through the system
-browser, and receive a session-only access token for Docs/Drive workflows. From
-the same panel they can import the current document to Google Docs and run a
-plain-text readback check. The token is intentionally not persisted in workspace
-settings.
+browser, and receive a session-only access token for Docs/Drive workflows. The
+panel can also request an in-memory session refresh token so longer import and
+readback sessions can renew expired access tokens without persisting Google
+secrets. From the same panel they can import the current document to Google Docs
+and run a plain-text readback check.
 
 `pnpm run check:ai-provider` writes `.tmp/ai-provider-evidence/report.json`
 and creates `.tmp/ai-provider-evidence/templates/provider-evidence.template.json`
