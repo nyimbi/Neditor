@@ -1435,6 +1435,14 @@
               >
                 {{ citationSourceLibraryBusy ? "Refreshing..." : "Refresh source library" }}
               </button>
+              <button
+                type="button"
+                :disabled="citationSourceBulkBusy || !active.path || !citationSearchResults.length"
+                title="Save every visible search result into this document's local source library."
+                @click="downloadAllCitationSources()"
+              >
+                {{ citationSourceBulkBusy ? "Saving sources..." : "Save all found sources" }}
+              </button>
             </div>
             <p v-if="citationSourceLibraryDir" class="sidebar-hint">Saved source library: {{ citationSourceLibraryDir }}</p>
             <article v-for="source in citationSearchResults" :key="source.url" class="snapshot-row">
@@ -1513,6 +1521,14 @@
                 <input v-model.number="deepResearchResultsPerIteration" type="number" min="3" max="12" />
               </label>
             </div>
+            <label class="reference-checkbox">
+              <input v-model="deepResearchSaveSources" :disabled="!active.path" type="checkbox" />
+              Save research source documents to this document's source library
+            </label>
+            <p v-if="deepResearchSaveSources && !active.path" class="sidebar-hint">Save the document first to preserve Deep Research sources locally.</p>
+            <p v-if="deepResearchSavedSourceCount" class="sidebar-hint">
+              Saved or reused {{ deepResearchSavedSourceCount }} Deep Research source{{ deepResearchSavedSourceCount === 1 ? "" : "s" }} in the local library.
+            </p>
             <div class="reference-actions">
               <button type="button" :disabled="deepResearchBusy || !deepResearchTopic.trim()" @click="runDeepResearchDocumentCreation">
                 {{ deepResearchBusy ? "Researching..." : "Create deep research draft" }}
@@ -6207,12 +6223,15 @@ const citationTavilyApiKey = ref("");
 const citationSearchBusy = ref(false);
 const citationSearchResults = ref<DeepResearchSource[]>([]);
 const citationSourceBusyUrl = ref("");
+const citationSourceBulkBusy = ref(false);
 const citationSourceLibraryBusy = ref(false);
 const citationSourceLibrary = ref<CitationSourceLibraryItem[]>([]);
 const citationSourceLibraryDir = ref("");
 const deepResearchTopic = ref("");
 const deepResearchDocumentType = ref("research brief");
 const deepResearchAudience = ref("business readers");
+const deepResearchSaveSources = ref(true);
+const deepResearchSavedSourceCount = ref(0);
 const deepResearchTargetPages = ref(5);
 const deepResearchIterationsTarget = ref(3);
 const deepResearchResultsPerIteration = ref(5);
@@ -9939,10 +9958,13 @@ async function searchCitationSources(query = citationSearchQuery.value) {
   }
 }
 
-async function downloadCitationSource(source: DeepResearchSource) {
+async function saveCitationSourceToLibrary(
+  source: DeepResearchSource,
+  options: { insertBibliography?: boolean; silent?: boolean } = {},
+) {
   if (!active.value.path) {
-    store.statusMessage = "Save the document before downloading citation sources";
-    return;
+    if (!options.silent) store.statusMessage = "Save the document before downloading citation sources";
+    return null;
   }
   citationSourceBusyUrl.value = source.url;
   try {
@@ -9954,16 +9976,63 @@ async function downloadCitationSource(source: DeepResearchSource) {
         snippet: source.snippet,
       },
     });
-    insertBlock(response.bibliography_stub);
+    if (options.insertBibliography) insertBlock(response.bibliography_stub);
     citationSourceLibraryDir.value = response.source_dir;
     await refreshCitationSourceLibrary({ silent: true });
     const action = response.reused ? "Reused existing source" : "Downloaded source";
-    store.statusMessage = `${action} at ${response.relative_path} and inserted bibliography stub`;
+    if (!options.silent) {
+      const suffix = options.insertBibliography ? " and inserted bibliography stub" : "";
+      store.statusMessage = `${action} at ${response.relative_path}${suffix}`;
+    }
+    return response;
   } catch (error) {
-    store.lastError = appErrorText(error);
-    store.statusMessage = "Citation source download failed";
+    if (!options.silent) {
+      store.lastError = appErrorText(error);
+      store.statusMessage = "Citation source download failed";
+    }
+    return null;
   } finally {
     citationSourceBusyUrl.value = "";
+  }
+}
+
+async function downloadCitationSource(source: DeepResearchSource) {
+  await saveCitationSourceToLibrary(source, { insertBibliography: true });
+}
+
+function uniqueResearchSources(sources: DeepResearchSource[]) {
+  const byUrl = new Map<string, DeepResearchSource>();
+  for (const source of sources) {
+    const url = source.url.trim();
+    if (!url || byUrl.has(url)) continue;
+    byUrl.set(url, source);
+  }
+  return Array.from(byUrl.values());
+}
+
+async function downloadAllCitationSources() {
+  if (!active.value.path) {
+    store.statusMessage = "Save the document before saving citation sources";
+    return;
+  }
+  const sources = uniqueResearchSources(citationSearchResults.value);
+  if (!sources.length) {
+    store.statusMessage = "No citation search results to save";
+    return;
+  }
+  citationSourceBulkBusy.value = true;
+  let saved = 0;
+  let failed = 0;
+  try {
+    for (const source of sources) {
+      const response = await saveCitationSourceToLibrary(source, { insertBibliography: false, silent: true });
+      if (response) saved += 1;
+      else failed += 1;
+    }
+    await refreshCitationSourceLibrary({ silent: true });
+    store.statusMessage = `Saved or reused ${saved}/${sources.length} source${sources.length === 1 ? "" : "s"}${failed ? `; ${failed} failed` : ""}`;
+  } finally {
+    citationSourceBulkBusy.value = false;
   }
 }
 
@@ -10030,6 +10099,23 @@ function formatCitationSourceBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+async function saveDeepResearchSources(results: DeepResearchSource[], loopIndex: number) {
+  if (!deepResearchSaveSources.value || !active.value.path) return 0;
+  const sources = uniqueResearchSources(results).slice(0, deepResearchResultsPerIteration.value);
+  if (!sources.length) return 0;
+  let saved = 0;
+  deepResearchStatus.value = `Saving ${sources.length} source document${sources.length === 1 ? "" : "s"} from research loop ${loopIndex}`;
+  for (const source of sources) {
+    const response = await saveCitationSourceToLibrary(source, { insertBibliography: false, silent: true });
+    if (response) saved += 1;
+  }
+  if (saved) {
+    deepResearchSavedSourceCount.value += saved;
+    await refreshCitationSourceLibrary({ silent: true });
+  }
+  return saved;
+}
+
 async function runDeepResearchDocumentCreation() {
   const settings = deepResearchSettings();
   if (!settings.topic) {
@@ -10039,6 +10125,7 @@ async function runDeepResearchDocumentCreation() {
   deepResearchBusy.value = true;
   deepResearchDraft.value = "";
   deepResearchIterations.value = [];
+  deepResearchSavedSourceCount.value = 0;
   try {
     for (let index = 1; index <= settings.iterations; index += 1) {
       deepResearchStatus.value = `Planning research query ${index}/${settings.iterations}`;
@@ -10061,6 +10148,7 @@ async function runDeepResearchDocumentCreation() {
       }
       deepResearchStatus.value = `Searching ${settings.searchProvider}: ${query}`;
       const results = await searchCitationSources(query);
+      await saveDeepResearchSources(results, index);
       deepResearchStatus.value = `Reflecting on ${results.length} source candidate${results.length === 1 ? "" : "s"}`;
       let summary = results.map((result) => `- ${result.title}: ${result.snippet || result.url}`).join("\n");
       let gaps = ["Download and inspect the most relevant source documents before approval."];
@@ -10137,11 +10225,14 @@ async function runDeepResearchDocumentCreation() {
       }
     }
     const finalPages = estimateMarkdownPages(deepResearchDraft.value);
+    const savedSourceSuffix = deepResearchSavedSourceCount.value
+      ? `; saved or reused ${deepResearchSavedSourceCount.value} source document${deepResearchSavedSourceCount.value === 1 ? "" : "s"}`
+      : "";
     const readyMessage = finalPages >= settings.targetPages
       ? `Deep research draft reached the ${settings.targetPages}-page target`
       : `Deep research draft reached about ${finalPages}/${settings.targetPages} pages; provider output limits prevented more useful expansion`;
-    store.statusMessage = readyMessage;
-    deepResearchStatus.value = readyMessage;
+    store.statusMessage = `${readyMessage}${savedSourceSuffix}`;
+    deepResearchStatus.value = `${readyMessage}${savedSourceSuffix}`;
   } catch (error) {
     store.lastError = appErrorText(error);
     deepResearchStatus.value = "Deep research failed";

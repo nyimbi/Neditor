@@ -337,9 +337,11 @@ CSL JSON bibliography stub, and keep a `sources.json` manifest with URL, hash,
 file path, media type, download time, and citation-key evidence. Repeated
 downloads reuse the saved manifest entry when the source file still exists, and
 the References panel can refresh the active document's source library, cite a
-saved source again, insert its bibliography entry, or link to the local copy.
-Deep Research uses the selected AI provider, including Ollama local or
-remote/cloud endpoints, to plan iterative queries, reflect on knowledge gaps,
+saved source again, insert its bibliography entry, link to the local copy, or
+bulk-save every visible search result without changing the document text. Deep
+Research uses the selected AI provider, including Ollama local or remote/cloud
+endpoints, to plan iterative queries, reflect on knowledge gaps, preserve found
+source documents in the active document's local source library when enabled,
 write a sourced Markdown draft, and expand that draft toward a user-selected
 length from 1 to 200 pages before the user inserts and edits it.
 

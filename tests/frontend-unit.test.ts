@@ -6560,6 +6560,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("deferCitationTodoItem"));
   ok(app.includes('aria-label="Downloaded citation source library"'));
   ok(app.includes("Refresh source library"));
+  ok(app.includes("Save all found sources"));
+  ok(app.includes("deepResearchSaveSources"));
+  ok(app.includes("saveDeepResearchSources"));
+  ok(app.includes("deepResearchSavedSourceCount"));
   ok(app.includes('invoke<CitationSourceLibraryResponse>("list_citation_sources"'));
   ok(app.includes("citationSourceLibrary"));
   ok(app.includes("insertCitationSourceBibliography"));

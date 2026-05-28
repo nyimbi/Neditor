@@ -453,11 +453,15 @@ web app.
   `.neditor-sources` directory, insert a CSL JSON bibliography stub, and retain
   a local source manifest for review. Repeated downloads reuse the saved local
   copy when present, and the source library can be refreshed to cite saved
-  sources again, insert their bibliography entries, or link to the local files.
+  sources again, insert their bibliography entries, link to the local files, or
+  bulk-save every visible source search result without changing the document
+  text.
   Deep Research uses the configured AI provider, including Ollama, to iterate
   search queries, summarize evidence, identify knowledge gaps, draft a sourced
   report, and expand it toward a slider-selected length from a 1-page brief to
-  a 200-page report before the user inserts and edits the Markdown. It also
+  a 200-page report before the user inserts and edits the Markdown. When the
+  active document has been saved, Deep Research can also preserve the source
+  documents it found in the same local source library for later review. It also
   exposes front matter and merged project variables from
   `.neditor/variables.yaml` as insertable placeholders
   with filters, so repeated client, owner, budget, and source values do not
