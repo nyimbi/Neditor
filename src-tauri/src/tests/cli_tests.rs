@@ -955,6 +955,65 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     )
     .expect("write workspace profile");
 
+    let filled_template_preview = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "templates".to_string(),
+        "--workspace".to_string(),
+        snippet_workspace.to_string_lossy().to_string(),
+        "--markdown".to_string(),
+        "capability-statement".to_string(),
+        "--title".to_string(),
+        "Acme Capability".to_string(),
+        "--fill-profile".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("filled template preview json");
+    let filled_template_report: serde_json::Value =
+        serde_json::from_str(&filled_template_preview.message).expect("filled template json");
+    assert_eq!(filled_template_report["schema"], "neditor.ned-template.v1");
+    assert_eq!(filled_template_report["profileApplied"], true);
+    assert!(filled_template_report["markdown"]
+        .as_str()
+        .expect("filled template markdown")
+        .contains("**Prepared by:** Jane Doe"));
+    assert!(filled_template_report["markdown"]
+        .as_str()
+        .expect("filled template markdown")
+        .contains("**Email:** jane@example.com"));
+    assert!(filled_template_report["markdown"]
+        .as_str()
+        .expect("filled template markdown")
+        .contains("**Website:** https://acme.example"));
+    assert!(filled_template_report["rawMarkdown"]
+        .as_str()
+        .expect("raw template markdown")
+        .contains("{{owner}}"));
+
+    let filled_new_path = snippet_workspace.join("case-study.md");
+    let filled_new = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "new".to_string(),
+        filled_new_path.to_string_lossy().to_string(),
+        "--template".to_string(),
+        "case-study".to_string(),
+        "--title".to_string(),
+        "Globex Case Study".to_string(),
+        "--workspace".to_string(),
+        snippet_workspace.to_string_lossy().to_string(),
+        "--fill-profile".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("filled new document json");
+    let filled_new_report: serde_json::Value =
+        serde_json::from_str(&filled_new.message).expect("filled new json");
+    assert_eq!(filled_new_report["schema"], "neditor.ned-new.v1");
+    assert_eq!(filled_new_report["profileApplied"], true);
+    let filled_new_markdown = fs::read_to_string(&filled_new_path).expect("filled new markdown");
+    assert!(filled_new_markdown.contains("| Industry | Consulting |"));
+    assert!(filled_new_markdown.contains("| Customer | {{customer_name}} |"));
+    assert!(filled_new_markdown.contains("| {{phase}} | {{action}} | {{evidence}} | Jane Doe |"));
+    assert!(filled_new_markdown.contains("| Review status | {{approval_status}} |"));
+
     let workspace_snippets = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "snippets".to_string(),

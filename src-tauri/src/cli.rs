@@ -620,6 +620,8 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut output: Option<String> = None;
     let mut template = "blank".to_string();
     let mut title: Option<String> = None;
+    let mut workspace = PathBuf::from(".");
+    let mut fill_profile = false;
     let mut should_open = false;
     let mut force = false;
     let mut dry_run = false;
@@ -642,6 +644,14 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
                         .to_string(),
                 );
             }
+            "--workspace" | "-w" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
+            "--fill-profile" | "--profile" => fill_profile = true,
             "--open" => should_open = true,
             "--force" => force = true,
             "--dry-run" => dry_run = true,
@@ -668,7 +678,12 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
         );
     }
     let resolved_title = title.unwrap_or_else(|| title_from_path(&output));
-    let markdown = new_document_markdown(&template, &resolved_title)?;
+    let raw_markdown = new_document_markdown(&template, &resolved_title)?;
+    let (profile_path, profile) = read_workspace_profile_if_requested(&workspace, fill_profile)?;
+    let markdown = profile
+        .as_ref()
+        .map(|profile| fill_business_profile_placeholders(&raw_markdown, profile))
+        .unwrap_or_else(|| raw_markdown.to_string());
     if dry_run {
         if json_output {
             return Ok(CliOutcome {
@@ -681,6 +696,9 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
                     "template": template,
                     "title": resolved_title,
                     "force": force,
+                    "workspace": path_to_display(&workspace),
+                    "profileApplied": profile.is_some(),
+                    "profilePath": path_to_display(&profile_path),
                 }))
                 .map_err(|err| err.to_string())?,
                 exit_code: 0,
@@ -692,7 +710,11 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
                 output.display(),
                 template,
                 resolved_title
-            ),
+            ) + if profile.is_some() {
+                " with saved business profile values"
+            } else {
+                ""
+            },
             exit_code: 0,
         });
     }
@@ -726,6 +748,9 @@ fn run_new_command(args: &[String]) -> Result<CliOutcome, String> {
                 "template": template,
                 "title": resolved_title,
                 "force": force,
+                "workspace": path_to_display(&workspace),
+                "profileApplied": profile.is_some(),
+                "profilePath": path_to_display(&profile_path),
             }))
             .map_err(|err| err.to_string())?,
             exit_code: 0,
@@ -1277,11 +1302,21 @@ fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut title: Option<String> = None;
     let mut category: Option<String> = None;
     let mut query: Option<String> = None;
+    let mut workspace = PathBuf::from(".");
+    let mut fill_profile = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
             "--json" => json_output = true,
             "--ids-only" => ids_only = true,
+            "--workspace" | "-w" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
+            "--fill-profile" | "--profile" => fill_profile = true,
             "--markdown" | "--body" => {
                 index += 1;
                 markdown_id = Some(
@@ -1317,6 +1352,9 @@ fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
             value => return Err(format!("Unsupported templates option '{value}'")),
         }
         index += 1;
+    }
+    if fill_profile && markdown_id.is_none() {
+        return Err("--fill-profile is only valid with templates --markdown <id>.".to_string());
     }
 
     let category_filter = category
@@ -1362,7 +1400,13 @@ fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
                 )
             })?;
         let resolved_title = title.unwrap_or_else(|| template.label.to_string());
-        let markdown = new_document_markdown(template.id, &resolved_title)?;
+        let raw_markdown = new_document_markdown(template.id, &resolved_title)?;
+        let (profile_path, profile) =
+            read_workspace_profile_if_requested(&workspace, fill_profile)?;
+        let markdown = profile
+            .as_ref()
+            .map(|profile| fill_business_profile_placeholders(&raw_markdown, profile))
+            .unwrap_or_else(|| raw_markdown.to_string());
         if json_output {
             return Ok(CliOutcome {
                 message: serde_json::to_string_pretty(&json!({
@@ -1371,6 +1415,10 @@ fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
                     "title": resolved_title,
                     "templateDetails": template,
                     "markdown": markdown,
+                    "rawMarkdown": raw_markdown,
+                    "workspace": path_to_display(&workspace),
+                    "profileApplied": profile.is_some(),
+                    "profilePath": path_to_display(&profile_path),
                 }))
                 .map_err(|err| err.to_string())?,
                 exit_code: 0,
@@ -5705,6 +5753,23 @@ fn read_business_profile(path: &Path) -> Result<BusinessProfile, String> {
         .map_err(|err| format!("Could not parse business profile {}: {err}", path.display()))
 }
 
+fn workspace_business_profile_path(workspace: &Path) -> PathBuf {
+    workspace.join(".neditor").join("business-profile.json")
+}
+
+fn read_workspace_profile_if_requested(
+    workspace: &Path,
+    fill_profile: bool,
+) -> Result<(PathBuf, Option<BusinessProfile>), String> {
+    let profile_path = workspace_business_profile_path(workspace);
+    let profile = if fill_profile && profile_path.exists() {
+        Some(read_business_profile(&profile_path)?)
+    } else {
+        None
+    };
+    Ok((profile_path, profile))
+}
+
 fn write_business_profile(path: &Path, profile: &BusinessProfile) -> Result<(), String> {
     let text = serde_json::to_string_pretty(profile).map_err(|err| err.to_string())?;
     fs::write(path, format!("{text}\n"))
@@ -7620,7 +7685,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--dry-run --force --json" -- "$cur") )
         ;;
       new)
-        COMPREPLY=( $(compgen -W "--template --title --open --force --dry-run --json" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--template --title --workspace --fill-profile --profile --open --force --dry-run --json" -- "$cur") )
         ;;
       open)
         COMPREPLY=( $(compgen -W "--dry-run --json" -- "$cur") )
@@ -7641,7 +7706,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json" -- "$cur") )
         ;;
       templates)
-        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body --title" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body --title --workspace --fill-profile --profile" -- "$cur") )
         ;;
       outlines)
         COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body --workspace --save --delete --name --label --summary --docs-live-type --document-type --outline-file --section --tag --best-for" -- "$cur") )
@@ -7724,7 +7789,7 @@ _ned() {{
       _arguments '1:workspace directory:_files -/' '--dry-run[preview action]' '--force[replace scaffold files]' '--json[print machine-readable JSON]'
       ;;
     new)
-      _arguments '*:markdown file:_files -g "*.md"' '--template[choose starter template]:template:($templates)' '--title[set document title]:title:' '--open[open after creating]' '--force[replace existing file]' '--dry-run[preview action]' '--json[print machine-readable JSON]'
+      _arguments '*:markdown file:_files -g "*.md"' '--template[choose starter template]:template:($templates)' '--title[set document title]:title:' '--workspace[workspace containing .neditor]:directory:_files -/' '--fill-profile[merge saved business profile values into the starter document]' '--profile[alias for --fill-profile]' '--open[open after creating]' '--force[replace existing file]' '--dry-run[preview action]' '--json[print machine-readable JSON]'
       ;;
     open)
       _arguments '*:markdown file:_files -g "*.md"' '--dry-run[preview action]' '--json[print machine-readable JSON]'
@@ -7742,7 +7807,7 @@ _ned() {{
       _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--json[print machine-readable JSON]' '--strict[treat warnings as non-zero]' '--option[set export option key=value]:option:'
       ;;
     templates)
-      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:' '--markdown[print one starter document template]:id:($templates)' '--body[alias for --markdown]:id:($templates)' '--title[set preview document title]:title:'
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:' '--markdown[print one starter document template]:id:($templates)' '--body[alias for --markdown]:id:($templates)' '--title[set preview document title]:title:' '--workspace[workspace containing .neditor]:directory:_files -/' '--fill-profile[merge saved business profile values into the starter preview]' '--profile[alias for --fill-profile]'
       ;;
     outlines)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching outline ids only]' '--category[filter by category]:category:' '--query[search outlines by text]:query:' '--search[alias for --query]:query:' '--markdown[print one outline as planner Markdown]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--save[save a workspace outline id]:id:' '--delete[delete a workspace outline id]:id:' '--name[set outline display name]:name:' '--label[alias for --name]:name:' '--summary[set outline summary]:summary:' '--docs-live-type[set Docs Live workflow]:type:' '--document-type[alias for --docs-live-type]:type:' '--outline-file[read headings from a Markdown/text file]:file:_files' '--section[add one section heading]:heading:' '--tag[add a search tag]:tag:' '--best-for[add a best-fit use case]:use:'
@@ -7857,6 +7922,9 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from init' -l force".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from init' -l dry-run".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from new' -l title".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from new' -l workspace -s w -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from new' -l fill-profile".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from new' -l profile".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from new' -l open".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from new' -l force".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from new open' -l dry-run".to_string(),
@@ -7885,6 +7953,9 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l markdown -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l body -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l title -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l workspace -s w -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l fill-profile".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l profile".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l category -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l query -r".to_string(),
@@ -8333,7 +8404,7 @@ fn help_text() -> String {
         "Usage:".to_string(),
         "  ned <file.md> [more.md]".to_string(),
         "  ned init [workspace] [--dry-run] [--force] [--json]".to_string(),
-        "  ned new <file.md> [--template proposal] [--title \"Client Proposal\"] [--open] [--json]"
+        "  ned new <file.md> [--template proposal] [--title \"Client Proposal\"] [--workspace path --fill-profile] [--open] [--json]"
             .to_string(),
         "  ned open <file.md> [more.md] [--dry-run] [--json]".to_string(),
         "  ned convert <file.md|-> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
@@ -8342,7 +8413,7 @@ fn help_text() -> String {
         "  ned inspect <file.md|-> [--json]".to_string(),
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
-        "  ned templates [--json] [--category procurement] [--query tender] [--ids-only] [--markdown id] [--title title]".to_string(),
+        "  ned templates [--json] [--category procurement] [--query tender] [--ids-only] [--markdown id] [--title title] [--workspace path --fill-profile]".to_string(),
         "  ned outlines [--workspace .] [--json] [--category Procurement] [--query RFP] [--ids-only] [--markdown id]".to_string(),
         "  ned outlines --workspace . --save custom-id --docs-live-type proposal --section \"Executive Summary\" --section \"Recommendations\" [--json]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id] [--workspace . --fill-profile]".to_string(),
