@@ -850,12 +850,17 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     let outline_report: serde_json::Value =
         serde_json::from_str(&outlines.message).expect("outlines json");
     assert_eq!(outline_report["schema"], "neditor.ned-outlines.v1");
-    assert!(outline_report["count"].as_u64().expect("outline count") >= 27);
+    assert!(outline_report["count"].as_u64().expect("outline count") >= 32);
     assert!(outline_report["outlines"]
         .as_array()
         .expect("outlines")
         .contains(&serde_json::json!("rfp-technical-proposal")));
     for id in [
+        "sow",
+        "capability-statement",
+        "case-study",
+        "lesson-content",
+        "executive-brief",
         "grant-application",
         "standard-operating-procedure",
         "product-requirements-document",
@@ -898,6 +903,30 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     .expect("filtered outline ids");
     assert_eq!(filtered_outlines.message, "research-report");
 
+    let learning_outlines = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--category".to_string(),
+        "Learning".to_string(),
+        "--query".to_string(),
+        "handout".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("learning outline ids");
+    assert_eq!(learning_outlines.message, "lesson-content");
+
+    let case_study_outlines = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--category".to_string(),
+        "Business Development".to_string(),
+        "--query".to_string(),
+        "customer proof".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("case study outline ids");
+    assert_eq!(case_study_outlines.message, "case-study");
+
     let legal_outlines = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "outlines".to_string(),
@@ -938,6 +967,16 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     .expect("sop outline markdown");
     assert!(sop_markdown.message.contains("- Purpose"));
     assert!(sop_markdown.message.contains("- Controls and Checks"));
+
+    let sow_markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--markdown".to_string(),
+        "sow".to_string(),
+    ])
+    .expect("sow outline markdown");
+    assert!(sow_markdown.message.contains("- Scope"));
+    assert!(sow_markdown.message.contains("- Acceptance Criteria"));
 
     let outline_workspace = temp_workspace_path("outline-library");
     let saved_outline = crate::cli::run_cli_with_args(&[

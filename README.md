@@ -169,11 +169,12 @@ remove it. Outline entries also carry an explicit Docs Live workflow such as
 The CLI starter library also includes the app's business-development staples:
 statements of work, capability statements, and case studies, so `ned new` and
 the visual Templates panel present the same common starting points.
-Specialist built-in outlines cover RFP technical proposals, compliance reviews,
-grant applications, SOPs, PRDs, project charters, QBRs, due-diligence memos,
-incident postmortems, meeting decision packs, market research, contract review
-briefs, board memos, policy briefs, research reports, and implementation
-playbooks. `ned snippets`
+Specialist built-in outlines cover lesson content, statements of work,
+capability statements, case studies, executive briefs, RFP technical proposals,
+compliance reviews, grant applications, SOPs, PRDs, project charters, QBRs,
+due-diligence memos, incident postmortems, meeting decision packs, market
+research, contract review briefs, board memos, policy briefs, research reports,
+and implementation playbooks. `ned snippets`
 explains reusable standard document parts
 such as contact blocks, company overview, scope, pricing assumptions, compliance
 matrix, risk register, tender checklist, tutorial step, and review handoff; use
