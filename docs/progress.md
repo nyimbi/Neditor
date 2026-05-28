@@ -5082,6 +5082,12 @@ Structured transform artifact export proof:
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked document_ast_models_transform_artifacts_semantically --lib` | Pass | Focused transform architecture proof now verifies Markdown bundle `document-ast.json` and `transform-artifacts.json` preserve transform output kinds, source ranges, cache keys, execution kind, and output hashes alongside the in-memory document AST. |
 
+Purpose evidence consolidation:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:spec-completion` | Pass | The local-first workbench purpose row now cites exact docs, source modules, and `example_fixture_tests::example_project_fixtures_compile_and_export` evidence for Markdown source-of-truth/local-first positioning across HTML, DOCX, PPTX, and Markdown bundle outputs instead of carrying a duplicate broad buildout gap. |
+
 Vim punctuation word-motion parity:
 
 | Command | Result | Evidence |
