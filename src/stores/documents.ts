@@ -46,7 +46,16 @@ import {
   saveCustomTransformTemplateState,
   type CustomTransformTemplate,
 } from "../lib/transformTemplates";
-import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../lib/watchPaths";
+import {
+  buildWatchedPathRoles,
+  documentForWatchedRoot as documentForWatchedRootState,
+  documentForWatchContext as documentForWatchContextState,
+  isCurrentWatchContext,
+  resolveWatchReason,
+  sameWatchPath,
+  watchedPathsForContext,
+  type WatchContextState,
+} from "../lib/watchPaths";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import {
   clearAgentRunHistoryState,
@@ -126,13 +135,7 @@ interface DocumentWatchEvent {
   modified?: string | null;
 }
 
-interface WatchContext {
-  documentId: string;
-  rootPath: string;
-  openRootPaths: string[];
-  includedPaths: string[];
-  signature: string;
-}
+type WatchContext = WatchContextState;
 
 const staleSaveConflictMessage = "File changed on disk since it was opened; resolve the external conflict before saving.";
 
@@ -1061,40 +1064,22 @@ export const useDocumentsStore = defineStore("documents", {
       }
     },
     watchReasonForPath(path: string, rootPath: string, includedPaths: string[]) {
-      const normalizedPath = normalizeWatchPath(path);
-      return (
-        this.watchedPathRoles[path] ||
-        this.watchedPathRoles[normalizedPath] ||
-        (sameWatchPath(path, rootPath)
-          ? "root"
-          : includedPaths.some((includedPath) => sameWatchPath(path, includedPath))
-            ? "include"
-            : null)
-      );
+      return resolveWatchReason(path, rootPath, includedPaths, this.watchedPathRoles);
     },
     watchContextIsCurrent(context: WatchContext) {
-      const current = this.watchContext;
-      if (!current || current.signature !== context.signature) return false;
-      const doc = this.activeDocument;
-      return doc?.id === context.documentId && Boolean(doc.path) && sameWatchPath(doc.path as string, context.rootPath);
+      return isCurrentWatchContext(context, this.watchContext, this.activeDocument);
     },
     documentForWatchContext(context: WatchContext) {
-      const doc = this.documents.find((document) => document.id === context.documentId);
-      if (!doc?.path || !sameWatchPath(doc.path, context.rootPath)) return null;
-      return doc;
+      return documentForWatchContextState(this.documents, context);
     },
     documentForWatchedRoot(path: string, context: WatchContext) {
-      const activeContextDocument = this.documentForWatchContext(context);
-      if (activeContextDocument?.path && sameWatchPath(activeContextDocument.path, path)) return activeContextDocument;
-      return this.documents.find((document) => Boolean(document.path) && sameWatchPath(document.path as string, path)) || null;
+      return documentForWatchedRootState(this.documents, path, context);
     },
     async handleWatchedFileChange(event: DocumentWatchEvent, context: WatchContext) {
       if (!this.watchContextIsCurrent(context)) return;
       const doc = event.reason === "root" ? this.documentForWatchedRoot(event.path, context) : this.documentForWatchContext(context);
       if (!doc) return;
-      const watched = this.watchedPaths.length
-        ? this.watchedPaths
-        : [context.rootPath, ...context.includedPaths];
+      const watched = watchedPathsForContext(this.watchedPaths, context);
       if (!watched.some((path) => sameWatchPath(path, event.path))) return;
       await this.refreshExternalState(doc, event, context);
     },

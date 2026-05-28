@@ -194,7 +194,16 @@ import {
   ttsModelDownloadClipboardText,
   ttsReadIsDisabled,
 } from "../src/lib/ttsSetup.js";
-import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../src/lib/watchPaths.js";
+import {
+  buildWatchedPathRoles,
+  documentForWatchedRoot,
+  documentForWatchContext,
+  isCurrentWatchContext,
+  normalizeWatchPath,
+  resolveWatchReason,
+  sameWatchPath,
+  watchedPathsForContext,
+} from "../src/lib/watchPaths.js";
 import {
   clearAgentRunHistoryState,
   clearDocsLiveDraftHistoryState,
@@ -778,6 +787,39 @@ test("watch path helpers normalize platform paths and role lookup keys", () => {
     "c:/docs/root.md": "root",
     "/tmp/include.md": "include",
   });
+});
+
+test("watch context helpers resolve active roots includes and stale contexts", () => {
+  const context = {
+    documentId: "doc-1",
+    rootPath: "C:\\Docs\\Root.md",
+    openRootPaths: ["C:\\Docs\\Other.md"],
+    includedPaths: ["/tmp/include.md"],
+    signature: "watch-signature",
+  };
+  const documents = [
+    { id: "doc-1", path: "c:/Docs/Root.md", title: "Root" },
+    { id: "doc-2", path: "C:\\Docs\\Other.md", title: "Other" },
+    { id: "doc-3", path: null, title: "Untitled" },
+  ];
+  const roles = buildWatchedPathRoles([
+    { path: "C:\\Docs\\Root.md", role: "root" },
+    { path: "/tmp/include.md", role: "include" },
+  ]);
+
+  equal(resolveWatchReason("c:/docs/root.md", context.rootPath, context.includedPaths, roles), "root");
+  equal(resolveWatchReason("/tmp/include.md", context.rootPath, context.includedPaths, roles), "include");
+  equal(resolveWatchReason("/tmp/missing.md", context.rootPath, context.includedPaths, roles), null);
+  equal(isCurrentWatchContext(context, context, documents[0]), true);
+  equal(isCurrentWatchContext(context, { ...context, signature: "stale" }, documents[0]), false);
+  equal(isCurrentWatchContext(context, context, documents[1]), false);
+  equal(documentForWatchContext(documents, context)?.id, "doc-1");
+  equal(documentForWatchContext(documents, { ...context, rootPath: "/tmp/moved.md" }), null);
+  equal(documentForWatchedRoot(documents, "C:\\Docs\\Root.md", context)?.id, "doc-1");
+  equal(documentForWatchedRoot(documents, "c:/docs/other.md", context)?.id, "doc-2");
+  equal(documentForWatchedRoot(documents, "/tmp/unknown.md", context), null);
+  deepEqual(watchedPathsForContext([], context), ["C:\\Docs\\Root.md", "/tmp/include.md"]);
+  deepEqual(watchedPathsForContext(["/actual/root.md"], context), ["/actual/root.md"]);
 });
 
 test("table parsing preserves captions, alignment, and escaped pipes", () => {
