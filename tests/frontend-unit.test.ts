@@ -2894,13 +2894,33 @@ test("editable outline planner creates document skeletons before drafting conten
 });
 
 test("document outline library exposes built-ins and managed custom outlines", () => {
-  ok(builtInDocumentOutlineTemplates.length >= businessDocumentTemplates.length);
+  ok(builtInDocumentOutlineTemplates.length >= businessDocumentTemplates.length + 16);
   ok(builtInDocumentOutlineTemplates.some((template) => template.name === "RFP technical proposal" && template.category === "Procurement"));
   const rfpOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "outline-rfp-technical-proposal")!;
   equal(rfpOutline.docsLiveType, "rfp-response");
   const plannerText = documentOutlineTemplateToPlannerText(rfpOutline);
   ok(plannerText.includes("- Compliance Checklist"));
   ok(plannerText.includes("- Table of Contents"));
+  const specialistOutlineIds = new Set(builtInDocumentOutlineTemplates.map((template) => template.id));
+  for (const id of [
+    "outline-grant-application",
+    "outline-standard-operating-procedure",
+    "outline-product-requirements-document",
+    "outline-project-charter",
+    "outline-quarterly-business-review",
+    "outline-due-diligence-memo",
+    "outline-incident-postmortem",
+    "outline-meeting-decision-pack",
+    "outline-market-research-report",
+    "outline-contract-review-brief",
+  ]) {
+    ok(specialistOutlineIds.has(id), `missing specialist outline ${id}`);
+  }
+  const sopOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "outline-standard-operating-procedure")!;
+  equal(docsLiveDocumentTypeForOutlineSignal(sopOutline), "operating-procedure");
+  const contractOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "outline-contract-review-brief")!;
+  equal(contractOutline.docsLiveType, "contract-brief");
+  ok(documentOutlineTemplateToPlannerText(contractOutline).includes("- Approval Checklist"));
   const textbookOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "business-technical-textbook")!;
   equal(docsLiveDocumentTypeForOutlineSignal(textbookOutline), "technical-textbook");
   equal(docsLiveDocumentTypeForOutlineSignal({ docsLiveType: "movie-script", id: "custom-screen-story" }), "movie-script");

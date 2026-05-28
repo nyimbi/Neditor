@@ -165,7 +165,12 @@ to create or replace a workspace outline, `ned outlines --workspace . --markdown
 to print it, and `ned outlines --workspace . --delete board-pack --json` to
 remove it. Outline entries also carry an explicit Docs Live workflow such as
 `rfp-response`, `technical-textbook`, `novel`, `podcast-script`, or
-`movie-script` so app and CLI selections open the right AI drafting path. `ned snippets`
+`movie-script` so app and CLI selections open the right AI drafting path.
+Specialist built-in outlines cover RFP technical proposals, compliance reviews,
+grant applications, SOPs, PRDs, project charters, QBRs, due-diligence memos,
+incident postmortems, meeting decision packs, market research, contract review
+briefs, board memos, policy briefs, research reports, and implementation
+playbooks. `ned snippets`
 explains reusable standard document parts
 such as contact blocks, company overview, scope, pricing assumptions, compliance
 matrix, risk register, tender checklist, tutorial step, and review handoff; use
