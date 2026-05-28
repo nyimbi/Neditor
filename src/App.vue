@@ -2785,17 +2785,27 @@
               </label>
               <label>
                 Model
-                <select v-if="isOllamaProvider && ollamaModelOptions.length" v-model="agentProviderModel" aria-label="Ollama model">
-                  <option v-if="currentModelMissingFromOllamaList" :value="agentProviderModel">{{ agentProviderModel }} (current)</option>
+                <select
+                  v-if="isOllamaProvider"
+                  v-model="agentProviderModel"
+                  aria-label="Ollama model"
+                  :disabled="ollamaModelBusy || (!ollamaModelOptions.length && !agentProviderModel.trim())"
+                  @change="confirmOllamaModelSelection"
+                >
+                  <option v-if="!ollamaModelOptions.length && !agentProviderModel.trim()" value="">Refresh Ollama models to choose</option>
+                  <option v-if="currentModelMissingFromOllamaList || (!ollamaModelOptions.length && agentProviderModel.trim())" :value="agentProviderModel">
+                    {{ agentProviderModel }} (current)
+                  </option>
                   <option v-for="model in ollamaModelOptions" :key="model.name" :value="model.name">
-                    {{ model.name }}{{ model.parameter_size ? ` | ${model.parameter_size}` : "" }}{{ model.quantization_level ? ` | ${model.quantization_level}` : "" }}
+                    {{ formatOllamaModelOption(model) }}
                   </option>
                 </select>
                 <input v-else v-model="agentProviderModel" placeholder="Approved model or deployment name" />
+                <small v-if="isOllamaProvider && ollamaSelectedModelMetadata" class="model-selection-note">{{ ollamaSelectedModelMetadata }}</small>
               </label>
               <div v-if="isOllamaProvider" class="ollama-model-picker" aria-label="Ollama model discovery">
                 <button type="button" :disabled="ollamaModelBusy || !agentProviderEndpoint.trim()" @click="refreshOllamaModels">
-                  {{ ollamaModelBusy ? "Loading models..." : "Refresh Ollama models" }}
+                  {{ ollamaModelBusy ? "Loading models..." : "Refresh from Ollama" }}
                 </button>
                 <small>{{ ollamaModelPickerHelp }}</small>
               </div>
@@ -2806,6 +2816,10 @@
               <label>
                 API key environment variable
                 <input v-model="agentProviderKeyEnv" placeholder="OPENAI_API_KEY or NEDITOR_AI_API_KEY" />
+              </label>
+              <label v-if="isOllamaProvider && currentAgentProviderProfile.authHeader">
+                Session API key for model discovery
+                <input v-model="agentProviderApiKey" type="password" autocomplete="off" placeholder="Used once, never saved" />
               </label>
             </section>
             <div class="agent-cli-list" aria-label="Configured local agent options">
@@ -3453,17 +3467,27 @@
               </label>
               <label>
                 Model
-                <select v-if="isOllamaProvider && ollamaModelOptions.length" v-model="agentProviderModel" aria-label="Ollama model">
-                  <option v-if="currentModelMissingFromOllamaList" :value="agentProviderModel">{{ agentProviderModel }} (current)</option>
+                <select
+                  v-if="isOllamaProvider"
+                  v-model="agentProviderModel"
+                  aria-label="Ollama model"
+                  :disabled="ollamaModelBusy || (!ollamaModelOptions.length && !agentProviderModel.trim())"
+                  @change="confirmOllamaModelSelection"
+                >
+                  <option v-if="!ollamaModelOptions.length && !agentProviderModel.trim()" value="">Refresh Ollama models to choose</option>
+                  <option v-if="currentModelMissingFromOllamaList || (!ollamaModelOptions.length && agentProviderModel.trim())" :value="agentProviderModel">
+                    {{ agentProviderModel }} (current)
+                  </option>
                   <option v-for="model in ollamaModelOptions" :key="model.name" :value="model.name">
-                    {{ model.name }}{{ model.parameter_size ? ` | ${model.parameter_size}` : "" }}{{ model.quantization_level ? ` | ${model.quantization_level}` : "" }}
+                    {{ formatOllamaModelOption(model) }}
                   </option>
                 </select>
                 <input v-else v-model="agentProviderModel" />
+                <small v-if="isOllamaProvider && ollamaSelectedModelMetadata" class="model-selection-note">{{ ollamaSelectedModelMetadata }}</small>
               </label>
               <div v-if="isOllamaProvider" class="ollama-model-picker" aria-label="Ollama model discovery">
                 <button type="button" :disabled="ollamaModelBusy || !agentProviderEndpoint.trim()" @click="refreshOllamaModels">
-                  {{ ollamaModelBusy ? "Loading models..." : "Refresh Ollama models" }}
+                  {{ ollamaModelBusy ? "Loading models..." : "Refresh from Ollama" }}
                 </button>
                 <small>{{ ollamaModelPickerHelp }}</small>
               </div>
@@ -3474,6 +3498,10 @@
               <label>
                 Key environment variable
                 <input v-model="agentProviderKeyEnv" />
+              </label>
+              <label v-if="isOllamaProvider && currentAgentProviderProfile.authHeader">
+                Session API key for model discovery
+                <input v-model="agentProviderApiKey" type="password" autocomplete="off" placeholder="Used once, never saved" />
               </label>
               <p class="sidebar-hint">Session API keys are entered only when running a provider request and are never saved in workspace settings.</p>
             </section>
@@ -5166,17 +5194,27 @@
               </label>
               <label>
                 Model
-                <select v-if="isOllamaProvider && ollamaModelOptions.length" v-model="agentProviderModel" aria-label="Ollama model">
-                  <option v-if="currentModelMissingFromOllamaList" :value="agentProviderModel">{{ agentProviderModel }} (current)</option>
+                <select
+                  v-if="isOllamaProvider"
+                  v-model="agentProviderModel"
+                  aria-label="Ollama model"
+                  :disabled="ollamaModelBusy || (!ollamaModelOptions.length && !agentProviderModel.trim())"
+                  @change="confirmOllamaModelSelection"
+                >
+                  <option v-if="!ollamaModelOptions.length && !agentProviderModel.trim()" value="">Refresh Ollama models to choose</option>
+                  <option v-if="currentModelMissingFromOllamaList || (!ollamaModelOptions.length && agentProviderModel.trim())" :value="agentProviderModel">
+                    {{ agentProviderModel }} (current)
+                  </option>
                   <option v-for="model in ollamaModelOptions" :key="model.name" :value="model.name">
-                    {{ model.name }}{{ model.parameter_size ? ` | ${model.parameter_size}` : "" }}{{ model.quantization_level ? ` | ${model.quantization_level}` : "" }}
+                    {{ formatOllamaModelOption(model) }}
                   </option>
                 </select>
                 <input v-else v-model="agentProviderModel" placeholder="Approved model or deployment name" />
+                <small v-if="isOllamaProvider && ollamaSelectedModelMetadata" class="model-selection-note">{{ ollamaSelectedModelMetadata }}</small>
               </label>
               <div v-if="isOllamaProvider" class="ollama-model-picker" aria-label="Ollama model discovery">
                 <button type="button" :disabled="ollamaModelBusy || !agentProviderEndpoint.trim()" @click="refreshOllamaModels">
-                  {{ ollamaModelBusy ? "Loading models..." : "Refresh Ollama models" }}
+                  {{ ollamaModelBusy ? "Loading models..." : "Refresh from Ollama" }}
                 </button>
                 <small>{{ ollamaModelPickerHelp }}</small>
               </div>
@@ -7047,6 +7085,21 @@ const ollamaModelNames = computed(() => new Set(ollamaModelOptions.value.map((mo
 const currentModelMissingFromOllamaList = computed(() =>
   Boolean(isOllamaProvider.value && agentProviderModel.value.trim() && ollamaModelOptions.value.length && !ollamaModelNames.value.has(agentProviderModel.value.trim())),
 );
+const selectedOllamaModel = computed(() =>
+  isOllamaProvider.value ? ollamaModelOptions.value.find((model) => model.name === agentProviderModel.value.trim()) : undefined,
+);
+const ollamaSelectedModelMetadata = computed(() => {
+  const model = selectedOllamaModel.value;
+  if (!model) return "";
+  const metadata = [
+    model.family ? `family ${model.family}` : "",
+    model.parameter_size || "",
+    model.quantization_level || "",
+    model.size ? formatOllamaModelSize(model.size) : "",
+    model.modified_at ? `modified ${formatOllamaModelTimestamp(model.modified_at)}` : "",
+  ].filter(Boolean);
+  return metadata.length ? metadata.join(" | ") : "Selected from the live Ollama model list.";
+});
 const ollamaModelPickerHelp = computed(() => {
   if (!isOllamaProvider.value) return "";
   if (ollamaModelBusy.value) return "Loading models from Ollama...";
@@ -9522,6 +9575,49 @@ function applyStoredAiProviderDefaults() {
   agentProviderKeyEnv.value = defaults.keyEnv || aiProviderDefaultKeyEnv(defaults.profileId);
 }
 
+function formatOllamaModelOption(model: OllamaModelSummary) {
+  return [
+    model.name,
+    model.parameter_size,
+    model.quantization_level,
+    model.family ? `family ${model.family}` : "",
+    model.size ? formatOllamaModelSize(model.size) : "",
+  ].filter(Boolean).join(" | ");
+}
+
+function formatOllamaModelSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function formatOllamaModelTimestamp(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+}
+
+function shouldSelectFirstOllamaModel(models: OllamaModelSummary[]) {
+  if (!models.length) return false;
+  const current = agentProviderModel.value.trim();
+  if (!current) return true;
+  if (models.some((model) => model.name === current)) return false;
+  return current === currentAgentProviderProfile.value.model.trim();
+}
+
+function confirmOllamaModelSelection() {
+  if (!isOllamaProvider.value) return;
+  const model = selectedOllamaModel.value;
+  if (model) {
+    store.statusMessage = `Selected Ollama model ${model.name}`;
+    return;
+  }
+  if (agentProviderModel.value.trim()) {
+    store.statusMessage = `Keeping current Ollama model ${agentProviderModel.value.trim()} until it appears in the refreshed model list`;
+  }
+}
+
 async function refreshOllamaModels() {
   if (!isOllamaProvider.value) {
     ollamaModelStatus.value = "Select an Ollama provider profile before listing models.";
@@ -9545,13 +9641,14 @@ async function refreshOllamaModels() {
     });
     ollamaModelOptions.value = response.models || [];
     ollamaModelEndpoint.value = response.endpoint;
-    if (!agentProviderModel.value.trim() && ollamaModelOptions.value[0]) {
+    if (shouldSelectFirstOllamaModel(ollamaModelOptions.value) && ollamaModelOptions.value[0]) {
       agentProviderModel.value = ollamaModelOptions.value[0].name;
     }
     const warning = response.warnings?.[0] ? ` ${response.warnings[0]}` : "";
-    ollamaModelStatus.value = `Loaded ${response.count} Ollama model${response.count === 1 ? "" : "s"} from ${response.endpoint}.${warning}`;
+    const selection = selectedOllamaModel.value ? ` Selected ${selectedOllamaModel.value.name}.` : "";
+    ollamaModelStatus.value = `Loaded ${response.count} Ollama model${response.count === 1 ? "" : "s"} from ${response.endpoint}.${selection}${warning}`;
     store.statusMessage = response.count
-      ? `Loaded ${response.count} Ollama model${response.count === 1 ? "" : "s"}`
+      ? `Loaded ${response.count} Ollama model${response.count === 1 ? "" : "s"}${selectedOllamaModel.value ? ` and selected ${selectedOllamaModel.value.name}` : ""}`
       : "Ollama returned no installed models";
   } catch (error) {
     ollamaModelOptions.value = [];
@@ -24592,6 +24689,15 @@ select:hover {
 .ollama-model-picker small {
   color: #526171;
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.model-selection-note {
+  display: block;
+  color: #526171;
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 4px;
   overflow-wrap: anywhere;
 }
 

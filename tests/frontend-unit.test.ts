@@ -6298,9 +6298,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Exact deep research target pages"'));
   ok(app.includes('aria-label="Ollama model discovery"'));
   ok(app.includes('aria-label="Ollama model"'));
-  ok(app.includes("Refresh Ollama models"));
+  ok(app.includes("Refresh from Ollama"));
   ok(app.includes('invoke<OllamaModelListResponse>("list_ollama_models"'));
   ok(app.includes("ollamaModelOptions"));
+  ok(app.includes("formatOllamaModelOption(model)"));
+  ok(app.includes("shouldSelectFirstOllamaModel(ollamaModelOptions.value)"));
+  ok(app.includes("confirmOllamaModelSelection"));
+  ok(app.includes("Session API key for model discovery"));
   ok(app.includes("currentModelMissingFromOllamaList"));
   ok(app.includes('aria-label="Application menus"'));
   ok(app.includes("appMenus"));
