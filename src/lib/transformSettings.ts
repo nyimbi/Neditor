@@ -57,3 +57,45 @@ export function setTransformInputModeState(
 export function clampTransformTimeout(timeoutMs: number): number {
   return Math.min(Math.max(Number(timeoutMs) || 1, 1), 30000);
 }
+
+export interface TransformProbeResponse {
+  diagnostics: Array<{ message?: string | null }>;
+  cache_key: string;
+}
+
+export function applyTransformProbeSuccessState(
+  results: Record<string, TransformProbeResult>,
+  name: string,
+  response: TransformProbeResponse,
+) {
+  const diagnostics = response.diagnostics.map((diagnostic) => diagnostic.message || "").filter(Boolean);
+  const detail = diagnostics[0] || response.cache_key;
+  return {
+    transformProbeResults: {
+      ...results,
+      [name]: {
+        ok: true,
+        message: detail,
+        diagnostics,
+        cacheKey: response.cache_key,
+      },
+    },
+    statusMessage: `${name} transform probe succeeded: ${detail}`,
+  };
+}
+
+export function applyTransformProbeFailureState(results: Record<string, TransformProbeResult>, name: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    lastError: message,
+    transformProbeResults: {
+      ...results,
+      [name]: {
+        ok: false,
+        message,
+        diagnostics: [message],
+      },
+    },
+    statusMessage: `${name} transform probe failed`,
+  };
+}

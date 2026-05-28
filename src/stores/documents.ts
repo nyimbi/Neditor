@@ -46,6 +46,8 @@ import { isAiSourceFenceOpener, rewriteAiAssistedMarker, rewriteAiSourceReviewBl
 import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
 import { appendChangeNoteMarker, appendReviewCommentMarker, resolveReviewCommentAtLine } from "../lib/reviewMarkers";
 import {
+  applyTransformProbeFailureState,
+  applyTransformProbeSuccessState,
   clampTransformTimeout,
   setTransformBooleanFlag,
   setTransformInputModeState,
@@ -1456,30 +1458,9 @@ export const useDocumentsStore = defineStore("documents", {
             max_output_bytes: engine?.limits.maxOutputBytes,
           },
         });
-        const diagnostics = response.diagnostics.map((diagnostic) => diagnostic.message).filter(Boolean);
-        const detail = diagnostics[0] || response.cache_key;
-        this.transformProbeResults = {
-          ...this.transformProbeResults,
-          [name]: {
-            ok: true,
-            message: detail,
-            diagnostics,
-            cacheKey: response.cache_key,
-          },
-        };
-        this.statusMessage = `${name} transform probe succeeded: ${detail}`;
+        Object.assign(this, applyTransformProbeSuccessState(this.transformProbeResults, name, response));
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.lastError = message;
-        this.transformProbeResults = {
-          ...this.transformProbeResults,
-          [name]: {
-            ok: false,
-            message,
-            diagnostics: [message],
-          },
-        };
-        this.statusMessage = `${name} transform probe failed`;
+        Object.assign(this, applyTransformProbeFailureState(this.transformProbeResults, name, error));
       }
     },
     async previewAiPaste(text: string, options: AiCleanupOptions) {

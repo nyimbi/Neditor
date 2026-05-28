@@ -169,6 +169,8 @@ import {
   releaseReadinessAuditMarkdown,
 } from "../src/lib/releaseReadiness.js";
 import {
+  applyTransformProbeFailureState,
+  applyTransformProbeSuccessState,
   clampTransformTimeout,
   setTransformBooleanFlag,
   setTransformInputModeState,
@@ -581,6 +583,35 @@ test("transform settings helpers clear trust and clamp runtime preferences", () 
   equal(clampTransformTimeout(Number.NaN), 1);
   equal(clampTransformTimeout(45000), 30000);
   equal(clampTransformTimeout(1200), 1200);
+
+  const probeSuccess = applyTransformProbeSuccessState(
+    { old: { ok: false, message: "pending", diagnostics: ["pending"] } },
+    "dot",
+    {
+      diagnostics: [{ message: "" }, { message: "Graphviz 9.0 ready" }],
+      cache_key: "cache-123",
+    },
+  );
+  equal(probeSuccess.transformProbeResults.dot.ok, true);
+  equal(probeSuccess.transformProbeResults.dot.message, "Graphviz 9.0 ready");
+  deepEqual(probeSuccess.transformProbeResults.dot.diagnostics, ["Graphviz 9.0 ready"]);
+  equal(probeSuccess.transformProbeResults.dot.cacheKey, "cache-123");
+  equal(probeSuccess.transformProbeResults.old.message, "pending");
+  equal(probeSuccess.statusMessage, "dot transform probe succeeded: Graphviz 9.0 ready");
+
+  const probeSuccessWithoutDiagnostics = applyTransformProbeSuccessState({}, "pikchr", {
+    diagnostics: [],
+    cache_key: "cache-fallback",
+  });
+  equal(probeSuccessWithoutDiagnostics.transformProbeResults.pikchr.message, "cache-fallback");
+  equal(probeSuccessWithoutDiagnostics.statusMessage, "pikchr transform probe succeeded: cache-fallback");
+
+  const probeFailure = applyTransformProbeFailureState(probeSuccess.transformProbeResults, "plantuml", new Error("Java not found"));
+  equal(probeFailure.lastError, "Java not found");
+  equal(probeFailure.transformProbeResults.plantuml.ok, false);
+  deepEqual(probeFailure.transformProbeResults.plantuml.diagnostics, ["Java not found"]);
+  equal(probeFailure.transformProbeResults.dot.ok, true);
+  equal(probeFailure.statusMessage, "plantuml transform probe failed");
 });
 
 test("workflow history helpers deduplicate runs drafts and guided demo progress", () => {
