@@ -39,6 +39,7 @@ const SUPPORTED_EXPORT_TARGETS: &[&str] = &[
     "epub",
 ];
 const STDOUT_EXPORT_TARGETS: &[&str] = &["html", "latex"];
+const TRANSFORM_TEMPLATE_SOURCE: &str = include_str!("../../src/lib/transformTemplates.ts");
 const NEW_DOCUMENT_TEMPLATES: &[&str] = &[
     "blank",
     "proposal",
@@ -75,6 +76,8 @@ const CLI_COMMANDS: &[&str] = &[
     "outlines",
     "snippets",
     "parts",
+    "transform-templates",
+    "xforms",
     "profile",
     "business-profile",
     "rfp",
@@ -222,6 +225,18 @@ struct DocumentSnippetEntry {
     path: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TransformTemplateEntry {
+    id: String,
+    name: String,
+    category: String,
+    transform: String,
+    summary: String,
+    body: String,
+    tags: Vec<String>,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct BusinessProfile {
@@ -350,6 +365,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "templates" => run_templates_command(&args[2..]),
         "outlines" => run_outlines_command(&args[2..]),
         "snippets" | "parts" => run_snippets_command(&args[2..]),
+        "transform-templates" | "xforms" => run_transform_templates_command(&args[2..]),
         "profile" | "business-profile" => run_profile_command(&args[2..]),
         "rfp" | "rfp-response" | "analyze-rfp" => run_rfp_response_command(&args[2..], stdin_text),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
@@ -1771,6 +1787,153 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
     }
     Ok(CliOutcome {
         message: snippets_text_report(&filtered),
+        exit_code: 0,
+    })
+}
+
+fn run_transform_templates_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut ids_only = false;
+    let mut category: Option<String> = None;
+    let mut transform: Option<String> = None;
+    let mut query: Option<String> = None;
+    let mut markdown_id: Option<String> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--ids-only" => ids_only = true,
+            "--category" => {
+                index += 1;
+                category = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--category requires a category name".to_string())?
+                        .to_string(),
+                );
+            }
+            "--transform" | "--kind" => {
+                index += 1;
+                transform = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--transform requires a transform name".to_string())?
+                        .to_string(),
+                );
+            }
+            "--query" | "--search" => {
+                index += 1;
+                query = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--query requires search text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--markdown" | "--body" => {
+                index += 1;
+                markdown_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--markdown requires a transform template id".to_string())?
+                        .to_string(),
+                );
+            }
+            value => return Err(format!("Unsupported transform-templates option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let templates = transform_template_catalog()?;
+    if let Some(id) = markdown_id {
+        let template = templates
+            .into_iter()
+            .find(|template| template.id == id)
+            .ok_or_else(|| {
+                format!(
+                    "Unknown transform template '{}'. Available transform templates: {}",
+                    id,
+                    transform_template_catalog()
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|template| template.id.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })?;
+        if json_output {
+            let markdown = template.body.clone();
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-transform-template.v1",
+                    "template": template,
+                    "markdown": markdown,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: template.body,
+            exit_code: 0,
+        });
+    }
+
+    let category_filter = category
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let transform_filter = transform
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let query_filter = query
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let filtered = templates
+        .into_iter()
+        .filter(|template| {
+            category_filter.as_deref().map_or(true, |category| {
+                template.category.to_ascii_lowercase() == category
+            })
+        })
+        .filter(|template| {
+            transform_filter.as_deref().map_or(true, |transform| {
+                template.transform.to_ascii_lowercase() == transform
+            })
+        })
+        .filter(|template| {
+            query_filter.as_deref().map_or(true, |query| {
+                transform_template_matches_query(template, query)
+            })
+        })
+        .collect::<Vec<_>>();
+    let ids = filtered
+        .iter()
+        .map(|template| template.id.as_str())
+        .collect::<Vec<_>>();
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-transform-templates.v1",
+                "count": filtered.len(),
+                "filters": {
+                    "category": category_filter,
+                    "transform": transform_filter,
+                    "query": query_filter,
+                },
+                "templates": ids,
+                "templateDetails": filtered,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    if ids_only {
+        return Ok(CliOutcome {
+            message: ids.join("\n"),
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: transform_templates_text_report(&filtered),
         exit_code: 0,
     })
 }
@@ -4659,6 +4822,268 @@ fn outlines_text_report(outlines: &[DocumentOutlineEntry]) -> String {
     lines.join("\n")
 }
 
+fn transform_template_catalog() -> Result<Vec<TransformTemplateEntry>, String> {
+    let source = TRANSFORM_TEMPLATE_SOURCE;
+    let start = source
+        .find("export const builtinTransformTemplates")
+        .ok_or_else(|| "Could not find built-in transform template source.".to_string())?;
+    let initializer = source[start..]
+        .find('=')
+        .map(|index| start + index)
+        .ok_or_else(|| "Could not find transform template initializer.".to_string())?;
+    let array_open = source[initializer..]
+        .find('[')
+        .map(|index| initializer + index)
+        .ok_or_else(|| "Could not find transform template array.".to_string())?;
+    let array_close = find_matching_delimiter(source, array_open, '[', ']')
+        .ok_or_else(|| "Could not parse transform template array.".to_string())?;
+    let mut templates = Vec::new();
+    let mut cursor = array_open + 1;
+    while let Some(relative) = source[cursor..array_close].find("template(") {
+        let template_start = cursor + relative;
+        let open = template_start + "template".len();
+        let Some(close) = find_matching_delimiter(source, open, '(', ')') else {
+            break;
+        };
+        if close > array_close {
+            break;
+        }
+        let args = split_top_level_arguments(&source[open + 1..close]);
+        if args.len() >= 6 {
+            if let (Some(id), Some(category), Some(transform), Some(name), Some(summary)) = (
+                parse_js_string(args[0].trim()),
+                parse_js_string(args[1].trim()),
+                parse_js_string(args[2].trim()),
+                parse_js_string(args[3].trim()),
+                parse_js_string(args[4].trim()),
+            ) {
+                templates.push(TransformTemplateEntry {
+                    id,
+                    name,
+                    category,
+                    transform,
+                    summary,
+                    body: render_transform_template_body(args[5].trim()).unwrap_or_default(),
+                    tags: args
+                        .get(6)
+                        .map(|value| parse_js_string_array(value))
+                        .unwrap_or_default(),
+                });
+            }
+        }
+        cursor = close + 1;
+    }
+    if templates.is_empty() {
+        return Err("No built-in transform templates could be parsed.".to_string());
+    }
+    Ok(templates)
+}
+
+fn render_transform_template_body(expression: &str) -> Option<String> {
+    let expression = expression.trim();
+    if expression.starts_with("calc(") {
+        let open = expression.find('(')?;
+        let close = find_matching_delimiter(expression, open, '(', ')')?;
+        let args = split_top_level_arguments(&expression[open + 1..close]);
+        let content = parse_js_string(args.first()?.trim())?;
+        let after = args
+            .get(1)
+            .and_then(|value| parse_js_string(value.trim()))
+            .unwrap_or_default();
+        return Some(format!("```calc\n{}\n```\n{}", content.trim(), after));
+    }
+    if expression.starts_with("fenced(") {
+        return render_fenced_expression(expression);
+    }
+    parse_js_string(expression)
+}
+
+fn render_fenced_expression(expression: &str) -> Option<String> {
+    let open = expression.find('(')?;
+    let close = find_matching_delimiter(expression, open, '(', ')')?;
+    let args = split_top_level_arguments(&expression[open + 1..close]);
+    let transform = parse_js_string(args.first()?.trim())?;
+    let content = parse_js_string(args.get(1)?.trim())?;
+    let options = args
+        .get(2)
+        .and_then(|value| parse_js_string(value.trim()))
+        .unwrap_or_default();
+    let suffix = if options.trim().is_empty() {
+        String::new()
+    } else {
+        format!(" {}", options.trim())
+    };
+    Some(format!(
+        "```{}{}\n{}\n```\n",
+        transform,
+        suffix,
+        content.trim()
+    ))
+}
+
+fn find_matching_delimiter(
+    source: &str,
+    open_index: usize,
+    open_delimiter: char,
+    close_delimiter: char,
+) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    for (offset, ch) in source[open_index..].char_indices() {
+        let index = open_index + offset;
+        if let Some(quote_char) = quote {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == quote_char {
+                quote = None;
+            }
+            continue;
+        }
+        if matches!(ch, '"' | '\'' | '`') {
+            quote = Some(ch);
+            continue;
+        }
+        if ch == open_delimiter {
+            depth += 1;
+        } else if ch == close_delimiter {
+            depth = depth.saturating_sub(1);
+            if depth == 0 {
+                return Some(index);
+            }
+        }
+    }
+    None
+}
+
+fn split_top_level_arguments(source: &str) -> Vec<&str> {
+    let mut args = Vec::new();
+    let mut start = 0usize;
+    let mut paren_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut brace_depth = 0usize;
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    for (index, ch) in source.char_indices() {
+        if let Some(quote_char) = quote {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == quote_char {
+                quote = None;
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' | '`' => quote = Some(ch),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '{' => brace_depth += 1,
+            '}' => brace_depth = brace_depth.saturating_sub(1),
+            ',' if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => {
+                args.push(source[start..index].trim());
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    let tail = source[start..].trim();
+    if !tail.is_empty() {
+        args.push(tail);
+    }
+    args
+}
+
+fn parse_js_string(source: &str) -> Option<String> {
+    let source = source.trim();
+    let quote = source.chars().next()?;
+    if !matches!(quote, '"' | '\'' | '`') {
+        return None;
+    }
+    let mut output = String::new();
+    let mut escaped = false;
+    for ch in source[quote.len_utf8()..].chars() {
+        if escaped {
+            output.push(match ch {
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                '\\' => '\\',
+                '"' => '"',
+                '\'' => '\'',
+                '`' => '`',
+                other => other,
+            });
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == quote {
+            return Some(output);
+        }
+        output.push(ch);
+    }
+    None
+}
+
+fn parse_js_string_array(source: &str) -> Vec<String> {
+    let source = source.trim();
+    if !source.starts_with('[') {
+        return Vec::new();
+    }
+    split_top_level_arguments(source.trim_start_matches('[').trim_end_matches(']').trim())
+        .into_iter()
+        .filter_map(|value| parse_js_string(value.trim()))
+        .collect()
+}
+
+fn transform_template_matches_query(template: &TransformTemplateEntry, query: &str) -> bool {
+    template.id.to_ascii_lowercase().contains(query)
+        || template.name.to_ascii_lowercase().contains(query)
+        || template.category.to_ascii_lowercase().contains(query)
+        || template.transform.to_ascii_lowercase().contains(query)
+        || template.summary.to_ascii_lowercase().contains(query)
+        || template
+            .tags
+            .iter()
+            .any(|value| value.to_ascii_lowercase().contains(query))
+        || template.body.to_ascii_lowercase().contains(query)
+}
+
+fn transform_templates_text_report(templates: &[TransformTemplateEntry]) -> String {
+    if templates.is_empty() {
+        return "No NEditor transform templates match those filters.".to_string();
+    }
+    let mut lines = vec![format!(
+        "NEditor transform templates ({}):",
+        templates.len()
+    )];
+    for template in templates {
+        lines.push(format!(
+            "  - {} [{} | {}] {}: {}",
+            template.id, template.category, template.transform, template.name, template.summary
+        ));
+    }
+    lines.push("Use `ned transform-templates --markdown <id>` to print a reusable calc, chart, diagram, data, API, or planning transform block.".to_string());
+    lines.join("\n")
+}
+
 fn document_snippet_catalog() -> Vec<DocumentSnippetInfo> {
     vec![
         DocumentSnippetInfo {
@@ -6761,6 +7186,9 @@ _ned() {{
       snippets|parts)
         COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body --workspace --fill-profile --profile" -- "$cur") )
         ;;
+      transform-templates|xforms)
+        COMPREPLY=( $(compgen -W "--json --ids-only --category --transform --kind --query --search --markdown --body" -- "$cur") )
+        ;;
       profile|business-profile)
         COMPREPLY=( $(compgen -W "--workspace --set --get --fields --init --force --dry-run --json --markdown --placeholders --placeholder-text" -- "$cur") )
         ;;
@@ -6858,6 +7286,9 @@ _ned() {{
       ;;
     snippets|parts)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--fill-profile[merge saved business profile values into printed snippet Markdown]' '--profile[alias for --fill-profile]'
+      ;;
+    transform-templates|xforms)
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching transform template ids only]' '--category[filter by template category]:category:' '--transform[filter by transform type]:transform:' '--kind[alias for --transform]:transform:' '--query[search transform templates by text]:query:' '--search[alias for --query]:query:' '--markdown[print one transform template body]:id:' '--body[alias for --markdown]:id:'
       ;;
     profile|business-profile)
       _arguments '--workspace[workspace containing .neditor]:directory:_files -/' '--set[set profile field key=value]:assignment:' '--get[print one profile field]:field:' '--fields[list supported profile fields and aliases]' '--init[create profile file]' '--force[replace existing profile when initializing]' '--dry-run[preview write]' '--json[print machine-readable JSON]' '--markdown[print reusable identity block]' '--placeholders[print Docs Live placeholder values]' '--placeholder-text[alias for --placeholders]'
@@ -6982,7 +7413,7 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l allow-not-ready".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l option -r".to_string(),
-        "complete -c ned -n '__fish_seen_subcommand_from templates outlines targets inspect doctor' -l json"
+        "complete -c ned -n '__fish_seen_subcommand_from templates outlines transform-templates xforms targets inspect doctor' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
@@ -7006,6 +7437,14 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l section -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l tag -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l best-for -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l ids-only".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l category -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l transform -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l kind -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l query -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l search -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l markdown -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l body -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l kind -r".to_string(),
@@ -7441,6 +7880,7 @@ fn help_text() -> String {
         "  ned outlines [--workspace .] [--json] [--category Procurement] [--query RFP] [--ids-only] [--markdown id]".to_string(),
         "  ned outlines --workspace . --save custom-id --docs-live-type proposal --section \"Executive Summary\" --section \"Recommendations\" [--json]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id] [--workspace . --fill-profile]".to_string(),
+        "  ned transform-templates [--json] [--category Business] [--transform calc] [--query ROI] [--ids-only] [--markdown id]".to_string(),
         "  ned profile [--workspace path] [--init] [--set fullName=...] [--get field|--fields] [--json|--markdown|--placeholders]".to_string(),
         "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--json|--markdown|--matrix]".to_string(),
         "  ned targets [--json]".to_string(),

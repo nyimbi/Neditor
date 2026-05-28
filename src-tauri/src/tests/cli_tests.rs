@@ -784,6 +784,62 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     assert!(snippet_body.message.contains("## Review Handoff"));
     assert!(snippet_body.message.contains("{{reviewer}}"));
 
+    let transform_templates = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "transform-templates".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("transform templates json");
+    let transform_template_report: serde_json::Value =
+        serde_json::from_str(&transform_templates.message).expect("transform templates json");
+    assert_eq!(
+        transform_template_report["schema"],
+        "neditor.ned-transform-templates.v1"
+    );
+    assert!(
+        transform_template_report["count"]
+            .as_u64()
+            .expect("transform template count")
+            >= 50
+    );
+    for template in [
+        "calc-business-roi",
+        "chart-business-horizontal-risk",
+        "plantuml-enterprise-components",
+        "vega-lite-sla-thresholds",
+    ] {
+        assert!(transform_template_report["templates"]
+            .as_array()
+            .expect("transform templates")
+            .contains(&serde_json::json!(template)));
+    }
+
+    let runway_template = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "xforms".to_string(),
+        "--category".to_string(),
+        "Business".to_string(),
+        "--transform".to_string(),
+        "calc".to_string(),
+        "--query".to_string(),
+        "runway".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("filtered transform template ids");
+    assert_eq!(runway_template.message, "calc-business-runway");
+
+    let transform_template_body = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "transform-templates".to_string(),
+        "--markdown".to_string(),
+        "chart-business-horizontal-risk".to_string(),
+    ])
+    .expect("transform template markdown");
+    assert!(transform_template_body.message.contains("```chart"));
+    assert!(transform_template_body
+        .message
+        .contains("targetLabel: Escalation"));
+
     let snippet_workspace = temp_workspace_path("workspace-snippets");
     fs::create_dir_all(snippet_workspace.join(".neditor").join("snippets"))
         .expect("create workspace snippets");

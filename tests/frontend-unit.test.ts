@@ -8179,6 +8179,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned file.md"));
   ok(app.includes("ned open file.md --dry-run --json"));
   ok(app.includes("ned templates --category Procurement --json"));
+  ok(app.includes("ned transform-templates --category Business --transform calc --query ROI --json"));
   ok(app.includes("ned snippets --markdown review-handoff"));
   ok(app.includes("ned profile --workspace . --set companyName=Acme --json"));
   ok(app.includes("ned profile --fields --json"));
@@ -8240,6 +8241,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(store.includes("workspaceDocumentOutlineLibraryJson"));
   ok(cli.includes("snippetDetails"));
   ok(cli.includes("neditor.ned-snippets.v1"));
+  ok(cli.includes("run_transform_templates_command"));
+  ok(cli.includes("neditor.ned-transform-templates.v1"));
+  ok(cli.includes("neditor.ned-transform-template.v1"));
+  ok(cli.includes("TRANSFORM_TEMPLATE_SOURCE"));
   ok(cli.includes("workspaceSnippetPath"));
   ok(cli.includes("read_workspace_snippet_entries"));
   ok(cli.includes("neditor.ned-profile.v1"));

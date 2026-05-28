@@ -95,6 +95,8 @@ ned inspect board-paper.md --json
 ned validate board-paper.md --to pdf --json
 ned export proposal.md --to docx --output proposal.docx
 ned templates --category Procurement --json
+ned transform-templates --category Business --transform calc --query ROI --json
+ned transform-templates --markdown calc-business-roi
 ned outlines --category Procurement --query RFP --json
 ned outlines --markdown rfp-technical-proposal
 ned outlines --workspace . --save board-pack --name "Board Pack" --docs-live-type board-memo --section "Decision Requested" --section "Recommendation" --json
@@ -149,9 +151,15 @@ diagnostics, and available export targets without writing any artifacts. `ned
 templates` explains the installed starter documents with categories, summaries,
 and best-fit uses; use `ned templates --category Procurement --json` or
 `ned templates --query podcast --ids-only` when help desk scripts need filtered
-template discovery. `ned outlines` explains reusable document outlines for
-proposal planning before body text is drafted. Built-in outlines are always
-available, and workspace outlines live in `.neditor/outlines.json` so teams can
+template discovery. `ned transform-templates` exposes the same built-in
+calculation, chart, diagram, data, API, timeline, roadmap, QR, SQL, and schema
+starter blocks used by the visual Templates panel; use
+`ned transform-templates --category Business --transform calc --query ROI --json`
+for filtered discovery or `ned transform-templates --markdown calc-business-roi`
+to print a fillable fenced block for a document or script. `ned outlines`
+explains reusable document outlines for proposal planning before body text is
+drafted. Built-in outlines are always available, and workspace outlines live in
+`.neditor/outlines.json` so teams can
 save their own board packs, operating reviews, reports, and proposal skeletons;
 the Outline Library panel can sync that same workspace file so outlines created
 with `ned` are selectable in the app, and app-saved custom outlines remain
