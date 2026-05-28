@@ -203,6 +203,18 @@ struct DocumentSnippetInfo {
     body: &'static str,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentSnippetEntry {
+    id: String,
+    label: String,
+    kind: String,
+    summary: String,
+    body: String,
+    source: String,
+    path: Option<String>,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct BusinessProfile {
@@ -1641,7 +1653,7 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
         index += 1;
     }
 
-    let snippets = document_snippet_catalog();
+    let snippets = document_snippet_catalog_entries(&workspace)?;
     if let Some(id) = markdown_id {
         let normalized = id.trim().to_ascii_lowercase();
         let snippet = snippets
@@ -1653,7 +1665,7 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
                     id,
                     snippets
                         .iter()
-                        .map(|snippet| snippet.id)
+                        .map(|snippet| snippet.id.as_str())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -1666,7 +1678,7 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
         };
         let markdown = profile
             .as_ref()
-            .map(|profile| fill_business_profile_placeholders(snippet.body, profile))
+            .map(|profile| fill_business_profile_placeholders(&snippet.body, profile))
             .unwrap_or_else(|| snippet.body.to_string());
         if json_output {
             return Ok(CliOutcome {
@@ -1711,7 +1723,7 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
         .collect::<Vec<_>>();
     let ids = filtered
         .iter()
-        .map(|snippet| snippet.id)
+        .map(|snippet| snippet.id.as_str())
         .collect::<Vec<_>>();
 
     if json_output {
@@ -1719,6 +1731,8 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
             message: serde_json::to_string_pretty(&json!({
                 "schema": "neditor.ned-snippets.v1",
                 "count": filtered.len(),
+                "workspace": path_to_display(&workspace),
+                "workspaceSnippetPath": path_to_display(&workspace_snippets_dir(&workspace)),
                 "filters": {
                     "kind": kind_filter,
                     "query": query_filter,
@@ -4462,7 +4476,204 @@ fn document_snippet_catalog() -> Vec<DocumentSnippetInfo> {
     ]
 }
 
-fn snippet_matches_query(snippet: &DocumentSnippetInfo, query: &str) -> bool {
+fn document_snippet_catalog_entries(workspace: &Path) -> Result<Vec<DocumentSnippetEntry>, String> {
+    let mut snippets = document_snippet_catalog()
+        .into_iter()
+        .map(built_in_snippet_entry)
+        .collect::<Vec<_>>();
+    snippets.extend(read_workspace_snippet_entries(workspace)?);
+    snippets.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(snippets)
+}
+
+fn built_in_snippet_entry(snippet: DocumentSnippetInfo) -> DocumentSnippetEntry {
+    DocumentSnippetEntry {
+        id: snippet.id.to_string(),
+        label: snippet.label.to_string(),
+        kind: snippet.kind.to_string(),
+        summary: snippet.summary.to_string(),
+        body: snippet.body.to_string(),
+        source: "builtin".to_string(),
+        path: None,
+    }
+}
+
+fn workspace_snippets_dir(workspace: &Path) -> PathBuf {
+    workspace.join(".neditor").join("snippets")
+}
+
+fn read_workspace_snippet_entries(workspace: &Path) -> Result<Vec<DocumentSnippetEntry>, String> {
+    let dir = workspace_snippets_dir(workspace);
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut snippets = Vec::new();
+    let entries = fs::read_dir(&dir)
+        .map_err(|err| format!("Could not read workspace snippets {}: {err}", dir.display()))?;
+    for entry in entries {
+        let entry =
+            entry.map_err(|err| format!("Could not read workspace snippet entry: {err}"))?;
+        let path = entry.path();
+        if !path.is_file()
+            || path
+                .extension()
+                .and_then(|value| value.to_str())
+                .map_or(true, |ext| !ext.eq_ignore_ascii_case("md"))
+        {
+            continue;
+        }
+        let text = fs::read_to_string(&path)
+            .map_err(|err| format!("Could not read workspace snippet {}: {err}", path.display()))?;
+        snippets.extend(parse_workspace_snippet_file(&path, &text));
+    }
+    Ok(snippets)
+}
+
+fn parse_workspace_snippet_file(path: &Path, text: &str) -> Vec<DocumentSnippetEntry> {
+    let kind = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .and_then(slugify_workspace_snippet_part)
+        .unwrap_or_else(|| "workspace".to_string());
+    let lines = text.lines().collect::<Vec<_>>();
+    let mut heading_indexes = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| workspace_h2_heading_label(line).map(|label| (index, label)))
+        .collect::<Vec<_>>();
+    if heading_indexes.is_empty() {
+        let body = text.trim();
+        if body.is_empty() {
+            return Vec::new();
+        }
+        let label = path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .map(humanize_workspace_snippet_label)
+            .unwrap_or_else(|| "Workspace snippet".to_string());
+        return vec![workspace_snippet_entry(&kind, &label, body, path, 0)];
+    }
+    heading_indexes.push((lines.len(), String::new()));
+    let mut snippets = Vec::new();
+    for pair in heading_indexes.windows(2) {
+        let (start, label) = &pair[0];
+        let (end, _) = pair[1];
+        let body = lines[*start..end].join("\n").trim().to_string();
+        if body.is_empty() {
+            continue;
+        }
+        snippets.push(workspace_snippet_entry(
+            &kind,
+            label,
+            &body,
+            path,
+            snippets.len(),
+        ));
+    }
+    snippets
+}
+
+fn workspace_snippet_entry(
+    kind: &str,
+    label: &str,
+    body: &str,
+    path: &Path,
+    suffix: usize,
+) -> DocumentSnippetEntry {
+    let id_base = format!(
+        "{}-{}",
+        kind,
+        slugify_workspace_snippet_part(label).unwrap_or_else(|| "snippet".to_string())
+    );
+    let id = if suffix == 0 {
+        id_base
+    } else {
+        format!("{id_base}-{suffix}")
+    };
+    DocumentSnippetEntry {
+        id,
+        label: label.to_string(),
+        kind: kind.to_string(),
+        summary: workspace_snippet_summary(body, path),
+        body: format!("{}\n", body.trim()),
+        source: "workspace".to_string(),
+        path: Some(path_to_display(path)),
+    }
+}
+
+fn workspace_h2_heading_label(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if !trimmed.starts_with("##") || trimmed.starts_with("###") {
+        return None;
+    }
+    let label = trimmed.trim_start_matches('#').trim();
+    if label.is_empty() {
+        None
+    } else {
+        Some(label.chars().take(120).collect())
+    }
+}
+
+fn workspace_snippet_summary(body: &str, path: &Path) -> String {
+    body.lines()
+        .map(|line| line.trim())
+        .find(|line| {
+            !line.is_empty()
+                && !line.starts_with('#')
+                && !line.starts_with('|')
+                && !line.starts_with("- ")
+                && !line.starts_with("* ")
+        })
+        .map(|line| line.chars().take(180).collect())
+        .unwrap_or_else(|| {
+            format!(
+                "Workspace snippet from {}.",
+                path.file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or("snippets")
+            )
+        })
+}
+
+fn slugify_workspace_snippet_part(value: &str) -> Option<String> {
+    let mut slug = String::new();
+    let mut previous_dash = false;
+    for ch in value.chars().flat_map(|ch| ch.to_lowercase()) {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch);
+            previous_dash = false;
+        } else if !previous_dash {
+            slug.push('-');
+            previous_dash = true;
+        }
+        if slug.len() >= 80 {
+            break;
+        }
+    }
+    let slug = slug.trim_matches('-').to_string();
+    if slug.is_empty() {
+        None
+    } else {
+        Some(slug)
+    }
+}
+
+fn humanize_workspace_snippet_label(value: &str) -> String {
+    value
+        .split(|ch: char| matches!(ch, '-' | '_' | '.'))
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn snippet_matches_query(snippet: &DocumentSnippetEntry, query: &str) -> bool {
     snippet.id.to_ascii_lowercase().contains(query)
         || snippet.label.to_ascii_lowercase().contains(query)
         || snippet.kind.to_ascii_lowercase().contains(query)
@@ -4470,7 +4681,7 @@ fn snippet_matches_query(snippet: &DocumentSnippetInfo, query: &str) -> bool {
         || snippet.body.to_ascii_lowercase().contains(query)
 }
 
-fn snippets_text_report(snippets: &[DocumentSnippetInfo]) -> String {
+fn snippets_text_report(snippets: &[DocumentSnippetEntry]) -> String {
     if snippets.is_empty() {
         return "No NEditor document snippets match those filters.".to_string();
     }
@@ -4481,7 +4692,7 @@ fn snippets_text_report(snippets: &[DocumentSnippetInfo]) -> String {
             snippet.id, snippet.kind, snippet.label, snippet.summary
         ));
     }
-    lines.push("Use `ned snippets --markdown <id>` to print a reusable document part, or add `--workspace . --fill-profile` to merge saved business identity values.".to_string());
+    lines.push("Use `ned snippets --workspace . --markdown <id>` to print a built-in or .neditor/snippets Markdown part; add `--fill-profile` to merge saved business identity values.".to_string());
     lines.join("\n")
 }
 

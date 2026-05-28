@@ -754,6 +754,63 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     assert!(snippet_body.message.contains("## Review Handoff"));
     assert!(snippet_body.message.contains("{{reviewer}}"));
 
+    let snippet_workspace = temp_workspace_path("workspace-snippets");
+    fs::create_dir_all(snippet_workspace.join(".neditor").join("snippets"))
+        .expect("create workspace snippets");
+    fs::write(
+        snippet_workspace.join(".neditor").join("snippets").join("business.md"),
+        "## Client Brief\n\nPrepared for {{companyName}}.\n\n## Decision Log\n\n| Decision | Owner |\n| --- | --- |\n| {{decision}} | {{owner}} |\n",
+    )
+    .expect("write workspace snippets");
+    fs::write(
+        snippet_workspace
+            .join(".neditor")
+            .join("business-profile.json"),
+        "{\n  \"fullName\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"phone\": \"\",\n  \"roleTitle\": \"Managing Partner\",\n  \"companyName\": \"Acme Advisory\",\n  \"companyAddress\": \"\",\n  \"website\": \"https://acme.example\",\n  \"industry\": \"Consulting\",\n  \"defaultClientName\": \"Globex\",\n  \"brandVoice\": \"clear and practical\"\n}\n",
+    )
+    .expect("write workspace profile");
+
+    let workspace_snippets = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "snippets".to_string(),
+        "--workspace".to_string(),
+        snippet_workspace.to_string_lossy().to_string(),
+        "--kind".to_string(),
+        "business".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("workspace snippets json");
+    let workspace_snippet_report: serde_json::Value =
+        serde_json::from_str(&workspace_snippets.message).expect("workspace snippets json");
+    assert_eq!(
+        workspace_snippet_report["schema"],
+        "neditor.ned-snippets.v1"
+    );
+    assert_eq!(workspace_snippet_report["count"], 2);
+    assert!(workspace_snippet_report["snippetDetails"]
+        .as_array()
+        .expect("workspace snippet details")
+        .iter()
+        .any(|snippet| snippet["id"] == "business-client-brief"
+            && snippet["source"] == "workspace"
+            && snippet["path"]
+                .as_str()
+                .is_some_and(|path| path.ends_with(".neditor/snippets/business.md"))));
+
+    let workspace_snippet_body = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "snippets".to_string(),
+        "--workspace".to_string(),
+        snippet_workspace.to_string_lossy().to_string(),
+        "--markdown".to_string(),
+        "business-client-brief".to_string(),
+        "--fill-profile".to_string(),
+    ])
+    .expect("workspace snippet markdown");
+    assert!(workspace_snippet_body
+        .message
+        .contains("Prepared for Acme Advisory."));
+
     let outlines = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "outlines".to_string(),

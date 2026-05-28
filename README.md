@@ -170,8 +170,12 @@ matrix, risk register, tender checklist, tutorial step, and review handoff; use
 `ned snippets --markdown review-handoff` to print a copyable Markdown part or
 `ned snippets --markdown company-contact-block --workspace . --fill-profile` to
 merge saved `.neditor/business-profile.json` identity values while leaving
-unknown placeholders visible. Use `ned snippets --kind procurement --json` for
-filtered automation. `ned profile`
+unknown placeholders visible. Workspace files under `.neditor/snippets/*.md`
+are now first-class CLI snippets too: each `##` heading becomes a selectable
+snippet such as `business-client-brief`, so teams can keep local document parts
+with the project and still use `--json`, `--query`, `--kind`, `--markdown`, and
+`--fill-profile`. Use `ned snippets --kind procurement --json` for filtered
+automation. `ned profile`
 creates, updates, and prints the reusable name, email, phone, role, company,
 address, website, industry, default client, and brand voice values that appear in
 templates, snippets, Docs Live, and agent handoffs; use `--json` for help desks,
