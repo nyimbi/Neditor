@@ -290,6 +290,37 @@ review.shape: diamond
 }
 
 #[test]
+fn d2_native_fallback_flattens_nested_containers_and_relative_edges() {
+    let artifact = run_transform(
+        "d2".to_string(),
+        r#"direction: right
+cloud: Cloud {
+  api: API Service
+  db: Database
+  api -> db: writes
+}
+user: Business User
+user -> cloud.api: submits request
+"#
+        .to_string(),
+    )
+    .expect("d2 native fallback");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert_eq!(artifact.execution_kind, "embedded");
+    assert!(artifact.html.contains("transform-d2"));
+    assert!(artifact.html.contains("Cloud"));
+    assert!(artifact.html.contains("API Service"));
+    assert!(artifact.html.contains("Database"));
+    assert!(artifact.html.contains("Business User"));
+    assert!(artifact.html.contains("writes"));
+    assert!(artifact.html.contains("submits request"));
+    assert!(!artifact.html.contains(">right<"));
+    assert!(!artifact.html.contains(">cloud.api<"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
 fn document_ast_models_transform_artifacts_semantically() {
     let response = compile(CompileRequest {
         text: r#"---

@@ -7181,6 +7181,11 @@ test("transform template library covers reusable calculations and custom templat
   ok(openApiComponentsTemplate.body.includes("parameters:"));
   ok(openApiComponentsTemplate.body.includes("responses:"));
   ok(openApiComponentsTemplate.tags.includes("components"));
+  const d2ContainerTemplate = builtinTransformTemplates.find((template) => template.id === "d2-system-container");
+  if (!d2ContainerTemplate) throw new Error("missing D2 container template");
+  ok(d2ContainerTemplate.body.includes("platform: Platform {"));
+  ok(d2ContainerTemplate.body.includes("customer -> platform.api"));
+  ok(d2ContainerTemplate.tags.includes("container"));
   const vegaTickTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-risk-ticks");
   if (!vegaTickTemplate) throw new Error("missing Vega-Lite tick template");
   ok(vegaTickTemplate.body.includes('"type": "tick"'));

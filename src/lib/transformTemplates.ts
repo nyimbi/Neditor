@@ -1121,6 +1121,27 @@ digraph G {
     ["diagram", "graphviz"],
   ),
   template(
+    "d2-system-container",
+    "Diagrams",
+    "d2",
+    "D2 system container",
+    "Creates a nested D2 system diagram that works with the native fallback and external D2.",
+    fenced(
+      "d2",
+      `
+direction: right
+customer: Customer
+platform: Platform {
+  api: API Service
+  database: Database
+  api -> database: writes
+}
+customer -> platform.api: request
+`,
+    ),
+    ["diagram", "d2", "architecture", "container"],
+  ),
+  template(
     "plantuml-sequence",
     "Diagrams",
     "plantuml",

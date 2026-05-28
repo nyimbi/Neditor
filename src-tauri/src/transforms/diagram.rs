@@ -506,7 +506,9 @@ fn add_mermaid_node(nodes: &mut Vec<MermaidNode>, seen: &mut HashSet<String>, no
             label: node.label.clone(),
         });
     } else if let Some(existing) = nodes.iter_mut().find(|existing| existing.id == node.id) {
-        if existing.label == existing.id && node.label != node.id {
+        if (existing.label == existing.id || existing.label == d2_node_leaf(&existing.id))
+            && node.label != node.id
+        {
             existing.label.clone_from(&node.label);
         }
     }
@@ -550,14 +552,25 @@ fn parse_d2_graph(body: &str) -> MermaidGraph {
     let mut nodes = Vec::new();
     let mut seen = HashSet::new();
     let mut edges = Vec::new();
-    for line in d2_statements(body) {
+    let mut scope: Vec<String> = Vec::new();
+    for raw_line in body.lines().flat_map(|line| line.split(';')) {
+        let mut line = raw_line.trim();
+        while let Some(rest) = line.strip_prefix('}') {
+            scope.pop();
+            line = rest.trim();
+        }
         if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
             continue;
         }
+        let opens_scope = line.ends_with('{');
+        line = line.trim_end_matches('{').trim();
+        if line.is_empty() {
+            continue;
+        }
         if let Some((left, right)) = split_first_operator(line, &["<->", "->", "--"]) {
-            let from = parse_plain_graph_node(left);
+            let from = parse_d2_graph_node(left, &scope);
             let (target, label) = split_d2_edge_label(right);
-            let to = parse_plain_graph_node(target);
+            let to = parse_d2_graph_node(target, &scope);
             add_mermaid_node(&mut nodes, &mut seen, &from);
             add_mermaid_node(&mut nodes, &mut seen, &to);
             edges.push(MermaidEdge {
@@ -569,21 +582,62 @@ fn parse_d2_graph(body: &str) -> MermaidGraph {
             if is_d2_attribute_statement(id) {
                 continue;
             }
+            let full_id = qualify_d2_node_id(&normalize_plain_node_id(id), &scope);
             let node = MermaidNode {
-                id: normalize_plain_node_id(id),
+                id: full_id,
                 label: clean_d2_label(label),
             };
             add_mermaid_node(&mut nodes, &mut seen, &node);
+        } else if !is_d2_attribute_statement(line) {
+            let node = parse_d2_graph_node(line, &scope);
+            if !node.id.is_empty() {
+                add_mermaid_node(&mut nodes, &mut seen, &node);
+            }
+        }
+        if opens_scope {
+            if let Some(scope_id) = d2_scope_id(line, &scope) {
+                scope.push(scope_id);
+            }
         }
     }
     MermaidGraph { nodes, edges }
 }
 
-fn d2_statements(body: &str) -> impl Iterator<Item = &str> {
-    body.lines()
-        .flat_map(|line| line.split(';'))
-        .map(|statement| statement.trim().trim_end_matches('{').trim())
-        .filter(|statement| !statement.is_empty() && *statement != "}")
+fn parse_d2_graph_node(text: &str, scope: &[String]) -> MermaidNode {
+    let label = extract_quoted_attribute(text, "label");
+    let raw_id = normalize_plain_node_id(strip_bracket_attributes(text));
+    let id = qualify_d2_node_id(&raw_id, scope);
+    MermaidNode {
+        label: label.unwrap_or_else(|| d2_node_leaf(&id).to_string()),
+        id,
+    }
+}
+
+fn d2_scope_id(statement: &str, scope: &[String]) -> Option<String> {
+    if split_first_operator(statement, &["<->", "->", "--"]).is_some() {
+        return None;
+    }
+    let id = statement
+        .split_once(':')
+        .map(|(id, _)| id)
+        .unwrap_or(statement)
+        .trim();
+    if id.is_empty() || is_d2_attribute_statement(id) {
+        return None;
+    }
+    Some(qualify_d2_node_id(&normalize_plain_node_id(id), scope))
+}
+
+fn qualify_d2_node_id(id: &str, scope: &[String]) -> String {
+    let id = id.trim();
+    if id.is_empty() || id.contains('.') || scope.is_empty() {
+        return id.to_string();
+    }
+    format!("{}.{}", scope.last().expect("checked non-empty scope"), id)
+}
+
+fn d2_node_leaf(id: &str) -> &str {
+    id.rsplit('.').next().unwrap_or(id)
 }
 
 fn split_d2_edge_label(text: &str) -> (&str, Option<String>) {
