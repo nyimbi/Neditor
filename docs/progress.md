@@ -27,6 +27,21 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Validation Closure
+
+`9.20 Validation | One-click prepare report across metadata/includes/
+citations/formulas/figures/transforms/settings/links/comments` is now marked
+complete in `docs/spec-completion-matrix.md`. The closure is based on current
+backend readiness tests, reference diagnostics, and browser proof for one-click
+export preparation plus blocked-write behavior across the main and extended
+export handoff targets.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked prepare_for_export --lib` | Pass | 23 readiness tests passed, covering readiness/manifest parity, target-specific release metadata blockers, public distribution metadata/options validation, citation-source and caption/label diagnostics, malformed review/provenance metadata, dirty-Git warnings, transform engine options, duplicate/malformed reference labels, and explicit readiness summaries. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked reference --lib` | Pass | 13 reference tests passed, covering duplicate labels, malformed markers, readiness manifest behavior, resolved cross references, literal inline-code examples, named table formulas, topology, trusted transform preferences, and cross-target reference export evidence. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "runs export readiness\|publishes and hands off extended export targets" --project chromium` | Pass | Two focused Chromium workflows passed, proving one-click Prepare for export, readiness diagnostics, blocked export before unsafe writes, manifest/readiness metadata display, distribution metadata scaffolding, and blog/Substack/LaTeX/Google Docs/EPUB handoff routing. |
+
 ## 2026-05-28 Two-Way Table Editing Refresh
 
 Refreshed focused proof for the user's table-editing requirement. NEditor
