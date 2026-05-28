@@ -155,6 +155,13 @@ import {
 } from "../src/lib/ttsSetup.js";
 import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../src/lib/watchPaths.js";
 import {
+  recordAgentRunHistoryState,
+  recordDocsLiveDraftHistoryState,
+  recordGuidedDemoStepState,
+  removeAgentRunHistoryState,
+  removeDocsLiveDraftHistoryState,
+} from "../src/lib/workflowHistory.js";
+import {
   migratePersistedWorkspace,
   normalizeAgentRunHistory,
   normalizeAiProviderDefaults,
@@ -354,6 +361,68 @@ test("transform settings helpers clear trust and clamp runtime preferences", () 
   equal(clampTransformTimeout(Number.NaN), 1);
   equal(clampTransformTimeout(45000), 30000);
   equal(clampTransformTimeout(1200), 1200);
+});
+
+test("workflow history helpers deduplicate runs drafts and guided demo progress", () => {
+  const firstRun = {
+    runId: "run-1",
+    title: "Board packet",
+    generatedAt: "2026-05-28T01:00:00.000Z",
+    updatedAt: "2026-05-28T01:00:00.000Z",
+    instruction: "Draft a board packet",
+    documentType: "board-brief",
+    lanes: ["draft", "review"],
+    distributionTargets: ["pdf" as const],
+    status: "generated" as const,
+    applicationMode: "append-packet" as const,
+    readinessScore: 72,
+    outputFingerprint: "out",
+    sourceFingerprint: "src",
+    contextFingerprint: "ctx",
+    instructionFingerprint: "ins",
+  };
+  const updatedRun = {
+    ...firstRun,
+    title: "Updated board packet",
+    status: "applied" as const,
+    readinessScore: 88,
+  };
+  const secondRun = { ...firstRun, runId: "run-2", title: "RFP response" };
+  const runHistory = recordAgentRunHistoryState(recordAgentRunHistoryState([firstRun], secondRun), updatedRun);
+  deepEqual(
+    runHistory.map((item) => `${item.runId}:${item.title}:${item.status}`),
+    ["run-1:Updated board packet:applied", "run-2:RFP response:generated"],
+  );
+  deepEqual(removeAgentRunHistoryState(runHistory, "run-2").map((item) => item.runId), ["run-1"]);
+
+  const firstDraft = {
+    draftId: "draft-1",
+    title: "Market plan",
+    generatedAt: "2026-05-28T02:00:00.000Z",
+    updatedAt: "2026-05-28T02:00:00.000Z",
+    documentType: "marketing-brief",
+    sectionCount: 3,
+    issueCount: 1,
+    markdown: "# Market plan\n\nDraft.",
+    outputFingerprint: "draft",
+  };
+  const updatedDraft = { ...firstDraft, title: "Updated market plan", markdown: "# Updated\n\nDraft." };
+  const secondDraft = { ...firstDraft, draftId: "draft-2", title: "Lesson plan" };
+  const draftHistory = recordDocsLiveDraftHistoryState(recordDocsLiveDraftHistoryState([firstDraft], secondDraft), updatedDraft);
+  deepEqual(
+    draftHistory.map((item) => `${item.draftId}:${item.title}`),
+    ["draft-1:Updated market plan", "draft-2:Lesson plan"],
+  );
+  deepEqual(removeDocsLiveDraftHistoryState(draftHistory, "draft-2").map((item) => item.draftId), ["draft-1"]);
+
+  let steps = recordGuidedDemoStepState([], " ai-create ");
+  steps = recordGuidedDemoStepState(steps, "export");
+  steps = recordGuidedDemoStepState(steps, "ai-create");
+  deepEqual(steps, ["ai-create", "export"]);
+  equal(recordGuidedDemoStepState(steps, ""), steps);
+  const capped = Array.from({ length: 42 }, (_, index) => `step-${index}`);
+  equal(recordGuidedDemoStepState(capped.slice(0, 39), "final").length, 40);
+  equal(recordGuidedDemoStepState(capped, "overflow").length, 40);
 });
 
 test("recent item helpers deduplicate limit and forget paths", () => {

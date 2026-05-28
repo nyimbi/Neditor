@@ -19,6 +19,13 @@ import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from 
 import { buildWatchedPathRoles, normalizeWatchPath, sameWatchPath } from "../lib/watchPaths";
 import { applyAiPasteInsertion, type AiPasteInsertMode } from "../lib/workflows";
 import {
+  recordAgentRunHistoryState,
+  recordDocsLiveDraftHistoryState,
+  recordGuidedDemoStepState,
+  removeAgentRunHistoryState,
+  removeDocsLiveDraftHistoryState,
+} from "../lib/workflowHistory";
+import {
   clampAutosaveDelay,
   clampFontSize,
   clampLineHeight,
@@ -607,14 +614,11 @@ export const useDocumentsStore = defineStore("documents", {
       await preferencesStore.save();
     },
     recordAgentRunHistory(item: AgentRunHistoryItem) {
-      this.agentRunHistory = normalizeAgentRunHistory([
-        item,
-        ...this.agentRunHistory.filter((entry) => entry.runId !== item.runId),
-      ]);
+      this.agentRunHistory = recordAgentRunHistoryState(this.agentRunHistory, item);
       void this.persistWorkspace();
     },
     removeAgentRunHistory(runId: string) {
-      this.agentRunHistory = this.agentRunHistory.filter((entry) => entry.runId !== runId);
+      this.agentRunHistory = removeAgentRunHistoryState(this.agentRunHistory, runId);
       void this.persistWorkspace();
     },
     clearAgentRunHistory() {
@@ -622,14 +626,11 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     recordDocsLiveDraftHistory(item: DocsLiveDraftHistoryItem) {
-      this.docsLiveDraftHistory = normalizeDocsLiveDraftHistory([
-        item,
-        ...this.docsLiveDraftHistory.filter((entry) => entry.draftId !== item.draftId),
-      ]);
+      this.docsLiveDraftHistory = recordDocsLiveDraftHistoryState(this.docsLiveDraftHistory, item);
       void this.persistWorkspace();
     },
     removeDocsLiveDraftHistory(draftId: string) {
-      this.docsLiveDraftHistory = this.docsLiveDraftHistory.filter((entry) => entry.draftId !== draftId);
+      this.docsLiveDraftHistory = removeDocsLiveDraftHistoryState(this.docsLiveDraftHistory, draftId);
       void this.persistWorkspace();
     },
     clearDocsLiveDraftHistory() {
@@ -649,9 +650,9 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     recordGuidedDemoStepComplete(stepId: string) {
-      const normalizedStepId = stepId.trim();
-      if (!normalizedStepId || this.guidedDemoCompletedStepIds.includes(normalizedStepId)) return;
-      this.guidedDemoCompletedStepIds = [...this.guidedDemoCompletedStepIds, normalizedStepId].slice(0, 40);
+      const nextStepIds = recordGuidedDemoStepState(this.guidedDemoCompletedStepIds, stepId);
+      if (nextStepIds === this.guidedDemoCompletedStepIds) return;
+      this.guidedDemoCompletedStepIds = nextStepIds;
       void this.persistWorkspace();
     },
     resetGuidedDemoProgress() {
