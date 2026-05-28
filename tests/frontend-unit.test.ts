@@ -78,6 +78,12 @@ import {
   upsertDocsLivePlaceholder,
 } from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
+import {
+  closeDocumentTabState,
+  forgetDocumentPathState,
+  moveDocumentTabState,
+  setPinnedDocumentState,
+} from "../src/lib/documentTabs.js";
 import { emacsKillLineRange, emacsWordRange } from "../src/lib/emacsKeybindings.js";
 import {
   buildExportMetadataChecklist,
@@ -423,6 +429,53 @@ test("workflow history helpers deduplicate runs drafts and guided demo progress"
   const capped = Array.from({ length: 42 }, (_, index) => `step-${index}`);
   equal(recordGuidedDemoStepState(capped.slice(0, 39), "final").length, 40);
   equal(recordGuidedDemoStepState(capped, "overflow").length, 40);
+});
+
+test("document tab helpers close pin move and forget file state", () => {
+  const documents = [
+    { id: "a", path: "/workspace/a.md", title: "Alpha", pinned: false },
+    { id: "b", path: "/workspace/b.md", title: "Beta", pinned: false },
+    { id: "c", path: "/workspace/c.md", title: "Gamma", pinned: true },
+  ];
+
+  const closeActive = closeDocumentTabState(documents, "b", ["/workspace/old.md"], "b");
+  deepEqual(closeActive?.documents.map((document) => document.id), ["a", "c"]);
+  equal(closeActive?.activeId, "a");
+  deepEqual(closeActive?.recentlyClosed, ["/workspace/b.md", "/workspace/old.md"]);
+  equal(closeActive?.closedActiveDocument, true);
+
+  const closeInactive = closeDocumentTabState(documents, "a", [], "c");
+  deepEqual(closeInactive?.documents.map((document) => document.id), ["a", "b"]);
+  equal(closeInactive?.activeId, "a");
+  equal(closeDocumentTabState([documents[0]], "a", [], "a"), null);
+
+  const pinned = setPinnedDocumentState(documents, "b", true);
+  deepEqual(pinned?.documents.map((document) => `${document.id}:${document.pinned ? "pinned" : "open"}`), [
+    "b:pinned",
+    "c:pinned",
+    "a:open",
+  ]);
+  equal(pinned?.statusMessage, "Pinned Beta");
+  const unpinned = setPinnedDocumentState(pinned?.documents || [], "b", false);
+  equal(unpinned?.statusMessage, "Unpinned Beta");
+  equal(setPinnedDocumentState(documents, "missing", true), null);
+
+  const movedBefore = moveDocumentTabState(documents, "c", "a", "before");
+  deepEqual(movedBefore?.documents.map((document) => document.id), ["c", "a", "b"]);
+  equal(movedBefore?.statusMessage, "Moved Gamma tab before target");
+  const movedAfter = moveDocumentTabState(documents, "a", "c", "after");
+  deepEqual(movedAfter?.documents.map((document) => document.id), ["b", "c", "a"]);
+  equal(moveDocumentTabState(documents, "a", "a", "before"), null);
+  equal(moveDocumentTabState(documents, "a", "missing", "before"), null);
+
+  deepEqual(
+    forgetDocumentPathState(["/workspace/a.md", "/workspace/b.md"], ["/workspace/b.md"], ["/workspace/b.md"], "/workspace/b.md"),
+    {
+      recentFiles: ["/workspace/a.md"],
+      recentlyClosed: [],
+      missingWorkspaceFiles: [],
+    },
+  );
 });
 
 test("recent item helpers deduplicate limit and forget paths", () => {

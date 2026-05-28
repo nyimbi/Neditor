@@ -5,6 +5,12 @@ import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/p
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessDocuments";
+import {
+  closeDocumentTabState,
+  forgetDocumentPathState,
+  moveDocumentTabState,
+  setPinnedDocumentState,
+} from "../lib/documentTabs";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
 import { isAiSourceFenceOpener, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
 import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
@@ -1731,21 +1737,15 @@ export const useDocumentsStore = defineStore("documents", {
       await this.refreshGitStatus();
     },
     closeDocument(id: string) {
-      if (this.documents.length === 1) return;
-      const index = this.documents.findIndex((document) => document.id === id);
-      if (index >= 0) {
-        const [closed] = this.documents.slice(index, index + 1);
-        const closingActiveDocument = closed?.id === this.activeId;
-        if (closed?.path) {
-          this.recentlyClosed = rememberRecentItem(this.recentlyClosed, closed.path, 20);
-        }
-        this.documents.splice(index, 1);
-        if (closingActiveDocument) {
-          this.activeId = this.documents[Math.max(0, index - 1)].id;
-          void this.compileActive();
-        }
-        void this.persistWorkspace();
+      const result = closeDocumentTabState(this.documents, this.activeId, this.recentlyClosed, id);
+      if (!result) return;
+      this.documents = result.documents;
+      this.activeId = result.activeId;
+      this.recentlyClosed = result.recentlyClosed;
+      if (result.closedActiveDocument) {
+        void this.compileActive();
       }
+      void this.persistWorkspace();
     },
     togglePin(id: string) {
       const document = this.documents.find((item) => item.id === id);
@@ -1753,27 +1753,17 @@ export const useDocumentsStore = defineStore("documents", {
       this.setPinned(id, !document.pinned);
     },
     setPinned(id: string, pinned: boolean) {
-      const document = this.documents.find((item) => item.id === id);
-      if (!document) return;
-      document.pinned = pinned;
-      this.documents.sort((left, right) => Number(Boolean(right.pinned)) - Number(Boolean(left.pinned)));
-      this.statusMessage = pinned ? `Pinned ${document.title}` : `Unpinned ${document.title}`;
+      const result = setPinnedDocumentState(this.documents, id, pinned);
+      if (!result) return;
+      this.documents = result.documents;
+      this.statusMessage = result.statusMessage;
       void this.persistWorkspace();
     },
     moveDocument(id: string, targetId: string, placement: "before" | "after") {
-      if (id === targetId) return;
-      const fromIndex = this.documents.findIndex((document) => document.id === id);
-      const moving = this.documents[fromIndex];
-      if (fromIndex < 0 || !moving) return;
-      this.documents.splice(fromIndex, 1);
-      const targetIndex = this.documents.findIndex((document) => document.id === targetId);
-      if (targetIndex < 0) {
-        this.documents.splice(fromIndex, 0, moving);
-        return;
-      }
-      const insertionIndex = placement === "before" ? targetIndex : targetIndex + 1;
-      this.documents.splice(insertionIndex, 0, moving);
-      this.statusMessage = `Moved ${moving.title} tab ${placement} target`;
+      const result = moveDocumentTabState(this.documents, id, targetId, placement);
+      if (!result) return;
+      this.documents = result.documents;
+      this.statusMessage = result.statusMessage;
       void this.persistWorkspace();
     },
     rememberFile(path: string | null) {
@@ -1781,10 +1771,10 @@ export const useDocumentsStore = defineStore("documents", {
       this.recentFiles = rememberRecentItem(this.recentFiles, path, 20);
     },
     forgetFilePath(path: string | null) {
-      if (!path) return;
-      this.recentFiles = forgetRecentItem(this.recentFiles, path);
-      this.recentlyClosed = forgetRecentItem(this.recentlyClosed, path);
-      this.missingWorkspaceFiles = forgetRecentItem(this.missingWorkspaceFiles, path);
+      const result = forgetDocumentPathState(this.recentFiles, this.recentlyClosed, this.missingWorkspaceFiles, path);
+      this.recentFiles = result.recentFiles;
+      this.recentlyClosed = result.recentlyClosed;
+      this.missingWorkspaceFiles = result.missingWorkspaceFiles;
     },
     rememberFolder(path: string | null) {
       if (!path) return;
