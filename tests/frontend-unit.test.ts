@@ -80,6 +80,7 @@ import {
   businessTemplateMarkdown,
   businessWizardContext,
   normalizeBusinessProfile,
+  rfpComplianceChecklistMarkdown,
   rfpComplianceMatrixMarkdown,
   rfpResponseMarkdown,
 } from "../src/lib/businessDocuments.js";
@@ -3334,17 +3335,37 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
         "3. Vendor must demonstrate SOC 2 security controls and data protection practices.",
         "4. Submit signed insurance certificate and three relevant customer references.",
         "Evaluation criteria: technical merit 40 points, price 30 points, experience 30 points.",
+        "| Requirement | Mandatory | Evidence |",
+        "| Bid bond certificate | Yes | Failure to submit will be rejected |",
+        "Responses must use Arial 11pt and may not exceed 25 pages.",
+        "Annex C - Declaration of Undertaking must be signed and submitted.",
+        "Training materials must be bilingual EN/FR and workshops delivered in French.",
+        "The bidder must name a Legal/IPR expert; TBD or placeholder roles are non-compliant.",
       ].join("\n"),
     },
     profile,
   );
-  equal(analysis.requirements.length, 5);
+  equal(analysis.requirements.length, 11);
   ok(analysis.statedIntent.some((item) => item.includes("improve customer support")));
   ok(analysis.impliedIntent.some((item) => item.includes("easily scored response")));
   ok(analysis.impliedIntent.some((item) => item.includes("procurement risk")));
   ok(analysis.timelines.some((item) => item.includes("90 days")));
   ok(analysis.budgetHints.some((item) => item.includes("pricing")));
   ok(analysis.mandatoryAttachments.some((item) => item.includes("insurance certificate")));
+  ok(analysis.requirements.some((item) => item.requirementType === "SCORED" && item.text.includes("technical merit")));
+  ok(analysis.requirements.some((item) => item.requirementType === "FORMAT" && item.text.includes("Arial 11pt")));
+  ok(analysis.requirements.some((item) => item.disqualificationRisk && item.text.includes("Bid bond certificate")));
+  ok(analysis.requirements.every((item) => item.sourceExcerpt.length > 0 && item.confidence));
+  ok(analysis.complianceChecklist.length > analysis.complianceRows.length);
+  ok(analysis.complianceChecklist.some((item) => item.section === "Document checklist - attachments required" && item.requirement.includes("Annex C")));
+  ok(analysis.complianceChecklist.some((item) => item.section === "Annex references" && item.requirement.includes("Annex C")));
+  ok(analysis.complianceChecklist.some((item) => item.section === "Bilingual / language obligations" && item.requirement.includes("bilingual")));
+  ok(analysis.complianceChecklist.some((item) => item.section === "Placeholder and response-readiness traps" && item.requirement.includes("placeholder")));
+  ok(analysis.criticalDisqualifiers.some((item) => item.includes("Bid bond certificate")));
+  ok(analysis.scoringWeights.some((item) => item.criterion.includes("technical merit") && item.weight === 40));
+  ok(analysis.annexReferences.some((item) => item.annex === "Annex C"));
+  ok(analysis.bilingualRequirements.some((item) => item.includes("EN/FR")));
+  ok(analysis.placeholderRisks.some((item) => item.includes("TBD")));
   ok(analysis.complianceRows.every((row) => row.verification.includes("Compliance Matrix")));
   ok(analysis.complianceRows.every((row) => row.suggestedResponse.includes("Specific requirement:")));
   ok(analysis.complianceRows.some((row) => row.category === "Compliance" && row.suggestedResponse.includes("mapping controls")));
@@ -3353,7 +3374,14 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(analysis.verificationSummary.allRequirementsMapped);
   ok(analysis.verificationSummary.rowsNeedingEvidence > 0);
   ok(analysis.verificationSummary.checklist.some((item) => item.includes("Every extracted requirement")));
+  ok(analysis.verificationSummary.checklist.some((item) => item.includes("explicit rejection")));
+  ok(analysis.verificationSummary.checklist.some((item) => item.includes("scored or weighted")));
+  ok(analysis.verificationSummary.checklist.some((item) => item.includes("annex reference")));
+  ok(analysis.verificationSummary.checklist.some((item) => item.includes("bilingual")));
+  ok(analysis.verificationSummary.checklist.some((item) => item.includes("placeholder")));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes(`source line ${row.sourceLine}`))));
+  ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes("Requirement type:"))));
+  ok(analysis.complianceRows.some((row) => row.verificationChecklist.some((item) => item.includes("Disqualification risk flagged"))));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes("Suggested answer reviewed"))));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes(row.owner))));
 
@@ -3374,13 +3402,25 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(assistance.some((item) => item.stepId === "evidence-qa" && item.suggestedAnswer.includes("row(s) still need evidence review")));
 
   const matrix = rfpComplianceMatrixMarkdown(analysis);
-  ok(matrix.includes("| ID | Requirement | Category | Compliance status | Response section | Suggested response | Evidence / proof | Verification |"));
+  ok(matrix.includes("| ID | Type | Risk | Requirement | Category | Compliance status | Response section | Suggested response | Evidence / proof | Verification |"));
   ok(matrix.includes("RFP-REQ-001"));
   ok(matrix.includes("SOC 2 security controls"));
+  ok(matrix.includes("Disqualification risk"));
+  ok(matrix.includes("FORMAT"));
   ok(matrix.includes("Suggested response"));
   ok(matrix.includes("Evidence to attach"));
 
+  const checklist = rfpComplianceChecklistMarkdown(analysis);
+  ok(checklist.includes("## Compliance Checklist"));
+  ok(checklist.includes("### Critical Disqualification Traps"));
+  ok(checklist.includes("Verification method"));
+  ok(checklist.includes("Bid bond certificate"));
+  ok(checklist.includes("Annex C"));
+  ok(checklist.includes("bilingual EN/FR"));
+
   const response = rfpResponseMarkdown(analysis, profile, "Win theme: reduce implementation risk.");
+  ok(response.includes("## Compliance Checklist"));
+  ok(response.includes("### Scoring Weights"));
   ok(response.includes("## Buyer Intent Analysis"));
   ok(response.includes("### Response Context and Decision Notes"));
   ok(response.includes("Win theme: reduce implementation risk."));
@@ -9096,6 +9136,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("collectNativeSplitSourcePaneEvidence"));
   ok(app.includes("native workflow mounted split source panes"));
   ok(app.includes("native workflow synced secondary split pane to primary and preview"));
+  ok(app.includes("preservePreviewScrollFromSecondaryEditor"));
   ok(app.includes("native workflow kept secondary split scroll isolated from preview"));
   ok(app.includes("collectNativeEditorKeybindingEvidence"));
   ok(app.includes("native workflow applied Emacs keybinding mode"));

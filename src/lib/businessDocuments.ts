@@ -96,11 +96,17 @@ export interface RfpSourceInput {
   text: string;
 }
 
+export type RfpRequirementType = "MANDATORY" | "SCORED" | "DEADLINE" | "FORMAT" | "IMPLIED" | "REQUIREMENT";
+
 export interface RfpRequirement {
   id: string;
+  requirementType: RfpRequirementType;
   category: string;
   text: string;
   sourceLine: number;
+  sourceExcerpt: string;
+  disqualificationRisk: boolean;
+  confidence: "high" | "medium" | "low";
   responseStrategy: string;
   evidenceNeeded: string;
   owner: string;
@@ -112,6 +118,33 @@ export interface RfpComplianceRow extends RfpRequirement {
   suggestedResponse: string;
   verification: string;
   verificationChecklist: string[];
+}
+
+export interface RfpScoringWeight {
+  criterion: string;
+  weight: number;
+  unit: "%" | "points";
+  sourceLine: number;
+}
+
+export interface RfpAnnexReference {
+  annex: string;
+  label: string;
+  sourceLine: number;
+  requirement: string;
+}
+
+export type RfpComplianceChecklistRisk = "critical" | "high" | "standard";
+
+export interface RfpComplianceChecklistItem {
+  id: string;
+  section: string;
+  requirement: string;
+  verification: string;
+  reference: string;
+  risk: RfpComplianceChecklistRisk;
+  owner: string;
+  sourceLine: number;
 }
 
 export interface RfpVerificationSummary {
@@ -132,6 +165,7 @@ export interface RfpAnalysis {
   };
   requirements: RfpRequirement[];
   complianceRows: RfpComplianceRow[];
+  complianceChecklist: RfpComplianceChecklistItem[];
   verificationSummary: RfpVerificationSummary;
   capabilities: string[];
   statedIntent: string[];
@@ -140,6 +174,11 @@ export interface RfpAnalysis {
   budgetHints: string[];
   evaluationCriteria: string[];
   mandatoryAttachments: string[];
+  criticalDisqualifiers: string[];
+  scoringWeights: RfpScoringWeight[];
+  annexReferences: RfpAnnexReference[];
+  bilingualRequirements: string[];
+  placeholderRisks: string[];
   risks: string[];
   questions: string[];
   warnings: string[];
@@ -958,8 +997,7 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
     .map((line, index) => ({ line: normalizeWhitespace(line), index: index + 1 }))
     .filter((item) => item.line.length > 0);
   const requirements = dedupeRequirements(
-    significantLines
-      .filter((item) => isRequirementLine(item.line))
+    extractRfpRequirementCandidates(significantLines)
       .map((item, index) => buildRfpRequirement(item.line, item.index, index + 1, normalizedProfile)),
   );
   if (!requirements.length && normalizedText.trim()) {
@@ -969,13 +1007,31 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
   const timelines = extractMatchingLines(significantLines, /\b(deadline|due|schedule|timeline|milestone|weeks?|months?|days?|implementation|start date|go-live|submission)\b/i, 8);
   const budgetHints = extractMatchingLines(significantLines, /\b(budget|price|pricing|cost|fee|fees|commercial|payment|invoice|rate|rates|discount|value for money|\$|usd|eur|gbp|kes)\b/i, 8);
   const evaluationCriteria = extractMatchingLines(significantLines, /\b(evaluation|scor|weight|criteria|points|award|selection|rated|technical merit|best value)\b/i, 8);
-  const mandatoryAttachments = extractMatchingLines(significantLines, /\b(attachment|appendix|form|certificate|insurance|tax|license|licence|registration|declaration|signature|signed|mandatory document)\b/i, 10);
+  const scoringWeights = extractRfpScoringWeights(significantLines);
+  const annexReferences = extractRfpAnnexReferences(significantLines);
+  const bilingualRequirements = extractMatchingLines(significantLines, /\b(bilingual|english\s*\/\s*french|en\s*\/\s*fr|french|français|francais|translation|translated)\b/i, 10);
+  const placeholderRisks = extractMatchingLines(significantLines, /\b(tbd|to be confirmed|to be assigned|placeholder|insert|fill in|not yet available|pending)\b/i, 10);
+  const mandatoryAttachments = dedupeStrings([
+    ...extractMatchingLines(significantLines, /\b(attachment|appendix|annex|annexure|form|certificate|insurance|tax|license|licence|registration|declaration|signature|signed|mandatory document|audited accounts|bank statements?)\b/i, 20),
+    ...annexReferences.map((item) => item.requirement),
+  ]).slice(0, 20);
   const capabilities = inferRfpCapabilities(requirements, normalizedText, normalizedProfile);
   const statedIntent = inferStatedRfpIntent(significantLines, requirements);
   const impliedIntent = inferImpliedRfpIntent(requirements, timelines, budgetHints, evaluationCriteria, mandatoryAttachments, normalizedProfile);
   const complianceRows = requirements.map(buildRfpComplianceRow);
-  const verificationSummary = buildRfpVerificationSummary(requirements, complianceRows, mandatoryAttachments, evaluationCriteria);
-  const risks = inferRfpRisks(requirements, timelines, budgetHints, mandatoryAttachments);
+  const complianceChecklist = extractRfpComplianceChecklist({
+    complianceRows,
+    mandatoryAttachments,
+    scoringWeights,
+    annexReferences,
+    bilingualRequirements,
+    placeholderRisks,
+  });
+  const criticalDisqualifiers = complianceChecklist
+    .filter((item) => item.risk === "critical")
+    .map((item) => `${item.id}: ${item.requirement}`);
+  const verificationSummary = buildRfpVerificationSummary(requirements, complianceRows, mandatoryAttachments, evaluationCriteria, scoringWeights, annexReferences, bilingualRequirements, placeholderRisks);
+  const risks = inferRfpRisks(requirements, timelines, budgetHints, mandatoryAttachments, criticalDisqualifiers, placeholderRisks);
   const questions = inferRfpQuestions(requirements, timelines, budgetHints, evaluationCriteria, mandatoryAttachments, normalizedProfile);
   const warnings = inferRfpWarnings(input, normalizedText, requirements);
   const completenessScore = Math.max(0, Math.min(100, Math.round(
@@ -985,7 +1041,9 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
       Math.min(timelines.length, 4) * 3 +
       Math.min(budgetHints.length, 4) * 3 +
       Math.min(evaluationCriteria.length, 4) * 3 +
-      Math.min(mandatoryAttachments.length, 5) * 2 -
+      Math.min(scoringWeights.length, 5) * 2 +
+      Math.min(mandatoryAttachments.length, 5) * 2 +
+      Math.min(annexReferences.length, 5) * 2 +
       warnings.length * 5,
   )));
 
@@ -999,6 +1057,7 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
     },
     requirements,
     complianceRows,
+    complianceChecklist,
     verificationSummary,
     capabilities,
     statedIntent,
@@ -1007,6 +1066,11 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
     budgetHints,
     evaluationCriteria,
     mandatoryAttachments,
+    criticalDisqualifiers,
+    scoringWeights,
+    annexReferences,
+    bilingualRequirements,
+    placeholderRisks,
     risks,
     questions,
     warnings,
@@ -1019,10 +1083,39 @@ export function rfpComplianceMatrixMarkdown(analysis: RfpAnalysis) {
   return [
     "## Compliance Matrix",
     "",
-    "| ID | Requirement | Category | Compliance status | Response section | Suggested response | Evidence / proof | Verification |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- |",
-    ...rows.map((row) => `| ${escapeMarkdownTableCell(row.id)} | ${escapeMarkdownTableCell(row.text)} | ${escapeMarkdownTableCell(row.category)} | ${escapeMarkdownTableCell(row.complianceStatus)} | ${escapeMarkdownTableCell(row.responseSection)} | ${escapeMarkdownTableCell(row.suggestedResponse)} | ${escapeMarkdownTableCell(row.evidenceNeeded)} | ${escapeMarkdownTableCell(row.verification)} |`),
-    rows.length ? "" : "| RFP-REQ-001 | Paste or import the RFP text to populate requirements. | Intake | Needs evidence review | Requirements Analysis | Analyze the full source RFP before drafting a response. | Source RFP text | Not verified. |",
+    "| ID | Type | Risk | Requirement | Category | Compliance status | Response section | Suggested response | Evidence / proof | Verification |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${escapeMarkdownTableCell(row.id)} | ${escapeMarkdownTableCell(row.requirementType)} | ${row.disqualificationRisk ? "Disqualification risk" : "Standard review"} | ${escapeMarkdownTableCell(row.text)} | ${escapeMarkdownTableCell(row.category)} | ${escapeMarkdownTableCell(row.complianceStatus)} | ${escapeMarkdownTableCell(row.responseSection)} | ${escapeMarkdownTableCell(row.suggestedResponse)} | ${escapeMarkdownTableCell(row.evidenceNeeded)} | ${escapeMarkdownTableCell(row.verification)} |`),
+    rows.length ? "" : "| RFP-REQ-001 | REQUIREMENT | Standard review | Paste or import the RFP text to populate requirements. | Intake | Needs evidence review | Requirements Analysis | Analyze the full source RFP before drafting a response. | Source RFP text | Not verified. |",
+  ].join("\n");
+}
+
+export function rfpComplianceChecklistMarkdown(analysis: RfpAnalysis) {
+  const rows = analysis.complianceChecklist.length ? analysis.complianceChecklist : [
+    {
+      id: "RFP-CHECK-001",
+      section: "Intake",
+      requirement: "Paste or import the full RFP source to populate the compliance checklist.",
+      verification: "Re-run RFP analysis after source import and confirm all sections, annexes, and tables were captured.",
+      reference: "RFP source",
+      risk: "high" as RfpComplianceChecklistRisk,
+      owner: "Bid Owner",
+      sourceLine: 0,
+    },
+  ];
+  return [
+    "## Compliance Checklist",
+    "",
+    "### Critical Disqualification Traps",
+    "",
+    ...criticalChecklistRows(rows).map((row) => `- [ ] **${row.id}:** ${row.requirement} (${row.reference}) - ${row.verification}`),
+    criticalChecklistRows(rows).length ? "" : "- [ ] No explicit automatic-exclusion wording detected; reviewer must still inspect the source RFP.",
+    "",
+    "### Full Checklist",
+    "",
+    "| ID | Section | Risk | Requirement | Verification method | Owner | Reference |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${escapeMarkdownTableCell(row.id)} | ${escapeMarkdownTableCell(row.section)} | ${escapeMarkdownTableCell(row.risk)} | ${escapeMarkdownTableCell(row.requirement)} | ${escapeMarkdownTableCell(row.verification)} | ${escapeMarkdownTableCell(row.owner)} | ${escapeMarkdownTableCell(row.reference)} |`),
   ].join("\n");
 }
 
@@ -1041,6 +1134,9 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
   const questionBullets = markdownBullets(analysis.questions, "No open questions detected.");
   const verificationBullets = analysis.verificationSummary.checklist.map((item) => `- [ ] ${item}`).join("\n");
   const responseDrafts = rfpRequirementResponseDraftsMarkdown(analysis.complianceRows);
+  const scoringBullets = analysis.scoringWeights.length
+    ? analysis.scoringWeights.map((item) => `- ${item.criterion}: ${item.weight}${item.unit} (source line ${item.sourceLine})`).join("\n")
+    : "- Add scoring weights after reviewing the evaluation section.";
   const notes = responseNotes.trim();
   return fillBusinessTemplate(
     [
@@ -1091,6 +1187,8 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "",
       impliedIntentBullets,
       "",
+      rfpComplianceChecklistMarkdown(analysis),
+      "",
       rfpComplianceMatrixMarkdown(analysis),
       "",
       responseDrafts,
@@ -1128,6 +1226,10 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "## Evaluation Criteria Response",
       "",
       criteriaBullets,
+      "",
+      "### Scoring Weights",
+      "",
+      scoringBullets,
       "",
       "## Mandatory Attachments",
       "",
@@ -1193,6 +1295,102 @@ function rfpRequirementResponseDraftsMarkdown(rows: RfpComplianceRow[]) {
   ].join("\n");
 }
 
+function criticalChecklistRows(rows: RfpComplianceChecklistItem[]) {
+  return rows.filter((row) => row.risk === "critical");
+}
+
+function extractRfpComplianceChecklist(input: {
+  complianceRows: RfpComplianceRow[];
+  mandatoryAttachments: string[];
+  scoringWeights: RfpScoringWeight[];
+  annexReferences: RfpAnnexReference[];
+  bilingualRequirements: string[];
+  placeholderRisks: string[];
+}): RfpComplianceChecklistItem[] {
+  const rows: RfpComplianceChecklistItem[] = [];
+  const seen = new Set<string>();
+  const push = (item: Omit<RfpComplianceChecklistItem, "id">) => {
+    const key = `${item.section}|${item.requirement}|${item.reference}`.toLowerCase().replace(/[^a-z0-9|]+/g, " ").trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    rows.push({ ...item, id: `RFP-CHECK-${String(rows.length + 1).padStart(3, "0")}` });
+  };
+
+  for (const row of input.complianceRows) {
+    push({
+      section: row.disqualificationRisk ? "Critical disqualification traps" : row.responseSection,
+      requirement: row.text,
+      verification: row.verification,
+      reference: `Source line ${row.sourceLine}`,
+      risk: row.disqualificationRisk ? "critical" : row.complianceStatus === "Needs evidence review" || row.requirementType !== "REQUIREMENT" ? "high" : "standard",
+      owner: row.owner,
+      sourceLine: row.sourceLine,
+    });
+  }
+
+  for (const attachment of input.mandatoryAttachments) {
+    push({
+      section: "Document checklist - attachments required",
+      requirement: `Include and verify mandatory attachment: ${attachment}`,
+      verification: "Confirm the named attachment is complete, signed where required, current, and included in the final submission package.",
+      reference: "Attachment / annex scan",
+      risk: /will be rejected|automatic|disqualif|failure to|must|shall|required|mandatory/i.test(attachment) ? "critical" : "high",
+      owner: "Bid Coordinator",
+      sourceLine: 0,
+    });
+  }
+
+  for (const annex of input.annexReferences) {
+    push({
+      section: "Annex references",
+      requirement: annex.requirement,
+      verification: `Locate ${annex.annex} in the source package, confirm required format/signature, and attach it to the response bundle.`,
+      reference: `Source line ${annex.sourceLine}`,
+      risk: "high",
+      owner: "Bid Coordinator",
+      sourceLine: annex.sourceLine,
+    });
+  }
+
+  for (const item of input.scoringWeights) {
+    push({
+      section: "Scored criteria and win themes",
+      requirement: `Address scored criterion "${item.criterion}" worth ${item.weight}${item.unit}.`,
+      verification: "Mirror this criterion in the executive response, section heading, proof point, and reviewer scoring check.",
+      reference: `Source line ${item.sourceLine}`,
+      risk: "high",
+      owner: "Bid Manager",
+      sourceLine: item.sourceLine,
+    });
+  }
+
+  for (const requirement of input.bilingualRequirements) {
+    push({
+      section: "Bilingual / language obligations",
+      requirement,
+      verification: "Confirm French, English/French, translation, workshop, or training-material capability is explicitly covered and owned.",
+      reference: "Language requirement scan",
+      risk: "high",
+      owner: "Delivery Lead",
+      sourceLine: 0,
+    });
+  }
+
+  for (const placeholder of input.placeholderRisks) {
+    push({
+      section: "Placeholder and response-readiness traps",
+      requirement: `Resolve non-final placeholder language before submission: ${placeholder}`,
+      verification: "Search the response for TBD, placeholder, to be assigned, to be confirmed, and similar markers; replace or explicitly escalate before final packaging.",
+      reference: "Placeholder scan",
+      risk: "high",
+      owner: "Bid Owner",
+      sourceLine: 0,
+    });
+  }
+
+  return rows;
+}
+
 function sectionPromptForHeading(heading: string) {
   return `<!-- Draft ${heading.toLowerCase()} with concrete evidence, unresolved placeholders, and review notes. -->`;
 }
@@ -1221,16 +1419,61 @@ function normalizeWhitespace(value: string) {
 function isRequirementLine(line: string) {
   if (line.length < 18) return false;
   if (/^(table of contents|contents|page \d+|copyright)\b/i.test(line)) return false;
-  return /(\b(shall|must|required|mandatory|provide|submit|include|describe|demonstrate|support|deliver|implement|maintain|comply|bidder|proposer|vendor|contractor|respondent)\b|^\s*(\d+(\.\d+){0,4}|[A-Z]\.|\([a-z0-9]+\)|[-*])\s+)/i.test(line);
+  return /(\b(shall|must|required|mandatory|provide|submit|include|describe|demonstrate|support|deliver|implement|maintain|comply|bidder|proposer|vendor|contractor|respondent|evaluation|scoring|criteria|deadline|due date|page limit|font size|certificate|declaration)\b|^\s*(\d+(\.\d+){0,4}|[A-Z]\.|\([a-z0-9]+\)|[-*])\s+)/i.test(line);
+}
+
+function extractRfpRequirementCandidates(lines: Array<{ line: string; index: number }>) {
+  const candidates: Array<{ line: string; index: number }> = [];
+  for (const item of lines) {
+    const normalized = normalizeRfpTableLikeLine(item.line);
+    if (isRfpTableHeaderLine(normalized)) continue;
+    if (isRequirementLine(normalized) || isRfpTableRequirementLine(normalized) || isExplicitRfpConstraintLine(normalized)) {
+      candidates.push({ line: normalized, index: item.index });
+    }
+  }
+  return candidates;
+}
+
+function normalizeRfpTableLikeLine(line: string) {
+  const cells = line
+    .split(/\s*(?:\||\t)\s*/g)
+    .map((cell) => normalizeWhitespace(cell))
+    .filter(Boolean);
+  if (cells.length < 2) return line;
+  return cells.join(" | ");
+}
+
+function isRfpTableRequirementLine(line: string) {
+  if (!line.includes("|")) return false;
+  if (isRfpTableHeaderLine(line)) return false;
+  const lower = line.toLowerCase();
+  const hasComplianceSignal = /\b(mandatory|required|yes|pass\/fail|compliant|non-compliant|disqualif|reject|scored|points?|weight|deadline|attachment|certificate|form|submission)\b/.test(lower);
+  const hasRequirementSubject = /\b(requirement|description|response|vendor|bidder|proposer|contractor|document|evidence|deliverable|criteria|proof|section)\b/.test(lower);
+  return hasComplianceSignal && hasRequirementSubject;
+}
+
+function isRfpTableHeaderLine(line: string) {
+  return /^\s*(requirement|description|item|criterion|criteria)\s*\|/i.test(line) && /\|\s*(mandatory|required|evidence|response|owner|status|weight|points?)\b/i.test(line);
+}
+
+function isExplicitRfpConstraintLine(line: string) {
+  return /\b(submission deadline|deadline for submission|due no later than|will be rejected|automatic exclusion|non-responsive|maximum \d+ pages?|limit of \d+ pages?|font size|times new roman|arial|calibri|scoring|weighted|points?)\b/i.test(line);
 }
 
 function buildRfpRequirement(line: string, sourceLine: number, index: number, profile: Record<keyof BusinessProfile, string>): RfpRequirement {
   const category = categorizeRequirement(line);
+  const requirementType = classifyRfpRequirementType(line, category);
+  const disqualificationRisk = hasRfpDisqualificationRisk(line);
+  const confidence = requirementConfidence(line, requirementType, disqualificationRisk);
   return {
     id: `RFP-REQ-${String(index).padStart(3, "0")}`,
+    requirementType,
     category,
     text: stripRequirementPrefix(line),
     sourceLine,
+    sourceExcerpt: line,
+    disqualificationRisk,
+    confidence,
     responseStrategy: responseStrategyForCategory(category, profile),
     evidenceNeeded: evidenceForCategory(category),
     owner: ownerForCategory(category),
@@ -1257,11 +1500,12 @@ function fallbackRequirements(lines: Array<{ line: string; index: number }>, pro
 }
 
 function stripRequirementPrefix(line: string) {
-  return normalizeWhitespace(line.replace(/^(\s*(\d+(\.\d+){0,4}|[A-Z]\.|\([a-z0-9]+\)|[-*])\s*)/i, ""));
+  return normalizeWhitespace(line.replace(/^(\s*(\d+(?:\.\d+){0,4}\.?|[A-Z]\.|\([a-z0-9]+\)|[-*])\s*)/i, ""));
 }
 
 function categorizeRequirement(line: string) {
   const value = line.toLowerCase();
+  if (/\b(maximum \d+ pages?|limit of \d+ pages?|font size|times new roman|arial|calibri|margin|page limit|format|file type|pdf|docx)\b/.test(value)) return "Format";
   if (/\b(price|pricing|cost|fee|commercial|budget|payment|invoice|rate)\b/.test(value)) return "Pricing";
   if (/\b(deadline|timeline|schedule|milestone|implementation|delivery|go-live|days|weeks|months)\b/.test(value)) return "Timeline";
   if (/\b(security|privacy|data|confidential|encryption|accessibility|compliance|regulatory|audit)\b/.test(value)) return "Compliance";
@@ -1272,11 +1516,33 @@ function categorizeRequirement(line: string) {
   return "Requirement";
 }
 
+function classifyRfpRequirementType(line: string, category: string): RfpRequirementType {
+  const value = line.toLowerCase();
+  if (/\b(evaluation|scor|weight|criteria|points?|award|selection|rated|technical merit|best value)\b/.test(value)) return "SCORED";
+  if (/\b(deadline|due no later than|submission date|submission time|closing date|close date)\b/.test(value)) return "DEADLINE";
+  if (/\b(maximum \d+ pages?|limit of \d+ pages?|font size|times new roman|arial|calibri|margin|page limit|format|file type|pdf|docx)\b/.test(value)) return "FORMAT";
+  if (/\b(shall|must|required|mandatory|submit|required form|certificate|declaration|signed|signature|minimum)\b/.test(value) || category === "Mandatory Attachment") return "MANDATORY";
+  if (/\b(expect|prefer|should|may score|value for money|intent|objective|outcome)\b/.test(value)) return "IMPLIED";
+  return "REQUIREMENT";
+}
+
+function hasRfpDisqualificationRisk(line: string) {
+  return /\b(will be rejected|automatic(?:ally)? excluded|automatic exclusion|disqualif(?:y|ication|ied)|non-responsive|shall be excluded|failure to (?:submit|provide|include|meet)|must be submitted|late submissions? (?:will|shall) not be accepted)\b/i.test(line);
+}
+
+function requirementConfidence(line: string, type: RfpRequirementType, disqualificationRisk: boolean): "high" | "medium" | "low" {
+  if (disqualificationRisk) return "high";
+  if (type === "MANDATORY" || type === "DEADLINE" || type === "FORMAT") return "high";
+  if (type === "SCORED" || /\b(shall|must|required|submit|include|provide|demonstrate)\b/i.test(line)) return "medium";
+  return "low";
+}
+
 function responseSectionForCategory(category: string) {
   const map: Record<string, string> = {
     Pricing: "Pricing and Budget Response",
     Timeline: "Implementation Plan and Timeline",
     Compliance: "Compliance Matrix",
+    Format: "Submission Format",
     "Team and Experience": "Capability Match",
     "Mandatory Attachment": "Mandatory Attachments",
     "Delivery Governance": "Risk and Assumptions",
@@ -1292,6 +1558,7 @@ function responseStrategyForCategory(category: string, profile: Record<keyof Bus
     Pricing: `State ${company}'s pricing basis, assumptions, exclusions, validity, and required commercial forms.`,
     Timeline: "Mirror every buyer deadline, milestone, dependency, and approval date in the implementation plan.",
     Compliance: "Map the requirement to a compliance response with proof, exception handling, and reviewer sign-off.",
+    Format: "Mirror the buyer's page limit, font, file type, naming, and packaging rules before final export.",
     "Team and Experience": "Attach named roles, relevant experience, certifications, references, and case evidence.",
     "Mandatory Attachment": "Add the required attachment to the submission checklist and assign an owner.",
     "Delivery Governance": "Describe governance cadence, quality controls, risk management, reporting, and escalation.",
@@ -1307,6 +1574,10 @@ function buildRfpComplianceRow(requirement: RfpRequirement): RfpComplianceRow {
   const suggestedResponse = suggestedRfpRequirementResponse(requirement, responseSection, needsEvidenceReview);
   const verificationChecklist = [
     `${requirement.id} maps source line ${requirement.sourceLine} to ${responseSection}.`,
+    `Requirement type: ${requirement.requirementType}; confidence: ${requirement.confidence}.`,
+    requirement.disqualificationRisk
+      ? "Disqualification risk flagged: missing or late response may make the bid non-responsive."
+      : "No automatic disqualification wording detected; reviewer should still confirm the RFP source.",
     `Suggested answer reviewed: ${suggestedResponse}`,
     `Evidence required: ${requirement.evidenceNeeded}`,
     `Owner assigned: ${requirement.owner}.`,
@@ -1319,7 +1590,7 @@ function buildRfpComplianceRow(requirement: RfpRequirement): RfpComplianceRow {
     complianceStatus: needsEvidenceReview ? "Needs evidence review" : "Responsive draft prepared",
     responseSection,
     suggestedResponse,
-    verification: `${requirement.id} mapped from source line ${requirement.sourceLine} to ${responseSection} and Compliance Matrix; evidence owner ${requirement.owner} must confirm proof before submission.`,
+    verification: `${requirement.id} mapped from source line ${requirement.sourceLine} to ${responseSection} and Compliance Matrix; type ${requirement.requirementType}; ${requirement.disqualificationRisk ? "disqualification risk flagged; " : ""}evidence owner ${requirement.owner} must confirm proof before submission.`,
     verificationChecklist,
   };
 }
@@ -1333,6 +1604,7 @@ function suggestedRfpRequirementResponse(requirement: RfpRequirement, responseSe
     Pricing: "We will provide a transparent commercial response with pricing basis, assumptions, exclusions, validity, and required commercial forms aligned to the buyer's format.",
     Timeline: "We will meet the required schedule through a phased implementation plan with named milestones, dependencies, approval points, and delivery ownership.",
     Compliance: "We will comply with the requirement by mapping controls, exceptions, proof artifacts, and reviewer sign-off in the compliance response.",
+    Format: "We will package the response in the buyer's required format with page, font, file type, naming, and submission checks completed before upload.",
     "Team and Experience": "We will demonstrate delivery capacity through named roles, relevant experience, certifications, references, and comparable project proof.",
     "Mandatory Attachment": "We will include the required attachment in the submission checklist and assign ownership for completion before final packaging.",
     "Delivery Governance": "We will manage delivery through governance cadence, quality controls, risk management, reporting, escalation, and service-level commitments.",
@@ -1358,10 +1630,16 @@ function buildRfpVerificationSummary(
   complianceRows: RfpComplianceRow[],
   attachments: string[],
   criteria: string[],
+  scoringWeights: RfpScoringWeight[],
+  annexReferences: RfpAnnexReference[],
+  bilingualRequirements: string[],
+  placeholderRisks: string[],
 ): RfpVerificationSummary {
   const rowIds = new Set(complianceRows.map((row) => row.id));
   const allRequirementsMapped = requirements.length > 0 && requirements.every((requirement) => rowIds.has(requirement.id));
   const rowsNeedingEvidence = complianceRows.filter((row) => row.complianceStatus === "Needs evidence review").length;
+  const disqualificationRisks = complianceRows.filter((row) => row.disqualificationRisk).length;
+  const scoredRows = Math.max(complianceRows.filter((row) => row.requirementType === "SCORED").length, scoringWeights.length);
   const checklist = [
     `${requirements.length} extracted requirement(s) mapped to ${complianceRows.length} compliance row(s).`,
     allRequirementsMapped
@@ -1370,9 +1648,24 @@ function buildRfpVerificationSummary(
     rowsNeedingEvidence
       ? `${rowsNeedingEvidence} row(s) still need attached evidence or reviewer sign-off before submission.`
       : "No evidence-review blockers were detected in the extracted requirements.",
+    disqualificationRisks
+      ? `${disqualificationRisks} row(s) contain explicit rejection, exclusion, or non-responsive bid risk language.`
+      : "No explicit rejection or automatic exclusion language was detected in extracted rows.",
+    scoredRows
+      ? `${scoredRows} scored or weighted row(s) should be mirrored in win themes and evaluator-facing headings.`
+      : "No scored rows were detected; confirm evaluation weighting manually.",
     attachments.length
       ? `${attachments.length} mandatory attachment hint(s) need checklist confirmation.`
       : "No mandatory attachment hints were detected; confirm appendices manually.",
+    annexReferences.length
+      ? `${annexReferences.length} annex reference(s) were extracted and must be matched to signed or completed response documents.`
+      : "No annex references were detected; confirm annex schedules manually.",
+    bilingualRequirements.length
+      ? `${bilingualRequirements.length} bilingual or French-language obligation(s) need delivery and training-material coverage.`
+      : "No bilingual language requirement was detected; confirm language obligations manually.",
+    placeholderRisks.length
+      ? `${placeholderRisks.length} placeholder or unfinished-response trap(s) were detected and must be resolved before submission.`
+      : "No placeholder trap wording was detected in the source scan.",
     criteria.length
       ? `${criteria.length} evaluation criteria hint(s) should be mirrored in the executive response and section scoring.`
       : "No evaluation criteria hints were detected; confirm scoring weights manually.",
@@ -1391,6 +1684,7 @@ function evidenceForCategory(category: string) {
     Pricing: "Pricing schedule, assumptions, approvals, and commercial terms.",
     Timeline: "Delivery plan, milestone schedule, dependency log, and named delivery owner.",
     Compliance: "Policy, certificate, audit result, control description, or signed declaration.",
+    Format: "Formatted proposal export, page-count proof, font/style settings, file naming proof, and final packaging checklist.",
     "Team and Experience": "CV, biography, certification, reference, case study, or project proof.",
     "Mandatory Attachment": "Required form, certificate, signed statement, registration, or insurance proof.",
     "Delivery Governance": "Governance plan, quality plan, risk register, reporting sample, or SLA.",
@@ -1405,6 +1699,7 @@ function ownerForCategory(category: string) {
     Pricing: "Finance / Commercial",
     Timeline: "Delivery Lead",
     Compliance: "Legal / Compliance",
+    Format: "Bid Coordinator",
     "Team and Experience": "Bid Manager",
     "Mandatory Attachment": "Bid Coordinator",
     "Delivery Governance": "Delivery Lead",
@@ -1420,6 +1715,58 @@ function extractMatchingLines(lines: Array<{ line: string; index: number }>, pat
     .map((item) => stripRequirementPrefix(item.line))
     .filter((line, index, array) => array.findIndex((candidate) => candidate.toLowerCase() === line.toLowerCase()) === index)
     .slice(0, limit);
+}
+
+function dedupeStrings(values: string[]) {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const value of values.map(normalizeWhitespace).filter(Boolean)) {
+    const key = value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(value);
+  }
+  return deduped;
+}
+
+function extractRfpScoringWeights(lines: Array<{ line: string; index: number }>): RfpScoringWeight[] {
+  const output: RfpScoringWeight[] = [];
+  const seen = new Set<string>();
+  const pattern = /([A-Za-z][A-Za-z0-9 /&()'.,:-]{2,90}?)\s+(\d{1,3})\s*(%|percent|points?|pts?)\b/gi;
+  for (const item of lines) {
+    for (const match of item.line.matchAll(pattern)) {
+      const rawCriterion = normalizeWhitespace(match[1] || "")
+        .replace(/^(evaluation criteria|criteria|scoring|maximum points?|points?|weight(?:ed)?|award)\s*[:;-]?\s*/i, "")
+        .replace(/[,;:|-]+$/g, "")
+        .trim();
+      const criterion = rawCriterion || "Scored criterion";
+      const weight = Number(match[2]);
+      const unit = /^%|percent$/i.test(match[3]) ? "%" : "points";
+      const key = `${criterion.toLowerCase()}|${weight}|${unit}`;
+      if (!criterion || !Number.isFinite(weight) || weight <= 0 || seen.has(key)) continue;
+      seen.add(key);
+      output.push({ criterion, weight, unit, sourceLine: item.index });
+    }
+  }
+  return output.slice(0, 30);
+}
+
+function extractRfpAnnexReferences(lines: Array<{ line: string; index: number }>): RfpAnnexReference[] {
+  const output: RfpAnnexReference[] = [];
+  const seen = new Set<string>();
+  const pattern = /\b(Annex(?:ure)?\s+([A-Z0-9]+))(?:\s*[-:]\s*([^.;\n]+))?/gi;
+  for (const item of lines) {
+    for (const match of item.line.matchAll(pattern)) {
+      const annex = normalizeWhitespace(match[1] || "");
+      const label = normalizeWhitespace(match[3] || "");
+      const requirement = label ? `${annex}: ${label}` : `${annex} must be reviewed, completed, and included if required.`;
+      const key = `${annex}|${label}`.toLowerCase();
+      if (!annex || seen.has(key)) continue;
+      seen.add(key);
+      output.push({ annex, label, sourceLine: item.index, requirement });
+    }
+  }
+  return output.slice(0, 30);
 }
 
 function inferRfpCapabilities(requirements: RfpRequirement[], text: string, profile: Record<keyof BusinessProfile, string>) {
@@ -1474,12 +1821,21 @@ function inferImpliedRfpIntent(
   return [...intent];
 }
 
-function inferRfpRisks(requirements: RfpRequirement[], timelines: string[], budgetHints: string[], attachments: string[]) {
+function inferRfpRisks(
+  requirements: RfpRequirement[],
+  timelines: string[],
+  budgetHints: string[],
+  attachments: string[],
+  criticalDisqualifiers: string[] = [],
+  placeholderRisks: string[] = [],
+) {
   const risks = new Set<string>();
   if (requirements.length > 30) risks.add("Large requirement set; assign matrix owners and verify every row before submission.");
   if (!timelines.length) risks.add("No explicit timeline detected; confirm submission deadline and delivery milestones.");
   if (!budgetHints.length) risks.add("No budget or pricing hint detected; confirm pricing format, assumptions, taxes, and validity period.");
   if (attachments.length) risks.add("Mandatory attachments detected; missing forms or signatures can make the bid nonresponsive.");
+  if (criticalDisqualifiers.length) risks.add("Critical disqualification traps detected; verify each pass/fail item before any response drafting is treated as complete.");
+  if (placeholderRisks.length) risks.add("Placeholder or unfinished-response wording detected; unresolved placeholders can make a submission non-compliant.");
   if (requirements.some((requirement) => requirement.category === "Compliance")) risks.add("Compliance requirements need legal or control-owner sign-off before final submission.");
   if (!risks.size) risks.add("Keep all generated responses under human review until source evidence and approvals are verified.");
   return [...risks];

@@ -1117,8 +1117,26 @@
                 <span><strong>{{ rfpAnalysis.capabilities.length }}</strong> capabilities</span>
                 <span><strong>{{ rfpAnalysis.timelines.length }}</strong> timeline hints</span>
                 <span><strong>{{ rfpAnalysis.budgetHints.length }}</strong> budget hints</span>
+                <span><strong>{{ rfpAnalysis.complianceChecklist.length }}</strong> checklist items</span>
+                <span><strong>{{ rfpAnalysis.criticalDisqualifiers.length }}</strong> critical traps</span>
                 <span><strong>{{ rfpAnalysis.verificationSummary.rowsNeedingEvidence }}</strong> evidence checks</span>
               </div>
+              <details open>
+                <summary>Compliance checklist extractor</summary>
+                <ul>
+                  <li v-for="item in rfpAnalysis.complianceChecklist.slice(0, 16)" :key="item.id">
+                    <strong>{{ item.id }}</strong> {{ item.requirement }}
+                    <small>{{ item.section }} | {{ item.risk }} | {{ item.owner }} | {{ item.reference }}</small>
+                    <p>{{ item.verification }}</p>
+                  </li>
+                </ul>
+              </details>
+              <details v-if="rfpAnalysis.criticalDisqualifiers.length" open>
+                <summary>Critical disqualification traps</summary>
+                <ul>
+                  <li v-for="item in rfpAnalysis.criticalDisqualifiers" :key="item">{{ item }}</li>
+                </ul>
+              </details>
               <details open>
                 <summary>Stated buyer intent</summary>
                 <ul>
@@ -6263,6 +6281,8 @@ const previewTextCommit = createDebouncedTextCommit((text) => store.updateText(t
 let autosaveHandle = 0;
 let autoSnapshotHandle = 0;
 let scrollPersistHandle = 0;
+let scrollSyncReleaseHandle = 0;
+let lastControlledPreviewScrollTop = 0;
 let lastAutoSnapshotSignature = "";
 let syncingScroll = false;
 let restoringScroll = false;
@@ -14663,13 +14683,26 @@ async function collectNativeSplitSourcePaneEvidence(record: (name: string, passe
 
     const previewPane = document.querySelector(".preview-pane") as HTMLElement | null;
     if (editorView?.scrollDOM && secondaryEditorView?.scrollDOM && previewPane) {
+      const waitForStablePreviewScroll = async () => {
+        for (let elapsed = 0; elapsed < 560; elapsed += 80) {
+          await nativeWorkflowDelay(80);
+        }
+        let previous = previewPane.scrollTop;
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          await nativeWorkflowDelay(80);
+          const current = previewPane.scrollTop;
+          if (Math.abs(current - previous) < 2) return current;
+          previous = current;
+        }
+        return previewPane.scrollTop;
+      };
       editorView.scrollDOM.scrollTop = editorView.scrollDOM.scrollHeight * 0.82;
       editorView.scrollDOM.dispatchEvent(new Event("scroll", { bubbles: true }));
       await waitForNativeWorkflowCondition(() => previewPane.scrollTop > 20, 1200);
-      const previewAfterPrimaryScroll = previewPane.scrollTop;
+      const previewAfterPrimaryScroll = await waitForStablePreviewScroll();
       secondaryEditorView.scrollDOM.scrollTop = secondaryEditorView.scrollDOM.scrollHeight * 0.18;
       secondaryEditorView.scrollDOM.dispatchEvent(new Event("scroll", { bubbles: true }));
-      await nativeWorkflowDelay(240);
+      await nativeWorkflowDelay(320);
       evidence.scroll = {
         primaryScrollTop: editorView.scrollDOM.scrollTop,
         secondaryScrollTop: secondaryEditorView.scrollDOM.scrollTop,
@@ -15455,7 +15488,11 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
         return handleVimNormalKey(event, view, vimKeybindingController);
       },
       scroll: () => {
-        if (syncPreviewScroll) syncPreviewScrollFromEditor();
+        if (syncPreviewScroll) {
+          syncPreviewScrollFromEditor();
+        } else {
+          preservePreviewScrollFromSecondaryEditor();
+        }
       },
     }),
     ...(store.wordWrap ? [EditorView.lineWrapping] : []),
@@ -16051,21 +16088,43 @@ function syncPreviewScrollFromEditor() {
   if (!editorView || !previewPane.value || syncingScroll) return;
   syncingScroll = true;
   syncScrollPosition(editorView.scrollDOM, previewPane.value);
+  lastControlledPreviewScrollTop = previewPane.value.scrollTop;
   recordActiveScrollPosition();
   scheduleScrollPositionPersist();
-  window.requestAnimationFrame(() => {
-    syncingScroll = false;
-  });
+  releaseScrollSyncLockAfterSettling();
 }
 
 function syncEditorScrollFromPreview() {
   if (!editorView || !previewPane.value || syncingScroll) return;
   syncingScroll = true;
+  lastControlledPreviewScrollTop = previewPane.value.scrollTop;
   syncScrollPosition(previewPane.value, editorView.scrollDOM);
   recordActiveScrollPosition();
   scheduleScrollPositionPersist();
+  releaseScrollSyncLockAfterSettling();
+}
+
+function preservePreviewScrollFromSecondaryEditor() {
+  const pane = previewPane.value;
+  if (!pane || syncingScroll) return;
+  const targetScrollTop = lastControlledPreviewScrollTop || pane.scrollTop;
   window.requestAnimationFrame(() => {
-    syncingScroll = false;
+    if (!previewPane.value || syncingScroll) return;
+    previewPane.value.scrollTop = targetScrollTop;
+  });
+  window.setTimeout(() => {
+    if (!previewPane.value || syncingScroll) return;
+    previewPane.value.scrollTop = targetScrollTop;
+  }, 120);
+}
+
+function releaseScrollSyncLockAfterSettling() {
+  window.clearTimeout(scrollSyncReleaseHandle);
+  window.requestAnimationFrame(() => {
+    window.clearTimeout(scrollSyncReleaseHandle);
+    scrollSyncReleaseHandle = window.setTimeout(() => {
+      syncingScroll = false;
+    }, 80);
   });
 }
 
