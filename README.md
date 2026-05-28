@@ -128,7 +128,9 @@ use `--dry-run`
 to preview the files and `--json` for help desk automation. `ned new` creates a
 starter Markdown document from business templates such as proposal, RFP, RFP
 response, RFQ, tender, tutorial, lesson plan, lesson content, technical textbook,
-novel, podcast script, movie script, business case, and executive brief; add
+novel, podcast script, movie script, business case, executive brief, board
+decision memo, policy brief, research report, grant application, SOP, PRD,
+project charter, QBR, due-diligence memo, and contract review brief; add
 `--json` for script-friendly creation status, selected template, title, output
 path, and open status. `ned convert` and `ned export` run the same local export
 pipeline used by the app for HTML, PDF, DOCX,
@@ -174,9 +176,11 @@ to print it, and `ned outlines --workspace . --delete board-pack --json` to
 remove it. Outline entries also carry an explicit Docs Live workflow such as
 `rfp-response`, `technical-textbook`, `novel`, `podcast-script`, or
 `movie-script` so app and CLI selections open the right AI drafting path.
-The CLI starter library also includes the app's business-development staples:
-statements of work, capability statements, and case studies, so `ned new` and
-the visual Templates panel present the same common starting points.
+The CLI starter library and visual Templates panel now share the app's expanded
+business-development, governance, research, funding, product, operations, and
+legal starter set, including statements of work, capability statements, case
+studies, board memos, policy briefs, research reports, grant applications, SOPs,
+PRDs, project charters, QBRs, due-diligence memos, and contract review briefs.
 Specialist built-in outlines cover lesson content, statements of work,
 capability statements, case studies, executive briefs, RFP technical proposals,
 compliance reviews, grant applications, SOPs, PRDs, project charters, QBRs,
@@ -593,7 +597,9 @@ web app.
   name, email, phone, role, company, address, website, industry, default client,
   and brand voice; common business-development document builders for tutorials,
   proposals, RFPs, RFQs, tenders, statements of work, capability statements,
-  case studies, business cases, and executive briefs; reusable semi-template
+  case studies, business cases, executive briefs, board memos, policy briefs,
+  research reports, grant applications, SOPs, PRDs, project charters, QBRs,
+  due-diligence memos, and contract review briefs; reusable semi-template
   document parts; and handoff options for Claude Code, Codex, OpenCode, and
   Google Antigravity.
   Each document builder shows context-aware AI step assistance for identity,

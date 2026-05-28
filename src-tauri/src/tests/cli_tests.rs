@@ -669,7 +669,7 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     let template_report: serde_json::Value =
         serde_json::from_str(&templates_json.message).expect("templates json");
     assert_eq!(template_report["schema"], "neditor.ned-templates.v1");
-    assert_eq!(template_report["count"], 20);
+    assert_eq!(template_report["count"], 30);
     assert!(template_report["templateDetails"]
         .as_array()
         .expect("template details")
@@ -689,6 +689,16 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "tutorial",
         "podcast-script",
         "movie-script",
+        "board-decision-memo",
+        "policy-brief",
+        "research-report",
+        "grant-application",
+        "standard-operating-procedure",
+        "product-requirements-document",
+        "project-charter",
+        "quarterly-business-review",
+        "due-diligence-memo",
+        "contract-review-brief",
     ] {
         assert!(template_report["templates"]
             .as_array()
@@ -741,6 +751,34 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     ])
     .expect("template ids only");
     assert_eq!(ids_only.message, "podcast-script\nmovie-script");
+
+    let research_ids = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "templates".to_string(),
+        "--category".to_string(),
+        "Research".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("research template ids only");
+    assert_eq!(research_ids.message, "research-report");
+
+    let prd_path = temp_markdown_path("new-prd-template");
+    let prd_template = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "new".to_string(),
+        prd_path.to_string_lossy().to_string(),
+        "--template".to_string(),
+        "product-requirements-document".to_string(),
+        "--title".to_string(),
+        "Mobile App PRD".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("new prd json");
+    assert_eq!(prd_template.exit_code, 0);
+    let prd_markdown = fs::read_to_string(&prd_path).expect("prd markdown");
+    assert!(prd_markdown.contains("documentType: project-plan"));
+    assert!(prd_markdown.contains("## Acceptance Criteria"));
+    assert!(prd_markdown.contains("## AI Drafting Brief"));
 
     let snippets = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

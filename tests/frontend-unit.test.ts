@@ -3390,6 +3390,20 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(businessDocumentTemplates.some((template) => template.id === "novel"));
   ok(businessDocumentTemplates.some((template) => template.id === "podcast-script"));
   ok(businessDocumentTemplates.some((template) => template.id === "movie-script"));
+  for (const id of [
+    "board-decision-memo",
+    "policy-brief",
+    "research-report",
+    "grant-application",
+    "standard-operating-procedure",
+    "product-requirements-document",
+    "project-charter",
+    "quarterly-business-review",
+    "due-diligence-memo",
+    "contract-review-brief",
+  ]) {
+    ok(businessDocumentTemplates.some((template) => template.id === id), `missing ${id} business document template`);
+  }
   ok(agenticCliIntegrations.some((integration) => integration.command === "claude"));
   ok(agenticCliIntegrations.some((integration) => integration.command === "codex"));
   ok(agenticCliIntegrations.some((integration) => integration.command === "opencode"));
@@ -3402,6 +3416,12 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(markdown.includes("## AI Drafting Brief"));
   ok(markdown.includes("Create a proposal that is client-centered"));
   ok(!markdown.includes("{{companyName}}"));
+
+  const prd = businessDocumentTemplates.find((template) => template.id === "product-requirements-document")!;
+  const prdMarkdown = businessTemplateMarkdown(prd, profile);
+  ok(prdMarkdown.includes("## Acceptance Criteria"));
+  ok(prdMarkdown.includes("Create a product requirements document"));
+  ok(prdMarkdown.includes("Prepared by:** Jane Doe"));
 
   const snippet = businessSnippetMarkdown(contact, profile);
   ok(snippet.includes("Jane Doe"));

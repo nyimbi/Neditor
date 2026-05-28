@@ -33,7 +33,17 @@ export type BusinessDocumentKind =
   | "capability-statement"
   | "case-study"
   | "business-case"
-  | "executive-brief";
+  | "executive-brief"
+  | "board-decision-memo"
+  | "policy-brief"
+  | "research-report"
+  | "grant-application"
+  | "standard-operating-procedure"
+  | "product-requirements-document"
+  | "project-charter"
+  | "quarterly-business-review"
+  | "due-diligence-memo"
+  | "contract-review-brief";
 
 export interface BusinessDocumentTemplate {
   id: BusinessDocumentKind;
@@ -444,6 +454,96 @@ export const businessDocumentTemplates: BusinessDocumentTemplate[] = [
     bestFor: ["Leadership updates", "Decision meetings", "Board pre-reads"],
     aiPrompt: "Create a crisp executive brief that surfaces the decision, facts, tradeoffs, and requested action.",
     outline: ["Executive Summary", "Decision Needed", "Context", "Options", "Risks", "Recommendation", "Next Steps"],
+  },
+  {
+    id: "board-decision-memo",
+    label: "Board decision memo",
+    summary: "Creates a board-ready decision paper with options, financial case, risks, recommendation, and approvals.",
+    docsLiveType: "board-memo",
+    bestFor: ["Board packs", "Investment approvals", "Executive decisions"],
+    aiPrompt: "Create a board decision memo that separates the decision ask, evidence, tradeoffs, risks, financial implications, and approval path.",
+    outline: ["Decision Requested", "Executive Summary", "Strategic Context", "Options Considered", "Financial Case", "Risk Assessment", "Implementation Plan", "Recommendation", "Appendices"],
+  },
+  {
+    id: "policy-brief",
+    label: "Policy brief",
+    summary: "Builds an evidence-led policy brief with problem framing, options, impacts, tradeoffs, and recommendation.",
+    docsLiveType: "policy",
+    bestFor: ["Public policy", "Research translation", "Advisory briefs"],
+    aiPrompt: "Create a policy brief that translates evidence into practical options, impacts, risks, and an actionable recommendation.",
+    outline: ["Executive Summary", "Problem Definition", "Policy Context", "Evidence Base", "Options", "Impact Assessment", "Risks and Tradeoffs", "Recommendation", "Implementation Considerations"],
+  },
+  {
+    id: "research-report",
+    label: "Research report",
+    summary: "Creates a structured research report with questions, method, findings, limitations, recommendations, and bibliography.",
+    docsLiveType: "research-brief",
+    bestFor: ["Deep research", "Evidence reports", "Analyst deliverables"],
+    aiPrompt: "Create a research report that keeps research questions, method, evidence, findings, limitations, recommendations, and citation readiness traceable.",
+    outline: ["Abstract", "Introduction", "Research Questions", "Methodology", "Literature and Source Review", "Findings", "Analysis", "Limitations", "Recommendations", "Bibliography"],
+  },
+  {
+    id: "grant-application",
+    label: "Grant application",
+    summary: "Structures a funder-aligned application with need, beneficiaries, theory of change, work plan, budget, and measurement.",
+    docsLiveType: "proposal",
+    bestFor: ["Grant proposals", "Foundation applications", "Nonprofit funding"],
+    aiPrompt: "Create a grant application that maps the funder's priorities to the applicant profile, need, program design, measurement, budget, sustainability, and required attachments.",
+    outline: ["Cover Summary", "Applicant Profile", "Problem and Need", "Target Beneficiaries", "Theory of Change", "Program Design", "Work Plan", "Monitoring and Evaluation", "Budget Narrative", "Sustainability", "Attachments"],
+  },
+  {
+    id: "standard-operating-procedure",
+    label: "Standard operating procedure",
+    summary: "Creates a repeatable SOP with ownership, procedure steps, controls, exceptions, evidence, and revision history.",
+    docsLiveType: "operating-procedure",
+    bestFor: ["SOPs", "Work instructions", "Operational controls"],
+    aiPrompt: "Create an SOP that is easy to execute, audit, train, and update, with clear ownership, controls, records, exceptions, and approvals.",
+    outline: ["Purpose", "Scope", "Owner and Approvers", "Definitions", "Inputs and Systems", "Procedure", "Controls and Checks", "Exceptions", "Records and Evidence", "Revision History"],
+  },
+  {
+    id: "product-requirements-document",
+    label: "Product requirements document",
+    summary: "Creates a PRD with goals, users, requirements, acceptance criteria, dependencies, metrics, and release risks.",
+    docsLiveType: "project-plan",
+    bestFor: ["Product teams", "Feature planning", "Release scoping"],
+    aiPrompt: "Create a product requirements document that keeps user value, requirements, UX notes, acceptance criteria, dependencies, metrics, and release risk aligned.",
+    outline: ["Problem Statement", "Goals and Non-Goals", "Personas and Use Cases", "Requirements", "User Experience Notes", "Technical Dependencies", "Acceptance Criteria", "Metrics", "Risks and Open Questions", "Release Plan"],
+  },
+  {
+    id: "project-charter",
+    label: "Project charter",
+    summary: "Defines project objectives, scope, stakeholders, governance, milestones, budget, risks, and approvals.",
+    docsLiveType: "project-plan",
+    bestFor: ["Project kickoff", "Delivery governance", "Executive approvals"],
+    aiPrompt: "Create a project charter that gives sponsors and delivery teams a shared scope, governance model, milestone plan, risk posture, and success criteria.",
+    outline: ["Executive Summary", "Objectives", "Scope", "Out of Scope", "Stakeholders", "Governance", "Milestones", "Budget and Resources", "Risks and Assumptions", "Success Criteria", "Approvals"],
+  },
+  {
+    id: "quarterly-business-review",
+    label: "Quarterly business review",
+    summary: "Creates a client or leadership review with scorecards, delivered value, risks, opportunities, and next-quarter actions.",
+    docsLiveType: "meeting-brief",
+    bestFor: ["Client reviews", "Account management", "Leadership updates"],
+    aiPrompt: "Create a quarterly business review that links outcomes, scorecards, delivered value, risks, opportunities, decisions, and next-quarter ownership.",
+    outline: ["Executive Summary", "Period Highlights", "Goals and Scorecard", "Usage or Financial Trends", "Delivered Value", "Risks and Blockers", "Opportunities", "Next Quarter Plan", "Decisions and Actions"],
+  },
+  {
+    id: "due-diligence-memo",
+    label: "Due diligence memo",
+    summary: "Creates an investment or vendor diligence memo with thesis, evidence, risks, financials, operations, and recommendation.",
+    docsLiveType: "business-case",
+    bestFor: ["Investment diligence", "Vendor assessment", "M&A review"],
+    aiPrompt: "Create a diligence memo that separates the decision thesis, market evidence, product or service assessment, financial review, operational review, legal/compliance risks, and recommendation.",
+    outline: ["Executive Summary", "Transaction or Decision Context", "Investment Thesis", "Market and Customer Evidence", "Product or Service Assessment", "Financial Review", "Operational Review", "Legal and Compliance Review", "Risk Register", "Recommendation", "Appendices"],
+  },
+  {
+    id: "contract-review-brief",
+    label: "Contract review brief",
+    summary: "Creates a commercial contract review with key terms, obligations, service levels, data/IP terms, risks, and approval checklist.",
+    docsLiveType: "contract-brief",
+    bestFor: ["Contract review", "Legal handoff", "Commercial negotiation"],
+    aiPrompt: "Create a contract review brief that helps business, legal, and delivery reviewers see obligations, risks, negotiation positions, and approvals quickly.",
+    outline: ["Contract Summary", "Parties and Scope", "Commercial Terms", "Delivery Obligations", "Service Levels", "Data and IP Terms", "Liability and Indemnities", "Termination and Renewal", "Negotiation Positions", "Approval Checklist"],
   },
 ];
 
