@@ -27,6 +27,22 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Multi-Cursor Evidence Closure
+
+`6.3 Editor | Multi-cursor support` is now marked complete in
+`docs/spec-completion-matrix.md`. The closure is based on exact CodeMirror
+command wiring in `src/App.vue`, direct helper coverage in
+`tests/frontend-unit.test.ts`, focused browser workflow proof for command
+discovery and simultaneous multi-selection edits, and app-authored native
+workflow smoke evidence for launched-webview multi-selection editing.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 87 frontend unit/static tests passed, including `multi-cursor helpers select repeated terms and split selected lines` plus static guards for command descriptions and multi-cursor search aliases. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "edits with explicit multi-cursor commands" --project chromium` | Pass | Focused Chromium workflow passed on 2026-05-28, proving Add Cursor Above/Below, Select Next Occurrence, Select All Occurrences, Split Selection Into Line Cursors, simultaneous insertion, all-occurrence replacement, and line-cursor splitting. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after closing the multi-cursor evidence row. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json`; open rows dropped to 98 while remaining gaps are external/manual/distribution evidence or separately tracked local proof. |
+
 ## 2026-05-28 Verification Update
 
 Table cursor-follow source editing verification:
