@@ -541,13 +541,19 @@
               Best for
               <input v-model="customOutlineBestFor" placeholder="Board packs, client reviews, technical chapters" />
             </label>
+            <label>
+              Docs Live workflow
+              <select v-model="customOutlineDraft.docsLiveType">
+                <option v-for="type in docsLiveDocumentTypes" :key="type.id" :value="type.id">{{ type.label }}</option>
+              </select>
+            </label>
             <p class="sidebar-hint">Saving uses the current planner outline so users can adapt a built-in outline and keep it for future documents.</p>
             <div class="outline-template-list" role="list" aria-label="Selectable document outlines">
               <article v-for="template in filteredDocumentOutlineTemplates" :key="`${template.source}-${template.id}`" role="listitem" class="outline-template-card">
                 <header>
                   <div>
                     <strong>{{ template.name }}</strong>
-                    <small>{{ template.category }} | {{ template.source }} | {{ template.outline.length }} sections</small>
+                    <small>{{ template.category }} | {{ template.source }} | {{ outlineDocsLiveTypeLabel(template) }} | {{ template.outline.length }} sections</small>
                   </div>
                   <button type="button" title="Load this outline into the planner" @click="useDocumentOutlineTemplate(template)">Use</button>
                 </header>
@@ -3099,7 +3105,7 @@
           <section v-show="selectedConfigurationSection === 'files'" class="configuration-center-panel" aria-label="Recent documents configuration">
           <section aria-label="Command line and default reader setup">
             <h3>Command line and default reader</h3>
-            <p class="sidebar-hint">Use <code>ned file.md</code> to open Markdown, <code>ned open file.md --dry-run --json</code> to verify file handoff, <code>ned init . --json</code> to create a reusable <code>.neditor</code> project scaffold, <code>ned profile --workspace . --set companyName=Acme --json</code> to set reusable business identity, <code>ned profile --fields --json</code> to list identity fields and aliases, <code>ned profile --workspace . --get companyName</code> to print one value for scripts, <code>ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json</code> to analyze an RFP and write a response plus compliance matrix, <code>ned analyze-rfp - --matrix</code> to turn piped RFP text into a matrix, <code>ned templates --category Procurement --json</code> to discover filtered starters, <code>ned outlines --category Procurement --query RFP --json</code> to discover reusable document outlines, <code>ned outlines --markdown rfp-technical-proposal</code> to print an outline for the planner or Docs Live, <code>ned outlines --workspace . --save board-pack --section "Decision Requested" --section "Recommendation"</code> to add a reusable workspace outline, <code>ned snippets --markdown review-handoff</code> to print reusable document parts, <code>ned new tender.md --template tender --json</code> or <code>ned new podcast.md --template podcast-script --json</code> to start from business and publishing scaffolds, <code>ned inspect file.md --json</code> for no-write document inventory, <code>ned validate file.md --to pdf --json</code> for no-write readiness checks, <code>ned convert file.md --to pdf,docx,html --output-dir exports</code> for headless delivery packs, <code>ned convert - --to html --stdout</code> for pipe automation, <code>ned targets</code> or <code>ned handlers --commands-only</code> for setup discovery, <code>ned readiness --json</code> for release gap summaries, <code>ned evidence --json</code> for release evidence report status, <code>ned default-reader --status --json</code> for default Markdown reader setup, <code>ned support-bundle --output support.json</code> for help desk handoffs, <code>ned completions zsh</code> for shell setup, and <code>ned doctor --workspace . --json</code> for setup checks.</p>
+            <p class="sidebar-hint">Use <code>ned file.md</code> to open Markdown, <code>ned open file.md --dry-run --json</code> to verify file handoff, <code>ned init . --json</code> to create a reusable <code>.neditor</code> project scaffold, <code>ned profile --workspace . --set companyName=Acme --json</code> to set reusable business identity, <code>ned profile --fields --json</code> to list identity fields and aliases, <code>ned profile --workspace . --get companyName</code> to print one value for scripts, <code>ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json</code> to analyze an RFP and write a response plus compliance matrix, <code>ned analyze-rfp - --matrix</code> to turn piped RFP text into a matrix, <code>ned templates --category Procurement --json</code> to discover filtered starters, <code>ned outlines --category Procurement --query RFP --json</code> to discover reusable document outlines, <code>ned outlines --markdown rfp-technical-proposal</code> to print an outline for the planner or Docs Live, <code>ned outlines --workspace . --save board-pack --docs-live-type board-memo --section "Decision Requested" --section "Recommendation"</code> to add a reusable workspace outline, <code>ned snippets --markdown review-handoff</code> to print reusable document parts, <code>ned new tender.md --template tender --json</code> or <code>ned new podcast.md --template podcast-script --json</code> to start from business and publishing scaffolds, <code>ned inspect file.md --json</code> for no-write document inventory, <code>ned validate file.md --to pdf --json</code> for no-write readiness checks, <code>ned convert file.md --to pdf,docx,html --output-dir exports</code> for headless delivery packs, <code>ned convert - --to html --stdout</code> for pipe automation, <code>ned targets</code> or <code>ned handlers --commands-only</code> for setup discovery, <code>ned readiness --json</code> for release gap summaries, <code>ned evidence --json</code> for release evidence report status, <code>ned default-reader --status --json</code> for default Markdown reader setup, <code>ned support-bundle --output support.json</code> for help desk handoffs, <code>ned completions zsh</code> for shell setup, and <code>ned doctor --workspace . --json</code> for setup checks.</p>
             <label>
               <input :checked="defaultMarkdownReaderEnabled" type="checkbox" :disabled="defaultMarkdownReaderBusy" @change="toggleDefaultMarkdownReader($event)" />
               Make NEditor the default Markdown reader
@@ -5858,6 +5864,7 @@ import {
   docsLiveAuditInline,
   buildDocsLiveReviewPacketMarkdown,
   buildDocsLiveSuggestedAnswers,
+  docsLiveDocumentTypeForOutlineSignal,
   docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
   normalizeDocsLiveDocumentType,
@@ -16662,7 +16669,7 @@ function appendDocumentOutlineTemplate(template: DocumentOutlineTemplate) {
 function sendOutlineTemplateToDocsLive(template: DocumentOutlineTemplate) {
   docsLiveTargetSection.value = null;
   docsLiveOutlineText.value = documentOutlineTemplateToPlannerText(template);
-  docsLiveTitle.value = outlineDraftTitle.value || template.name;
+  docsLiveTitle.value = template.name;
   docsLiveDocumentType.value = docsLiveTypeForOutlineTemplate(template);
   docsLiveContext.value = [
     `Selected outline template: ${template.name}`,
@@ -16679,8 +16686,12 @@ function sendOutlineTemplateToDocsLive(template: DocumentOutlineTemplate) {
 }
 
 function docsLiveTypeForOutlineTemplate(template: DocumentOutlineTemplate): DocsLiveDocumentType {
-  const signals = [template.id, template.name, template.category, ...template.tags, ...template.bestFor].join(" ");
-  return normalizeDocsLiveDocumentType(signals);
+  return docsLiveDocumentTypeForOutlineSignal(template);
+}
+
+function outlineDocsLiveTypeLabel(template: DocumentOutlineTemplate) {
+  const type = docsLiveTypeForOutlineTemplate(template);
+  return docsLiveDocumentTypes.find((item) => item.id === type)?.label || "Business brief";
 }
 
 function resetCustomOutlineDraft() {
@@ -16695,6 +16706,7 @@ function editCustomOutlineTemplate(template: DocumentOutlineTemplate) {
     name: template.name,
     category: template.category,
     summary: template.summary,
+    docsLiveType: template.docsLiveType || docsLiveTypeForOutlineTemplate(template),
     outline: template.outline,
     tags: [...template.tags],
     bestFor: [...template.bestFor],
@@ -16714,6 +16726,7 @@ async function saveCurrentOutlineTemplate() {
     name: customOutlineDraft.value.name.trim() || outlineDraftTitle.value.trim() || "Custom outline",
     category: customOutlineDraft.value.category.trim() || "Custom",
     summary: customOutlineDraft.value.summary.trim() || `Reusable outline with ${items.length} planned section${items.length === 1 ? "" : "s"}.`,
+    docsLiveType: normalizeDocsLiveDocumentType(customOutlineDraft.value.docsLiveType || "business-brief"),
     outline,
     tags: customOutlineDraft.value.tags.length ? customOutlineDraft.value.tags : ["custom"],
     bestFor: customOutlineDraft.value.bestFor.length ? customOutlineDraft.value.bestFor : ["Reusable planning"],

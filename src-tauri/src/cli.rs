@@ -154,6 +154,7 @@ struct DocumentOutlineInfo {
     label: &'static str,
     category: &'static str,
     summary: &'static str,
+    docs_live_type: &'static str,
     best_for: &'static [&'static str],
     outline: &'static [&'static str],
     tags: &'static [&'static str],
@@ -166,6 +167,8 @@ struct WorkspaceDocumentOutline {
     label: String,
     category: String,
     summary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    docs_live_type: Option<String>,
     #[serde(default)]
     best_for: Vec<String>,
     outline: Vec<String>,
@@ -180,6 +183,7 @@ struct DocumentOutlineEntry {
     label: String,
     category: String,
     summary: String,
+    docs_live_type: String,
     best_for: Vec<String>,
     outline: Vec<String>,
     tags: Vec<String>,
@@ -1329,6 +1333,7 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut workspace = PathBuf::from(".");
     let mut label: Option<String> = None;
     let mut summary: Option<String> = None;
+    let mut docs_live_type: Option<String> = None;
     let mut outline_file: Option<String> = None;
     let mut sections: Vec<String> = Vec::new();
     let mut tags: Vec<String> = Vec::new();
@@ -1390,6 +1395,16 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
                 summary = Some(
                     args.get(index)
                         .ok_or_else(|| "--summary requires text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--docs-live-type" | "--document-type" => {
+                index += 1;
+                docs_live_type = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            "--docs-live-type requires a Docs Live document type".to_string()
+                        })?
                         .to_string(),
                 );
             }
@@ -1456,6 +1471,7 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
                 label,
                 category,
                 summary,
+                docs_live_type,
                 outline_file,
                 sections,
                 tags,
@@ -3920,6 +3936,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Client Proposal",
             category: "Business development",
             summary: "Reusable client proposal structure for scope, delivery, commercials, and next steps.",
+            docs_live_type: "proposal",
             best_for: &["consulting offers", "implementation projects", "commercial services"],
             outline: &["Executive Summary", "Client Situation", "Recommended Approach", "Scope of Work", "Deliverables", "Timeline", "Investment", "Assumptions", "Next Steps"],
             tags: &["proposal", "business-development", "commercial"],
@@ -3929,6 +3946,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "RFP Response",
             category: "Procurement",
             summary: "Seller-side RFP response outline with compliance, solution, team, pricing, and appendices.",
+            docs_live_type: "rfp-response",
             best_for: &["public procurement", "enterprise vendor selection", "competitive bids"],
             outline: &["Executive Response", "Compliance Matrix", "Understanding of Requirements", "Proposed Solution", "Implementation Plan", "Team and Experience", "Pricing Response", "Risk and Assumptions", "Appendices"],
             tags: &["rfp", "proposal", "compliance"],
@@ -3938,6 +3956,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "RFP Technical Proposal",
             category: "Procurement",
             summary: "Compliance-first technical proposal outline with checklist before content drafting.",
+            docs_live_type: "rfp-response",
             best_for: &["technical proposals", "evaluated RFPs", "compliance-heavy bids"],
             outline: &["Cover", "Compliance Checklist", "Table of Contents", "Executive Summary", "Assignment Understanding", "Proposed Methodology", "Work Plan and Timeline", "Team Organization", "Past Performance", "Risk and Quality Management", "Sustainability and Transition", "Required Annexes"],
             tags: &["rfp", "technical", "compliance", "outline-first"],
@@ -3947,6 +3966,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "RFP Compliance Review Pack",
             category: "Procurement",
             summary: "Reviewer-focused outline for disqualifiers, attachments, owners, and submission sign-off.",
+            docs_live_type: "rfp-response",
             best_for: &["bid QA", "procurement review", "submission readiness"],
             outline: &["Source Intake Summary", "Critical Disqualifiers", "Mandatory Submission Checklist", "Compliance Matrix", "Attachment Register", "Evidence Owner Map", "Open Clarifications", "Submission QA Sign-off"],
             tags: &["rfp", "compliance", "qa", "attachments"],
@@ -3956,6 +3976,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "RFQ Response",
             category: "Procurement",
             summary: "Concise quotation response outline for pricing, inclusions, exclusions, and validity.",
+            docs_live_type: "rfq-response",
             best_for: &["price quotations", "supplier comparisons", "standardized services"],
             outline: &["Quotation Summary", "Buyer Requirements", "Quoted Items", "Pricing Table", "Inclusions", "Exclusions", "Delivery Schedule", "Commercial Terms", "Validity and Acceptance"],
             tags: &["rfq", "quotation", "pricing"],
@@ -3965,6 +3986,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Tender Response",
             category: "Procurement",
             summary: "Formal tender response outline with mandatory checklist, method statement, quality, and attachments.",
+            docs_live_type: "tender-response",
             best_for: &["government tenders", "formal bids", "regulated procurement"],
             outline: &["Bid Summary", "Mandatory Submission Checklist", "Compliance Statement", "Technical Methodology", "Work Plan", "Key Personnel", "Quality and Risk Management", "Commercial Offer", "Required Attachments"],
             tags: &["tender", "bid", "procurement"],
@@ -3974,6 +3996,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Tutorial or Training Guide",
             category: "Learning",
             summary: "Practical tutorial outline with goals, prerequisites, walkthrough, practice, and troubleshooting.",
+            docs_live_type: "tutorial",
             best_for: &["customer enablement", "internal training", "step-by-step adoption"],
             outline: &["Learning Goals", "Audience and Prerequisites", "Before You Begin", "Step-by-Step Walkthrough", "Practice Exercise", "Troubleshooting", "Next Steps"],
             tags: &["tutorial", "training", "learning"],
@@ -3983,6 +4006,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Lesson Plan",
             category: "Learning",
             summary: "Instructor-ready lesson plan outline with objectives, flow, assessment, and differentiation.",
+            docs_live_type: "lesson-plan",
             best_for: &["teachers", "corporate training", "workshop facilitators"],
             outline: &["Learning Objectives", "Standards and Prerequisites", "Materials", "Lesson Flow", "Guided Practice", "Assessment", "Differentiation", "Homework or Extension"],
             tags: &["lesson", "education", "training"],
@@ -3992,6 +4016,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Technical Textbook",
             category: "Learning",
             summary: "Outline-first textbook architecture for sequential chapter drafting and quality review.",
+            docs_live_type: "technical-textbook",
             best_for: &["technical education", "certification courses", "engineering documentation"],
             outline: &["Textbook Architecture", "Chapter Outline", "Reader Prerequisites", "Chapter 1 - Conceptual Foundation", "Chapter 2 - Technical Model", "Chapter 3 - Worked Examples", "Chapter 4 - Practice Exercises", "Chapter 5 - Pitfalls and Review", "Instructional Quality Review"],
             tags: &["textbook", "technical", "long-form"],
@@ -4001,6 +4026,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Novel",
             category: "Creative",
             summary: "Plot-first novel outline for story architecture, chapter sequence, and narrative review.",
+            docs_live_type: "novel",
             best_for: &["fiction drafting", "story bibles", "developmental editing"],
             outline: &["Story Premise", "Character Arcs", "World and Continuity Rules", "Plot Outline", "Chapter 1 - Opening Image", "Chapter 2 - Inciting Incident", "Chapter 3 - Rising Complications", "Chapter 4 - Midpoint Reversal", "Chapter 5 - Crisis and Climax", "Chapter 6 - Resolution", "Narrative Quality Review"],
             tags: &["novel", "fiction", "plot"],
@@ -4010,6 +4036,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Podcast Script",
             category: "Creative",
             summary: "Episode architecture outline for segment planning, host script, production notes, and review.",
+            docs_live_type: "podcast-script",
             best_for: &["podcast episodes", "interview shows", "narrative audio"],
             outline: &["Episode Architecture", "Segment Rundown", "Cold Open", "Intro", "Segment 1", "Segment 2", "Guest Questions", "Sponsor or Promo Read", "Outro", "Production Notes", "Audio Production Review"],
             tags: &["podcast", "script", "audio"],
@@ -4019,6 +4046,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Movie Script",
             category: "Creative",
             summary: "Screen story outline for logline, characters, beat sheet, acts, key scenes, and production constraints.",
+            docs_live_type: "movie-script",
             best_for: &["screenplays", "film treatments", "scene planning"],
             outline: &["Screen Story Architecture", "Logline", "Characters", "World and Tone", "Beat Sheet", "Act I", "Act II", "Act III", "Key Scenes", "Dialogue Notes", "Production Constraints", "Screenplay Quality Review"],
             tags: &["movie", "screenplay", "script"],
@@ -4028,6 +4056,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Board Decision Memo",
             category: "Executive",
             summary: "Decision-oriented outline for board or executive approval papers.",
+            docs_live_type: "board-memo",
             best_for: &["board packs", "investment approvals", "executive decisions"],
             outline: &["Decision Requested", "Executive Summary", "Strategic Context", "Options Considered", "Financial Case", "Risk Assessment", "Implementation Plan", "Recommendation", "Appendices"],
             tags: &["board", "decision", "executive"],
@@ -4037,6 +4066,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Business Case",
             category: "Executive",
             summary: "Decision-ready business case outline for options, financial case, risks, and recommendation.",
+            docs_live_type: "business-case",
             best_for: &["investment approval", "operating changes", "portfolio decisions"],
             outline: &["Executive Summary", "Decision Needed", "Problem", "Options", "Financial Case", "Risks", "Recommendation", "Implementation Plan"],
             tags: &["business-case", "decision", "finance"],
@@ -4046,6 +4076,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Policy Brief",
             category: "Policy",
             summary: "Evidence-led policy outline with options, impacts, risks, and recommendation.",
+            docs_live_type: "policy",
             best_for: &["public policy", "research translation", "advisory briefs"],
             outline: &["Executive Summary", "Problem Definition", "Policy Context", "Evidence Base", "Options", "Impact Assessment", "Risks and Tradeoffs", "Recommendation", "Implementation Considerations"],
             tags: &["policy", "brief", "evidence"],
@@ -4055,6 +4086,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Research Report",
             category: "Research",
             summary: "Structured research report outline with methodology, findings, citations, and recommendations.",
+            docs_live_type: "research-brief",
             best_for: &["deep research", "evidence reports", "analyst deliverables"],
             outline: &["Abstract", "Introduction", "Research Questions", "Methodology", "Literature and Source Review", "Findings", "Analysis", "Limitations", "Recommendations", "Bibliography"],
             tags: &["research", "report", "citations"],
@@ -4064,6 +4096,7 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             label: "Implementation Playbook",
             category: "Delivery",
             summary: "Operational outline for implementing a project, tool, process, or platform.",
+            docs_live_type: "project-plan",
             best_for: &["delivery teams", "rollouts", "internal operating guides"],
             outline: &["Purpose", "Operating Model", "Scope", "Roles and Responsibilities", "Implementation Phases", "Change Management", "Training Plan", "Risks and Controls", "Success Metrics", "Runbook"],
             tags: &["implementation", "delivery", "playbook"],
@@ -4076,6 +4109,7 @@ struct WorkspaceOutlineSaveInput {
     label: Option<String>,
     category: Option<String>,
     summary: Option<String>,
+    docs_live_type: Option<String>,
     outline_file: Option<String>,
     sections: Vec<String>,
     tags: Vec<String>,
@@ -4102,6 +4136,7 @@ fn built_in_outline_entry(outline: DocumentOutlineInfo) -> DocumentOutlineEntry 
         label: outline.label.to_string(),
         category: outline.category.to_string(),
         summary: outline.summary.to_string(),
+        docs_live_type: outline.docs_live_type.to_string(),
         best_for: outline
             .best_for
             .iter()
@@ -4127,6 +4162,9 @@ fn workspace_outline_entry(outline: WorkspaceDocumentOutline) -> DocumentOutline
         label: outline.label,
         category: outline.category,
         summary: outline.summary,
+        docs_live_type: outline
+            .docs_live_type
+            .unwrap_or_else(|| "business-brief".to_string()),
         best_for: outline.best_for,
         outline: outline.outline,
         tags: outline.tags,
@@ -4221,6 +4259,13 @@ fn save_workspace_outline(
     let id = sanitize_outline_id(&input.id).ok_or_else(|| {
         "--save requires an id with letters, numbers, dots, underscores, or hyphens".to_string()
     })?;
+    let docs_live_type = if input.docs_live_type.is_some() {
+        normalize_docs_live_type(input.docs_live_type.clone()).ok_or_else(|| {
+            "--docs-live-type must be a supported Docs Live document type".to_string()
+        })?
+    } else {
+        "business-brief".to_string()
+    };
     let mut outline = input
         .sections
         .iter()
@@ -4248,6 +4293,7 @@ fn save_workspace_outline(
                 outline.len()
             )
         }),
+        docs_live_type: Some(docs_live_type),
         best_for: dedupe_string_vec(input.best_for, 12),
         outline,
         tags: dedupe_string_vec(input.tags, 16),
@@ -4288,6 +4334,7 @@ fn normalize_workspace_outline(
                 normalized_outline.len()
             )
         }),
+        docs_live_type: normalize_docs_live_type(outline.docs_live_type),
         best_for: dedupe_string_vec(outline.best_for, 12),
         outline: normalized_outline,
         tags: dedupe_string_vec(outline.tags, 16),
@@ -4342,6 +4389,42 @@ fn outline_string(value: Option<String>) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn normalize_docs_live_type(value: Option<String>) -> Option<String> {
+    let value = value?.trim().to_ascii_lowercase();
+    if value.is_empty() {
+        return None;
+    }
+    let allowed = [
+        "business-brief",
+        "board-memo",
+        "proposal",
+        "rfp-response",
+        "rfq-response",
+        "tender-response",
+        "tutorial",
+        "lesson-plan",
+        "lesson-content",
+        "technical-textbook",
+        "novel",
+        "podcast-script",
+        "movie-script",
+        "strategy-plan",
+        "project-plan",
+        "research-brief",
+        "policy",
+        "meeting-brief",
+        "business-case",
+        "operating-procedure",
+        "technical-architecture",
+        "adr",
+        "release-notes",
+        "contract-brief",
+        "marketing-brief",
+        "customer-case-study",
+    ];
+    allowed.contains(&value.as_str()).then_some(value)
+}
+
 fn dedupe_string_vec(values: Vec<String>, limit: usize) -> Vec<String> {
     let mut seen = std::collections::BTreeSet::new();
     let mut output = Vec::new();
@@ -4363,6 +4446,7 @@ fn outline_matches_query(outline: &DocumentOutlineEntry, query: &str) -> bool {
         || outline.label.to_ascii_lowercase().contains(query)
         || outline.category.to_ascii_lowercase().contains(query)
         || outline.summary.to_ascii_lowercase().contains(query)
+        || outline.docs_live_type.to_ascii_lowercase().contains(query)
         || outline
             .best_for
             .iter()
@@ -4393,11 +4477,11 @@ fn outlines_text_report(outlines: &[DocumentOutlineEntry]) -> String {
     let mut lines = vec![format!("NEditor document outlines ({}):", outlines.len())];
     for outline in outlines {
         lines.push(format!(
-            "  - {} [{}] {}: {}",
-            outline.id, outline.category, outline.label, outline.summary
+            "  - {} [{} | Docs Live: {}] {}: {}",
+            outline.id, outline.category, outline.docs_live_type, outline.label, outline.summary
         ));
     }
-    lines.push("Use `ned outlines --markdown <id>` to print a reusable outline, or `ned outlines --workspace . --save <id> --section \"Executive Summary\"` to add one to .neditor/outlines.json.".to_string());
+    lines.push("Use `ned outlines --markdown <id>` to print a reusable outline, or `ned outlines --workspace . --save <id> --docs-live-type proposal --section \"Executive Summary\"` to add one to .neditor/outlines.json.".to_string());
     lines.join("\n")
 }
 
@@ -6489,7 +6573,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search" -- "$cur") )
         ;;
       outlines)
-        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body --workspace --save --delete --name --label --summary --outline-file --section --tag --best-for" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body --workspace --save --delete --name --label --summary --docs-live-type --document-type --outline-file --section --tag --best-for" -- "$cur") )
         ;;
       snippets|parts)
         COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body --workspace --fill-profile --profile" -- "$cur") )
@@ -6587,7 +6671,7 @@ _ned() {{
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:'
       ;;
     outlines)
-      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching outline ids only]' '--category[filter by category]:category:' '--query[search outlines by text]:query:' '--search[alias for --query]:query:' '--markdown[print one outline as planner Markdown]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--save[save a workspace outline id]:id:' '--delete[delete a workspace outline id]:id:' '--name[set outline display name]:name:' '--label[alias for --name]:name:' '--summary[set outline summary]:summary:' '--outline-file[read headings from a Markdown/text file]:file:_files' '--section[add one section heading]:heading:' '--tag[add a search tag]:tag:' '--best-for[add a best-fit use case]:use:'
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching outline ids only]' '--category[filter by category]:category:' '--query[search outlines by text]:query:' '--search[alias for --query]:query:' '--markdown[print one outline as planner Markdown]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--save[save a workspace outline id]:id:' '--delete[delete a workspace outline id]:id:' '--name[set outline display name]:name:' '--label[alias for --name]:name:' '--summary[set outline summary]:summary:' '--docs-live-type[set Docs Live workflow]:type:' '--document-type[alias for --docs-live-type]:type:' '--outline-file[read headings from a Markdown/text file]:file:_files' '--section[add one section heading]:heading:' '--tag[add a search tag]:tag:' '--best-for[add a best-fit use case]:use:'
       ;;
     snippets|parts)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--fill-profile[merge saved business profile values into printed snippet Markdown]' '--profile[alias for --fill-profile]'
@@ -6733,6 +6817,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l name -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l label -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l summary -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l docs-live-type -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l document-type -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l outline-file -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l section -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l tag -r".to_string(),
@@ -7170,7 +7256,7 @@ fn help_text() -> String {
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
         "  ned outlines [--workspace .] [--json] [--category Procurement] [--query RFP] [--ids-only] [--markdown id]".to_string(),
-        "  ned outlines --workspace . --save custom-id --section \"Executive Summary\" --section \"Recommendations\" [--json]".to_string(),
+        "  ned outlines --workspace . --save custom-id --docs-live-type proposal --section \"Executive Summary\" --section \"Recommendations\" [--json]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id] [--workspace . --fill-profile]".to_string(),
         "  ned profile [--workspace path] [--init] [--set fullName=...] [--get field|--fields] [--json|--markdown|--placeholders]".to_string(),
         "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--json|--markdown|--matrix]".to_string(),

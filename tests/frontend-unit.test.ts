@@ -110,6 +110,7 @@ import {
   buildDocsLiveQuestionnaire,
   buildDocsLiveReviewPacketMarkdown,
   buildDocsLiveSuggestedAnswers,
+  docsLiveDocumentTypeForOutlineSignal,
   docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
   extractDocsLivePlaceholders,
@@ -2880,21 +2881,27 @@ test("document outline library exposes built-ins and managed custom outlines", (
   ok(builtInDocumentOutlineTemplates.length >= businessDocumentTemplates.length);
   ok(builtInDocumentOutlineTemplates.some((template) => template.name === "RFP technical proposal" && template.category === "Procurement"));
   const rfpOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "outline-rfp-technical-proposal")!;
+  equal(rfpOutline.docsLiveType, "rfp-response");
   const plannerText = documentOutlineTemplateToPlannerText(rfpOutline);
   ok(plannerText.includes("- Compliance Checklist"));
   ok(plannerText.includes("- Table of Contents"));
+  const textbookOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "business-technical-textbook")!;
+  equal(docsLiveDocumentTypeForOutlineSignal(textbookOutline), "technical-textbook");
+  equal(docsLiveDocumentTypeForOutlineSignal({ docsLiveType: "movie-script", id: "custom-screen-story" }), "movie-script");
 
   const saved = saveCustomDocumentOutlineTemplateState([], {
     id: "custom-qbr",
     name: "Quarterly business review",
     category: "Executive",
     summary: "Reusable QBR outline.",
+    docsLiveType: "board-memo",
     outline: ["Executive Summary", "  Revenue Review", "  Risk Review", "Next Quarter Plan"],
     tags: ["qbr", "executive"],
     bestFor: ["Quarterly reviews"],
   });
   equal(saved.changed, true);
   equal(saved.templates.length, 1);
+  equal(saved.templates[0].docsLiveType, "board-memo");
   ok(documentOutlineTemplateToPlannerText({ outline: saved.templates[0].outline }).includes("  - Revenue Review"));
 
   const updated = saveCustomDocumentOutlineTemplateState(saved.templates, {
@@ -2912,6 +2919,7 @@ test("document outline library exposes built-ins and managed custom outlines", (
   const workspaceJson = workspaceDocumentOutlineLibraryJson(updated.templates);
   ok(workspaceJson.includes("neditor.workspace-outlines.v1"));
   ok(workspaceJson.includes('"label": "Quarterly business review"'));
+  ok(workspaceJson.includes('"docsLiveType": "board-memo"'));
   const imported = workspaceDocumentOutlineTemplatesFromJson(
     JSON.stringify({
       schema: "neditor.workspace-outlines.v1",
@@ -2921,6 +2929,7 @@ test("document outline library exposes built-ins and managed custom outlines", (
           label: "Quarterly Review",
           category: "Business",
           summary: "CLI-managed outline.",
+          docsLiveType: "technical-textbook",
           bestFor: ["Client reviews"],
           outline: ["Executive Summary", "  Revenue Review", "Decision Log"],
           tags: ["qbr"],
@@ -2929,6 +2938,7 @@ test("document outline library exposes built-ins and managed custom outlines", (
     }),
   );
   equal(imported[0].name, "Quarterly Review");
+  equal(imported[0].docsLiveType, "technical-textbook");
   equal(imported[0].bestFor[0], "Client reviews");
   ok(documentOutlineTemplateToPlannerText({ outline: imported[0].outline }).includes("  - Revenue Review"));
   equal(workspaceOutlineLibraryPath("/workspace/project/"), "/workspace/project/.neditor/outlines.json");
@@ -8121,12 +8131,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned new podcast.md --template podcast-script --json"));
   ok(app.includes("ned outlines --category Procurement --query RFP --json"));
   ok(app.includes("ned outlines --markdown rfp-technical-proposal"));
-  ok(app.includes('ned outlines --workspace . --save board-pack --section "Decision Requested" --section "Recommendation"'));
+  ok(app.includes('ned outlines --workspace . --save board-pack --docs-live-type board-memo --section "Decision Requested" --section "Recommendation"'));
   ok(app.includes("Sync workspace outlines"));
   ok(app.includes("workspaceOutlineSyncStatus"));
   ok(app.includes("customOutlineBestFor"));
+  ok(app.includes("Docs Live workflow"));
+  ok(app.includes("outlineDocsLiveTypeLabel"));
   ok(app.includes("docsLiveTypeForOutlineTemplate"));
-  ok(app.includes("normalizeDocsLiveDocumentType(signals)"));
+  ok(app.includes("docsLiveDocumentTypeForOutlineSignal(template)"));
   ok(app.includes("ned evidence --json"));
   ok(app.includes("ned default-reader --status --json"));
   ok(app.includes("ned support-bundle --output support.json"));

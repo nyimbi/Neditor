@@ -53,6 +53,7 @@ export interface DocumentOutlineTemplate {
   name: string;
   category: string;
   summary: string;
+  docsLiveType?: string;
   outline: string[];
   tags: string[];
   bestFor: string[];
@@ -453,6 +454,7 @@ const specialistDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
     name: "RFP technical proposal",
     category: "Procurement",
     summary: "Compliance-first technical proposal outline for evaluated RFP responses.",
+    docsLiveType: "rfp-response",
     outline: [
       "Cover",
       "Compliance Checklist",
@@ -476,6 +478,7 @@ const specialistDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
     name: "RFP compliance review pack",
     category: "Procurement",
     summary: "Reviewer-focused outline for compliance checks, attachments, disqualifiers, and owner sign-off.",
+    docsLiveType: "rfp-response",
     outline: [
       "Source Intake Summary",
       "Critical Disqualifiers",
@@ -495,6 +498,7 @@ const specialistDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
     name: "Board decision memo",
     category: "Executive",
     summary: "Decision-oriented outline for board or executive approval papers.",
+    docsLiveType: "board-memo",
     outline: ["Decision Requested", "Executive Summary", "Strategic Context", "Options Considered", "Financial Case", "Risk Assessment", "Implementation Plan", "Recommendation", "Appendices"],
     tags: ["board", "decision", "executive", "memo"],
     bestFor: ["Board packs", "Investment approvals", "Executive decisions"],
@@ -505,6 +509,7 @@ const specialistDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
     name: "Policy brief",
     category: "Policy",
     summary: "Evidence-led policy outline with options, impacts, risks, and recommendation.",
+    docsLiveType: "policy",
     outline: ["Executive Summary", "Problem Definition", "Policy Context", "Evidence Base", "Options", "Impact Assessment", "Risks and Tradeoffs", "Recommendation", "Implementation Considerations"],
     tags: ["policy", "brief", "evidence", "recommendation"],
     bestFor: ["Public policy", "Research translation", "Advisory briefs"],
@@ -515,6 +520,7 @@ const specialistDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
     name: "Research report",
     category: "Research",
     summary: "Structured research report outline with methodology, findings, citations, and recommendations.",
+    docsLiveType: "research-brief",
     outline: ["Abstract", "Introduction", "Research Questions", "Methodology", "Literature and Source Review", "Findings", "Analysis", "Limitations", "Recommendations", "Bibliography"],
     tags: ["research", "report", "citations", "analysis"],
     bestFor: ["Deep research", "Evidence reports", "Analyst deliverables"],
@@ -525,6 +531,7 @@ const specialistDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
     name: "Implementation playbook",
     category: "Delivery",
     summary: "Operational outline for implementing a project, tool, process, or platform.",
+    docsLiveType: "project-plan",
     outline: ["Purpose", "Operating Model", "Scope", "Roles and Responsibilities", "Implementation Phases", "Change Management", "Training Plan", "Risks and Controls", "Success Metrics", "Runbook"],
     tags: ["implementation", "delivery", "playbook", "operations"],
     bestFor: ["Delivery teams", "Rollouts", "Internal operating guides"],
@@ -538,6 +545,7 @@ export const builtInDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
     name: template.label,
     category: documentOutlineCategoryForTemplate(template),
     summary: template.summary,
+    docsLiveType: template.docsLiveType,
     outline: template.outline,
     tags: [template.id, template.docsLiveType, ...template.bestFor].map((item) => item.toLowerCase().replace(/\s+/g, "-")),
     bestFor: template.bestFor,
@@ -809,6 +817,7 @@ export function blankCustomDocumentOutlineTemplate(): CustomDocumentOutlineTempl
     name: "Custom outline",
     category: "Custom",
     summary: "Reusable document outline.",
+    docsLiveType: "business-brief",
     outline: ["Executive Summary", "Main Section", "Review Notes"],
     tags: ["custom"],
     bestFor: ["Reusable planning"],
@@ -826,11 +835,13 @@ export function normalizeCustomDocumentOutlineTemplates(value: unknown): CustomD
     const outline = outlineStringArray(record.outline, 80, true);
     if (!outline.length || seen.has(id)) continue;
     seen.add(id);
+    const docsLiveType = outlineStringValue(record.docsLiveType ?? record.docs_live_type);
     templates.push({
       id,
       name: outlineStringValue(record.name) || "Custom outline",
       category: outlineStringValue(record.category) || "Custom",
       summary: outlineStringValue(record.summary) || "Reusable document outline.",
+      ...(docsLiveType ? { docsLiveType } : {}),
       outline,
       tags: outlineStringArray(record.tags, 16),
       bestFor: outlineStringArray(record.bestFor, 12),
@@ -867,6 +878,7 @@ export function workspaceDocumentOutlineTemplatesFromJson(text: string): CustomD
         name: record.name ?? record.label,
         category: record.category,
         summary: record.summary,
+        docsLiveType: record.docsLiveType ?? record.docs_live_type,
         outline: record.outline,
         tags: record.tags,
         bestFor: record.bestFor,
@@ -881,6 +893,7 @@ export function workspaceDocumentOutlineLibraryJson(templates: CustomDocumentOut
     label: template.name,
     category: template.category,
     summary: template.summary,
+    ...(template.docsLiveType ? { docsLiveType: template.docsLiveType } : {}),
     bestFor: template.bestFor,
     outline: template.outline,
     tags: template.tags,

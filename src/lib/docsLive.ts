@@ -31,6 +31,15 @@ export const docsLiveDocumentTypes = [
 
 export type DocsLiveDocumentType = (typeof docsLiveDocumentTypes)[number]["id"];
 
+export interface DocsLiveOutlineTypeInput {
+  docsLiveType?: string;
+  id?: string;
+  name?: string;
+  category?: string;
+  tags?: string[];
+  bestFor?: string[];
+}
+
 export interface DocsLiveDraftRequest {
   documentType?: string;
   title?: string;
@@ -682,6 +691,13 @@ export function normalizeDocsLiveDocumentType(input = ""): DocsLiveDocumentType 
   if (direct) return direct.id;
   const signaled = explicitTypeSignals.find(([, signal]) => signal.test(input));
   return signaled?.[0] || "business-brief";
+}
+
+export function docsLiveDocumentTypeForOutlineSignal(outline: DocsLiveOutlineTypeInput): DocsLiveDocumentType {
+  const explicit = outline.docsLiveType?.trim().toLowerCase();
+  if (docsLiveDocumentTypes.some((type) => type.id === explicit)) return explicit as DocsLiveDocumentType;
+  const signals = [outline.id, outline.name, outline.category, ...(outline.tags || []), ...(outline.bestFor || [])].filter(Boolean).join(" ");
+  return normalizeDocsLiveDocumentType(signals);
 }
 
 export function buildDocsLiveQuestionnaire(documentType: string, request: DocsLiveQuestionnaireRequest = {}) {

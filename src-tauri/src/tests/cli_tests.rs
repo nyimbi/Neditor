@@ -872,6 +872,8 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "Business".to_string(),
         "--summary".to_string(),
         "Quarterly business review for account teams.".to_string(),
+        "--docs-live-type".to_string(),
+        "board-memo".to_string(),
         "--section".to_string(),
         "Executive Summary".to_string(),
         "--section".to_string(),
@@ -892,6 +894,10 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         "neditor.ned-outline-save.v1"
     );
     assert_eq!(saved_outline_report["outline"]["id"], "qbr-custom");
+    assert_eq!(
+        saved_outline_report["outline"]["docsLiveType"],
+        "board-memo"
+    );
     assert!(outline_workspace
         .join(".neditor")
         .join("outlines.json")
@@ -913,7 +919,9 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         .as_array()
         .expect("workspace outline details")
         .iter()
-        .any(|outline| outline["id"] == "qbr-custom" && outline["source"] == "workspace"));
+        .any(|outline| outline["id"] == "qbr-custom"
+            && outline["source"] == "workspace"
+            && outline["docsLiveType"] == "board-memo"));
 
     let workspace_markdown = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1574,6 +1582,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--ids-only"));
     assert!(zsh.message.contains("--markdown"));
     assert!(zsh.message.contains("--best-for"));
+    assert!(zsh.message.contains("--docs-live-type"));
     assert!(zsh.message.contains("--fill-profile"));
     assert!(zsh.message.contains("--fields"));
     assert!(zsh.message.contains("--get"));

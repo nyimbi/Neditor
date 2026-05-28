@@ -97,7 +97,7 @@ ned export proposal.md --to docx --output proposal.docx
 ned templates --category Procurement --json
 ned outlines --category Procurement --query RFP --json
 ned outlines --markdown rfp-technical-proposal
-ned outlines --workspace . --save board-pack --name "Board Pack" --section "Decision Requested" --section "Recommendation" --json
+ned outlines --workspace . --save board-pack --name "Board Pack" --docs-live-type board-memo --section "Decision Requested" --section "Recommendation" --json
 ned outlines --workspace . --markdown board-pack
 ned snippets --kind procurement --json
 ned snippets --markdown review-handoff
@@ -160,10 +160,12 @@ use
 `ned outlines --category Procurement --query RFP --json` for filtered discovery
 or `ned outlines --markdown rfp-technical-proposal` to print a copyable outline
 for the Outline planner, Docs Live, or another writing tool. Use
-`ned outlines --workspace . --save board-pack --name "Board Pack" --section "Decision Requested" --section "Recommendation" --json`
+`ned outlines --workspace . --save board-pack --name "Board Pack" --docs-live-type board-memo --section "Decision Requested" --section "Recommendation" --json`
 to create or replace a workspace outline, `ned outlines --workspace . --markdown board-pack`
 to print it, and `ned outlines --workspace . --delete board-pack --json` to
-remove it. `ned snippets`
+remove it. Outline entries also carry an explicit Docs Live workflow such as
+`rfp-response`, `technical-textbook`, `novel`, `podcast-script`, or
+`movie-script` so app and CLI selections open the right AI drafting path. `ned snippets`
 explains reusable standard document parts
 such as contact blocks, company overview, scope, pricing assumptions, compliance
 matrix, risk register, tender checklist, tutorial step, and review handoff; use
