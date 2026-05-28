@@ -326,6 +326,11 @@ When a file changes on disk, NEditor protects local edits:
 
 Large deliverables can be split into smaller files and compiled as one document.
 
+Open References and use the Include document builder when you want to
+incorporate one Markdown document inside another without memorizing directive
+syntax. Enter the child document path, choose the directive style, review the
+preview, then insert it into the parent document.
+
 Use any supported include form:
 
 ```md

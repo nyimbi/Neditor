@@ -571,7 +571,8 @@ web app.
   citation style, variables, and export controls.
 - Include expansion for modular master documents, with relative resolution,
   child front-matter stripping, include graph tracking, source/include hashing,
-  and diagnostics for missing or circular includes.
+  diagnostics for missing or circular includes, and a References sidebar builder
+  for inserting include directives with previewed syntax.
 - Document variables, default variables, project variables, inline formulas,
   calculation blocks, table formulas, UI insertion for merged metadata
   variables, and dependency diagnostics.

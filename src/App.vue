@@ -1810,6 +1810,26 @@
             {{ edge.from }} -> {{ edge.to }}
           </p>
           <h3>Includes</h3>
+          <section class="reference-manager include-builder" aria-label="Include document builder">
+            <p class="sidebar-hint">Insert another Markdown file into this document. Include paths resolve relative to the saved parent document.</p>
+            <label>
+              Child document path
+              <input v-model="includeTargetDraft" type="text" placeholder="chapters/introduction.md" aria-label="Included document path" />
+            </label>
+            <label>
+              Include syntax
+              <select v-model="includeSyntaxDraft" aria-label="Include directive syntax">
+                <option v-for="option in includeDirectiveSyntaxOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <p class="sidebar-hint">{{ includeDirectiveSyntaxHelp }}</p>
+            <code class="include-directive-preview">{{ includeDirectivePreview || "Enter a child document path" }}</code>
+            <div class="include-actions">
+              <button type="button" :disabled="!includeDirectivePreview" @click="insertIncludeDirectiveFromBuilder">Insert include</button>
+            </div>
+          </section>
           <p v-if="!includeGraphItems.length" class="sidebar-hint">No included files in this document.</p>
           <section v-else class="include-graph" aria-label="Include graph">
             <article
@@ -5793,6 +5813,13 @@ import {
   parseMergedMetadataVariables,
   type SupportedDataSourceKind,
 } from "./lib/frontMatterManagers";
+import {
+  formatIncludeDirective,
+  includeDirectiveHelpText,
+  includeDirectiveSyntaxOptions,
+  normalizeIncludeTarget,
+  type IncludeDirectiveSyntax,
+} from "./lib/documentIncludes";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "./lib/documentOutline";
 import { markdownListContinuation } from "./lib/markdownEditing";
 import { replaceOrAppendMarkdownSection } from "./lib/markdownSectionMerge";
@@ -6431,6 +6458,8 @@ const outlineModeNewTitle = ref("New chapter");
 const outlineModeNewLevel = ref(1);
 const documentSetDraft = ref("");
 const documentSetRenameDraft = ref("");
+const includeTargetDraft = ref("chapters/introduction.md");
+const includeSyntaxDraft = ref<IncludeDirectiveSyntax>("bang");
 const tablePasteText = ref("");
 const tableDraft = ref<TableDraft | null>(null);
 const tableSourceSnapshot = ref<TableSourceSnapshot | null>(null);
@@ -6690,6 +6719,7 @@ type ToolbarIconName =
   | "fence"
   | "heading"
   | "link"
+  | "include"
   | "table"
   | "figure"
   | "calc"
@@ -6779,6 +6809,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   fence: ["M5 6h14", "M5 12h14", "M5 18h14"],
   heading: ["M5 5v14", "M19 5v14", "M5 12h14", "M14 19h5"],
   link: ["M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1", "M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"],
+  include: ["M5 4h9l5 5v11H5z", "M14 4v5h5", "M8 12h8", "M8 16h5"],
   table: ["M4 5h16v14H4z", "M4 10h16", "M4 15h16", "M10 5v14", "M15 5v14"],
   figure: ["M4 5h16v14H4z", "M8 13l3-3 3 4 2-2 4 5", "M8 8h.01"],
   calc: ["M7 4h10v16H7z", "M10 8h4", "M10 12h1", "M14 12h1", "M10 16h1", "M14 16h1"],
@@ -7806,6 +7837,8 @@ const includeGraphItems = computed<IncludeGraphItem[]>(() => {
       };
     });
 });
+const includeDirectivePreview = computed(() => formatIncludeDirective(includeTargetDraft.value, includeSyntaxDraft.value));
+const includeDirectiveSyntaxHelp = computed(() => includeDirectiveHelpText(includeSyntaxDraft.value));
 const groupedDocuments = computed<DocumentTabGroup[]>(() => {
   const groups = new Map<string, DocumentTabGroup>();
   for (const document of store.documents) {
@@ -8913,6 +8946,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
       { id: "install-handlers", label: "Handlers", title: "Download and install transform handlers", icon: "settings", run: () => openTransformInstaller() },
       { id: "biz-part", label: "Part", title: "Insert a reusable business document part", icon: "templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
+      { id: "include", label: "Include", title: "Open the include document builder", icon: "include", run: () => openIncludeBuilder() },
       { id: "equation", label: "Equation", title: "Open equation editor", icon: "equation", run: () => openEquationEditor() },
       { id: "toc", label: "TOC", title: "Insert table of contents", icon: "toc", run: () => insertBlock(tocSnippet) },
       { id: "ai-source", label: "AI Source", title: "Insert AI source block", icon: "ai", run: () => insertBlock(aiSnippet) },
@@ -9101,6 +9135,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "templates", label: "Transform Templates", help: "Open reusable calc, chart, diagram, data, and API templates.", run: () => openTransformTemplates() },
           { id: "sql-transform", label: "SQL Transform", help: "Insert a trusted read-only SQL transform scaffold for database-backed Markdown tables.", run: () => insertSqlTransformTemplate() },
           { id: "install-transform-handlers", label: "Install Transform Handlers", help: "Open the configurator workflow that downloads and installs Graphviz, D2, PlantUML, Pikchr, and SQLite handlers.", run: () => openTransformInstaller() },
+          { id: "include-document", label: "Include Document", help: "Open the References sidebar builder for inserting another Markdown document into this one.", run: () => openIncludeBuilder() },
         ],
       },
       {
@@ -12013,6 +12048,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Insert table of contents", group: "Snippet", run: () => insertBlock(tocSnippet) },
   { name: "Insert index", group: "Snippet", run: () => insertBlock(indexSnippet) },
   { name: "Insert bibliography", group: "Snippet", run: () => insertBlock(bibliographySnippet) },
+  { name: "Open include document builder", group: "Snippet", description: "Insert another Markdown document into this one from the References sidebar.", run: () => openIncludeBuilder() },
   { name: "Insert list of figures", group: "Snippet", run: () => insertBlock(listOfFiguresSnippet) },
   { name: "Insert list of tables", group: "Snippet", run: () => insertBlock(listOfTablesSnippet) },
   { name: "Insert glossary section", group: "Snippet", run: () => insertBlock(glossarySectionSnippet) },
@@ -17253,6 +17289,23 @@ async function openIncludeChild(edge: IncludeGraphItem) {
   await store.openPath(edge.child);
 }
 
+async function openIncludeBuilder() {
+  store.sidebar = "references";
+  store.statusMessage = "Opened include document builder";
+  await nextTick();
+  document.querySelector<HTMLInputElement>('[aria-label="Included document path"]')?.focus();
+}
+
+function insertIncludeDirectiveFromBuilder() {
+  const directive = includeDirectivePreview.value;
+  if (!directive) {
+    store.statusMessage = "Enter a document path to include";
+    return;
+  }
+  insertBlock(directive);
+  store.statusMessage = `Inserted include directive for ${normalizeIncludeTarget(includeTargetDraft.value)}`;
+}
+
 async function goToIncludeDirective(edge: IncludeGraphItem) {
   await store.openPath(edge.parent);
   await nextTick();
@@ -21749,6 +21802,16 @@ select:hover {
   background: #223246;
 }
 
+.app-shell[data-theme="dark"] .include-builder label {
+  color: #e6edf5;
+}
+
+.app-shell[data-theme="dark"] .include-directive-preview {
+  border-color: #34465a;
+  background: #162231;
+  color: #e6edf5;
+}
+
 .sidebar-hint {
   margin: 6px 0 12px;
   color: #526171;
@@ -21782,6 +21845,24 @@ select:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.include-builder label {
+  display: grid;
+  gap: 4px;
+  color: #223246;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.include-directive-preview {
+  display: block;
+  padding: 7px 8px;
+  border: 1px solid #d5dee8;
+  border-radius: 6px;
+  background: #f6f8fb;
+  color: #1b2736;
+  overflow-wrap: anywhere;
 }
 
 .reference-manager {

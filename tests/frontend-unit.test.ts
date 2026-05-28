@@ -108,6 +108,7 @@ import {
   upsertDocsLivePlaceholder,
 } from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
+import { formatIncludeDirective, includeDirectiveHelpText, normalizeIncludeTarget } from "../src/lib/documentIncludes.js";
 import {
   closeDocumentTabState,
   forgetDocumentPathState,
@@ -7094,6 +7095,17 @@ test("custom transform template state helpers save replace and delete templates"
   deepEqual(missingDelete.templates, deleted.templates);
 });
 
+test("document include helpers normalize targets and format supported directives", () => {
+  equal(normalizeIncludeTarget(" ./chapters\\intro.md "), "chapters/intro.md");
+  equal(normalizeIncludeTarget('"appendices/financials.md"'), "appendices/financials.md");
+  equal(normalizeIncludeTarget("`sections/market.md`"), "sections/market.md");
+  equal(formatIncludeDirective(" chapters/intro.md ", "bang"), "!include chapters/intro.md");
+  equal(formatIncludeDirective("chapters\\market-analysis.md", "braces"), "{{include chapters/market-analysis.md}}");
+  equal(formatIncludeDirective("appendices/financials.md", "comment"), "<!-- include: appendices/financials.md -->");
+  equal(formatIncludeDirective("   ", "bang"), "");
+  ok(includeDirectiveHelpText("comment").includes("hidden"));
+});
+
 test("workbench command bar exposes icon display controls and workflow groups", () => {
   const app = readFileSync("src/App.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
@@ -7162,6 +7174,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("commandSearchText(command).includes(query)"));
   ok(app.includes("document.compile?.semantic.title"));
   ok(app.includes("include graph included file nested document"));
+  ok(app.includes('aria-label="Include document builder"'));
+  ok(app.includes("includeDirectivePreview"));
+  ok(app.includes("openIncludeBuilder"));
+  ok(app.includes('id: "include", label: "Include"'));
+  ok(app.includes('id: "include-document", label: "Include Document"'));
+  ok(app.includes("insertIncludeDirectiveFromBuilder"));
+  ok(app.includes("Include paths resolve relative to the saved parent document"));
   ok(app.includes("outline section navigation"));
   ok(app.includes("bibliographyTitle"));
   ok(app.includes("missing bibliography entry citation todo"));
