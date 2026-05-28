@@ -7164,6 +7164,10 @@ test("transform template library covers reusable calculations and custom templat
   const chartTemplate = builtinTransformTemplates.find((template) => template.transform === "chart");
   if (!chartTemplate) throw new Error("missing chart template");
   ok(transformTemplateFillFields(chartTemplate).some((field) => field.name === "title"));
+  const timelineTemplate = builtinTransformTemplates.find((template) => template.id === "timeline-launch");
+  if (!timelineTemplate) throw new Error("missing timeline template");
+  ok(timelineTemplate.body.includes("owner=Delivery"));
+  ok(timelineTemplate.body.includes("milestone=Release"));
   const horizontalChartTemplate = builtinTransformTemplates.find((template) => template.id === "chart-business-horizontal-risk");
   if (!horizontalChartTemplate) throw new Error("missing horizontal chart template");
   ok(horizontalChartTemplate.body.includes("type: horizontal-bar"));

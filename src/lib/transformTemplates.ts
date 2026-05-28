@@ -1036,9 +1036,9 @@ valueSuffix: "%"
       "timeline",
       `
 2026-06-01: Discovery complete
-2026-06-15: Pilot launch
-2026-07-01: General availability
-2026-07-15: Executive readout
+2026-06-15: Pilot launch | owner=Delivery | status=active
+2026-07-01: General availability | owner=Product | milestone=Release
+2026-07-15: Executive readout | owner=Leadership | status=review
 `,
     ),
     ["timeline", "launch"],

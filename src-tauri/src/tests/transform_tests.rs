@@ -1116,7 +1116,7 @@ fn chart_transform_applies_business_style_options() {
 fn timeline_transform_renders_static_svg_preview() {
     let artifact = run_transform(
         "timeline".to_string(),
-        "2026-05-18: Kickoff\n2026-06-01: Review\n2026-06-15: Release\n".to_string(),
+        "2026-05-18: Kickoff | owner=Delivery | status=active\n2026-06-01: Review | owner=QA | milestone=Gate 1\n2026-06-15: Release | status=approved\n".to_string(),
     )
     .expect("timeline transform");
 
@@ -1124,6 +1124,11 @@ fn timeline_transform_renders_static_svg_preview() {
     assert!(artifact.html.contains("transform-timeline"));
     assert!(artifact.html.contains("Kickoff"));
     assert!(artifact.html.contains("Release"));
+    assert!(artifact.html.contains("timeline-marker"));
+    assert!(artifact.html.contains("timeline-meta-owner"));
+    assert!(artifact.html.contains("timeline-meta-status"));
+    assert!(artifact.html.contains("Delivery"));
+    assert!(artifact.html.contains("Gate 1"));
     assert!(artifact.diagnostics.is_empty());
 }
 

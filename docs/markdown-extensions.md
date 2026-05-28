@@ -452,7 +452,7 @@ First-release native business transforms:
 
 | Transform | Supported syntax |
 | --- | --- |
-| `timeline` | One event per line, usually `date: label`. Rendered as a static SVG timeline. |
+| `timeline` | One event per line, usually `date: label`; optional pipe metadata such as `owner=Delivery`, `status=active`, or `milestone=Release` renders under each event in the static SVG timeline. |
 | `roadmap` | One item per line, `stage: text`, with optional pipe metadata such as `status=active`, `owner=Docs`, or `due=2026-06-30`. |
 | `adr` | One `key: value` row per line for fields such as `Status`, `Context`, `Decision`, and `Consequences`. |
 | `diff` | Unified-diff-style text. Additions, deletions, and hunk headers are classified and summarized. |

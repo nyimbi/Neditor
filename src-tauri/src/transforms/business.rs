@@ -109,16 +109,101 @@ fn push_bibtex_metadata_row(rows: &mut Vec<String>, label: &str, value: Option<&
 pub(crate) fn render_timeline_svg(body: &str) -> String {
     let items = body
         .lines()
-        .filter(|line| !line.trim().is_empty())
+        .map(parse_timeline_item)
+        .filter(|item| !item.marker.is_empty() || !item.label.is_empty())
         .collect::<Vec<_>>();
-    let height = 80 + items.len() * 54;
+    let height = 80 + items.len() * 76;
     let mut svg = format!("<svg class=\"transform transform-timeline timeline\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 {height}\" role=\"img\"><line x1=\"120\" y1=\"40\" x2=\"120\" y2=\"{}\" stroke=\"#275DA8\" stroke-width=\"3\"/>", height - 30);
     for (index, item) in items.iter().enumerate() {
-        let y = 50 + index * 54;
-        svg.push_str(&format!("<circle cx=\"120\" cy=\"{y}\" r=\"8\" fill=\"#275DA8\"/><text x=\"150\" y=\"{}\" font-size=\"18\" fill=\"#1f2937\">{}</text>", y + 6, escape_html(item)));
+        let y = 50 + index * 76;
+        let metadata = timeline_metadata_svg(&item.metadata, y);
+        svg.push_str(&format!(
+            "<g class=\"timeline-item\"><circle cx=\"120\" cy=\"{y}\" r=\"8\" fill=\"#275DA8\"/><text class=\"timeline-marker\" x=\"150\" y=\"{}\" font-size=\"14\" font-weight=\"700\" fill=\"#275DA8\">{}</text><text class=\"timeline-label\" x=\"270\" y=\"{}\" font-size=\"18\" fill=\"#1f2937\">{}</text>{metadata}</g>",
+            y + 5,
+            escape_html(&item.marker),
+            y + 5,
+            escape_html(&item.label)
+        ));
     }
     svg.push_str("</svg>");
     svg
+}
+
+struct TimelineItem {
+    marker: String,
+    label: String,
+    metadata: Vec<(String, String)>,
+}
+
+fn parse_timeline_item(line: &str) -> TimelineItem {
+    let parts = line
+        .split('|')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+    let event = parts.first().copied().unwrap_or_default();
+    let (marker, label) = event
+        .split_once(':')
+        .or_else(|| event.split_once(" - "))
+        .map(|(marker, label)| (marker.trim(), label.trim()))
+        .unwrap_or(("", event.trim()));
+    let metadata = parts
+        .iter()
+        .skip(1)
+        .filter_map(|part| {
+            let (key, value) = part.split_once('=')?;
+            let key = key.trim();
+            let value = value.trim();
+            if key.is_empty() || value.is_empty() {
+                None
+            } else {
+                Some((key.to_string(), value.to_string()))
+            }
+        })
+        .collect();
+    TimelineItem {
+        marker: marker.to_string(),
+        label: label.to_string(),
+        metadata,
+    }
+}
+
+fn timeline_metadata_svg(metadata: &[(String, String)], y: usize) -> String {
+    metadata
+        .iter()
+        .take(4)
+        .enumerate()
+        .map(|(index, (key, value))| {
+            let x = 270 + index * 142;
+            let class_key = metadata_class_key(key);
+            format!(
+                "<text class=\"timeline-meta timeline-meta-{class_key}\" x=\"{x}\" y=\"{}\" font-size=\"12\" fill=\"#64748b\"><tspan font-weight=\"700\">{}</tspan>: {}</text>",
+                y + 28,
+                escape_html(key),
+                escape_html(value)
+            )
+        })
+        .collect::<String>()
+}
+
+fn metadata_class_key(key: &str) -> String {
+    let normalized = key
+        .chars()
+        .filter_map(|character| {
+            if character.is_ascii_alphanumeric() {
+                Some(character.to_ascii_lowercase())
+            } else if matches!(character, '-' | '_') {
+                Some('-')
+            } else {
+                None
+            }
+        })
+        .collect::<String>();
+    if normalized.is_empty() {
+        "item".to_string()
+    } else {
+        normalized
+    }
 }
 
 pub(crate) fn render_roadmap_html(body: &str) -> String {
