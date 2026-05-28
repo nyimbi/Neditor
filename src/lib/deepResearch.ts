@@ -356,9 +356,16 @@ function appendDeepResearchEvidenceSections(
   const withBibliographyMarker = hasBibliographyMarker(withCitationIndex)
     ? withCitationIndex
     : `${withCitationIndex.trim()}\n\n## Bibliography\n\n[BIBLIOGRAPHY]\n`;
-  const withEvidenceLog = hasDeepResearchEvidenceLog(withBibliographyMarker)
+  const missingEvidenceIterations = missingDeepResearchEvidenceIterations(withBibliographyMarker, iterations);
+  const missingEvidenceLog = missingEvidenceIterations.length
+    ? formatDeepResearchLog(missingEvidenceIterations)
+    : "";
+  const evidenceLogHeading = hasDeepResearchEvidenceLog(withBibliographyMarker)
+    ? "## Deep Research Evidence Log Addendum"
+    : "## Deep Research Evidence Log";
+  const withEvidenceLog = !missingEvidenceLog
     ? withBibliographyMarker
-    : `${withBibliographyMarker.trim()}\n\n## Deep Research Evidence Log\n\n${formatDeepResearchLog(iterations)}\n`;
+    : `${withBibliographyMarker.trim()}\n\n${evidenceLogHeading}\n\n${missingEvidenceLog}\n`;
   const sourceLibraryAudit = normalizeSourceLibraryAudit(options.sourceLibraryAuditMarkdown);
   return !sourceLibraryAudit || hasSourceLibraryAudit(withEvidenceLog)
     ? withEvidenceLog
@@ -735,6 +742,15 @@ function missingDeepResearchCitationIndexRecords(
   return records.filter((record) => !citationIndexSectionContainsKey(section, record.citationKey));
 }
 
+function missingDeepResearchEvidenceIterations(
+  markdown: string,
+  iterations: DeepResearchIteration[],
+) {
+  if (!iterations.length) return [];
+  if (!hasDeepResearchEvidenceLog(markdown)) return iterations;
+  return iterations.filter((iteration) => !deepResearchEvidenceLogContainsIteration(markdown, iteration));
+}
+
 function bibliographyFenceBlocks(markdown: string) {
   const blocks: string[] = [];
   const fencePattern = /^(```|~~~)(?:bibliography|bibtex|hayagriva)\b[^\n]*\r?\n([\s\S]*?)^\1\s*$/gim;
@@ -755,6 +771,11 @@ function bibliographyBlockContainsKey(block: string, key: string) {
 
 function citationIndexSectionContainsKey(section: string, key: string) {
   return new RegExp(`\\[@${escapeRegExp(key)}(?:\\]|[\\s,;:])`).test(section);
+}
+
+function deepResearchEvidenceLogContainsIteration(markdown: string, iteration: DeepResearchIteration) {
+  const escapedQuery = escapeRegExp(iteration.query.trim());
+  return new RegExp(`^##\\s+Iteration\\s+${iteration.index}:\\s+${escapedQuery}\\s*$`, "im").test(markdown);
 }
 
 function escapeRegExp(value: string) {
@@ -852,11 +873,11 @@ function hasDeepResearchProvenance(markdown: string) {
 }
 
 function hasDeepResearchEvidenceLog(markdown: string) {
-  return /^##\s+Deep Research Evidence Log\b/im.test(markdown);
+  return /^##\s+Deep Research Evidence Log\s*$/im.test(markdown);
 }
 
 function hasDeepResearchCitationIndex(markdown: string) {
-  return /^##\s+Source Citation Index\b/im.test(markdown);
+  return /^##\s+Source Citation Index\s*$/im.test(markdown);
 }
 
 function hasBibliographyMarker(markdown: string) {

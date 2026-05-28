@@ -476,9 +476,11 @@ web app.
   already contains an empty or partial bibliography block, NEditor appends the
   missing Deep Research source records instead of treating the draft block as
   complete; empty or partial Source Citation Index sections get a missing-key
-  addendum instead of suppressing source review rows. Drafting, expansion, QA,
-  and fallback generation receive the same citation-key map, preferring saved
-  local source-library keys and falling back to deterministic keys for unsaved
+  addendum instead of suppressing source review rows; empty or partial Deep
+  Research Evidence Log sections get a missing-iteration addendum for the
+  research loops that still need review evidence. Drafting, expansion, QA, and
+  fallback generation receive the same citation-key map, preferring saved local
+  source-library keys and falling back to deterministic keys for unsaved
   results. When the active document has been saved, Deep Research can also
   preserve the source documents it found in the same local source library for
   later review and carry the source-library audit into the standalone research

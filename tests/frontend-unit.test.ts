@@ -5175,6 +5175,121 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ok(!standaloneWithCompleteCitationIndex.includes("## Source Citation Index Addendum"));
   equal((standaloneWithCompleteCitationIndex.match(/\[@agency2026\]/g) || []).length, 1);
 
+  const standaloneWithEmptyEvidenceLog = deepResearchDocumentMarkdown(
+    settings,
+    "# Draft\n\n## Deep Research Evidence Log\n\nPending source review.\n\nBody with source review.",
+    [
+      {
+        index: 1,
+        query: "AI procurement controls policy",
+        summary: "Initial source review.",
+        gaps: ["Budget evidence still missing."],
+        results: [
+          {
+            title: "Policy Evidence",
+            url: "https://agency.gov/policy.pdf",
+            snippet: "Controls policy.",
+            source: "DuckDuckGo",
+          },
+        ],
+      },
+    ],
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+    },
+  );
+  ok(standaloneWithEmptyEvidenceLog.includes("## Deep Research Evidence Log Addendum"));
+  ok(standaloneWithEmptyEvidenceLog.includes("## Iteration 1: AI procurement controls policy"));
+  ok(standaloneWithEmptyEvidenceLog.includes("Budget evidence still missing."));
+
+  const standaloneWithPartialEvidenceLog = deepResearchDocumentMarkdown(
+    settings,
+    [
+      "# Draft",
+      "",
+      "## Deep Research Evidence Log",
+      "",
+      "## Iteration 1: AI procurement controls policy",
+      "",
+      "Initial source review.",
+      "",
+      "Body with source review.",
+    ].join("\n"),
+    [
+      {
+        index: 1,
+        query: "AI procurement controls policy",
+        summary: "Initial source review.",
+        gaps: [],
+        results: [
+          {
+            title: "Policy Evidence",
+            url: "https://agency.gov/policy.pdf",
+            snippet: "Controls policy.",
+            source: "DuckDuckGo",
+          },
+        ],
+      },
+      {
+        index: 2,
+        query: "AI procurement budget controls",
+        summary: "Budget source review.",
+        gaps: ["Confirm budget authority."],
+        results: [
+          {
+            title: "Budget Evidence",
+            url: "https://agency.gov/budget.pdf",
+            snippet: "Budget controls.",
+            source: "DuckDuckGo",
+          },
+        ],
+      },
+    ],
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+    },
+  );
+  ok(standaloneWithPartialEvidenceLog.includes("## Deep Research Evidence Log Addendum"));
+  equal((standaloneWithPartialEvidenceLog.match(/## Iteration 1: AI procurement controls policy/g) || []).length, 1);
+  ok(standaloneWithPartialEvidenceLog.includes("## Iteration 2: AI procurement budget controls"));
+  ok(standaloneWithPartialEvidenceLog.includes("Confirm budget authority."));
+
+  const standaloneWithCompleteEvidenceLog = deepResearchDocumentMarkdown(
+    settings,
+    [
+      "# Draft",
+      "",
+      "## Deep Research Evidence Log",
+      "",
+      "## Iteration 1: AI procurement controls policy",
+      "",
+      "Initial source review.",
+      "",
+      "Body with source review.",
+    ].join("\n"),
+    [
+      {
+        index: 1,
+        query: "AI procurement controls policy",
+        summary: "Initial source review.",
+        gaps: [],
+        results: [
+          {
+            title: "Policy Evidence",
+            url: "https://agency.gov/policy.pdf",
+            snippet: "Controls policy.",
+            source: "DuckDuckGo",
+          },
+        ],
+      },
+    ],
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+    },
+  );
+  ok(!standaloneWithCompleteEvidenceLog.includes("## Deep Research Evidence Log Addendum"));
+  equal((standaloneWithCompleteEvidenceLog.match(/## Iteration 1: AI procurement controls policy/g) || []).length, 1);
+
   const reviewPackage = deepResearchReviewPackageMarkdown(
     settings,
     "# Draft\n\nBody with source review. [@agency2026]",
