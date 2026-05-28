@@ -438,8 +438,9 @@ Research and business documents can keep reference metadata near the source.
   `references`, `bibliography`, or `data`.
 - Deep Research report handoffs append CSL JSON records for any missing source
   keys even when the AI draft already contains an empty or partial bibliography
-  fence, then add the source citation index, `[BIBLIOGRAPHY]` marker, evidence
-  log, and source-library audit when available.
+  fence, complete empty or partial Source Citation Index sections with a
+  missing-key addendum, then add the `[BIBLIOGRAPHY]` marker, evidence log, and
+  source-library audit when available.
 - Choose `title`, `author-year`, `key`, `numeric`, or a common CSL alias such
   as `apa`, `chicago-author-date`, `ieee`, or `vancouver` from front matter,
   preferences, or the references panel.

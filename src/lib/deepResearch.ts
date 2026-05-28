@@ -344,10 +344,15 @@ function appendDeepResearchEvidenceSections(
   const withBibliographyEntries = !missingBibliography
     ? markdown
     : `${markdown.trim()}\n\n${missingBibliography}`;
-  const citationIndex = deepResearchCitationIndexMarkdownFromRecords(bibliographyRecords);
-  const withCitationIndex = !citationIndex || hasDeepResearchCitationIndex(withBibliographyEntries)
+  const missingCitationIndex = deepResearchCitationIndexMarkdownFromRecords(
+    missingDeepResearchCitationIndexRecords(withBibliographyEntries, bibliographyRecords),
+  );
+  const citationIndexHeading = hasDeepResearchCitationIndex(withBibliographyEntries)
+    ? "## Source Citation Index Addendum"
+    : "## Source Citation Index";
+  const withCitationIndex = !missingCitationIndex
     ? withBibliographyEntries
-    : `${withBibliographyEntries.trim()}\n\n## Source Citation Index\n\n${citationIndex}`;
+    : `${withBibliographyEntries.trim()}\n\n${citationIndexHeading}\n\n${missingCitationIndex}`;
   const withBibliographyMarker = hasBibliographyMarker(withCitationIndex)
     ? withCitationIndex
     : `${withCitationIndex.trim()}\n\n## Bibliography\n\n[BIBLIOGRAPHY]\n`;
@@ -720,6 +725,16 @@ function missingDeepResearchBibliographyRecords(
   );
 }
 
+function missingDeepResearchCitationIndexRecords(
+  markdown: string,
+  records: DeepResearchBibliographyRecord[],
+) {
+  if (!records.length) return [];
+  const section = sectionText(markdown, "Source Citation Index");
+  if (!section) return records;
+  return records.filter((record) => !citationIndexSectionContainsKey(section, record.citationKey));
+}
+
 function bibliographyFenceBlocks(markdown: string) {
   const blocks: string[] = [];
   const fencePattern = /^(```|~~~)(?:bibliography|bibtex|hayagriva)\b[^\n]*\r?\n([\s\S]*?)^\1\s*$/gim;
@@ -736,6 +751,10 @@ function bibliographyBlockContainsKey(block: string, key: string) {
     new RegExp(`@\\w+\\s*[({]\\s*${escaped}\\s*,`, "i"),
     new RegExp(`^\\s*${escaped}\\s*:`, "m"),
   ].some((pattern) => pattern.test(block));
+}
+
+function citationIndexSectionContainsKey(section: string, key: string) {
+  return new RegExp(`\\[@${escapeRegExp(key)}(?:\\]|[\\s,;:])`).test(section);
 }
 
 function escapeRegExp(value: string) {
