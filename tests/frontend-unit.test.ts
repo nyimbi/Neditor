@@ -241,7 +241,10 @@ import {
   applyOpenRecentWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderSuccessState,
+  applyWorkspaceRefreshFailureState,
+  applyWorkspaceRefreshSuccessState,
   applyWorkspaceRestoreState,
+  clearWorkspaceRefreshState,
   createRestoredWorkspaceDocumentState,
   forgetWorkspaceFolderState,
   setDocumentScrollState,
@@ -817,6 +820,16 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   deepEqual(openRecentFailure.workspaceFiles, []);
   equal(openRecentFailure.changed, true);
   equal(openRecentFailure.statusMessage, "Removed missing recent folder missing");
+
+  deepEqual(clearWorkspaceRefreshState(), { workspaceFiles: [] });
+  const refreshed = applyWorkspaceRefreshSuccessState([{ path: "/workspace/a.md" }]);
+  deepEqual(refreshed.workspaceFiles, [{ path: "/workspace/a.md" }]);
+  equal(refreshed.lastError, "");
+  const refreshFailure = applyWorkspaceRefreshFailureState(new Error("Permission denied"));
+  deepEqual(refreshFailure.workspaceFiles, []);
+  equal(refreshFailure.lastError, "Permission denied");
+  const refreshStringFailure = applyWorkspaceRefreshFailureState("offline");
+  equal(refreshStringFailure.lastError, "offline");
 
   let sequence = 0;
   const restored = createRestoredWorkspaceDocumentState(

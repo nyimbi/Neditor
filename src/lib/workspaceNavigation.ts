@@ -63,6 +63,11 @@ export interface OpenRecentWorkspaceFolderFailureStateResult<T> extends ForgetWo
   statusMessage: string;
 }
 
+export interface WorkspaceRefreshStateResult<T> {
+  workspaceFiles: T[];
+  lastError?: string;
+}
+
 export function setDocumentScrollState<T extends DocumentScrollState>(
   documents: T[],
   id: string,
@@ -103,6 +108,21 @@ export function forgetWorkspaceFolderState<T>(
     workspaceRoot: rootMatched ? null : workspaceRoot,
     workspaceFiles: rootMatched ? [] : workspaceFiles,
     changed: rootMatched || nextRecentFolders.length !== recentFolders.length,
+  };
+}
+
+export function clearWorkspaceRefreshState<T>(): WorkspaceRefreshStateResult<T> {
+  return { workspaceFiles: [] };
+}
+
+export function applyWorkspaceRefreshSuccessState<T>(workspaceFiles: T[]): WorkspaceRefreshStateResult<T> {
+  return { workspaceFiles, lastError: "" };
+}
+
+export function applyWorkspaceRefreshFailureState<T>(error: unknown): WorkspaceRefreshStateResult<T> {
+  return {
+    workspaceFiles: [],
+    lastError: error instanceof Error ? error.message : String(error),
   };
 }
 

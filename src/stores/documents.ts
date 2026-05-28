@@ -93,7 +93,10 @@ import {
   applyOpenRecentWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderFailureState,
   applyOpenWorkspaceFolderSuccessState,
+  applyWorkspaceRefreshFailureState,
+  applyWorkspaceRefreshSuccessState,
   applyWorkspaceRestoreState,
+  clearWorkspaceRefreshState,
   createRestoredWorkspaceDocumentState,
   forgetWorkspaceFolderState,
   setDocumentScrollState,
@@ -661,18 +664,17 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async refreshWorkspace() {
       if (!this.workspaceRoot) {
-        this.workspaceFiles = [];
+        Object.assign(this, clearWorkspaceRefreshState<WorkspaceFileEntry>());
         return true;
       }
       try {
-        this.workspaceFiles = await invoke<WorkspaceFileEntry[]>("list_workspace_files", {
+        const workspaceFiles = await invoke<WorkspaceFileEntry[]>("list_workspace_files", {
           request: { root: this.workspaceRoot },
         });
-        this.lastError = "";
+        Object.assign(this, applyWorkspaceRefreshSuccessState(workspaceFiles));
         return true;
       } catch (error) {
-        this.workspaceFiles = [];
-        this.lastError = error instanceof Error ? error.message : String(error);
+        Object.assign(this, applyWorkspaceRefreshFailureState<WorkspaceFileEntry>(error));
         return false;
       }
     },
