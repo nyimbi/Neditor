@@ -27,6 +27,20 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-28 Included-File Watch Closure
+
+`5.1 External File Refresh | Watch included files and recompile master docs`
+is now marked complete in `docs/spec-completion-matrix.md`. The closure is
+based on backend watch-path evidence for root/direct/nested include roles,
+focused browser proof for clean included-file re-rendering, include directive
+watch-path recomputation, stale-child event suppression, dirty-master conflict
+protection, and existing native Tauri smoke evidence for native included-file
+watching and recompilation.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "recompiles clean master documents|recomputes watched include paths|opens included-file conflicts" --project chromium` | Pass | Three focused Chromium workflows passed on 2026-05-28, proving clean master re-rendering after child-file edits, include watcher path recomputation after directive edits, stale old-child event suppression, new child recompilation, and included-file conflict handling while the master draft is dirty. |
+
 ## 2026-05-28 Master Include Evidence Closure
 
 `5.4 Master Documents And Includes | Include syntaxes, relative resolution,
