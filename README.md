@@ -454,8 +454,8 @@ web app.
   a local source manifest for review. Repeated downloads reuse the saved local
   copy when present, and the source library can be refreshed to cite saved
   sources again, insert their bibliography entries, link to the local files, or
-  bulk-save every visible source search result without changing the document
-  text.
+  copy/reveal the downloaded evidence path. Users can also bulk-save every
+  visible source search result without changing the document text.
   Deep Research uses the configured AI provider, including Ollama, to iterate
   search queries, summarize evidence, identify knowledge gaps, draft a sourced
   report, and expand it toward a slider-selected length from a 1-page brief to

@@ -6568,6 +6568,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("citationSourceLibrary"));
   ok(app.includes("insertCitationSourceBibliography"));
   ok(app.includes("insertCitationSourceReference"));
+  ok(app.includes("copyCitationSourcePath"));
+  ok(app.includes("revealCitationSource"));
+  ok(app.includes('invoke("reveal_path", { path: source.path })'));
   ok(app.includes("Generate agent packet"));
   ok(app.includes("Apply agent output"));
   ok(app.includes("appendAgentWorkspacePacket"));

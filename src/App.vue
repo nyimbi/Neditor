@@ -1472,6 +1472,8 @@
                   <button type="button" @click="insertCitationSourceReference(source)">Cite</button>
                   <button type="button" @click="insertCitationSourceBibliography(source)">Insert bibliography</button>
                   <button type="button" @click="insertBlock(`[${source.title}](${source.relative_path})`)">Insert local link</button>
+                  <button type="button" @click="copyCitationSourcePath(source)">Copy path</button>
+                  <button type="button" @click="revealCitationSource(source)">Reveal file</button>
                 </div>
               </article>
             </div>
@@ -10090,6 +10092,26 @@ function insertCitationSourceBibliography(source: CitationSourceLibraryItem) {
 
 function insertCitationSourceReference(source: CitationSourceLibraryItem) {
   insertCitationReference(source.citation_key);
+}
+
+async function copyCitationSourcePath(source: CitationSourceLibraryItem) {
+  const path = source.path || source.relative_path;
+  try {
+    await navigator.clipboard?.writeText(path);
+    store.statusMessage = `Copied source path for @${source.citation_key}`;
+  } catch {
+    store.statusMessage = `Source path ready: ${path}`;
+  }
+}
+
+async function revealCitationSource(source: CitationSourceLibraryItem) {
+  try {
+    await invoke("reveal_path", { path: source.path });
+    store.statusMessage = `Revealed source file for @${source.citation_key}`;
+  } catch (error) {
+    store.lastError = appErrorText(error);
+    store.statusMessage = "Could not reveal citation source file";
+  }
 }
 
 function formatCitationSourceBytes(bytes: number) {
