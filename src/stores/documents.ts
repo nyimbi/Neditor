@@ -33,13 +33,8 @@ import {
   removeDocsLiveDraftHistoryState,
 } from "../lib/workflowHistory";
 import {
-  clampAutosaveDelay,
-  clampFontSize,
-  clampLineHeight,
   clampPaneRatio,
   clampScrollRatio,
-  clampSnapshotInterval,
-  clampToolbarTextSize,
   migratePersistedWorkspace,
   normalizeAgentRunHistory,
   normalizeAiCleanupDefaults,
@@ -67,6 +62,7 @@ import {
   type ToolbarDisplay,
   type TtsPreferences,
 } from "../lib/workspacePersistence";
+import { applyPersistedUiPreferences } from "../lib/uiPreferences";
 import type {
   AiCleanupResponse,
   AiCleanupOptions,
@@ -429,34 +425,40 @@ export const useDocumentsStore = defineStore("documents", {
       try {
         preferencesStore = await Store.load("settings.json");
         const persisted = migratePersistedWorkspace(await preferencesStore.get<unknown>("workspace"));
-        if (persisted.theme) this.theme = persisted.theme;
-        if (persisted.previewTheme === "match" || persisted.previewTheme === "light" || persisted.previewTheme === "dark") this.previewTheme = persisted.previewTheme;
-        if (persisted.toolbarDisplay === "both" || persisted.toolbarDisplay === "icons" || persisted.toolbarDisplay === "text") {
-          this.toolbarDisplay = persisted.toolbarDisplay;
-        }
-        if (typeof persisted.toolbarTextSize === "number") this.toolbarTextSize = clampToolbarTextSize(persisted.toolbarTextSize);
-        if (Array.isArray(persisted.toolbarCollapsedRows)) this.toolbarCollapsedRows = persisted.toolbarCollapsedRows;
-        if (typeof persisted.editorPaneRatio === "number") this.editorPaneRatio = clampPaneRatio(persisted.editorPaneRatio);
-        if (typeof persisted.splitSourcePanes === "boolean") this.splitSourcePanes = persisted.splitSourcePanes;
-        if (persisted.editorKeymapMode === "default" || persisted.editorKeymapMode === "emacs" || persisted.editorKeymapMode === "vim") {
-          this.editorKeymapMode = persisted.editorKeymapMode;
-        }
-        if (typeof persisted.wordWrap === "boolean") this.wordWrap = persisted.wordWrap;
-        if (typeof persisted.lineNumbers === "boolean") this.lineNumbers = persisted.lineNumbers;
-        if (typeof persisted.codeFolding === "boolean") this.codeFolding = persisted.codeFolding;
-        if (typeof persisted.highContrast === "boolean") this.highContrast = persisted.highContrast;
-        if (typeof persisted.reducedMotion === "boolean") this.reducedMotion = persisted.reducedMotion;
-        if (typeof persisted.autosave === "boolean") this.autosave = persisted.autosave;
-        if (typeof persisted.autosaveDelayMs === "number") this.autosaveDelayMs = clampAutosaveDelay(persisted.autosaveDelayMs);
-        if (typeof persisted.autoSnapshot === "boolean") this.autoSnapshot = persisted.autoSnapshot;
-        if (typeof persisted.snapshotIntervalMs === "number") this.snapshotIntervalMs = clampSnapshotInterval(persisted.snapshotIntervalMs);
-        if (persisted.snapshotStorage === "project-local" || persisted.snapshotStorage === "app-data") this.snapshotStorage = persisted.snapshotStorage;
-        if (persisted.editorFont) this.editorFont = persisted.editorFont;
-        if (persisted.previewFont) this.previewFont = persisted.previewFont;
-        if (typeof persisted.editorFontSize === "number") this.editorFontSize = clampFontSize(persisted.editorFontSize);
-        if (typeof persisted.previewFontSize === "number") this.previewFontSize = clampFontSize(persisted.previewFontSize);
-        if (typeof persisted.editorLineHeight === "number") this.editorLineHeight = clampLineHeight(persisted.editorLineHeight);
-        if (typeof persisted.previewLineHeight === "number") this.previewLineHeight = clampLineHeight(persisted.previewLineHeight);
+        Object.assign(
+          this,
+          applyPersistedUiPreferences(
+            {
+              theme: this.theme,
+              previewTheme: this.previewTheme,
+              toolbarDisplay: this.toolbarDisplay,
+              toolbarTextSize: this.toolbarTextSize,
+              toolbarCollapsedRows: this.toolbarCollapsedRows,
+              editorPaneRatio: this.editorPaneRatio,
+              splitSourcePanes: this.splitSourcePanes,
+              editorKeymapMode: this.editorKeymapMode,
+              wordWrap: this.wordWrap,
+              lineNumbers: this.lineNumbers,
+              codeFolding: this.codeFolding,
+              highContrast: this.highContrast,
+              reducedMotion: this.reducedMotion,
+              autosave: this.autosave,
+              autosaveDelayMs: this.autosaveDelayMs,
+              autoSnapshot: this.autoSnapshot,
+              snapshotIntervalMs: this.snapshotIntervalMs,
+              snapshotStorage: this.snapshotStorage,
+              editorFont: this.editorFont,
+              previewFont: this.previewFont,
+              editorFontSize: this.editorFontSize,
+              previewFontSize: this.previewFontSize,
+              editorLineHeight: this.editorLineHeight,
+              previewLineHeight: this.previewLineHeight,
+              mode: this.mode,
+              sidebar: this.sidebar,
+            },
+            persisted,
+          ),
+        );
         if (persisted.exportTarget) this.exportTarget = persisted.exportTarget;
         if (persisted.exportDefaults) this.exportDefaults = normalizeExportDefaults(persisted.exportDefaults);
         if (persisted.bibliographyDefaults) this.bibliographyDefaults = normalizeBibliographyDefaults(persisted.bibliographyDefaults);
@@ -478,17 +480,6 @@ export const useDocumentsStore = defineStore("documents", {
         this.recentFolders = persisted.recentFolders || [];
         this.recentlyClosed = persisted.recentlyClosed || [];
         this.workspaceRoot = persisted.workspaceRoot || null;
-        if (persisted.mode && ["split", "source", "preview", "focus", "outline", "export", "review", "presentation"].includes(persisted.mode)) {
-          this.mode = persisted.mode;
-        }
-        if (
-          persisted.sidebar &&
-          ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "help", "settings"].includes(
-            persisted.sidebar,
-          )
-        ) {
-          this.sidebar = persisted.sidebar;
-        }
         this.transformEnginePaths = persisted.transformEnginePaths || {};
         this.trustedTransformEngines = persisted.trustedTransformEngines || {};
         this.disabledTransformEngines = persisted.disabledTransformEngines || {};

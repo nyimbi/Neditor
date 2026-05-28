@@ -152,6 +152,7 @@ import {
   transformTemplateFillFields,
   transformTemplateMarkdown,
 } from "../src/lib/transformTemplates.js";
+import { applyPersistedUiPreferences, type UiPreferencesState } from "../src/lib/uiPreferences.js";
 import {
   buildConfigurationCenterSections,
   buildConfigurationSetupStatus,
@@ -520,6 +521,114 @@ test("review marker helpers append and resolve review workflow comments", () => 
   );
   equal(resolveReviewCommentAtLine("# Plan\n\nNo review marker", 3), null);
   equal(resolveReviewCommentAtLine("<!-- comment: resolved | author: local | at: now | Done -->", 1), null);
+});
+
+test("UI preference helpers validate persisted workbench display settings", () => {
+  const current: UiPreferencesState = {
+    theme: "system",
+    previewTheme: "match",
+    toolbarDisplay: "both",
+    toolbarTextSize: 10,
+    toolbarCollapsedRows: [],
+    editorPaneRatio: 0.5,
+    splitSourcePanes: false,
+    editorKeymapMode: "default",
+    wordWrap: true,
+    lineNumbers: true,
+    codeFolding: true,
+    highContrast: false,
+    reducedMotion: false,
+    autosave: false,
+    autosaveDelayMs: 1500,
+    autoSnapshot: false,
+    snapshotIntervalMs: 300000,
+    snapshotStorage: "app-data",
+    editorFont: "Menlo",
+    previewFont: "Inter",
+    editorFontSize: 14,
+    previewFontSize: 14,
+    editorLineHeight: 1.55,
+    previewLineHeight: 1.65,
+    mode: "split",
+    sidebar: "outline",
+  };
+
+  const updated = applyPersistedUiPreferences(current, {
+    theme: "dark",
+    previewTheme: "light",
+    toolbarDisplay: "icons",
+    toolbarTextSize: 99,
+    toolbarCollapsedRows: ["writing", "view"],
+    editorPaneRatio: -1,
+    splitSourcePanes: true,
+    editorKeymapMode: "vim",
+    wordWrap: false,
+    lineNumbers: false,
+    codeFolding: false,
+    highContrast: true,
+    reducedMotion: true,
+    autosave: true,
+    autosaveDelayMs: 50,
+    autoSnapshot: true,
+    snapshotIntervalMs: 100,
+    snapshotStorage: "project-local",
+    editorFont: "IBM Plex Mono",
+    previewFont: "Source Serif",
+    editorFontSize: 2,
+    previewFontSize: 200,
+    editorLineHeight: 0.5,
+    previewLineHeight: 5,
+    mode: "outline",
+    sidebar: "settings",
+  });
+
+  equal(updated.theme, "dark");
+  equal(updated.previewTheme, "light");
+  equal(updated.toolbarDisplay, "icons");
+  equal(updated.toolbarTextSize, 15);
+  deepEqual(updated.toolbarCollapsedRows, ["writing", "view"]);
+  equal(updated.editorPaneRatio, 0.25);
+  equal(updated.splitSourcePanes, true);
+  equal(updated.editorKeymapMode, "vim");
+  equal(updated.wordWrap, false);
+  equal(updated.lineNumbers, false);
+  equal(updated.codeFolding, false);
+  equal(updated.highContrast, true);
+  equal(updated.reducedMotion, true);
+  equal(updated.autosave, true);
+  equal(updated.autosaveDelayMs, 500);
+  equal(updated.autoSnapshot, true);
+  equal(updated.snapshotIntervalMs, 30000);
+  equal(updated.snapshotStorage, "project-local");
+  equal(updated.editorFont, "IBM Plex Mono");
+  equal(updated.previewFont, "Source Serif");
+  equal(updated.editorFontSize, 12);
+  equal(updated.previewFontSize, 22);
+  equal(updated.editorLineHeight, 1);
+  equal(updated.previewLineHeight, 2.4);
+  equal(updated.mode, "outline");
+  equal(updated.sidebar, "settings");
+
+  const preserved = applyPersistedUiPreferences(current, {
+    theme: "sepia" as never,
+    previewTheme: "blue" as never,
+    toolbarDisplay: "badge" as never,
+    editorKeymapMode: "nano" as never,
+    snapshotStorage: "cloud" as never,
+    editorFont: "",
+    previewFont: "",
+    mode: "unknown" as never,
+    sidebar: "unknown" as never,
+  });
+  equal(preserved.theme, current.theme);
+  equal(preserved.previewTheme, current.previewTheme);
+  equal(preserved.toolbarDisplay, current.toolbarDisplay);
+  equal(preserved.editorKeymapMode, current.editorKeymapMode);
+  equal(preserved.snapshotStorage, current.snapshotStorage);
+  equal(preserved.editorFont, current.editorFont);
+  equal(preserved.previewFont, current.previewFont);
+  equal(preserved.mode, current.mode);
+  equal(preserved.sidebar, current.sidebar);
 });
 
 test("recent item helpers deduplicate limit and forget paths", () => {
