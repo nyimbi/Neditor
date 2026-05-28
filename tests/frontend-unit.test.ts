@@ -8219,6 +8219,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("appendFrontMatterDataSource"));
   ok(app.includes("insertDataSourceTemplate"));
   ok(app.includes("addFrontMatterDataSource"));
+  ok(app.includes("chooseFrontMatterDataSourceFile"));
+  ok(app.includes("frontMatterDataSourceRelativePath"));
+  ok(app.includes("dataSourceKindFromPath"));
   ok(app.includes("Data source type"));
   ok(app.includes("dataSourceSheetNameDraft"));
   ok(app.includes("dataSourceSheetIndexDraft"));

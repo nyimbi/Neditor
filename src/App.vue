@@ -1729,6 +1729,7 @@
                 File path
                 <input v-model="dataSourcePathDraft" placeholder="data/revenue.csv" />
               </label>
+              <button type="button" @click="chooseFrontMatterDataSourceFile">Choose file</button>
               <label>
                 Type
                 <select v-model="dataSourceTypeDraft" aria-label="Data source type">
@@ -18106,6 +18107,41 @@ function insertDataSourceTemplate() {
     appendFrontMatterDataSource(active.value.text, template),
   );
   store.statusMessage = "Inserted local data source template";
+}
+
+async function chooseFrontMatterDataSourceFile() {
+  const selected = await open({
+    multiple: false,
+    filters: [{ name: "Local data sources", extensions: ["csv", "tsv", "json", "yaml", "yml", "xlsx"] }],
+  });
+  if (typeof selected !== "string") return;
+  const relativePath = frontMatterDataSourceRelativePath(selected);
+  dataSourcePathDraft.value = relativePath;
+  dataSourceNameDraft.value ||= dataSourceNameFromPath(relativePath);
+  dataSourceTypeDraft.value = dataSourceKindFromPath(relativePath);
+  if (dataSourceTypeDraft.value !== "xlsx") {
+    dataSourceSheetNameDraft.value = "";
+    dataSourceSheetIndexDraft.value = "";
+  }
+  store.statusMessage = `Selected ${dataSourceTypeDraft.value.toUpperCase()} data source ${relativePath}`;
+}
+
+function frontMatterDataSourceRelativePath(path: string) {
+  const normalized = normalizeDocumentPath(path);
+  const bases = [active.value.path ? folderFromDocumentPath(active.value.path) : "", store.workspaceRoot ? normalizeDocumentPath(store.workspaceRoot) : ""]
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length);
+  const base = bases.find((candidate) => normalized === candidate || normalized.startsWith(`${candidate}/`));
+  return base ? normalized.slice(base.length + 1) : normalized;
+}
+
+function dataSourceKindFromPath(path: string): SupportedDataSourceKind {
+  const extension = path.split(".").pop()?.toLowerCase() || "";
+  if (extension === "tsv") return "tsv";
+  if (extension === "json") return "json";
+  if (extension === "yaml" || extension === "yml") return "yaml";
+  if (extension === "xlsx") return "xlsx";
+  return "csv";
 }
 
 function addFrontMatterDataSource() {
