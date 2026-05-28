@@ -43,6 +43,49 @@ export function stripMarkdownFencedBlocks(value: string) {
     .join("\n");
 }
 
+export function parseAiAssistedMarker(line: string) {
+  const content = line.match(/<!--\s*ai-assisted:(.*?)-->/)?.[1] || "";
+  const fields = new Map<string, string>();
+  for (const part of content
+    .split("|")
+    .map((entry) => entry.trim())
+    .filter(Boolean)) {
+    const pair = part.match(/^([^:=]+)\s*[:=]\s*(.*)$/);
+    if (pair) {
+      fields.set(pair[1].trim(), pair[2].trim());
+    } else if (["human-reviewed", "needs-review", "unreviewed"].includes(part)) {
+      fields.set("status", part);
+    }
+  }
+  return fields;
+}
+
+export function serializeAiAssistedMarker(fields: Map<string, string>) {
+  const orderedKeys = ["status", "reviewedBy", "reviewedAt", "source", "promptSummary"];
+  const parts = orderedKeys
+    .filter((key) => fields.has(key))
+    .map((key) => `${key}=${fields.get(key) || ""}`);
+  for (const [key, value] of fields) {
+    if (!orderedKeys.includes(key)) {
+      parts.push(`${key}=${value}`);
+    }
+  }
+  return `<!-- ai-assisted: ${parts.join(" | ")} -->`;
+}
+
+export function rewriteAiAssistedMarker(line: string, reviewed: boolean, reviewedAt = new Date().toISOString()) {
+  const fields = line.includes("<!-- ai-assisted:")
+    ? parseAiAssistedMarker(line)
+    : new Map<string, string>([
+        ["source", "AI paste cleanup"],
+        ["promptSummary", "AI paste cleanup review required"],
+      ]);
+  fields.set("status", reviewed ? "human-reviewed" : "needs-review");
+  fields.set("reviewedBy", reviewed ? "local" : "");
+  fields.set("reviewedAt", reviewed ? reviewedAt : "");
+  return serializeAiAssistedMarker(fields);
+}
+
 function rewriteYamlLikeField(lines: string[], key: string, value: string) {
   const index = lines.findIndex((line) => line.trimStart().startsWith(`${key}:`));
   const replacement = `${key}: ${value}`;

@@ -116,7 +116,15 @@ import {
   formatQualityRecommendationSummary,
   qualityRecommendationMarkdown,
 } from "../src/lib/qualityRecommendations.js";
-import { isAiSourceFenceOpener, markdownFenceOpener, rewriteAiSourceReviewBlock, stripMarkdownFencedBlocks } from "../src/lib/provenanceReview.js";
+import {
+  isAiSourceFenceOpener,
+  markdownFenceOpener,
+  parseAiAssistedMarker,
+  rewriteAiAssistedMarker,
+  rewriteAiSourceReviewBlock,
+  serializeAiAssistedMarker,
+  stripMarkdownFencedBlocks,
+} from "../src/lib/provenanceReview.js";
 import { forgetRecentItem, rememberRecentItem } from "../src/lib/recentItems.js";
 import {
   buildReleaseReadinessChecklist,
@@ -2750,6 +2758,31 @@ test("AI source review helper supports tilde fences aliases and inert examples",
   equal(isAiSourceFenceOpener(exampleLines[0]), false);
   equal(rewriteAiSourceReviewBlock(exampleLines, 0, true, "2026-05-26T12:00:00.000Z"), false);
   deepEqual(exampleLines, ["```markdown", "```ai-source", "provider: Example Only", "```", "```"]);
+});
+
+test("AI assisted marker helpers preserve governance fields while toggling review state", () => {
+  const marker = "<!-- ai-assisted: source: NEditor Agent Workspace | workflow=section-draft | needs-review | promptSummary=Draft renewal section -->";
+  const fields = parseAiAssistedMarker(marker);
+  equal(fields.get("source"), "NEditor Agent Workspace");
+  equal(fields.get("workflow"), "section-draft");
+  equal(fields.get("status"), "needs-review");
+  equal(fields.get("promptSummary"), "Draft renewal section");
+  equal(
+    serializeAiAssistedMarker(fields),
+    "<!-- ai-assisted: status=needs-review | source=NEditor Agent Workspace | promptSummary=Draft renewal section | workflow=section-draft -->",
+  );
+  equal(
+    rewriteAiAssistedMarker(marker, true, "2026-05-28T10:00:00.000Z"),
+    "<!-- ai-assisted: status=human-reviewed | reviewedBy=local | reviewedAt=2026-05-28T10:00:00.000Z | source=NEditor Agent Workspace | promptSummary=Draft renewal section | workflow=section-draft -->",
+  );
+  equal(
+    rewriteAiAssistedMarker(marker, false, "2026-05-28T10:00:00.000Z"),
+    "<!-- ai-assisted: status=needs-review | reviewedBy= | reviewedAt= | source=NEditor Agent Workspace | promptSummary=Draft renewal section | workflow=section-draft -->",
+  );
+  equal(
+    rewriteAiAssistedMarker("<!-- draft: AI paste cleanup review required -->", true, "2026-05-28T10:00:00.000Z"),
+    "<!-- ai-assisted: status=human-reviewed | reviewedBy=local | reviewedAt=2026-05-28T10:00:00.000Z | source=AI paste cleanup | promptSummary=AI paste cleanup review required -->",
+  );
 });
 
 test("release readiness checklist reports missing governance state", () => {

@@ -12,7 +12,7 @@ import {
   setPinnedDocumentState,
 } from "../lib/documentTabs";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
-import { isAiSourceFenceOpener, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
+import { isAiSourceFenceOpener, rewriteAiAssistedMarker, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
 import { forgetRecentItem, rememberRecentItem } from "../lib/recentItems";
 import {
   clampTransformTimeout,
@@ -120,49 +120,6 @@ interface WatchContext {
 }
 
 const staleSaveConflictMessage = "File changed on disk since it was opened; resolve the external conflict before saving.";
-
-function parseAiAssistedMarker(line: string) {
-  const content = line.match(/<!--\s*ai-assisted:(.*?)-->/)?.[1] || "";
-  const fields = new Map<string, string>();
-  for (const part of content
-    .split("|")
-    .map((entry) => entry.trim())
-    .filter(Boolean)) {
-    const pair = part.match(/^([^:=]+)\s*[:=]\s*(.*)$/);
-    if (pair) {
-      fields.set(pair[1].trim(), pair[2].trim());
-    } else if (["human-reviewed", "needs-review", "unreviewed"].includes(part)) {
-      fields.set("status", part);
-    }
-  }
-  return fields;
-}
-
-function serializeAiAssistedMarker(fields: Map<string, string>) {
-  const orderedKeys = ["status", "reviewedBy", "reviewedAt", "source", "promptSummary"];
-  const parts = orderedKeys
-    .filter((key) => fields.has(key))
-    .map((key) => `${key}=${fields.get(key) || ""}`);
-  for (const [key, value] of fields) {
-    if (!orderedKeys.includes(key)) {
-      parts.push(`${key}=${value}`);
-    }
-  }
-  return `<!-- ai-assisted: ${parts.join(" | ")} -->`;
-}
-
-function rewriteAiAssistedMarker(line: string, reviewed: boolean) {
-  const fields = line.includes("<!-- ai-assisted:")
-    ? parseAiAssistedMarker(line)
-    : new Map<string, string>([
-        ["source", "AI paste cleanup"],
-        ["promptSummary", "AI paste cleanup review required"],
-      ]);
-  fields.set("status", reviewed ? "human-reviewed" : "needs-review");
-  fields.set("reviewedBy", reviewed ? "local" : "");
-  fields.set("reviewedAt", reviewed ? new Date().toISOString() : "");
-  return serializeAiAssistedMarker(fields);
-}
 
 interface BackendWatchEvent {
   paths: string[];
