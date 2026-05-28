@@ -611,6 +611,16 @@ fn ned_cli_creates_new_business_document_from_template() {
             markdown.contains("{{"),
             "missing fillable placeholders for {template}"
         );
+        if template == "rfq" {
+            assert!(markdown.contains("## Quotation Summary"));
+            assert!(markdown.contains("## Buyer Requirements"));
+            assert!(markdown.contains("## Inclusions And Exclusions"));
+        }
+        if template == "tender" {
+            assert!(markdown.contains("## Bid Summary"));
+            assert!(markdown.contains("## Mandatory Submission Checklist"));
+            assert!(markdown.contains("## Technical Methodology"));
+        }
     }
 }
 
@@ -708,10 +718,20 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         .expect("template details")
         .iter()
         .any(|template| template["id"] == "tender"
+            && template["label"] == "Tender Response"
             && template["category"] == "Procurement"
             && template["summary"]
                 .as_str()
-                .is_some_and(|summary| summary.contains("tender"))));
+                .is_some_and(|summary| summary.contains("tender response"))));
+    assert!(template_report["templateDetails"]
+        .as_array()
+        .expect("template details")
+        .iter()
+        .any(|template| template["id"] == "rfq"
+            && template["label"] == "RFQ Response"
+            && template["summary"]
+                .as_str()
+                .is_some_and(|summary| summary.contains("Quotation response"))));
     for template in [
         "rfp",
         "rfq",
