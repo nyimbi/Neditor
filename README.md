@@ -443,6 +443,9 @@ web app.
   provider responses are wrapped in local `ai-source` and `ai-assisted`
   needs-review provenance before they enter the document, and provider-applied
   history records the wrapped review draft that was actually inserted.
+  Google Docs import and readback use the session token only, refresh it in
+  memory when it is near expiry, and retry once after token-expired Drive
+  responses when a session refresh token is available.
   The References panel also includes a Citation TODO workflow for adding,
   resolving, deferring, jumping to, and exporting citation blockers as a
   reviewer-ready Markdown audit. Source Search can query DuckDuckGo, SearXNG,

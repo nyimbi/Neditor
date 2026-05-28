@@ -215,6 +215,7 @@ import {
 import {
   GOOGLE_DRIVE_UPLOAD_URL,
   GOOGLE_DOCS_MIME_TYPE,
+  googleApiAuthErrorNeedsRefresh,
   googleOAuthScopesText,
   googleOAuthRefreshTokenRequestBody,
   googleOAuthTokenNeedsRefresh,
@@ -5004,6 +5005,10 @@ test("Google OAuth helpers normalize setup without exposing stored tokens", () =
   equal(refreshBody.get("refresh_token"), "refresh-123");
   equal(googleOAuthTokenNeedsRefresh("2026-05-28T11:00:30.000Z", Date.parse("2026-05-28T11:00:00.000Z")), true);
   equal(googleOAuthTokenNeedsRefresh("2026-05-28T11:10:00.000Z", Date.parse("2026-05-28T11:00:00.000Z")), false);
+  equal(googleApiAuthErrorNeedsRefresh(401), true);
+  equal(googleApiAuthErrorNeedsRefresh(403, "Request had invalid token credentials."), true);
+  equal(googleApiAuthErrorNeedsRefresh(403, "Insufficient file permission."), false);
+  equal(googleApiAuthErrorNeedsRefresh(500, "expired token"), false);
   equal(GOOGLE_DRIVE_UPLOAD_URL.includes("uploadType=multipart"), true);
   deepEqual(googleDocsImportMetadata("Board Pack.docx"), {
     name: "Board Pack",
@@ -6804,6 +6809,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Request session refresh"));
   ok(app.includes("Refresh token"));
   ok(app.includes("googleOAuthRefreshTokenRequestBody"));
+  ok(app.includes("fetchGoogleWithSessionRetry"));
+  ok(app.includes("retrying Docs upload"));
+  ok(app.includes("retrying Docs readback"));
   ok(app.includes("oauth2.googleapis.com/token"));
   ok(app.includes("GOOGLE_DRIVE_UPLOAD_URL"));
   ok(app.includes("session-only Google access token"));

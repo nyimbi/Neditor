@@ -5688,6 +5688,7 @@ import {
 } from "./lib/frontMatter";
 import {
   GOOGLE_DRIVE_UPLOAD_URL,
+  googleApiAuthErrorNeedsRefresh,
   googleOAuthScopesText,
   googleOAuthRefreshTokenRequestBody,
   googleOAuthTokenNeedsRefresh,
@@ -9746,6 +9747,24 @@ async function refreshGoogleAccessTokenNow() {
   }
 }
 
+async function googleApiResponseNeedsSessionRefresh(response: Response) {
+  if (response.status === 401) return true;
+  if (response.status !== 403) return false;
+  const bodyText = await response.clone().text().catch(() => "");
+  return googleApiAuthErrorNeedsRefresh(response.status, bodyText);
+}
+
+async function fetchGoogleWithSessionRetry(request: () => Promise<Response>, retryStatus: string) {
+  let response = await request();
+  if (!(await googleApiResponseNeedsSessionRefresh(response)) || !googleRefreshToken.value) {
+    return response;
+  }
+  googleDocsImportStatus.value = retryStatus;
+  await refreshGoogleAccessTokenIfNeeded(true);
+  response = await request();
+  return response;
+}
+
 async function copyGoogleAccessToken() {
   if (!googleAccessToken.value) return;
   try {
@@ -9776,16 +9795,19 @@ async function importCurrentDocumentToGoogleDocs() {
     });
     const boundary = `neditor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     const docxBytes = new Uint8Array(preparation.docx_bytes);
-    const body = googleDocsMultipartUploadBody(preparation.file_name, docxBytes, boundary);
     googleDocsImportStatus.value = `Uploading ${preparation.file_name} to Google Docs`;
-    const response = await fetch(GOOGLE_DRIVE_UPLOAD_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${googleAccessToken.value}`,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-      },
-      body,
-    });
+    const response = await fetchGoogleWithSessionRetry(
+      () =>
+        fetch(GOOGLE_DRIVE_UPLOAD_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${googleAccessToken.value}`,
+            "Content-Type": `multipart/related; boundary=${boundary}`,
+          },
+          body: googleDocsMultipartUploadBody(preparation.file_name, docxBytes, boundary),
+        }),
+      "Refreshing Google session token and retrying Docs upload",
+    );
     const uploaded = (await response.json()) as GoogleDriveImportResponse;
     if (!response.ok || uploaded.error || !uploaded.id) {
       throw new Error(uploaded.error?.message || `Google Docs import failed with HTTP ${response.status}`);
@@ -9807,9 +9829,13 @@ async function readBackGoogleDocsImport() {
   googleDocsImportStatus.value = "Reading back Google Docs text";
   try {
     await refreshGoogleAccessTokenIfNeeded();
-    const response = await fetch(googleDriveExportTextUrl(googleDocsLiveDocumentId.value), {
-      headers: { Authorization: `Bearer ${googleAccessToken.value}` },
-    });
+    const response = await fetchGoogleWithSessionRetry(
+      () =>
+        fetch(googleDriveExportTextUrl(googleDocsLiveDocumentId.value), {
+          headers: { Authorization: `Bearer ${googleAccessToken.value}` },
+        }),
+      "Refreshing Google session token and retrying Docs readback",
+    );
     const text = await response.text();
     if (!response.ok) {
       throw new Error(text || `Google Docs readback failed with HTTP ${response.status}`);

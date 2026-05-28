@@ -116,6 +116,12 @@ export function googleOAuthTokenNeedsRefresh(expiresAt: string, now = Date.now()
   return expiresMs <= now + skewMs;
 }
 
+export function googleApiAuthErrorNeedsRefresh(status: number, bodyText = "") {
+  if (status === 401) return true;
+  if (status !== 403) return false;
+  return /\b(?:access token|auth|credential|expired|invalid token|login required|token)\b/i.test(bodyText);
+}
+
 export function googleDriveExportTextUrl(fileId: string) {
   return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain`;
 }
