@@ -1064,15 +1064,19 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     let outline_report: serde_json::Value =
         serde_json::from_str(&outlines.message).expect("outlines json");
     assert_eq!(outline_report["schema"], "neditor.ned-outlines.v1");
-    assert!(outline_report["count"].as_u64().expect("outline count") >= 32);
+    assert!(outline_report["count"].as_u64().expect("outline count") >= 36);
     assert!(outline_report["outlines"]
         .as_array()
         .expect("outlines")
         .contains(&serde_json::json!("rfp-technical-proposal")));
     for id in [
+        "rfp",
+        "rfq",
+        "tender",
         "sow",
         "capability-statement",
         "case-study",
+        "report",
         "lesson-content",
         "executive-brief",
         "grant-application",
@@ -1104,6 +1108,16 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
                 .as_array()
                 .expect("outline")
                 .contains(&serde_json::json!("Compliance Checklist"))));
+    assert!(outline_report["outlineDetails"]
+        .as_array()
+        .expect("outline details")
+        .iter()
+        .any(|outline| outline["id"] == "rfp"
+            && outline["category"] == "Procurement"
+            && outline["outline"]
+                .as_array()
+                .expect("outline")
+                .contains(&serde_json::json!("Required Response Matrix"))));
 
     let filtered_outlines = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1141,6 +1155,18 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     .expect("case study outline ids");
     assert_eq!(case_study_outlines.message, "case-study");
 
+    let buyer_rfp_outlines = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--category".to_string(),
+        "Procurement".to_string(),
+        "--query".to_string(),
+        "buyer-side".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("buyer rfp outline ids");
+    assert_eq!(buyer_rfp_outlines.message, "rfp");
+
     let legal_outlines = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "outlines".to_string(),
@@ -1171,6 +1197,33 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     .expect("outline markdown");
     assert!(outline_markdown.message.contains("- Compliance Checklist"));
     assert!(outline_markdown.message.contains("- Table of Contents"));
+
+    let app_prefixed_outline = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--markdown".to_string(),
+        "business-report".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("app-prefixed outline markdown");
+    let app_prefixed_report: serde_json::Value =
+        serde_json::from_str(&app_prefixed_outline.message).expect("app-prefixed outline json");
+    assert_eq!(app_prefixed_report["outline"], "report");
+    assert!(app_prefixed_report["markdown"]
+        .as_str()
+        .expect("app-prefixed markdown")
+        .contains("- Analysis"));
+
+    let specialist_prefixed_outline = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--markdown".to_string(),
+        "outline-rfp-technical-proposal".to_string(),
+    ])
+    .expect("specialist-prefixed outline markdown");
+    assert!(specialist_prefixed_outline
+        .message
+        .contains("- Compliance Checklist"));
 
     let sop_markdown = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

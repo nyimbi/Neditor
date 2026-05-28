@@ -1686,21 +1686,18 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
 
     if let Some(id) = markdown_id {
         let catalog = document_outline_catalog_entries(&workspace)?;
-        let outline = catalog
-            .into_iter()
-            .find(|outline| outline.id == id)
-            .ok_or_else(|| {
-                format!(
-                    "Unknown outline '{}'. Available outlines: {}",
-                    id,
-                    document_outline_catalog_entries(&workspace)
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|outline| outline.id.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            })?;
+        let outline = find_outline_by_id_or_alias(catalog, &id).ok_or_else(|| {
+            format!(
+                "Unknown outline '{}'. Available outlines: {}",
+                id,
+                document_outline_catalog_entries(&workspace)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|outline| outline.id.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        })?;
         let markdown = outline_markdown(&outline);
         if json_output {
             return Ok(CliOutcome {
@@ -4331,6 +4328,26 @@ fn templates_text_report(templates: &[DocumentTemplateInfo]) -> String {
     lines.join("\n")
 }
 
+fn find_outline_by_id_or_alias(
+    catalog: Vec<DocumentOutlineEntry>,
+    id: &str,
+) -> Option<DocumentOutlineEntry> {
+    let normalized = id.trim().to_ascii_lowercase();
+    if normalized.is_empty() {
+        return None;
+    }
+    if let Some(outline) = catalog.iter().find(|outline| outline.id == normalized) {
+        return Some(outline.clone());
+    }
+    let builtin_alias = normalized
+        .strip_prefix("business-")
+        .or_else(|| normalized.strip_prefix("outline-"))?;
+    catalog
+        .iter()
+        .find(|outline| outline.source == "builtin" && outline.id == builtin_alias)
+        .cloned()
+}
+
 fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
     vec![
         DocumentOutlineInfo {
@@ -4342,6 +4359,36 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             best_for: &["consulting offers", "implementation projects", "commercial services"],
             outline: &["Executive Summary", "Client Situation", "Recommended Approach", "Scope of Work", "Deliverables", "Timeline", "Investment", "Assumptions", "Next Steps"],
             tags: &["proposal", "business-development", "commercial"],
+        },
+        DocumentOutlineInfo {
+            id: "rfp",
+            label: "Request for Proposal",
+            category: "Procurement",
+            summary: "Buyer-side RFP outline for opportunity framing, scope, instructions, evaluation, and response matrix.",
+            docs_live_type: "project-plan",
+            best_for: &["procurement packages", "vendor selection", "formal buyer requirements"],
+            outline: &["Opportunity Summary", "Scope of Work", "Vendor Instructions", "Evaluation Criteria", "Required Response Matrix", "Submission Checklist", "Clarification Process"],
+            tags: &["rfp", "buyer", "procurement", "vendor-selection"],
+        },
+        DocumentOutlineInfo {
+            id: "rfq",
+            label: "RFQ Response",
+            category: "Procurement",
+            summary: "Quotation response outline for buyer requirements, pricing, inclusions, exclusions, delivery, and validity.",
+            docs_live_type: "rfq-response",
+            best_for: &["price quotations", "supplier comparisons", "standardized services"],
+            outline: &["Quotation Summary", "Buyer Requirements", "Quoted Items", "Pricing Table", "Inclusions", "Exclusions", "Delivery Schedule", "Commercial Terms", "Validity and Acceptance"],
+            tags: &["rfq", "quotation", "pricing", "response"],
+        },
+        DocumentOutlineInfo {
+            id: "tender",
+            label: "Tender Response",
+            category: "Procurement",
+            summary: "Tender response outline for bid strategy, compliance, methodology, work plan, quality, and attachments.",
+            docs_live_type: "tender-response",
+            best_for: &["government tenders", "formal bids", "regulated procurement"],
+            outline: &["Bid Summary", "Mandatory Submission Checklist", "Compliance Statement", "Technical Methodology", "Work Plan", "Key Personnel", "Quality and Risk Management", "Commercial Offer", "Required Attachments"],
+            tags: &["tender", "bid", "procurement", "response"],
         },
         DocumentOutlineInfo {
             id: "sow",
@@ -4372,6 +4419,16 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
             best_for: &["sales proof", "marketing collateral", "client success stories"],
             outline: &["Customer Snapshot", "Challenge", "Solution", "Implementation", "Results", "Quote Prompts", "Review Approvals"],
             tags: &["case-study", "customer", "proof", "approvals"],
+        },
+        DocumentOutlineInfo {
+            id: "report",
+            label: "Business Report",
+            category: "Business Analysis",
+            summary: "Decision report outline for situation, evidence, analysis, recommendations, risks, and review handoff.",
+            docs_live_type: "business-brief",
+            best_for: &["management reports", "analysis memos", "decision support"],
+            outline: &["Executive Summary", "Situation", "Evidence Base", "Analysis", "Recommendations", "Risks and Next Steps", "Review Handoff"],
+            tags: &["report", "analysis", "decision-support", "business"],
         },
         DocumentOutlineInfo {
             id: "rfp-response",
@@ -8434,7 +8491,7 @@ fn help_text() -> String {
         "  ned --version".to_string(),
         "".to_string(),
         format!("Templates: {}", NEW_DOCUMENT_TEMPLATES.join(", ")),
-        "Outlines: proposal, sow, capability-statement, case-study, rfp-response, rfp-technical-proposal, grant-application, standard-operating-procedure, product-requirements-document, project-charter, and more.".to_string(),
+        "Outlines: proposal, rfp, rfq, tender, report, sow, capability-statement, case-study, rfp-response, rfp-technical-proposal, grant-application, standard-operating-procedure, product-requirements-document, project-charter, and more.".to_string(),
         format!(
             "Targets: {}, or all. Use comma-separated targets for delivery packs.",
             SUPPORTED_EXPORT_TARGETS.join(", ")

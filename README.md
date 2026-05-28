@@ -191,12 +191,15 @@ studies, board memos, policy briefs, research reports, grant applications, SOPs,
 PRDs, project charters, QBRs, due-diligence memos, contract review briefs,
 implementation playbooks, incident postmortems, meeting decision packs, and
 market research reports.
-Specialist built-in outlines cover lesson content, statements of work,
-capability statements, case studies, executive briefs, RFP technical proposals,
-compliance reviews, grant applications, SOPs, PRDs, project charters, QBRs,
-due-diligence memos, incident postmortems, meeting decision packs, market
-research, contract review briefs, board memos, policy briefs, research reports,
-and implementation playbooks. `ned snippets`
+Specialist built-in outlines cover buyer-side RFPs, RFQs, tenders, business
+reports, lesson content, statements of work, capability statements, case
+studies, executive briefs, RFP technical proposals, compliance reviews, grant
+applications, SOPs, PRDs, project charters, QBRs, due-diligence memos, incident
+postmortems, meeting decision packs, market research, contract review briefs,
+board memos, policy briefs, research reports, and implementation playbooks. The
+CLI also accepts app-style built-in outline IDs such as `business-report` and
+`outline-rfp-technical-proposal` when printing Markdown, which keeps GUI
+selections and support scripts compatible. `ned snippets`
 explains reusable standard document parts
 such as contact blocks, company overview, scope, pricing assumptions, compliance
 matrix, risk register, tender checklist, tutorial step, and review handoff; use
