@@ -101,6 +101,7 @@ import {
   applySavedWorkspaceDocumentState,
   clearWorkspaceRefreshState,
   createRestoredWorkspaceDocumentState,
+  ensureActiveWorkspaceDocumentState,
   setDocumentScrollState,
 } from "../lib/workspaceNavigation";
 import { applyPersistedWorkspacePreferenceState, buildPersistedWorkspaceState } from "../lib/workspacePersistenceState";
@@ -432,8 +433,9 @@ export const useDocumentsStore = defineStore("documents", {
   },
   actions: {
     async boot() {
-      if (!this.activeId) this.activeId = this.documents[0].id;
+      this.activeId = ensureActiveWorkspaceDocumentState(this.documents, this.activeId).activeId;
       await this.loadPreferences();
+      this.activeId = ensureActiveWorkspaceDocumentState(this.documents, this.activeId).activeId;
       await this.compileActive();
       await this.refreshWorkspace();
       await this.refreshGitStatus();
@@ -588,7 +590,7 @@ export const useDocumentsStore = defineStore("documents", {
     async openPath(path: string) {
       const existing = this.documents.find((document) => document.path === path);
       if (existing) {
-        this.activeId = existing.id;
+        this.activeId = applyActiveWorkspaceDocumentState(this.documents, this.activeId, existing.id).activeId;
         await this.compileActive();
         await this.refreshGitStatus();
         return;

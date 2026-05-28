@@ -253,6 +253,7 @@ import {
   applySavedWorkspaceDocumentState,
   clearWorkspaceRefreshState,
   createRestoredWorkspaceDocumentState,
+  ensureActiveWorkspaceDocumentState,
   forgetWorkspaceFolderState,
   setDocumentScrollState,
 } from "../src/lib/workspaceNavigation.js";
@@ -870,6 +871,12 @@ test("workspace navigation helpers preserve scroll ratios and recent folders", (
   const unchangedWorkspace = applyActiveWorkspaceDocumentState(newWorkspace.documents, "restored-1", "missing");
   equal(unchangedWorkspace.activeId, "restored-1");
   equal(unchangedWorkspace.changed, false);
+  const repairedActiveWorkspace = ensureActiveWorkspaceDocumentState(newWorkspace.documents, "missing-active");
+  equal(repairedActiveWorkspace.activeId, "old");
+  equal(repairedActiveWorkspace.changed, true);
+  const validActiveWorkspace = ensureActiveWorkspaceDocumentState(newWorkspace.documents, "restored-1");
+  equal(validActiveWorkspace.activeId, "restored-1");
+  equal(validActiveWorkspace.changed, false);
 
   const restoreResult = applyWorkspaceRestoreState(
     [{ id: "old", path: "/old.md", title: "Old", text: "", savedHash: "old", dirty: false }],

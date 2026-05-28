@@ -274,6 +274,16 @@ export function applyActiveWorkspaceDocumentState(
   return { activeId: id, changed: true };
 }
 
+export function ensureActiveWorkspaceDocumentState(
+  documents: OpenDocument[],
+  activeId: string,
+): ActiveWorkspaceDocumentStateResult {
+  if (!documents.length || documents.some((document) => document.id === activeId)) {
+    return { activeId, changed: false };
+  }
+  return { activeId: documents[0].id, changed: documents[0].id !== activeId };
+}
+
 export function applyNewWorkspaceDocumentState(
   documents: OpenDocument[],
   document: OpenDocument,
