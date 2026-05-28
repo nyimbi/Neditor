@@ -951,10 +951,23 @@ fn compiler_reports_missing_external_engine_path_before_embedded_fallback() {
         })
         .expect("missing external engine path diagnostic");
     assert_eq!(diagnostic.severity, "info");
+    assert_eq!(diagnostic.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(diagnostic.line, Some(5));
+    assert_eq!(diagnostic.end_line, Some(7));
+    assert_eq!(diagnostic.column, Some(1));
+    assert_eq!(diagnostic.end_column, Some(4));
     assert!(diagnostic
         .suggestion
         .as_deref()
         .is_some_and(|suggestion| suggestion.contains("Configure and trust")));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "transform: dot"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|related| related == "source range: 5-7"));
 }
 
 #[test]

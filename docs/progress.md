@@ -5370,6 +5370,12 @@ Review diagnostic range tightening:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_parses_review_comment_metadata --lib` | Pass | Focused Rust proof now confirms unresolved review-comment diagnostics carry source file, line, and HTML-comment column range while retaining release-blocking severity and comment text context. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked prepare_for_export_reports_review_change_note_audit_metadata --lib` | Pass | Focused export-readiness proof now confirms review-comment and change-note audit metadata diagnostics carry source ranges into export readiness and manifest diagnostics. |
 
+Missing external transform engine diagnostic proof:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_reports_missing_external_engine_path_before_embedded_fallback --lib` | Pass | Focused transform proof now confirms missing external engine path diagnostics carry source file, whole-fence source range, suggestion, transform related context, and source-range breadcrumbs before the compiler falls back to embedded rendering. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
