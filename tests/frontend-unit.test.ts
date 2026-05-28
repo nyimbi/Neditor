@@ -23,6 +23,8 @@ import {
 import {
   deepResearchDraftPrompt,
   estimateMarkdownPages,
+  expansionPassBudget,
+  pageShortfall,
   normalizeDeepResearchSettings,
   targetWordCount,
 } from "../src/lib/deepResearch.js";
@@ -4678,6 +4680,8 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   equal(settings.providerProfileId, "ollama-local");
   equal(settings.targetPages, 200);
   equal(targetWordCount(settings), 100000);
+  equal(expansionPassBudget(settings), 40);
+  equal(pageShortfall(settings, "word ".repeat(1001)), 197);
   ok(deepResearchDraftPrompt(settings, []).includes("Target length: about 200 pages"));
   equal(estimateMarkdownPages("word ".repeat(1001)), 3);
 
@@ -6224,6 +6228,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes(':style="appShellStyle"'));
   ok(app.includes('aria-label="Toolbar button display"'));
   ok(app.includes('aria-label="Toolbar text size"'));
+  ok(app.includes('aria-label="Deep research target report pages"'));
+  ok(app.includes('aria-label="Exact deep research target pages"'));
   ok(app.includes('aria-label="Application menus"'));
   ok(app.includes("appMenus"));
   ok(app.includes("openAppMenuId"));
@@ -6236,6 +6242,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("collapsedToolbarRows"));
   ok(app.includes("Collapse all toolbars"));
   ok(app.includes("Expand all toolbars"));
+  ok(app.includes('id: "deep-research", label: "Deep Research"'));
+  ok(app.includes("openDeepResearch"));
+  ok(app.includes("expansionPassBudget(settings)"));
   ok(app.includes("toggleToolbarRow"));
   ok(app.includes("markdownFenceOpener(text)"));
   ok(app.includes("isAiSourceFenceOpener(text)"));
@@ -6506,6 +6515,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("runCommandPaletteAgentRoute"));
   ok(app.includes('aria-label="AI command route suggestions"'));
   ok(app.includes("Docs Live"));
+  ok(app.includes("Deep Research"));
+  ok(app.includes('case "deep-research"'));
+  ok(app.includes("Routed command palette instruction to Deep Research"));
   ok(app.includes("AI Paste cleanup"));
   ok(app.includes("Load clipboard"));
   ok(app.includes("loadAiPasteFromClipboard"));
@@ -6515,6 +6527,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Outline mode"));
   ok(app.includes("Provider handoff"));
   ok(app.includes("selectAgentProviderProfileForInstruction"));
+  ok(app.includes('providerId = "ollama-local"'));
+  ok(app.includes('providerId = "ollama-cloud"'));
   ok(app.includes("openai-compatible"));
   ok(app.includes("local-openai"));
   ok(app.includes("Routed command palette instruction to provider handoff"));
@@ -7154,6 +7168,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-sign-in-google"'));
   ok(tauriLib.includes('"neditor-import-google-docs"'));
   ok(tauriLib.includes('"neditor-open-docs-live", "Docs Live"'));
+  ok(app.includes('case "neditor-open-deep-research"'));
   ok(tauriLib.includes('"neditor-open-table-editor",'));
   ok(tauriLib.includes('"neditor-edit-table-at-cursor",'));
   ok(tauriLib.includes('"neditor-go-to-source-table",'));
@@ -7166,6 +7181,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes("inspect_native_tts"));
   ok(tauriLib.includes("download_tts_model"));
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
+  ok(tauriLib.includes('"neditor-open-deep-research",'));
   ok(tauriLib.includes('"neditor-open-agent-workspace",'));
   ok(tauriLib.includes('"neditor-ai-create-document",'));
   ok(tauriLib.includes('"neditor-run-qa-review",'));

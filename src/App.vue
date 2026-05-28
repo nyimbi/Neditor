@@ -1453,9 +1453,27 @@
                 <input v-model="deepResearchAudience" placeholder="board, client, technical reviewers" />
               </label>
             </div>
-            <label>
-              Report length: {{ deepResearchTargetPages }} page{{ deepResearchTargetPages === 1 ? "" : "s" }}
-              <input v-model.number="deepResearchTargetPages" type="range" min="1" max="200" step="1" />
+            <label class="deep-research-length-control">
+              <span>Report length: {{ deepResearchTargetPages }} page{{ deepResearchTargetPages === 1 ? "" : "s" }}</span>
+              <input
+                v-model.number="deepResearchTargetPages"
+                aria-label="Deep research target report pages"
+                type="range"
+                min="1"
+                max="200"
+                step="1"
+                @change="setDeepResearchTargetPages(deepResearchTargetPages)"
+              />
+              <input
+                v-model.number="deepResearchTargetPages"
+                aria-label="Exact deep research target pages"
+                type="number"
+                min="1"
+                max="200"
+                step="1"
+                @change="setDeepResearchTargetPages(deepResearchTargetPages)"
+              />
+              <small>{{ deepResearchLengthSummary }}</small>
             </label>
             <div class="reference-inline-form">
               <label>
@@ -1474,7 +1492,9 @@
               <button type="button" :disabled="!deepResearchDraft" @click="insertDeepResearchDraft">Insert draft</button>
               <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchLog">Insert research log</button>
             </div>
-            <p class="sidebar-hint">{{ deepResearchStatus || "Deep research plans queries, searches, reflects on gaps, writes, and expands until it approaches the requested page count." }}</p>
+            <p class="sidebar-hint">
+              {{ deepResearchStatus || "Deep research plans queries, searches, reflects on gaps, writes, and iterates expansion passes until it reaches the requested page count or the provider stops adding useful length." }}
+            </p>
             <textarea v-if="deepResearchDraft" :value="deepResearchDraft" rows="8" readonly aria-label="Deep research draft preview"></textarea>
           </section>
           <button
@@ -5509,11 +5529,14 @@ import {
   deepResearchQueryPrompt,
   deepResearchReflectionPrompt,
   estimateMarkdownPages,
+  expansionPassBudget,
   fallbackDeepResearchQuery,
   fallbackResearchDraft,
   formatDeepResearchLog,
   normalizeDeepResearchSettings,
+  pageShortfall,
   parseReflection,
+  targetWordCount,
   type DeepResearchIteration,
   type DeepResearchSearchProvider,
   type DeepResearchSource,
@@ -6080,6 +6103,11 @@ const deepResearchBusy = ref(false);
 const deepResearchStatus = ref("");
 const deepResearchIterations = ref<DeepResearchIteration[]>([]);
 const deepResearchDraft = ref("");
+const deepResearchLengthSummary = computed(() => {
+  const settings = normalizeDeepResearchSettings({ targetPages: deepResearchTargetPages.value });
+  const passCount = expansionPassBudget(settings);
+  return `About ${targetWordCount(settings).toLocaleString()} words; up to ${passCount} expansion pass${passCount === 1 ? "" : "es"}.`;
+});
 const googleClientId = ref(store.googleIntegration.clientId);
 const googleAccountHint = ref(store.googleIntegration.accountHint);
 const googleScopesText = ref(googleOAuthScopesText(store.googleIntegration.scopes));
@@ -6516,7 +6544,7 @@ interface CommandToolbarRow {
   groups: CommandBarGroup[];
 }
 
-type CommandAgentRouteId = "docs-live" | "ai-paste" | "review" | "export" | "outline" | "provider";
+type CommandAgentRouteId = "docs-live" | "deep-research" | "ai-paste" | "review" | "export" | "outline" | "provider";
 
 interface CommandAgentRouteSuggestion {
   id: CommandAgentRouteId;
@@ -8611,6 +8639,14 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     label: "Write",
     actions: [
       { id: "docs-live", label: "Docs Live", title: "Open voice-guided document drafting", icon: "mic", primary: true, run: () => openDocsLive() },
+      {
+        id: "deep-research",
+        label: "Deep Research",
+        title: "Create a sourced report with iterative research and a 1-200 page length target",
+        icon: "find",
+        primary: true,
+        run: () => openDeepResearch(),
+      },
       { id: "read-selection", label: "Read Sel.", title: "Read selected text aloud", icon: "speak", run: () => readSelectionAloud() },
       { id: "read-document", label: "Read Doc", title: "Read the full document aloud", icon: "speak", run: () => readDocumentAloud() },
       { id: "biz-wizard", label: "Wizards", title: "Open the AI document creation wizard for common business, education, technical, and creative documents", icon: "ai", primary: true, run: () => openDocumentWizardHub() },
@@ -8820,6 +8856,7 @@ const appMenus = computed<AppMenu[]>(() => [
         items: [
           { id: "ai-create", label: "AI Create Document", help: "Open Docs Live as a document creation wizard.", run: () => startAiDocumentCreation() },
           { id: "docs-live", label: "Docs Live", help: "Dictate and structure a draft with context and placeholders.", run: () => openDocsLive() },
+          { id: "deep-research", label: "Deep Research", help: "Search sources and generate a sourced report from a 1-page brief to a 200-page report.", run: () => openDeepResearch() },
           { id: "agent", label: "AI Agent Workspace", help: "Plan, revise, review, and distribute with governed agent workflows.", run: () => openAgentWorkspace() },
           { id: "ai-paste", label: "Clean AI Paste", help: "Clean pasted AI output and add provenance.", run: () => openAiPaste() },
           { id: "read-selection", label: "Read Selection Aloud", help: "Read the selected editor text using the configured TTS engine.", run: () => readSelectionAloud() },
@@ -9651,6 +9688,10 @@ function aiProviderDefaultKeyEnv(profileId: AiProviderProfileId) {
   return "NEDITOR_AI_API_KEY";
 }
 
+function setDeepResearchTargetPages(value: number) {
+  deepResearchTargetPages.value = clampInteger(Number(value), 1, 200);
+}
+
 function deepResearchSettings() {
   return normalizeDeepResearchSettings({
     topic: deepResearchTopic.value || active.value.compile?.semantic.title || active.value.title,
@@ -9798,8 +9839,13 @@ async function runDeepResearchDocumentCreation() {
     } catch {
       deepResearchDraft.value = fallbackResearchDraft(settings, deepResearchIterations.value);
     }
-    for (let pass = 1; pass <= 4 && estimateMarkdownPages(deepResearchDraft.value) < settings.targetPages; pass += 1) {
-      deepResearchStatus.value = `Expanding draft toward ${settings.targetPages} pages (${estimateMarkdownPages(deepResearchDraft.value)} ready)`;
+    const maxExpansionPasses = expansionPassBudget(settings);
+    let stalledExpansionPasses = 0;
+    for (let pass = 1; estimateMarkdownPages(deepResearchDraft.value) < settings.targetPages && pass <= maxExpansionPasses; pass += 1) {
+      const currentPages = estimateMarkdownPages(deepResearchDraft.value);
+      const remainingPages = pageShortfall(settings, deepResearchDraft.value);
+      deepResearchStatus.value =
+        `Expanding ${currentPages}/${settings.targetPages} pages; ${remainingPages} page${remainingPages === 1 ? "" : "s"} remaining (pass ${pass}/${maxExpansionPasses})`;
       try {
         const expanded = await executeDirectAiProviderPrompt(
           {
@@ -9808,17 +9854,29 @@ async function runDeepResearchDocumentCreation() {
             model: settings.model,
             keyEnv: settings.keyEnv,
             systemPrompt: "You expand sourced Markdown documents with substantive analysis. Return the full document only.",
-            userPrompt: deepResearchExpansionPrompt(settings, deepResearchDraft.value, deepResearchIterations.value),
+            userPrompt: deepResearchExpansionPrompt(settings, deepResearchDraft.value, deepResearchIterations.value, currentPages, pass, maxExpansionPasses),
           },
           agentProviderApiKey.value,
         );
-        deepResearchDraft.value = expanded.markdown;
+        const nextDraft = expanded.markdown.trim();
+        if (!nextDraft) break;
+        deepResearchDraft.value = nextDraft;
+        const nextPages = estimateMarkdownPages(deepResearchDraft.value);
+        stalledExpansionPasses = nextPages <= currentPages ? stalledExpansionPasses + 1 : 0;
+        if (stalledExpansionPasses >= 2 && nextPages < settings.targetPages) {
+          deepResearchStatus.value = `Expansion paused at about ${nextPages}/${settings.targetPages} pages because the provider stopped increasing length.`;
+          break;
+        }
       } catch {
         break;
       }
     }
-    store.statusMessage = `Deep research draft ready at about ${estimateMarkdownPages(deepResearchDraft.value)} page${estimateMarkdownPages(deepResearchDraft.value) === 1 ? "" : "s"}`;
-    deepResearchStatus.value = "Deep research draft ready";
+    const finalPages = estimateMarkdownPages(deepResearchDraft.value);
+    const readyMessage = finalPages >= settings.targetPages
+      ? `Deep research draft reached the ${settings.targetPages}-page target`
+      : `Deep research draft reached about ${finalPages}/${settings.targetPages} pages; provider output limits prevented more useful expansion`;
+    store.statusMessage = readyMessage;
+    deepResearchStatus.value = readyMessage;
   } catch (error) {
     store.lastError = appErrorText(error);
     deepResearchStatus.value = "Deep research failed";
@@ -11082,6 +11140,19 @@ function startAiDocumentCreation() {
   refreshDocsLiveQuestionnaire();
   store.statusMessage = "AI-first document creation ready in Docs Live";
 }
+
+function openDeepResearch(topic = "") {
+  const trimmedTopic = topic.trim();
+  store.sidebar = "references";
+  if (trimmedTopic) {
+    deepResearchTopic.value = trimmedTopic;
+  } else if (!deepResearchTopic.value.trim()) {
+    deepResearchTopic.value = active.value.compile?.semantic.title || active.value.title;
+  }
+  if (!citationSearchQuery.value.trim()) citationSearchQuery.value = deepResearchTopic.value;
+  store.statusMessage = `Deep Research ready for a ${deepResearchTargetPages.value}-page target`;
+}
+
 const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "New document", group: "File", run: () => store.newDocument() },
   { name: "Open document", group: "File", run: () => void openDocument() },
@@ -11127,6 +11198,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "AI: Create document", group: "AI", run: () => startAiDocumentCreation() },
   { name: "AI: Document creation wizard", group: "AI", run: () => openDocumentWizardHub() },
   { name: "AI: Compose from outline", group: "AI", run: () => openDocsLiveFromOutline() },
+  {
+    name: "AI: Create deep research report",
+    group: "AI",
+    description: "Open source search, report length, and iterative sourced drafting controls.",
+    keywords: ["deep research", "research report", "sources", "duckduckgo", "searxng", "tavily", "ollama", "200 pages"],
+    run: () => openDeepResearch(commandQuery.value),
+  },
   { name: "AI: Review and clean pasted text", group: "AI", run: () => openAiPaste() },
   { name: "Open Docs Live", group: "AI", run: () => openDocsLive() },
   { name: "Open Docs Live draft history", group: "AI", run: () => openDocsLiveHistory() },
@@ -11461,7 +11539,8 @@ const filteredCommands = computed(() => {
 const commandAgentInstructionAvailable = computed(() => {
   const query = commandQuery.value.trim();
   if (query.length < 8) return false;
-  return /\b(ai|agent|create|draft|write|revise|edit|review|summari[sz]e|publish|export|prepare|make|turn|improve|humanize|outline|compose)\b/i.test(query);
+  return /\b(ai|agent|create|draft|write|revise|edit|review|summari[sz]e|publish|export|prepare|make|turn|improve|humanize|outline|compose|research|report|source|citation)\b/i
+    .test(query);
 });
 const commandAgentPlanPreview = computed(() => {
   const instruction = commandQuery.value.trim();
@@ -11490,6 +11569,12 @@ const commandAgentRouteSuggestions = computed<CommandAgentRouteSuggestion[]>(() 
       rank: /\b(paste|cleanup|clean up|chat output|clipboard|ai text)\b/.test(instruction) ? 0 : 5,
     },
     {
+      id: "deep-research",
+      label: "Deep Research",
+      detail: "Open source search and iterative report generation with a selected page target.",
+      rank: /\b(deep research|research report|source search|citation search|duckduckgo|searxng|tavily|200 pages?)\b/.test(instruction) ? 0 : 3,
+    },
+    {
       id: "review",
       label: "Review governance",
       detail: "Open review, provenance, comments, AI markers, and readiness blockers.",
@@ -11511,7 +11596,7 @@ const commandAgentRouteSuggestions = computed<CommandAgentRouteSuggestion[]>(() 
       id: "provider",
       label: "Provider handoff",
       detail: "Open the Agent Workspace, generate a governed packet, and build a redacted provider request.",
-      rank: /\b(provider|model|openai|anthropic|gemini|antigravity|local gateway|handoff|run ai)\b/.test(instruction) ? 0 : 4,
+      rank: /\b(provider|model|openai|anthropic|gemini|antigravity|ollama|local gateway|handoff|run ai)\b/.test(instruction) ? 0 : 4,
     },
   ];
   return candidates
@@ -11689,6 +11774,9 @@ async function runNativeMenuCommand(command: string) {
       break;
     case "neditor-open-docs-live":
       openDocsLive();
+      break;
+    case "neditor-open-deep-research":
+      openDeepResearch();
       break;
     case "neditor-read-selection-aloud":
       await readSelectionAloud();
@@ -18020,6 +18108,10 @@ async function runCommandPaletteAgentRoute(routeId: CommandAgentRouteId) {
       openDocsLive();
       store.statusMessage = "Routed command palette instruction to Docs Live";
       break;
+    case "deep-research":
+      openDeepResearch(instruction);
+      store.statusMessage = "Routed command palette instruction to Deep Research";
+      break;
     case "ai-paste":
       await openAiPaste();
       store.statusMessage = "Routed command palette instruction to AI Paste cleanup";
@@ -18058,7 +18150,9 @@ function selectAgentProviderProfileForInstruction(instruction: string) {
   else if (/\b(google antigravity|antigravity)\b/.test(text)) providerId = "google-antigravity-cli";
   else if (/\b(gemini|google ai)\b/.test(text)) providerId = "gemini-compatible";
   else if (/\b(anthropic|claude)\b/.test(text)) providerId = "anthropic-compatible";
-  else if (/\b(localhost|ollama|lm studio|local gateway|local model)\b/.test(text)) providerId = "local-openai";
+  else if (/\b(ollama cloud|remote ollama|ollama api)\b/.test(text)) providerId = "ollama-cloud";
+  else if (/\bollama\b/.test(text)) providerId = "ollama-local";
+  else if (/\b(localhost|lm studio|local gateway|local model)\b/.test(text)) providerId = "local-openai";
   else if (/\b(private network|internal gateway|intranet)\b/.test(text)) providerId = "private-openai";
   else if (/\b(openai|chatgpt|gpt|openai-compatible)\b/.test(text)) providerId = "openai-compatible";
   if (!providerId || providerId === agentProviderId.value) return;
@@ -20902,6 +20996,28 @@ select:hover {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   align-items: end;
+}
+
+.deep-research-length-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 6px;
+  align-items: center;
+}
+
+.deep-research-length-control span,
+.deep-research-length-control input[type="range"],
+.deep-research-length-control small {
+  grid-column: 1 / -1;
+}
+
+.deep-research-length-control input[type="number"] {
+  justify-self: start;
+  width: 72px;
+}
+
+.deep-research-length-control small {
+  color: #526171;
 }
 
 .reference-chip-list {

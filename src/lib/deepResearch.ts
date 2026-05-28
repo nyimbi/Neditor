@@ -42,6 +42,10 @@ export interface DeepResearchRun {
   draftMarkdown: string;
 }
 
+const WORDS_PER_MARKDOWN_PAGE = 500;
+const EXPANSION_PAGES_PER_PASS = 5;
+const MAX_EXPANSION_PASSES = 40;
+
 export function normalizeDeepResearchSettings(input: Partial<DeepResearchSettings>): DeepResearchSettings {
   return {
     topic: normalizeText(input.topic, 240),
@@ -117,12 +121,25 @@ export function deepResearchDraftPrompt(settings: DeepResearchSettings, iteratio
   ].join("\n");
 }
 
-export function deepResearchExpansionPrompt(settings: DeepResearchSettings, draftMarkdown: string, iterations: DeepResearchIteration[]) {
+export function deepResearchExpansionPrompt(
+  settings: DeepResearchSettings,
+  draftMarkdown: string,
+  iterations: DeepResearchIteration[],
+  currentPages = estimateMarkdownPages(draftMarkdown),
+  pass = 1,
+  maxPasses = expansionPassBudget(settings),
+) {
+  const remainingPages = pageShortfall(settings, draftMarkdown);
+  const passTargetPages = Math.min(remainingPages, EXPANSION_PAGES_PER_PASS);
   return [
     `Expand this ${settings.documentType} toward ${settings.targetPages} pages (${targetWordCount(settings)} words) for ${settings.audience}.`,
     `Topic: ${settings.topic}`,
+    `Current estimate: ${currentPages} page${currentPages === 1 ? "" : "s"}.`,
+    `Expansion pass: ${pass}/${maxPasses}.`,
+    `This pass should add about ${passTargetPages} page${passTargetPages === 1 ? "" : "s"} of new, substantive material unless the target is already met.`,
     "",
     "Use the research log to add substantive sections, examples, implications, constraints, and review TODOs. Do not pad with repetition.",
+    "Prefer new useful sections, tables, assumptions, decision implications, risks, implementation detail, and clearly marked source-verification TODOs over repeated prose.",
     "",
     "Research log:",
     formatDeepResearchLog(iterations),
@@ -185,11 +202,19 @@ export function estimateMarkdownPages(markdown: string) {
     .replace(/[#>*_[\]()`|:-]/g, " ")
     .split(/\s+/)
     .filter(Boolean).length;
-  return Math.max(1, Math.ceil(words / 500));
+  return Math.max(1, Math.ceil(words / WORDS_PER_MARKDOWN_PAGE));
 }
 
 export function targetWordCount(settings: DeepResearchSettings) {
-  return settings.targetPages * 500;
+  return settings.targetPages * WORDS_PER_MARKDOWN_PAGE;
+}
+
+export function expansionPassBudget(settings: DeepResearchSettings) {
+  return Math.min(MAX_EXPANSION_PASSES, Math.max(1, Math.ceil(settings.targetPages / EXPANSION_PAGES_PER_PASS)));
+}
+
+export function pageShortfall(settings: DeepResearchSettings, markdown: string) {
+  return Math.max(0, settings.targetPages - estimateMarkdownPages(markdown));
 }
 
 export function formatDeepResearchLog(iterations: DeepResearchIteration[]) {
