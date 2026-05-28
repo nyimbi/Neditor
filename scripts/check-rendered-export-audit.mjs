@@ -1600,12 +1600,16 @@ function isHostLimitedBrowserAssertion(assertion) {
 }
 
 function hostLimitReason(assertion) {
-  return String(assertion.reason || "Browser automation is unavailable on this verifier host.")
-    .replace(/\x1B\[[0-9;]*m/g, "")
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .slice(0, 4)
-    .join(" ");
+  const clean = String(assertion.reason || "Browser automation is unavailable on this verifier host.").replace(/\x1B\[[0-9;]*m/g, "");
+  const signals = [
+    /EPERM/i.test(clean) ? "EPERM" : "",
+    /SIGABRT/i.test(clean) ? "SIGABRT" : "",
+    /sandbox/i.test(clean) ? "sandbox" : "",
+  ].filter(Boolean);
+  if (signals.length) {
+    return `${assertion.scope} screenshot browser launch was blocked by the verifier host (${signals.join(", ")}).`;
+  }
+  return clean.split(/\r?\n/).filter(Boolean)[0]?.slice(0, 240) || "Browser automation is unavailable on this verifier host.";
 }
 
 function automatedTargetEvidence(target, evidence) {

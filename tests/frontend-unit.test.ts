@@ -8927,6 +8927,7 @@ test("rendered export audit exposes structured manual sign-off workflow", () => 
   ok(script.includes("hostLimitedScreenshotOnly"));
   ok(script.includes("hasHostLimitedBrowserAssertion"));
   ok(script.includes("browserScreenshotScopes"));
+  ok(script.includes("screenshot browser launch was blocked by the verifier host"));
   ok(script.includes("Host-limited browser screenshot proof"));
   ok(script.includes("office-preview-docx"));
   ok(script.includes("office-preview-pptx"));
