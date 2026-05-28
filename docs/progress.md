@@ -97,6 +97,26 @@ the broader AI runtime evidence rows.
 | `pnpm run check:docs` | Pass | Markdown links resolved after closing the AI paste cleanup evidence row. |
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json`; open rows dropped to 95 while remaining gaps are external/manual/distribution evidence or separately tracked local proof. |
 
+## 2026-05-28 Includes Evidence Closure
+
+`9.6 Includes | Include graph, diagnostics, re-render, export single doc` is now
+marked complete in `docs/spec-completion-matrix.md`. The closure is based on
+compiler tests for include expansion, child-front-matter stripping, source maps,
+directive forms, circular/depth/read diagnostics, Markdown bundle include maps,
+and focused browser workflows for clean included-file re-rendering, include
+directive watch-path recomputation, stale-child-event suppression, and include
+graph navigation from References and the command palette.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked include_expansion --lib` | Pass | Document-structure tests proved child front matter stripping, included heading source maps/AST source ranges, bang/brace/comment include directive forms, and included-file manifest entries. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_reports_circular_and_too_deep_includes --lib` | Pass | Compiler diagnostics proved circular include detection, maximum-depth enforcement, suggestions, and include-graph depth evidence. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_reports_unreadable_include_targets_with_context --lib` | Pass | Compiler diagnostics proved unreadable include targets carry source file, directive line, suggestion, target, and resolved-path context. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked markdown_bundle_keeps_duplicate_include_basenames_distinct --lib` | Pass | Markdown bundle proof preserved flattened compiled output plus collision-safe child include files, `manifest.json`, `include-graph.json`, and `include-map.json`. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "recompiles clean master documents|recomputes watched include paths|navigates include graph" --project chromium` | Pass | Focused Chromium workflows proved clean master re-rendering after child edits, include directive watch-path recomputation with stale-child suppression, and include graph navigation from References and command palette. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after closing the includes evidence row. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json`; open rows dropped to 94 while remaining gaps are external/manual/distribution evidence or separately tracked local proof. |
+
 ## 2026-05-28 Verification Update
 
 Table cursor-follow source editing verification:
