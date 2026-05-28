@@ -99,6 +99,7 @@ import {
   exportMetadataChecklistHelp,
   formatExportMetadataChecklistSummary,
 } from "../src/lib/exportMetadataChecklist.js";
+import { buildDocumentCompileOptions, buildDocumentExportOptions } from "../src/lib/documentExportOptions.js";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../src/lib/exportProfiles.js";
 import {
   applyRenamedDocumentState,
@@ -379,6 +380,68 @@ test("export profile helpers save apply and delete normalized profile state", ()
   equal(unchanged.profiles.length, 1);
   equal(unchanged.activeExportProfileId, "profile-1");
   equal(unchanged.statusMessage, "");
+});
+
+test("document export option helpers normalize compile export and transform settings", () => {
+  const baseState = {
+    bibliographyDefaults: { citationStyle: "unknown-style" as never },
+    brandProfileDefaults: {
+      name: "Acme",
+      color: "",
+      logo: "",
+      font: "",
+      header: "",
+      footer: "",
+      watermark: "Confidential",
+      legalDisclaimer: "",
+    },
+    transformEnginePaths: { dot: "/usr/bin/dot" },
+    trustedTransformEngines: { dot: true },
+    disabledTransformEngines: { plantuml: true },
+    transformInputModes: { plantuml: "file" as const },
+    transformTimeoutMs: 12_000,
+  };
+
+  const compileOptions = buildDocumentCompileOptions(baseState);
+  equal(compileOptions.defaultCitationStyle, "title");
+  equal(compileOptions.defaultBrandProfile.color, "#275DA8");
+  deepEqual(compileOptions.transformEnginePaths, { dot: "/usr/bin/dot" });
+  deepEqual(compileOptions.disabledTransformEngines, { plantuml: true });
+
+  const exportOptions = buildDocumentExportOptions({
+    ...baseState,
+    exportDefaults: {
+      includeManifest: false,
+      includeStyles: true,
+      includeSyntaxHighlighting: true,
+      htmlLanguage: "en-US",
+      htmlDescription: "Board package",
+      canonicalUrl: "https://example.test/board",
+      coverPage: true,
+      pageNumbers: false,
+      layoutPreset: "compact",
+      includeComments: false,
+      includeProvenance: true,
+      includeGlossary: false,
+      includeAgenda: true,
+    },
+    gitIntegration: { enabled: true, warnOnDirtyExport: true },
+    semanticStatus: "draft",
+  });
+  equal(exportOptions.includeManifest, false);
+  equal(exportOptions.layoutPreset, "compact");
+  equal(exportOptions.warnOnDirtyGit, true);
+  equal(exportOptions.watermark, "DRAFT");
+  equal(exportOptions.defaultBrandProfile.watermark, "Confidential");
+
+  const reviewedExportOptions = buildDocumentExportOptions({
+    ...baseState,
+    exportDefaults: { ...exportOptions, includeManifest: true },
+    gitIntegration: { enabled: false, warnOnDirtyExport: true },
+    semanticStatus: "approved",
+  });
+  equal(reviewedExportOptions.warnOnDirtyGit, false);
+  equal(reviewedExportOptions.watermark, "Confidential");
 });
 
 test("transform settings helpers clear trust and clamp runtime preferences", () => {

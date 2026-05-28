@@ -19,6 +19,7 @@ import {
   moveDocumentTabState,
   setPinnedDocumentState,
 } from "../lib/documentTabs";
+import { buildDocumentCompileOptions, buildDocumentExportOptions } from "../lib/documentExportOptions";
 import { activeDocumentState, externalTransformEnginesState, windowTitleState } from "../lib/documentSelectors";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
 import {
@@ -79,7 +80,6 @@ import {
   normalizeAiProviderDefaults,
   normalizeBibliographyDefaults,
   normalizeBrandProfileDefaults,
-  normalizeCitationStyle,
   normalizeDocsLiveDraftHistory,
   normalizeExportDefaults,
   normalizeExportProfiles,
@@ -1332,45 +1332,29 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     exportOptionsForActive() {
-      const defaults = normalizeExportDefaults(this.exportDefaults);
-      return {
-        includeManifest: defaults.includeManifest,
-        includeStyles: defaults.includeStyles,
-        includeSyntaxHighlighting: defaults.includeSyntaxHighlighting,
-        htmlLanguage: defaults.htmlLanguage,
-        htmlDescription: defaults.htmlDescription,
-        canonicalUrl: defaults.canonicalUrl,
-        coverPage: defaults.coverPage,
-        pageNumbers: defaults.pageNumbers,
-        layoutPreset: defaults.layoutPreset,
-        includeComments: defaults.includeComments,
-        includeProvenance: defaults.includeProvenance,
-        includeGlossary: defaults.includeGlossary,
-        includeAgenda: defaults.includeAgenda,
-        defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
-        defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
-        warnOnDirtyGit: this.gitIntegration.enabled && this.gitIntegration.warnOnDirtyExport,
+      return buildDocumentExportOptions({
+        exportDefaults: this.exportDefaults,
+        bibliographyDefaults: this.bibliographyDefaults,
+        brandProfileDefaults: this.brandProfileDefaults,
+        gitIntegration: this.gitIntegration,
         transformEnginePaths: this.transformEnginePaths,
         trustedTransformEngines: this.trustedTransformEngines,
         disabledTransformEngines: this.disabledTransformEngines,
         transformInputModes: this.transformInputModes,
         transformTimeoutMs: this.transformTimeoutMs,
-        watermark:
-          this.activeDocument.compile?.semantic.status === "draft"
-            ? "DRAFT"
-            : normalizeBrandProfileDefaults(this.brandProfileDefaults).watermark,
-      };
+        semanticStatus: this.activeDocument.compile?.semantic.status,
+      });
     },
     compileOptionsForActive() {
-      return {
-        defaultCitationStyle: normalizeCitationStyle(this.bibliographyDefaults.citationStyle),
-        defaultBrandProfile: normalizeBrandProfileDefaults(this.brandProfileDefaults),
+      return buildDocumentCompileOptions({
+        bibliographyDefaults: this.bibliographyDefaults,
+        brandProfileDefaults: this.brandProfileDefaults,
         transformEnginePaths: this.transformEnginePaths,
         trustedTransformEngines: this.trustedTransformEngines,
         disabledTransformEngines: this.disabledTransformEngines,
         transformInputModes: this.transformInputModes,
         transformTimeoutMs: this.transformTimeoutMs,
-      };
+      });
     },
     async createSnapshot(label = "manual") {
       const doc = this.activeDocument;
