@@ -69,6 +69,7 @@ const CLI_COMMANDS: &[&str] = &[
     "validate",
     "check",
     "templates",
+    "outlines",
     "snippets",
     "parts",
     "profile",
@@ -144,6 +145,18 @@ struct DocumentTemplateInfo {
     category: &'static str,
     summary: &'static str,
     best_for: &'static [&'static str],
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentOutlineInfo {
+    id: &'static str,
+    label: &'static str,
+    category: &'static str,
+    summary: &'static str,
+    best_for: &'static [&'static str],
+    outline: &'static [&'static str],
+    tags: &'static [&'static str],
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -282,6 +295,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "inspect" => run_inspect_command(&args[2..], stdin_text),
         "validate" | "check" => run_validate_command(&args[2..], stdin_text),
         "templates" => run_templates_command(&args[2..]),
+        "outlines" => run_outlines_command(&args[2..]),
         "snippets" | "parts" => run_snippets_command(&args[2..]),
         "profile" | "business-profile" => run_profile_command(&args[2..]),
         "rfp" | "rfp-response" | "analyze-rfp" => run_rfp_response_command(&args[2..], stdin_text),
@@ -1254,6 +1268,134 @@ fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
     }
     Ok(CliOutcome {
         message: templates_text_report(&templates),
+        exit_code: 0,
+    })
+}
+
+fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut ids_only = false;
+    let mut markdown_id: Option<String> = None;
+    let mut category: Option<String> = None;
+    let mut query: Option<String> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--ids-only" => ids_only = true,
+            "--markdown" | "--body" => {
+                index += 1;
+                markdown_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--markdown requires an outline id".to_string())?
+                        .to_string(),
+                );
+            }
+            "--category" => {
+                index += 1;
+                category = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--category requires a category name".to_string())?
+                        .to_string(),
+                );
+            }
+            "--query" | "--search" => {
+                index += 1;
+                query = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--query requires search text".to_string())?
+                        .to_string(),
+                );
+            }
+            value => return Err(format!("Unsupported outlines option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let category_filter = category
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let query_filter = query
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let outlines = document_outline_catalog()
+        .into_iter()
+        .filter(|outline| {
+            category_filter.as_deref().map_or(true, |category| {
+                outline.category.to_ascii_lowercase() == category
+            })
+        })
+        .filter(|outline| {
+            query_filter
+                .as_deref()
+                .map_or(true, |query| outline_matches_query(outline, query))
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(id) = markdown_id {
+        let outline = document_outline_catalog()
+            .into_iter()
+            .find(|outline| outline.id == id)
+            .ok_or_else(|| {
+                format!(
+                    "Unknown outline '{}'. Available outlines: {}",
+                    id,
+                    document_outline_catalog()
+                        .iter()
+                        .map(|outline| outline.id)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })?;
+        let markdown = outline_markdown(&outline);
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-outline-markdown.v1",
+                    "outline": outline.id,
+                    "markdown": markdown,
+                    "sectionCount": outline.outline.len(),
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: markdown,
+            exit_code: 0,
+        });
+    }
+
+    let ids = outlines
+        .iter()
+        .map(|outline| outline.id)
+        .collect::<Vec<_>>();
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-outlines.v1",
+                "count": outlines.len(),
+                "filters": {
+                    "category": category_filter,
+                    "query": query_filter,
+                },
+                "outlines": ids,
+                "outlineDetails": outlines,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    if ids_only {
+        return Ok(CliOutcome {
+            message: ids.join("\n"),
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: outlines_text_report(&outlines),
         exit_code: 0,
     })
 }
@@ -3566,6 +3708,207 @@ fn templates_text_report(templates: &[DocumentTemplateInfo]) -> String {
     lines.join("\n")
 }
 
+fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
+    vec![
+        DocumentOutlineInfo {
+            id: "proposal",
+            label: "Client Proposal",
+            category: "Business development",
+            summary: "Reusable client proposal structure for scope, delivery, commercials, and next steps.",
+            best_for: &["consulting offers", "implementation projects", "commercial services"],
+            outline: &["Executive Summary", "Client Situation", "Recommended Approach", "Scope of Work", "Deliverables", "Timeline", "Investment", "Assumptions", "Next Steps"],
+            tags: &["proposal", "business-development", "commercial"],
+        },
+        DocumentOutlineInfo {
+            id: "rfp-response",
+            label: "RFP Response",
+            category: "Procurement",
+            summary: "Seller-side RFP response outline with compliance, solution, team, pricing, and appendices.",
+            best_for: &["public procurement", "enterprise vendor selection", "competitive bids"],
+            outline: &["Executive Response", "Compliance Matrix", "Understanding of Requirements", "Proposed Solution", "Implementation Plan", "Team and Experience", "Pricing Response", "Risk and Assumptions", "Appendices"],
+            tags: &["rfp", "proposal", "compliance"],
+        },
+        DocumentOutlineInfo {
+            id: "rfp-technical-proposal",
+            label: "RFP Technical Proposal",
+            category: "Procurement",
+            summary: "Compliance-first technical proposal outline with checklist before content drafting.",
+            best_for: &["technical proposals", "evaluated RFPs", "compliance-heavy bids"],
+            outline: &["Cover", "Compliance Checklist", "Table of Contents", "Executive Summary", "Assignment Understanding", "Proposed Methodology", "Work Plan and Timeline", "Team Organization", "Past Performance", "Risk and Quality Management", "Sustainability and Transition", "Required Annexes"],
+            tags: &["rfp", "technical", "compliance", "outline-first"],
+        },
+        DocumentOutlineInfo {
+            id: "rfp-compliance-review",
+            label: "RFP Compliance Review Pack",
+            category: "Procurement",
+            summary: "Reviewer-focused outline for disqualifiers, attachments, owners, and submission sign-off.",
+            best_for: &["bid QA", "procurement review", "submission readiness"],
+            outline: &["Source Intake Summary", "Critical Disqualifiers", "Mandatory Submission Checklist", "Compliance Matrix", "Attachment Register", "Evidence Owner Map", "Open Clarifications", "Submission QA Sign-off"],
+            tags: &["rfp", "compliance", "qa", "attachments"],
+        },
+        DocumentOutlineInfo {
+            id: "rfq-response",
+            label: "RFQ Response",
+            category: "Procurement",
+            summary: "Concise quotation response outline for pricing, inclusions, exclusions, and validity.",
+            best_for: &["price quotations", "supplier comparisons", "standardized services"],
+            outline: &["Quotation Summary", "Buyer Requirements", "Quoted Items", "Pricing Table", "Inclusions", "Exclusions", "Delivery Schedule", "Commercial Terms", "Validity and Acceptance"],
+            tags: &["rfq", "quotation", "pricing"],
+        },
+        DocumentOutlineInfo {
+            id: "tender-response",
+            label: "Tender Response",
+            category: "Procurement",
+            summary: "Formal tender response outline with mandatory checklist, method statement, quality, and attachments.",
+            best_for: &["government tenders", "formal bids", "regulated procurement"],
+            outline: &["Bid Summary", "Mandatory Submission Checklist", "Compliance Statement", "Technical Methodology", "Work Plan", "Key Personnel", "Quality and Risk Management", "Commercial Offer", "Required Attachments"],
+            tags: &["tender", "bid", "procurement"],
+        },
+        DocumentOutlineInfo {
+            id: "tutorial",
+            label: "Tutorial or Training Guide",
+            category: "Learning",
+            summary: "Practical tutorial outline with goals, prerequisites, walkthrough, practice, and troubleshooting.",
+            best_for: &["customer enablement", "internal training", "step-by-step adoption"],
+            outline: &["Learning Goals", "Audience and Prerequisites", "Before You Begin", "Step-by-Step Walkthrough", "Practice Exercise", "Troubleshooting", "Next Steps"],
+            tags: &["tutorial", "training", "learning"],
+        },
+        DocumentOutlineInfo {
+            id: "lesson-plan",
+            label: "Lesson Plan",
+            category: "Learning",
+            summary: "Instructor-ready lesson plan outline with objectives, flow, assessment, and differentiation.",
+            best_for: &["teachers", "corporate training", "workshop facilitators"],
+            outline: &["Learning Objectives", "Standards and Prerequisites", "Materials", "Lesson Flow", "Guided Practice", "Assessment", "Differentiation", "Homework or Extension"],
+            tags: &["lesson", "education", "training"],
+        },
+        DocumentOutlineInfo {
+            id: "technical-textbook",
+            label: "Technical Textbook",
+            category: "Learning",
+            summary: "Outline-first textbook architecture for sequential chapter drafting and quality review.",
+            best_for: &["technical education", "certification courses", "engineering documentation"],
+            outline: &["Textbook Architecture", "Chapter Outline", "Reader Prerequisites", "Chapter 1 - Conceptual Foundation", "Chapter 2 - Technical Model", "Chapter 3 - Worked Examples", "Chapter 4 - Practice Exercises", "Chapter 5 - Pitfalls and Review", "Instructional Quality Review"],
+            tags: &["textbook", "technical", "long-form"],
+        },
+        DocumentOutlineInfo {
+            id: "novel",
+            label: "Novel",
+            category: "Creative",
+            summary: "Plot-first novel outline for story architecture, chapter sequence, and narrative review.",
+            best_for: &["fiction drafting", "story bibles", "developmental editing"],
+            outline: &["Story Premise", "Character Arcs", "World and Continuity Rules", "Plot Outline", "Chapter 1 - Opening Image", "Chapter 2 - Inciting Incident", "Chapter 3 - Rising Complications", "Chapter 4 - Midpoint Reversal", "Chapter 5 - Crisis and Climax", "Chapter 6 - Resolution", "Narrative Quality Review"],
+            tags: &["novel", "fiction", "plot"],
+        },
+        DocumentOutlineInfo {
+            id: "podcast-script",
+            label: "Podcast Script",
+            category: "Creative",
+            summary: "Episode architecture outline for segment planning, host script, production notes, and review.",
+            best_for: &["podcast episodes", "interview shows", "narrative audio"],
+            outline: &["Episode Architecture", "Segment Rundown", "Cold Open", "Intro", "Segment 1", "Segment 2", "Guest Questions", "Sponsor or Promo Read", "Outro", "Production Notes", "Audio Production Review"],
+            tags: &["podcast", "script", "audio"],
+        },
+        DocumentOutlineInfo {
+            id: "movie-script",
+            label: "Movie Script",
+            category: "Creative",
+            summary: "Screen story outline for logline, characters, beat sheet, acts, key scenes, and production constraints.",
+            best_for: &["screenplays", "film treatments", "scene planning"],
+            outline: &["Screen Story Architecture", "Logline", "Characters", "World and Tone", "Beat Sheet", "Act I", "Act II", "Act III", "Key Scenes", "Dialogue Notes", "Production Constraints", "Screenplay Quality Review"],
+            tags: &["movie", "screenplay", "script"],
+        },
+        DocumentOutlineInfo {
+            id: "board-decision-memo",
+            label: "Board Decision Memo",
+            category: "Executive",
+            summary: "Decision-oriented outline for board or executive approval papers.",
+            best_for: &["board packs", "investment approvals", "executive decisions"],
+            outline: &["Decision Requested", "Executive Summary", "Strategic Context", "Options Considered", "Financial Case", "Risk Assessment", "Implementation Plan", "Recommendation", "Appendices"],
+            tags: &["board", "decision", "executive"],
+        },
+        DocumentOutlineInfo {
+            id: "business-case",
+            label: "Business Case",
+            category: "Executive",
+            summary: "Decision-ready business case outline for options, financial case, risks, and recommendation.",
+            best_for: &["investment approval", "operating changes", "portfolio decisions"],
+            outline: &["Executive Summary", "Decision Needed", "Problem", "Options", "Financial Case", "Risks", "Recommendation", "Implementation Plan"],
+            tags: &["business-case", "decision", "finance"],
+        },
+        DocumentOutlineInfo {
+            id: "policy-brief",
+            label: "Policy Brief",
+            category: "Policy",
+            summary: "Evidence-led policy outline with options, impacts, risks, and recommendation.",
+            best_for: &["public policy", "research translation", "advisory briefs"],
+            outline: &["Executive Summary", "Problem Definition", "Policy Context", "Evidence Base", "Options", "Impact Assessment", "Risks and Tradeoffs", "Recommendation", "Implementation Considerations"],
+            tags: &["policy", "brief", "evidence"],
+        },
+        DocumentOutlineInfo {
+            id: "research-report",
+            label: "Research Report",
+            category: "Research",
+            summary: "Structured research report outline with methodology, findings, citations, and recommendations.",
+            best_for: &["deep research", "evidence reports", "analyst deliverables"],
+            outline: &["Abstract", "Introduction", "Research Questions", "Methodology", "Literature and Source Review", "Findings", "Analysis", "Limitations", "Recommendations", "Bibliography"],
+            tags: &["research", "report", "citations"],
+        },
+        DocumentOutlineInfo {
+            id: "implementation-playbook",
+            label: "Implementation Playbook",
+            category: "Delivery",
+            summary: "Operational outline for implementing a project, tool, process, or platform.",
+            best_for: &["delivery teams", "rollouts", "internal operating guides"],
+            outline: &["Purpose", "Operating Model", "Scope", "Roles and Responsibilities", "Implementation Phases", "Change Management", "Training Plan", "Risks and Controls", "Success Metrics", "Runbook"],
+            tags: &["implementation", "delivery", "playbook"],
+        },
+    ]
+}
+
+fn outline_matches_query(outline: &DocumentOutlineInfo, query: &str) -> bool {
+    outline.id.to_ascii_lowercase().contains(query)
+        || outline.label.to_ascii_lowercase().contains(query)
+        || outline.category.to_ascii_lowercase().contains(query)
+        || outline.summary.to_ascii_lowercase().contains(query)
+        || outline
+            .best_for
+            .iter()
+            .any(|value| value.to_ascii_lowercase().contains(query))
+        || outline
+            .tags
+            .iter()
+            .any(|value| value.to_ascii_lowercase().contains(query))
+        || outline
+            .outline
+            .iter()
+            .any(|value| value.to_ascii_lowercase().contains(query))
+}
+
+fn outline_markdown(outline: &DocumentOutlineInfo) -> String {
+    outline
+        .outline
+        .iter()
+        .map(|heading| format!("- {heading}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn outlines_text_report(outlines: &[DocumentOutlineInfo]) -> String {
+    if outlines.is_empty() {
+        return "No NEditor document outlines match those filters.".to_string();
+    }
+    let mut lines = vec![format!("NEditor document outlines ({}):", outlines.len())];
+    for outline in outlines {
+        lines.push(format!(
+            "  - {} [{}] {}: {}",
+            outline.id, outline.category, outline.label, outline.summary
+        ));
+    }
+    lines.push("Use `ned outlines --markdown <id>` to print a reusable outline for the planner or Docs Live.".to_string());
+    lines.join("\n")
+}
+
 fn document_snippet_catalog() -> Vec<DocumentSnippetInfo> {
     vec![
         DocumentSnippetInfo {
@@ -5170,6 +5513,9 @@ _ned() {{
       templates)
         COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search" -- "$cur") )
         ;;
+      outlines)
+        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body" -- "$cur") )
+        ;;
       snippets|parts)
         COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body --workspace --fill-profile --profile" -- "$cur") )
         ;;
@@ -5264,6 +5610,9 @@ _ned() {{
       ;;
     templates)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:'
+      ;;
+    outlines)
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching outline ids only]' '--category[filter by category]:category:' '--query[search outlines by text]:query:' '--search[alias for --query]:query:' '--markdown[print one outline as planner Markdown]:id:' '--body[alias for --markdown]:id:'
       ;;
     snippets|parts)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--fill-profile[merge saved business profile values into printed snippet Markdown]' '--profile[alias for --fill-profile]'
@@ -5391,12 +5740,18 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l allow-not-ready".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l option -r".to_string(),
-        "complete -c ned -n '__fish_seen_subcommand_from templates targets inspect doctor' -l json"
+        "complete -c ned -n '__fish_seen_subcommand_from templates outlines targets inspect doctor' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l query -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l search -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l ids-only".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l category -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l query -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l search -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l markdown -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l body -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l kind -r".to_string(),
@@ -5829,6 +6184,7 @@ fn help_text() -> String {
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
+        "  ned outlines [--json] [--category Procurement] [--query RFP] [--ids-only] [--markdown id]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id] [--workspace . --fill-profile]".to_string(),
         "  ned profile [--workspace path] [--init] [--set fullName=...] [--get field|--fields] [--json|--markdown|--placeholders]".to_string(),
         "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--json|--markdown|--matrix]".to_string(),
@@ -5846,6 +6202,7 @@ fn help_text() -> String {
         "  ned --version".to_string(),
         "".to_string(),
         format!("Templates: {}", NEW_DOCUMENT_TEMPLATES.join(", ")),
+        "Outlines: proposal, rfp-response, rfp-technical-proposal, rfp-compliance-review, research-report, board-decision-memo, and more.".to_string(),
         format!(
             "Targets: {}, or all. Use comma-separated targets for delivery packs.",
             SUPPORTED_EXPORT_TARGETS.join(", ")

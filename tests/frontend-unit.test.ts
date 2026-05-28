@@ -8081,6 +8081,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned analyze-rfp - --matrix"));
   ok(app.includes("ned new tender.md --template tender --json"));
   ok(app.includes("ned new podcast.md --template podcast-script --json"));
+  ok(app.includes("ned outlines --category Procurement --query RFP --json"));
+  ok(app.includes("ned outlines --markdown rfp-technical-proposal"));
   ok(app.includes("ned evidence --json"));
   ok(app.includes("ned default-reader --status --json"));
   ok(app.includes("ned support-bundle --output support.json"));
@@ -8097,6 +8099,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(cli.includes("neditor.ned-open.v1"));
   ok(cli.includes("neditor.ned-new.v1"));
   ok(cli.includes("templateDetails"));
+  ok(cli.includes("neditor.ned-outlines.v1"));
+  ok(cli.includes("outlineDetails"));
+  ok(cli.includes("run_outlines_command"));
   ok(cli.includes("snippetDetails"));
   ok(cli.includes("neditor.ned-snippets.v1"));
   ok(cli.includes("neditor.ned-profile.v1"));

@@ -714,6 +714,53 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     assert!(snippet_body.message.contains("## Review Handoff"));
     assert!(snippet_body.message.contains("{{reviewer}}"));
 
+    let outlines = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("outlines json");
+    let outline_report: serde_json::Value =
+        serde_json::from_str(&outlines.message).expect("outlines json");
+    assert_eq!(outline_report["schema"], "neditor.ned-outlines.v1");
+    assert!(outline_report["count"].as_u64().expect("outline count") >= 17);
+    assert!(outline_report["outlines"]
+        .as_array()
+        .expect("outlines")
+        .contains(&serde_json::json!("rfp-technical-proposal")));
+    assert!(outline_report["outlineDetails"]
+        .as_array()
+        .expect("outline details")
+        .iter()
+        .any(|outline| outline["id"] == "rfp-technical-proposal"
+            && outline["category"] == "Procurement"
+            && outline["outline"]
+                .as_array()
+                .expect("outline")
+                .contains(&serde_json::json!("Compliance Checklist"))));
+
+    let filtered_outlines = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--category".to_string(),
+        "Research".to_string(),
+        "--query".to_string(),
+        "bibliography".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("filtered outline ids");
+    assert_eq!(filtered_outlines.message, "research-report");
+
+    let outline_markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--markdown".to_string(),
+        "rfp-technical-proposal".to_string(),
+    ])
+    .expect("outline markdown");
+    assert!(outline_markdown.message.contains("- Compliance Checklist"));
+    assert!(outline_markdown.message.contains("- Table of Contents"));
+
     let targets = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "targets".to_string(),

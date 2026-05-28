@@ -95,6 +95,8 @@ ned inspect board-paper.md --json
 ned validate board-paper.md --to pdf --json
 ned export proposal.md --to docx --output proposal.docx
 ned templates --category Procurement --json
+ned outlines --category Procurement --query RFP --json
+ned outlines --markdown rfp-technical-proposal
 ned snippets --kind procurement --json
 ned snippets --markdown review-handoff
 ned profile --workspace . --set fullName="Jane Doe" --set companyName="Acme Advisory" --json
@@ -145,7 +147,12 @@ diagnostics, and available export targets without writing any artifacts. `ned
 templates` explains the installed starter documents with categories, summaries,
 and best-fit uses; use `ned templates --category Procurement --json` or
 `ned templates --query podcast --ids-only` when help desk scripts need filtered
-template discovery. `ned snippets` explains reusable standard document parts
+template discovery. `ned outlines` explains reusable document outlines for
+proposal planning before body text is drafted; use
+`ned outlines --category Procurement --query RFP --json` for filtered discovery
+or `ned outlines --markdown rfp-technical-proposal` to print a copyable outline
+for the Outline planner, Docs Live, or another writing tool. `ned snippets`
+explains reusable standard document parts
 such as contact blocks, company overview, scope, pricing assumptions, compliance
 matrix, risk register, tender checklist, tutorial step, and review handoff; use
 `ned snippets --markdown review-handoff` to print a copyable Markdown part or
