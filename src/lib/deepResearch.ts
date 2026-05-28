@@ -1,5 +1,6 @@
 import type { AiProviderProfileId } from "./aiProviderPackages.js";
 import { normalizeCitationKey } from "./bibliographyManager.js";
+import { countCitationTodoMarkers } from "./citationTodoPatterns.js";
 
 export type DeepResearchSearchProvider = "duckduckgo" | "searxng" | "tavily";
 
@@ -245,7 +246,7 @@ export function deepResearchQualityAuditMarkdown(
   const currentPages = estimateMarkdownPages(draftMarkdown);
   const sources = uniqueSources(iterations);
   const openGaps = iterations.flatMap((iteration) => iteration.gaps).filter(Boolean);
-  const citationTodos = (draftMarkdown.match(/citation TODO|\[@TODO|TODO citation/gi) || []).length;
+  const citationTodos = countCitationTodoMarkers(draftMarkdown);
   const targetStatus = currentPages >= settings.targetPages
     ? `Reached target: about ${currentPages}/${settings.targetPages} pages.`
     : `Below target: about ${currentPages}/${settings.targetPages} pages; provider expansion should be reviewed before release.`;

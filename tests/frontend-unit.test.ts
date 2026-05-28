@@ -90,6 +90,7 @@ import {
   extractCitationTodoItems,
   resolveCitationTodo,
 } from "../src/lib/citationTodoWorkflow.js";
+import { countCitationTodoMarkers } from "../src/lib/citationTodoPatterns.js";
 import { citationSourceLibraryAuditMarkdown } from "../src/lib/citationSourceLibrary.js";
 import { commandSearchText, compactCommandKeywords, joinCommandDescription } from "../src/lib/commandPalette.js";
 import { saveAiProviderDefaultsState, saveBusinessProfileState, saveTtsPreferencesState } from "../src/lib/configurationProfiles.js";
@@ -2065,13 +2066,20 @@ test("citation TODO workflow extracts resolves defers and audits blockers", () =
     "Revenue grew by 18%. citation TODO",
     "<!-- citation-todo: deferred | reason: Waiting on finance; needs citation -->",
     "Margin improved. needs citation",
+    "Bookings accelerated. <!-- TODO: citation needed -->",
+    "Churn decreased. TODO citation",
+    "Market share improved. citation needed",
   ].join("\n");
   const todos = extractCitationTodoItems(source);
 
-  equal(todos.length, 3);
+  equal(todos.length, 6);
+  equal(countCitationTodoMarkers(source), 6);
   equal(todos[0].status, "open");
   equal(todos[1].status, "deferred");
   equal(todos[1].note, "Waiting on finance; needs citation");
+  ok(todos.some((todo) => todo.marker === "TODO: citation needed"));
+  ok(todos.some((todo) => todo.marker === "TODO citation"));
+  ok(todos.some((todo) => todo.marker === "citation needed"));
 
   const resolved = resolveCitationTodo(source, todos[0], "[@finance2026]", "Audited forecast");
   ok(resolved.includes("Revenue grew by 18%. [@finance2026] <!-- citation-resolved: Audited forecast -->"));
@@ -2081,6 +2089,7 @@ test("citation TODO workflow extracts resolves defers and audits blockers", () =
   ok(deferred.includes("<!-- citation-todo: deferred | reason: Need source owner | original: needs citation -->"));
   ok(citationTodoComment("Board pack --> source").includes("Board pack source"));
   ok(citationTodoAuditMarkdown(todos).includes("Line 2 (open): Revenue grew by 18%. [citation TODO]"));
+  ok(citationTodoAuditMarkdown(todos).includes("Line 5 (open): Bookings accelerated. <!-- [TODO: citation needed] -->"));
 });
 
 test("conflict diff keeps local and external edits aligned for merge UI", () => {

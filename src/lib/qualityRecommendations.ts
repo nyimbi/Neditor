@@ -1,4 +1,5 @@
 import type { DocumentDiagnostic, SemanticDocument } from "../types.js";
+import { countCitationTodoMarkers } from "./citationTodoPatterns.js";
 import { frontMatterScalarValue } from "./frontMatter.js";
 import { markdownFenceOpener, stripMarkdownFencedBlocks } from "./provenanceReview.js";
 
@@ -41,7 +42,6 @@ const BIBLIOGRAPHY_LANGUAGES = new Set(["bibtex", "hayagriva", "bibliography"]);
 const RAW_BIBLIOGRAPHY_ENTRY_RE = /^@(?:article|book|misc|techreport|inproceedings)\s*[{(]/i;
 const HEADING_RE = /^#{1,4}\s+\S.+$/gm;
 const GENERIC_AI_PHRASE_RE = /\b(?:leverage|robust|seamless|cutting-edge|world-class|game-changing|holistic|synergy)\b/gi;
-const CITATION_TODO_RE = /(citation TODO|source needed|needs citation|TODO:\s*add citation|cite needed)/gi;
 const DEEP_RESEARCH_MARKER_RE = /provider:\s*NEditor Deep Research|^##\s+(?:Deep Research Evidence Log|Source Citation Index)\b/im;
 
 export function buildQualityRecommendations(input: QualityRecommendationInput): QualityRecommendation[] {
@@ -60,7 +60,7 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
     ? documentBodyForInlineCitationReview(analysisText)
     : analysisText;
   const deepResearchBodyCitationCount = (inlineCitationReviewText.match(CITATION_RE) || []).length;
-  const citationTodoCount = (inlineCitationReviewText.match(CITATION_TODO_RE) || []).length;
+  const citationTodoCount = countCitationTodoMarkers(inlineCitationReviewText);
   const headings = (analysisText.match(HEADING_RE) || []).length;
   const longParagraphs = longParagraphCount(analysisText);
   const genericPhrases = analysisText.match(GENERIC_AI_PHRASE_RE) || [];

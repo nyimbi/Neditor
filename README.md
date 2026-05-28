@@ -450,7 +450,8 @@ web app.
   responses when a session refresh token is available.
   The References panel also includes a Citation TODO workflow for adding,
   resolving, deferring, jumping to, and exporting citation blockers as a
-  reviewer-ready Markdown audit. Source Search can query DuckDuckGo, SearXNG,
+  reviewer-ready Markdown audit, including `TODO: citation needed` markers
+  inserted by AI paste cleanup. Source Search can query DuckDuckGo, SearXNG,
   or Tavily, download selected source documents into a document-associated
   `.neditor-sources` directory, rank candidates by deterministic citation fit,
   insert a CSL JSON bibliography stub, and retain a local source manifest for

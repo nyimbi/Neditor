@@ -467,7 +467,10 @@ The references panel surfaces resolved bibliography entries, missing citation
 keys, duplicate bibliography keys, and citation TODO blockers. The Citation
 TODO workflow can insert a source-review marker, jump to each unresolved item,
 resolve it with a citation such as `[@porter1985]`, defer it with a reason, or
-insert/copy a Markdown audit checklist for reviewers. Unsupported
+insert/copy a Markdown audit checklist for reviewers. It recognizes typed
+phrases such as `needs citation` and cleanup comments such as
+`TODO: citation needed`, so AI paste cleanup output flows into the same review
+queue. Unsupported
 citation-style warnings are reported with the rest of the document diagnostics.
 The same panel can insert the bibliography marker, add a BibTeX template,
 create stubs for missing keys, reinsert citation references, and copy resolved

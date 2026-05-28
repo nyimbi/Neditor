@@ -1,3 +1,5 @@
+import { citationTodoMarkerRegex } from "./citationTodoPatterns.js";
+
 export type CitationTodoStatus = "open" | "deferred";
 
 export interface CitationTodoItem {
@@ -10,7 +12,7 @@ export interface CitationTodoItem {
   note?: string;
 }
 
-const textTodoPattern = /(citation TODO|source needed|needs citation|TODO:\s*add citation|cite needed)/gi;
+const textTodoPattern = citationTodoMarkerRegex();
 const commentTodoPattern = /<!--\s*citation-todo:\s*(open|deferred)\b([^>]*)-->/gi;
 
 export function extractCitationTodoItems(markdown: string): CitationTodoItem[] {
