@@ -456,7 +456,7 @@ First-release native business transforms:
 | `roadmap` | One item per line, `stage: text`, with optional pipe metadata such as `status=active`, `owner=Docs`, or `due=2026-06-30`. |
 | `adr` | One `key: value` row per line for fields such as `Status`, `Context`, `Decision`, and `Consequences`. |
 | `diff` | Unified-diff-style text. Additions, deletions, and hunk headers are classified and summarized. |
-| `qr` | UTF-8 payload text rendered as a static SVG QR code for short URLs, artifact paths, or release-pack references. |
+| `qr` | UTF-8 payload text rendered as a static SVG QR code for short URLs, artifact paths, or release-pack references. The native byte-mode renderer covers QR versions 1-4, reserves finder separators, draws alignment patterns for versions 2-4, and reports a diagnostic when payloads exceed 78 bytes. |
 
 Execution-heavy second-wave transforms such as `python`, `r`, `wavedrom`,
 `nomnoml`, `latex`, and raw `html` are not first-release native transforms.

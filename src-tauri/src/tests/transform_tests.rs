@@ -725,6 +725,25 @@ fn qr_matrix_reserves_finder_separators() {
 }
 
 #[test]
+fn qr_matrix_draws_alignment_patterns_for_larger_versions() {
+    let matrix = transforms::qr::render_qr_matrix(&[b'x'; 20]).expect("version 2 qr matrix");
+    assert_eq!(matrix.len(), 25);
+    let center = matrix.len() - 7;
+
+    assert!(matrix[center - 2][center - 2]);
+    assert!(matrix[center - 2][center + 2]);
+    assert!(matrix[center + 2][center - 2]);
+    assert!(matrix[center + 2][center + 2]);
+    assert!(!matrix[center - 1][center]);
+    assert!(!matrix[center][center - 1]);
+    assert!(matrix[center][center]);
+
+    let version_four_matrix =
+        transforms::qr::render_qr_matrix(&[b'x'; 78]).expect("version 4 qr matrix");
+    assert_eq!(version_four_matrix.len(), 33);
+}
+
+#[test]
 fn bibtex_transform_renders_bibliography_preview() {
     let artifact = run_transform(
         "bibtex".to_string(),

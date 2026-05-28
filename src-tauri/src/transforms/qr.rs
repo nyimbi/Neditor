@@ -196,6 +196,7 @@ fn qr_build_matrix(version: usize, codewords: &[u8]) -> Vec<Vec<bool>> {
     qr_add_finder(&mut modules, &mut reserved, size - 7, 0);
     qr_add_finder(&mut modules, &mut reserved, 0, size - 7);
     qr_add_timing(&mut modules, &mut reserved);
+    qr_add_alignment_patterns(&mut modules, &mut reserved, version);
     qr_reserve_format_areas(&mut reserved);
     let dark_row = 4 * version + 9;
     qr_set_function(&mut modules, &mut reserved, 8, dark_row, true);
@@ -236,6 +237,46 @@ fn qr_add_timing(modules: &mut [Vec<bool>], reserved: &mut [Vec<bool>]) {
         let black = index % 2 == 0;
         qr_set_function(modules, reserved, index, 6, black);
         qr_set_function(modules, reserved, 6, index, black);
+    }
+}
+
+fn qr_add_alignment_patterns(
+    modules: &mut [Vec<bool>],
+    reserved: &mut [Vec<bool>],
+    version: usize,
+) {
+    let Some(center) = qr_alignment_center(version, modules.len()) else {
+        return;
+    };
+    qr_add_alignment(modules, reserved, center, center);
+}
+
+fn qr_alignment_center(version: usize, size: usize) -> Option<usize> {
+    (version >= 2 && version <= 4)
+        .then_some(size.checked_sub(7)?)
+        .filter(|center| *center >= 2)
+}
+
+fn qr_add_alignment(
+    modules: &mut [Vec<bool>],
+    reserved: &mut [Vec<bool>],
+    center_x: usize,
+    center_y: usize,
+) {
+    for dy in -2isize..=2 {
+        for dx in -2isize..=2 {
+            let Some(x) = center_x.checked_add_signed(dx) else {
+                continue;
+            };
+            let Some(y) = center_y.checked_add_signed(dy) else {
+                continue;
+            };
+            if y >= modules.len() || x >= modules[y].len() {
+                continue;
+            }
+            let distance = dx.unsigned_abs().max(dy.unsigned_abs());
+            qr_set_function(modules, reserved, x, y, distance == 0 || distance == 2);
+        }
     }
 }
 
