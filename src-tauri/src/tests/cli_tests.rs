@@ -375,6 +375,7 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
             "2. Proposer shall include pricing, payment terms, and all assumptions.",
             "3. Vendor must demonstrate SOC 2 security controls and data protection practices.",
             "4. Submit signed insurance certificate and three relevant customer references.",
+            "5. Failure to submit the bid bond certificate will be rejected as non-responsive.",
             "Evaluation criteria: technical merit 40 points, price 30 points, experience 30 points.",
             "| Role | Minimum Requirements | Points |",
             "| --- | --- | ---: |",
@@ -414,8 +415,18 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
             .as_array()
             .expect("requirements")
             .len(),
-        7
+        8
     );
+    assert!(report["analysis"]["requirements"]
+        .as_array()
+        .expect("requirements")
+        .iter()
+        .any(|item| item["text"]
+            .as_str()
+            .is_some_and(|value| value.contains("bid bond certificate"))
+            && item["requirementType"] == "MANDATORY"
+            && item["disqualificationRisk"] == true
+            && item["confidence"] == "high"));
     assert!(report["analysis"]["requirements"]
         .as_array()
         .expect("requirements")
@@ -424,7 +435,8 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
             .as_str()
             .is_some_and(|value| value.contains("Software Architect")
                 && value.contains("5+ years")
-                && value.contains("20 points"))));
+                && value.contains("20 points"))
+            && item["requirementType"] == "SCORED"));
     assert!(report["analysis"]["requirements"]
         .as_array()
         .expect("requirements")
@@ -433,7 +445,24 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
             .as_str()
             .is_some_and(|value| value.contains("Legal/IPR Expert")
                 && value.contains("bilingual EN/FR")
-                && value.contains("Mandatory"))));
+                && value.contains("Mandatory"))
+            && item["requirementType"] == "MANDATORY"));
+    assert!(report["analysis"]["criticalDisqualifiers"]
+        .as_array()
+        .expect("critical disqualifiers")
+        .iter()
+        .any(|item| item
+            .as_str()
+            .is_some_and(|value| value.contains("bid bond certificate"))));
+    assert!(report["analysis"]["complianceRows"]
+        .as_array()
+        .expect("compliance rows")
+        .iter()
+        .any(|item| item["disqualificationRisk"] == true
+            && item["requirementType"] == "MANDATORY"
+            && item["requirement"]
+                .as_str()
+                .is_some_and(|value| value.contains("bid bond certificate"))));
     assert!(report["analysis"]["evaluationCriteria"]
         .as_array()
         .expect("criteria")
@@ -506,6 +535,7 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     assert!(response_text.contains("## Requirement Response Drafts"));
     assert!(response_text.contains("Win theme: reduce implementation risk."));
     assert!(response_text.contains("SOC 2 security controls"));
+    assert!(response_text.contains("bid bond certificate"));
     assert!(response_text.contains("Software Architect"));
     assert!(response_text.contains("Legal/IPR Expert"));
     assert!(response_text.contains("Acme Advisory"));

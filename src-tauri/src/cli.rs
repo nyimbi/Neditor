@@ -284,7 +284,10 @@ struct RfpCliSource {
 struct RfpCliRequirement {
     id: String,
     text: String,
+    requirement_type: String,
     category: String,
+    disqualification_risk: bool,
+    confidence: String,
     source_line: usize,
 }
 
@@ -293,7 +296,9 @@ struct RfpCliRequirement {
 struct RfpCliComplianceRow {
     id: String,
     requirement: String,
+    requirement_type: String,
     category: String,
+    disqualification_risk: bool,
     compliance_status: String,
     response_section: String,
     suggested_response: String,
@@ -327,6 +332,7 @@ struct RfpCliAnalysis {
     budget_hints: Vec<String>,
     evaluation_criteria: Vec<String>,
     mandatory_attachments: Vec<String>,
+    critical_disqualifiers: Vec<String>,
     risks: Vec<String>,
     questions: Vec<String>,
     completeness_score: u8,
@@ -6075,11 +6081,8 @@ fn analyze_rfp_text(
             None
         })
         .enumerate()
-        .map(|(index, (line_number, text))| RfpCliRequirement {
-            id: format!("RFP-REQ-{:03}", index + 1),
-            text: trim_requirement_marker(&text),
-            category: rfp_requirement_category(&text),
-            source_line: line_number,
+        .map(|(index, (line_number, text))| {
+            build_rfp_cli_requirement(&text, line_number, index + 1)
         })
         .collect::<Vec<_>>();
     requirements = dedupe_rfp_requirements(requirements);
@@ -6088,11 +6091,8 @@ fn analyze_rfp_text(
             .iter()
             .take(6)
             .enumerate()
-            .map(|(index, (line_number, line))| RfpCliRequirement {
-                id: format!("RFP-REQ-{:03}", index + 1),
-                text: trim_requirement_marker(line),
-                category: rfp_requirement_category(line),
-                source_line: *line_number,
+            .map(|(index, (line_number, line))| {
+                build_rfp_cli_requirement(line, *line_number, index + 1)
             })
             .collect();
     }
@@ -6166,6 +6166,11 @@ fn analyze_rfp_text(
         ],
         10,
     );
+    let critical_disqualifiers = requirements
+        .iter()
+        .filter(|requirement| requirement.disqualification_risk)
+        .map(|requirement| format!("{}: {}", requirement.id, requirement.text))
+        .collect::<Vec<_>>();
     let capabilities = infer_rfp_capabilities(&requirements, &imported.text, profile);
     let stated_intent = infer_rfp_stated_intent(&significant_lines, &requirements);
     let implied_intent = infer_rfp_implied_intent(
@@ -6240,6 +6245,7 @@ fn analyze_rfp_text(
         budget_hints,
         evaluation_criteria,
         mandatory_attachments,
+        critical_disqualifiers,
         risks,
         questions,
         completeness_score,
@@ -6402,6 +6408,116 @@ fn is_rfp_explicit_constraint_line(line: &str) -> bool {
             "points",
         ],
     )
+}
+
+fn build_rfp_cli_requirement(line: &str, source_line: usize, index: usize) -> RfpCliRequirement {
+    let text = trim_requirement_marker(line);
+    let category = rfp_requirement_category(&text);
+    let disqualification_risk = rfp_cli_disqualification_risk(&text);
+    let requirement_type =
+        rfp_cli_requirement_type(&text, &category, disqualification_risk).to_string();
+    let confidence = rfp_cli_requirement_confidence(&text, disqualification_risk).to_string();
+    RfpCliRequirement {
+        id: format!("RFP-REQ-{:03}", index),
+        text,
+        requirement_type,
+        category,
+        disqualification_risk,
+        confidence,
+        source_line,
+    }
+}
+
+fn rfp_cli_requirement_type(
+    line: &str,
+    category: &str,
+    disqualification_risk: bool,
+) -> &'static str {
+    let lower = line.to_ascii_lowercase();
+    if disqualification_risk
+        || contains_any(
+            &lower,
+            &[
+                "mandatory",
+                "must",
+                "shall",
+                "required",
+                "pass/fail",
+                "non-responsive",
+            ],
+        )
+    {
+        "MANDATORY"
+    } else if contains_any(
+        &lower,
+        &[
+            "points", "point", "score", "scoring", "weight", "weighted", "%",
+        ],
+    ) {
+        "SCORED"
+    } else if contains_any(
+        &lower,
+        &["deadline", "due", "submission date", "no later than"],
+    ) {
+        "DEADLINE"
+    } else if contains_any(
+        &lower,
+        &[
+            "page limit",
+            "maximum ",
+            "font",
+            "format",
+            "times new roman",
+            "arial",
+            "calibri",
+        ],
+    ) {
+        "FORMAT"
+    } else if category == "Compliance" {
+        "COMPLIANCE"
+    } else {
+        "REQUIREMENT"
+    }
+}
+
+fn rfp_cli_requirement_confidence(line: &str, disqualification_risk: bool) -> &'static str {
+    let lower = line.to_ascii_lowercase();
+    if disqualification_risk
+        || contains_any(
+            &lower,
+            &[
+                "must",
+                "shall",
+                "mandatory",
+                "required",
+                "points",
+                "score",
+                "deadline",
+                "certificate",
+                "signed",
+            ],
+        )
+    {
+        "high"
+    } else if line.contains('|')
+        || contains_any(
+            &lower,
+            &[
+                "vendor",
+                "proposer",
+                "bidder",
+                "contractor",
+                "provide",
+                "submit",
+                "include",
+                "demonstrate",
+            ],
+        )
+    {
+        "medium"
+    } else {
+        "low"
+    }
 }
 
 fn rfp_requirement_candidate_text(line: &str) -> String {
@@ -6701,7 +6817,9 @@ fn build_rfp_compliance_row(
     RfpCliComplianceRow {
         id: requirement.id.clone(),
         requirement: requirement.text.clone(),
+        requirement_type: requirement.requirement_type.clone(),
         category: requirement.category.clone(),
+        disqualification_risk: requirement.disqualification_risk,
         compliance_status: "Needs evidence review".to_string(),
         response_section,
         suggested_response,
@@ -7083,7 +7201,7 @@ fn rfp_cli_compliance_checklist_markdown(analysis: &RfpCliAnalysis) -> String {
     let critical_rows = analysis
         .compliance_rows
         .iter()
-        .filter(|row| rfp_cli_disqualification_risk(&row.requirement))
+        .filter(|row| row.disqualification_risk)
         .collect::<Vec<_>>();
     if critical_rows.is_empty() {
         lines.push("- [ ] No explicit automatic-exclusion wording detected; reviewer must still inspect the source RFP.".to_string());
@@ -7111,7 +7229,7 @@ fn rfp_cli_compliance_checklist_markdown(analysis: &RfpCliAnalysis) -> String {
                 "| {} | {} | {} | {} | {} | {} | Source line {} |",
                 table_cell(&row.id.replace("RFP-REQ", "RFP-CHECK")),
                 table_cell(&row.response_section),
-                if rfp_cli_disqualification_risk(&row.requirement) {
+                if row.disqualification_risk {
                     "critical"
                 } else if row.compliance_status.contains("Needs") {
                     "high"
@@ -7147,7 +7265,7 @@ fn rfp_cli_proposal_planning_prompt_markdown(
     let pass_fail = analysis
         .compliance_rows
         .iter()
-        .filter(|row| rfp_cli_disqualification_risk(&row.requirement))
+        .filter(|row| row.disqualification_risk)
         .map(|row| format!("{}: {}", row.id, row.requirement))
         .collect::<Vec<_>>();
     let technical = rfp_cli_lines_for_categories(
