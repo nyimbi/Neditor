@@ -41,6 +41,12 @@ pub(crate) struct CitationDownloadRequest {
     pub(crate) title: Option<String>,
     pub(crate) snippet: Option<String>,
     pub(crate) citation_key: Option<String>,
+    pub(crate) force_refresh: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CitationSourceLibraryRequest {
+    pub(crate) document_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -48,9 +54,22 @@ pub(crate) struct CitationDownloadResponse {
     pub(crate) path: String,
     pub(crate) relative_path: String,
     pub(crate) manifest_path: String,
+    pub(crate) source_dir: String,
     pub(crate) citation_key: String,
     pub(crate) bibliography_stub: String,
     pub(crate) bytes: usize,
+    pub(crate) sha256: String,
+    pub(crate) downloaded_at: Option<String>,
+    pub(crate) media_type: Option<String>,
+    pub(crate) reused: bool,
+    pub(crate) manifest_entry_count: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CitationSourceLibraryResponse {
+    pub(crate) associated_dir: String,
+    pub(crate) manifest_path: String,
+    pub(crate) sources: Vec<CitationManifestItem>,
 }
 
 #[tauri::command]
@@ -92,6 +111,21 @@ pub(crate) fn download_citation_source(
     let associated_dir = associated_source_dir(document_path)?;
     fs::create_dir_all(&associated_dir)
         .map_err(|err| format!("Could not create citation source directory: {err}"))?;
+    let manifest_path = associated_dir.join("sources.json");
+    if request.force_refresh != Some(true) {
+        if let Some(existing) = read_source_manifest(&manifest_path)?
+            .into_iter()
+            .find(|item| item.url == request.url && Path::new(&item.path).exists())
+        {
+            return citation_download_response(
+                document_path,
+                &associated_dir,
+                &manifest_path,
+                existing,
+                true,
+            );
+        }
+    }
     let bytes = curl_bytes(&request.url)?;
     let key = request
         .citation_key
@@ -105,7 +139,8 @@ pub(crate) fn download_citation_source(
     fs::write(&output_path, &bytes)
         .map_err(|err| format!("Could not write downloaded citation source: {err}"))?;
     let relative_path = relative_source_path(document_path, &output_path);
-    let manifest_path = associated_dir.join("sources.json");
+    let sha256 = sha256_hex(&bytes);
+    let downloaded_at = chrono::Local::now().to_rfc3339();
     write_source_manifest(
         &manifest_path,
         &CitationManifestItem {
@@ -115,23 +150,39 @@ pub(crate) fn download_citation_source(
             snippet: request.snippet.unwrap_or_default(),
             path: path_to_string(&output_path),
             relative_path: relative_path.clone(),
-            sha256: sha256_hex(&bytes),
+            sha256,
             bytes: bytes.len(),
+            downloaded_at: Some(downloaded_at),
+            media_type: media_type_from_extension(extension).map(ToString::to_string),
         },
     )?;
-    let bibliography_stub = bibliography_stub_for_download(
-        &key,
-        request.title.as_deref().unwrap_or(&key),
-        &request.url,
-        &relative_path,
-    );
-    Ok(CitationDownloadResponse {
-        path: path_to_string(&output_path),
-        relative_path,
+    let item = read_source_manifest(&manifest_path)?
+        .into_iter()
+        .find(|item| item.url == request.url)
+        .ok_or_else(|| {
+            "Downloaded citation source was not recorded in the manifest.".to_string()
+        })?;
+    citation_download_response(document_path, &associated_dir, &manifest_path, item, false)
+}
+
+#[tauri::command]
+pub(crate) fn list_citation_sources(
+    request: CitationSourceLibraryRequest,
+) -> Result<CitationSourceLibraryResponse, String> {
+    let document_path = Path::new(request.document_path.trim());
+    let associated_dir = associated_source_dir(document_path)?;
+    let manifest_path = associated_dir.join("sources.json");
+    let mut sources = read_source_manifest(&manifest_path)?;
+    sources.sort_by(|left, right| {
+        right
+            .downloaded_at
+            .cmp(&left.downloaded_at)
+            .then_with(|| left.citation_key.cmp(&right.citation_key))
+    });
+    Ok(CitationSourceLibraryResponse {
+        associated_dir: path_to_string(&associated_dir),
         manifest_path: path_to_string(&manifest_path),
-        citation_key: key,
-        bibliography_stub,
-        bytes: bytes.len(),
+        sources,
     })
 }
 
@@ -341,10 +392,7 @@ fn associated_source_dir(document_path: &Path) -> Result<PathBuf, String> {
 }
 
 fn write_source_manifest(path: &Path, item: &CitationManifestItem) -> Result<(), String> {
-    let mut items = fs::read_to_string(path)
-        .ok()
-        .and_then(|text| serde_json::from_str::<Vec<CitationManifestItem>>(&text).ok())
-        .unwrap_or_default();
+    let mut items = read_source_manifest(path)?;
     items.retain(|existing| existing.sha256 != item.sha256 && existing.url != item.url);
     items.push(item.clone());
     let text = serde_json::to_string_pretty(&items)
@@ -352,8 +400,17 @@ fn write_source_manifest(path: &Path, item: &CitationManifestItem) -> Result<(),
     fs::write(path, text).map_err(|err| format!("Could not write citation source manifest: {err}"))
 }
 
+fn read_source_manifest(path: &Path) -> Result<Vec<CitationManifestItem>, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => serde_json::from_str::<Vec<CitationManifestItem>>(&text)
+            .map_err(|err| format!("Could not read citation source manifest: {err}")),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(err) => Err(format!("Could not read citation source manifest: {err}")),
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CitationManifestItem {
+pub(crate) struct CitationManifestItem {
     citation_key: String,
     title: String,
     url: String,
@@ -362,6 +419,41 @@ struct CitationManifestItem {
     relative_path: String,
     sha256: String,
     bytes: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    downloaded_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    media_type: Option<String>,
+}
+
+fn citation_download_response(
+    document_path: &Path,
+    associated_dir: &Path,
+    manifest_path: &Path,
+    item: CitationManifestItem,
+    reused: bool,
+) -> Result<CitationDownloadResponse, String> {
+    let manifest_entry_count = read_source_manifest(manifest_path)?.len();
+    let relative_path = if item.relative_path.trim().is_empty() {
+        relative_source_path(document_path, Path::new(&item.path))
+    } else {
+        item.relative_path.clone()
+    };
+    let bibliography_stub =
+        bibliography_stub_for_download(&item.citation_key, &item.title, &item.url, &relative_path);
+    Ok(CitationDownloadResponse {
+        path: item.path,
+        relative_path,
+        manifest_path: path_to_string(manifest_path),
+        source_dir: path_to_string(associated_dir),
+        citation_key: item.citation_key,
+        bibliography_stub,
+        bytes: item.bytes,
+        sha256: item.sha256,
+        downloaded_at: item.downloaded_at,
+        media_type: item.media_type,
+        reused,
+        manifest_entry_count,
+    })
 }
 
 fn bibliography_stub_for_download(
@@ -522,6 +614,18 @@ fn extension_from_url(url: &str) -> Option<&'static str> {
     None
 }
 
+fn media_type_from_extension(extension: &str) -> Option<&'static str> {
+    match extension {
+        "pdf" => Some("application/pdf"),
+        "docx" => Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        "md" | "markdown" => Some("text/markdown"),
+        "txt" => Some("text/plain"),
+        "rtf" => Some("application/rtf"),
+        "html" | "htm" => Some("text/html"),
+        _ => None,
+    }
+}
+
 fn citation_key_from_title_or_url(title: Option<&str>, url: &str) -> String {
     let base = title
         .map(safe_citation_key)
@@ -605,5 +709,96 @@ mod tests {
             "//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpaper.pdf&rut=abc",
         );
         assert_eq!(url, "https://example.com/paper.pdf");
+    }
+
+    #[test]
+    fn citation_source_manifest_replaces_duplicate_urls() {
+        let dir =
+            std::env::temp_dir().join(format!("neditor-citation-manifest-{}", std::process::id()));
+        fs::create_dir_all(&dir).expect("temp dir");
+        let manifest = dir.join("sources.json");
+        let first = CitationManifestItem {
+            citation_key: "first".to_string(),
+            title: "First".to_string(),
+            url: "https://example.com/source.pdf".to_string(),
+            snippet: String::new(),
+            path: path_to_string(&dir.join("first.pdf")),
+            relative_path: "doc.neditor-sources/first.pdf".to_string(),
+            sha256: "first-hash".to_string(),
+            bytes: 12,
+            downloaded_at: Some("2026-05-28T10:00:00+03:00".to_string()),
+            media_type: Some("application/pdf".to_string()),
+        };
+        let second = CitationManifestItem {
+            citation_key: "second".to_string(),
+            title: "Second".to_string(),
+            sha256: "second-hash".to_string(),
+            bytes: 24,
+            ..first.clone()
+        };
+        write_source_manifest(&manifest, &first).expect("write first");
+        write_source_manifest(&manifest, &second).expect("write second");
+        let items = read_source_manifest(&manifest).expect("read manifest");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].citation_key, "second");
+        assert_eq!(items[0].bytes, 24);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn citation_source_library_lists_manifest_items_newest_first() {
+        let dir =
+            std::env::temp_dir().join(format!("neditor-citation-library-{}", std::process::id()));
+        fs::create_dir_all(&dir).expect("temp dir");
+        let document = dir.join("proposal.md");
+        fs::write(&document, "# Proposal\n").expect("document");
+        let source_dir = associated_source_dir(&document).expect("source dir");
+        fs::create_dir_all(&source_dir).expect("source dir create");
+        let older_path = source_dir.join("older.html");
+        let newer_path = source_dir.join("newer.pdf");
+        fs::write(&older_path, "older").expect("older file");
+        fs::write(&newer_path, "newer").expect("newer file");
+        let manifest = source_dir.join("sources.json");
+        write_source_manifest(
+            &manifest,
+            &CitationManifestItem {
+                citation_key: "older".to_string(),
+                title: "Older".to_string(),
+                url: "https://example.com/older.html".to_string(),
+                snippet: String::new(),
+                path: path_to_string(&older_path),
+                relative_path: relative_source_path(&document, &older_path),
+                sha256: sha256_hex(b"older"),
+                bytes: 5,
+                downloaded_at: Some("2026-05-27T10:00:00+03:00".to_string()),
+                media_type: Some("text/html".to_string()),
+            },
+        )
+        .expect("write older");
+        write_source_manifest(
+            &manifest,
+            &CitationManifestItem {
+                citation_key: "newer".to_string(),
+                title: "Newer".to_string(),
+                url: "https://example.com/newer.pdf".to_string(),
+                snippet: String::new(),
+                path: path_to_string(&newer_path),
+                relative_path: relative_source_path(&document, &newer_path),
+                sha256: sha256_hex(b"newer"),
+                bytes: 5,
+                downloaded_at: Some("2026-05-28T10:00:00+03:00".to_string()),
+                media_type: Some("application/pdf".to_string()),
+            },
+        )
+        .expect("write newer");
+        let library = list_citation_sources(CitationSourceLibraryRequest {
+            document_path: path_to_string(&document),
+        })
+        .expect("library");
+        assert!(library.associated_dir.ends_with("proposal.neditor-sources"));
+        assert_eq!(library.sources.len(), 2);
+        assert_eq!(library.sources[0].citation_key, "newer");
+        assert_eq!(library.sources[1].citation_key, "older");
+        let _ = fs::remove_dir_all(&dir);
     }
 }

@@ -448,12 +448,15 @@ web app.
   reviewer-ready Markdown audit. Source Search can query DuckDuckGo, SearXNG,
   or Tavily, download selected source documents into a document-associated
   `.neditor-sources` directory, insert a CSL JSON bibliography stub, and retain
-  a local source manifest for review. Deep Research uses the configured AI
-  provider, including Ollama, to iterate search queries, summarize evidence,
-  identify knowledge gaps, draft a sourced report, and expand it toward a
-  slider-selected length from a 1-page brief to a 200-page report before the
-  user inserts and edits the Markdown. It also exposes front matter and merged
-  project variables from `.neditor/variables.yaml` as insertable placeholders
+  a local source manifest for review. Repeated downloads reuse the saved local
+  copy when present, and the source library can be refreshed to cite saved
+  sources again, insert their bibliography entries, or link to the local files.
+  Deep Research uses the configured AI provider, including Ollama, to iterate
+  search queries, summarize evidence, identify knowledge gaps, draft a sourced
+  report, and expand it toward a slider-selected length from a 1-page brief to
+  a 200-page report before the user inserts and edits the Markdown. It also
+  exposes front matter and merged project variables from
+  `.neditor/variables.yaml` as insertable placeholders
   with filters, so repeated client, owner, budget, and source values do not
   require hand-written `{{variable}}` syntax.
   The Help Center and guided demo include AI Governance steps that show

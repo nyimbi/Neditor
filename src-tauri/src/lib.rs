@@ -59,7 +59,9 @@ mod workspace_files;
 use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
 use ai_cleanup::AiCleanupRequest;
-use citation_discovery::{download_citation_source, search_citation_sources};
+use citation_discovery::{
+    download_citation_source, list_citation_sources, search_citation_sources,
+};
 use cli::{
     configure_default_markdown_reader, create_support_bundle, default_markdown_reader_plan,
     pending_cli_open_paths,
@@ -203,6 +205,7 @@ pub fn run() {
             cleanup_ai_paste,
             search_citation_sources,
             download_citation_source,
+            list_citation_sources,
             list_ollama_models,
             inspect_native_tts,
             download_tts_model,

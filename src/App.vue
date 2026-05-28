@@ -1427,7 +1427,16 @@
               <button type="button" :disabled="citationSearchBusy || !citationSearchQuery.trim()" @click="searchCitationSources()">
                 {{ citationSearchBusy ? "Searching..." : "Find sources" }}
               </button>
+              <button
+                type="button"
+                :disabled="citationSourceLibraryBusy || !active.path"
+                title="Refresh the saved source manifest for this document."
+                @click="refreshCitationSourceLibrary()"
+              >
+                {{ citationSourceLibraryBusy ? "Refreshing..." : "Refresh source library" }}
+              </button>
             </div>
+            <p v-if="citationSourceLibraryDir" class="sidebar-hint">Saved source library: {{ citationSourceLibraryDir }}</p>
             <article v-for="source in citationSearchResults" :key="source.url" class="snapshot-row">
               <p>{{ source.title }}</p>
               <small>{{ source.source }} | {{ source.url }}</small>
@@ -1439,6 +1448,25 @@
                 <button type="button" @click="insertBlock(`[${source.title}](${source.url})`)">Insert link</button>
               </div>
             </article>
+            <div v-if="citationSourceLibrary.length" class="reference-manager" aria-label="Downloaded citation source library">
+              <header>
+                <div>
+                  <strong>Downloaded Source Library</strong>
+                  <span>{{ citationSourceLibrary.length }} saved source{{ citationSourceLibrary.length === 1 ? "" : "s" }} for this document</span>
+                </div>
+              </header>
+              <article v-for="source in citationSourceLibrary" :key="`${source.citation_key}-${source.sha256}`" class="snapshot-row">
+                <p>{{ source.title }}</p>
+                <small>@{{ source.citation_key }} | {{ source.media_type || "source file" }} | {{ formatCitationSourceBytes(source.bytes) }}</small>
+                <small>{{ source.relative_path }}</small>
+                <small>{{ source.url }}</small>
+                <div class="reference-actions">
+                  <button type="button" @click="insertCitationSourceReference(source)">Cite</button>
+                  <button type="button" @click="insertCitationSourceBibliography(source)">Insert bibliography</button>
+                  <button type="button" @click="insertBlock(`[${source.title}](${source.relative_path})`)">Insert local link</button>
+                </div>
+              </article>
+            </div>
             <div class="reference-inline-form">
               <label>
                 Deep research topic
@@ -5818,6 +5846,35 @@ import {
 import { useDocumentsStore } from "./stores/documents";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
 
+interface CitationSourceLibraryItem {
+  citation_key: string;
+  title: string;
+  url: string;
+  snippet: string;
+  path: string;
+  relative_path: string;
+  sha256: string;
+  bytes: number;
+  downloaded_at?: string;
+  media_type?: string;
+}
+
+interface CitationSourceLibraryResponse {
+  associated_dir: string;
+  manifest_path: string;
+  sources: CitationSourceLibraryItem[];
+}
+
+interface CitationDownloadResult {
+  bibliography_stub: string;
+  relative_path: string;
+  source_dir: string;
+  citation_key: string;
+  bytes: number;
+  reused: boolean;
+  manifest_entry_count: number;
+}
+
 const store = useDocumentsStore();
 type ExportTarget = typeof store.exportTarget;
 interface AppMenuItem {
@@ -6149,6 +6206,9 @@ const citationTavilyApiKey = ref("");
 const citationSearchBusy = ref(false);
 const citationSearchResults = ref<DeepResearchSource[]>([]);
 const citationSourceBusyUrl = ref("");
+const citationSourceLibraryBusy = ref(false);
+const citationSourceLibrary = ref<CitationSourceLibraryItem[]>([]);
+const citationSourceLibraryDir = ref("");
 const deepResearchTopic = ref("");
 const deepResearchDocumentType = ref("research brief");
 const deepResearchAudience = ref("business readers");
@@ -9860,7 +9920,7 @@ async function downloadCitationSource(source: DeepResearchSource) {
   }
   citationSourceBusyUrl.value = source.url;
   try {
-    const response = await invoke<{ bibliography_stub: string; relative_path: string }>("download_citation_source", {
+    const response = await invoke<CitationDownloadResult>("download_citation_source", {
       request: {
         document_path: active.value.path,
         url: source.url,
@@ -9869,13 +9929,79 @@ async function downloadCitationSource(source: DeepResearchSource) {
       },
     });
     insertBlock(response.bibliography_stub);
-    store.statusMessage = `Downloaded source to ${response.relative_path} and inserted bibliography stub`;
+    citationSourceLibraryDir.value = response.source_dir;
+    await refreshCitationSourceLibrary({ silent: true });
+    const action = response.reused ? "Reused existing source" : "Downloaded source";
+    store.statusMessage = `${action} at ${response.relative_path} and inserted bibliography stub`;
   } catch (error) {
     store.lastError = appErrorText(error);
     store.statusMessage = "Citation source download failed";
   } finally {
     citationSourceBusyUrl.value = "";
   }
+}
+
+async function refreshCitationSourceLibrary(options: { silent?: boolean } = {}) {
+  if (!active.value.path) {
+    if (!options.silent) store.statusMessage = "Save the document before refreshing the source library";
+    return [];
+  }
+  citationSourceLibraryBusy.value = true;
+  try {
+    const response = await invoke<CitationSourceLibraryResponse>("list_citation_sources", {
+      request: {
+        document_path: active.value.path,
+      },
+    });
+    citationSourceLibrary.value = response.sources || [];
+    citationSourceLibraryDir.value = response.associated_dir;
+    if (!options.silent) {
+      store.statusMessage = `Loaded ${citationSourceLibrary.value.length} saved citation source${citationSourceLibrary.value.length === 1 ? "" : "s"}`;
+    }
+    return citationSourceLibrary.value;
+  } catch (error) {
+    store.lastError = appErrorText(error);
+    if (!options.silent) store.statusMessage = "Could not load citation source library";
+    return [];
+  } finally {
+    citationSourceLibraryBusy.value = false;
+  }
+}
+
+function citationSourceBibliographyStub(source: CitationSourceLibraryItem) {
+  const accessed = new Date().toISOString().slice(0, 10).split("-").map(Number);
+  const note = `Downloaded source: ${source.relative_path}${source.sha256 ? ` | sha256 ${source.sha256}` : ""}`;
+  return [
+    "```bibliography",
+    JSON.stringify([
+      {
+        id: source.citation_key,
+        type: "webpage",
+        title: source.title || source.citation_key,
+        URL: source.url,
+        accessed: { "date-parts": [accessed] },
+        note,
+      },
+    ]),
+    "```",
+    "",
+  ].join("\n");
+}
+
+function insertCitationSourceBibliography(source: CitationSourceLibraryItem) {
+  insertBlock(citationSourceBibliographyStub(source));
+  store.statusMessage = `Inserted bibliography entry for @${source.citation_key}`;
+}
+
+function insertCitationSourceReference(source: CitationSourceLibraryItem) {
+  insertCitationReference(source.citation_key);
+}
+
+function formatCitationSourceBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 async function runDeepResearchDocumentCreation() {
@@ -12056,6 +12182,8 @@ watch(
   async () => {
     await nextTick();
     selectedTableIndex.value = 0;
+    citationSourceLibrary.value = [];
+    citationSourceLibraryDir.value = "";
     loadSelectedTable({ force: true });
     buildEditor();
   },

@@ -6553,6 +6553,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("copyCitationTodoAudit"));
   ok(app.includes("resolveCitationTodoItem"));
   ok(app.includes("deferCitationTodoItem"));
+  ok(app.includes('aria-label="Downloaded citation source library"'));
+  ok(app.includes("Refresh source library"));
+  ok(app.includes('invoke<CitationSourceLibraryResponse>("list_citation_sources"'));
+  ok(app.includes("citationSourceLibrary"));
+  ok(app.includes("insertCitationSourceBibliography"));
+  ok(app.includes("insertCitationSourceReference"));
   ok(app.includes("Generate agent packet"));
   ok(app.includes("Apply agent output"));
   ok(app.includes("appendAgentWorkspacePacket"));
