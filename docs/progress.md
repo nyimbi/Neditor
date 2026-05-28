@@ -77,6 +77,26 @@ row.
 | `pnpm run check:docs` | Pass | Markdown links resolved after closing the Git versioning evidence row. |
 | `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json`; open rows dropped to 96 while remaining gaps are external/manual/distribution evidence or separately tracked local proof. |
 
+## 2026-05-28 AI Paste Cleanup Evidence Closure
+
+`9.4 AI paste cleanup | Normalize chat output, code fences, bullets, tables,
+links, citations, insert modes` is now marked complete in
+`docs/spec-completion-matrix.md`. The closure is based on backend cleanup tests
+for chat artifacts, rich HTML, code fences, tables, citation TODO handling, and
+draft/provenance options, plus focused browser workflows for clipboard loading,
+previewing, insertion, quote/appendix modes, full-document replacement,
+section merge, selection replacement, citation TODOs, draft governance, and
+provenance toggles. Real OS clipboard/runtime host proof remains tracked by
+the broader AI runtime evidence rows.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ai_cleanup_tests --lib` | Pass | Backend AI cleanup suite proved chat artifact normalization, rich HTML normalization, code-fence normalization/preservation, CSV table conversion, structure options, and provenance/draft output options. |
+| `pnpm run test:unit` | Pass | 87 frontend unit/static tests passed, including `AI paste insertion modes preserve workflow-specific output` and static AI Paste modal/command/accessibility guards. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "AI paste|cleaned AI paste" --project chromium` | Pass | Focused Chromium workflows proved rich clipboard loading, cleanup preview, insertion, quote/appendix modes, full-document replacement, selection replacement, section merge, citation TODO handling, draft governance, and provenance toggles. |
+| `pnpm run check:docs` | Pass | Markdown links resolved after closing the AI paste cleanup evidence row. |
+| `pnpm run check:spec-completion` | Pass with release risks | Wrote `.tmp/spec-completion/report.json`; open rows dropped to 95 while remaining gaps are external/manual/distribution evidence or separately tracked local proof. |
+
 ## 2026-05-28 Verification Update
 
 Table cursor-follow source editing verification:
