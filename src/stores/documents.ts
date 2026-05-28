@@ -8,6 +8,7 @@ import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessD
 import { saveAiProviderDefaultsState, saveBusinessProfileState, saveTtsPreferencesState } from "../lib/configurationProfiles";
 import {
   acceptExternalRootConflictState,
+  applyExternalRootReloadState,
   applyRootConflictMergeState,
   createExternalConflictState,
   keepLocalRootConflictState,
@@ -1032,18 +1033,13 @@ export const useDocumentsStore = defineStore("documents", {
       }
       if (mainChanged && metadata.hash) {
         const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path: targetDoc.path });
-        targetDoc.text = response.text;
-        targetDoc.savedHash = response.hash;
-        targetDoc.savedText = response.text;
-        targetDoc.modified = response.modified;
-        targetDoc.dirty = false;
-        this.externalConflict = null;
+        const reloaded = applyExternalRootReloadState(targetDoc, response, this.activeDocument.id);
+        Object.assign(targetDoc, reloaded.document);
+        this.externalConflict = reloaded.externalConflict;
         if (targetDoc.id === this.activeDocument.id) {
           await this.compileActive();
-          this.statusMessage = "Reloaded external changes";
-        } else {
-          this.statusMessage = `Reloaded external changes for ${titleFromPath(targetDoc.path)}`;
         }
+        this.statusMessage = reloaded.statusMessage;
       } else if (includeChanged) {
         this.externalConflict = null;
         await this.compileActive();

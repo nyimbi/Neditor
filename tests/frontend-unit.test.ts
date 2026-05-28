@@ -42,6 +42,7 @@ import {
 } from "../src/lib/bibliographyManager.js";
 import {
   acceptExternalRootConflictState,
+  applyExternalRootReloadState,
   applyRootConflictMergeState,
   buildConflictDiff,
   createExternalConflictState,
@@ -2056,6 +2057,31 @@ test("external conflict state helpers accept keep and merge root conflicts", () 
 
   const cleanMerge = applyRootConflictMergeState(doc, conflict, "external");
   equal(cleanMerge.document.dirty, false);
+
+  const activeReload = applyExternalRootReloadState(
+    doc,
+    {
+      path: "/workspace/report.md",
+      text: "external latest",
+      hash: "hash-latest",
+      modified: "2026-05-28T11:05:00.000Z",
+    },
+    "doc-1",
+  );
+  equal(activeReload.document.text, "external latest");
+  equal(activeReload.document.savedHash, "hash-latest");
+  equal(activeReload.document.savedText, "external latest");
+  equal(activeReload.document.dirty, false);
+  equal(activeReload.externalConflict, null);
+  equal(activeReload.statusMessage, "Reloaded external changes");
+
+  const inactiveReload = applyExternalRootReloadState(
+    { ...doc, id: "doc-2", path: "/workspace/background.md", title: "background.md" },
+    { path: "/workspace/background.md", text: "background latest", hash: "hash-background" },
+    "doc-1",
+  );
+  equal(inactiveReload.document.title, "background.md");
+  equal(inactiveReload.statusMessage, "Reloaded external changes for background.md");
 });
 
 test("conflict merge helpers compose selected local and external lines", () => {

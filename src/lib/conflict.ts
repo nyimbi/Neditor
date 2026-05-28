@@ -1,4 +1,5 @@
 import type { OpenDocument } from "../types.js";
+import { titleFromPath } from "./fileLifecycle.js";
 
 export interface ConflictDiffRow {
   key: string;
@@ -60,6 +61,31 @@ export function acceptExternalRootConflictState<T extends OpenDocument>(
     },
     externalConflict: null,
     statusMessage: "Accepted external file changes",
+  };
+}
+
+export function applyExternalRootReloadState<T extends OpenDocument>(
+  document: T,
+  response: ExternalConflictFileResponse,
+  activeDocumentId: string,
+) {
+  const nextPath = response.path || document.path;
+  return {
+    document: {
+      ...document,
+      path: nextPath,
+      title: titleFromPath(nextPath),
+      text: response.text,
+      savedHash: response.hash,
+      savedText: response.text,
+      modified: response.modified,
+      dirty: false,
+    },
+    externalConflict: null,
+    statusMessage:
+      document.id === activeDocumentId
+        ? "Reloaded external changes"
+        : `Reloaded external changes for ${titleFromPath(nextPath)}`,
   };
 }
 
