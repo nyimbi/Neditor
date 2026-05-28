@@ -735,10 +735,13 @@ properties, and Markdown bundle metadata.
   implementation evidence and remaining release risks against the product spec.
 
 `pnpm run check:spec-completion` turns that matrix into an executable release
-contract. It writes `.tmp/spec-completion/report.json`, validates every matrix
-row has a recognized status, direct evidence, and a substantive remaining gap
-when still Partial, Unverified, or Missing, and feeds open rows into release
-readiness as explicit production risks.
+contract. It writes `.tmp/spec-completion/report.json`,
+`.tmp/spec-completion/gap-plan.md`, and reviewer-ready
+`.tmp/spec-completion/work-orders.json` / `work-orders.md` packets. The checker
+validates every matrix row has a recognized status, direct evidence, and a
+substantive remaining gap when still Partial, Unverified, or Missing, then turns
+open rows into classified work orders with owners, runbooks, expected returned
+evidence, validator commands, ingest commands, and final readiness commands.
 
 ## Developer Quick Start
 

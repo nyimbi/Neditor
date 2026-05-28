@@ -8415,7 +8415,15 @@ test("local verification scripts expose local baseline checks", () => {
   ok(specCompletion.includes("Current major verification gaps"));
   ok(specCompletion.includes("Next Matrix Work"));
   ok(specCompletion.includes("neditor.spec-completion-report.v1"));
+  ok(specCompletion.includes("neditor.spec-completion-work-orders.v1"));
   ok(specCompletion.includes("gapPlanPath"));
+  ok(specCompletion.includes("workOrdersPath"));
+  ok(specCompletion.includes("workOrdersMarkdownPath"));
+  ok(specCompletion.includes("buildWorkOrder"));
+  ok(specCompletion.includes("renderWorkOrdersMarkdown"));
+  ok(specCompletion.includes("readyToSend"));
+  ok(specCompletion.includes("validatorCommands"));
+  ok(specCompletion.includes("pnpm run ingest:evidence -- --source <returned-evidence-dir>"));
   ok(specCompletion.includes("renderGapPlanMarkdown"));
   ok(specCompletion.includes("locallyClosableRows"));
   ok(specCompletion.includes("evidenceBlockedRows"));

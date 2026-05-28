@@ -25,6 +25,9 @@ const openRowPlans = openRows.map((row) => ({
 const gapTriage = summarizeGapTriage(openRowPlans);
 const status = issues.length ? "failed" : summary.openRows > 0 ? "partial-with-release-risks" : "complete";
 const gapPlanPath = join(outputDir, "gap-plan.md");
+const workOrdersPath = join(outputDir, "work-orders.json");
+const workOrdersMarkdownPath = join(outputDir, "work-orders.md");
+const workOrders = openRowPlans.map((row, index) => buildWorkOrder(row, index));
 
 mkdirSync(outputDir, { recursive: true });
 writeFileSync(
@@ -36,16 +39,40 @@ writeFileSync(
       status,
       matrixPath: relative(matrixPath),
       gapPlanPath: relative(gapPlanPath),
+      workOrdersPath: relative(workOrdersPath),
+      workOrdersMarkdownPath: relative(workOrdersMarkdownPath),
       summary,
       gapTriage,
       issues,
       openRows: openRowPlans,
+      workOrders,
     },
     null,
     2,
   )}\n`,
 );
 writeFileSync(gapPlanPath, renderGapPlanMarkdown(openRowPlans, gapTriage, summary, status));
+writeFileSync(
+  workOrdersPath,
+  `${JSON.stringify(
+    {
+      schema: "neditor.spec-completion-work-orders.v1",
+      generatedAt: new Date().toISOString(),
+      status,
+      matrixPath: relative(matrixPath),
+      reportPath: relative(reportPath),
+      summary: {
+        total: workOrders.length,
+        readyToSend: workOrders.filter((order) => order.readyToSend).length,
+        byClassification: gapTriage.byClassification,
+      },
+      workOrders,
+    },
+    null,
+    2,
+  )}\n`,
+);
+writeFileSync(workOrdersMarkdownPath, renderWorkOrdersMarkdown(workOrders, summary, status));
 
 if (issues.length) {
   console.error("Spec completion matrix validation failed:");
@@ -54,7 +81,9 @@ if (issues.length) {
   process.exit(1);
 }
 
-console.log(`Spec completion matrix is ${status}; wrote ${relative(reportPath)} and ${relative(gapPlanPath)}.`);
+console.log(
+  `Spec completion matrix is ${status}; wrote ${relative(reportPath)}, ${relative(gapPlanPath)}, ${relative(workOrdersPath)}, and ${relative(workOrdersMarkdownPath)}.`,
+);
 
 function parseMatrixRows(text) {
   const parsed = [];
@@ -226,6 +255,185 @@ function summarizeGapTriage(openRowPlans) {
   };
 }
 
+function buildWorkOrder(row, index) {
+  const id = `${String(index + 1).padStart(3, "0")}-${slugify(row.classification)}-${slugify(row.requirementArea).slice(0, 48)}`;
+  const owner = ownerForClassification(row.classification);
+  const runbooks = runbooksForClassification(row.classification);
+  const validatorCommands = validatorCommandsForClassification(row.classification);
+  const returns = returnedEvidenceForClassification(row.classification);
+  return {
+    id,
+    readyToSend: true,
+    owner,
+    specSection: row.specSection,
+    requirementArea: row.requirementArea,
+    status: row.status,
+    classification: row.classification,
+    remainingGap: row.remainingGap,
+    objective: objectiveForWorkOrder(row),
+    acceptanceCriteria: acceptanceCriteriaForClassification(row.classification),
+    runbooks,
+    returns,
+    validatorCommands,
+    ingestCommand: "pnpm run ingest:evidence -- --source <returned-evidence-dir>",
+    finalReadinessCommand: "pnpm run check:release-readiness",
+    matrixClosureCommand: "pnpm run check:spec-completion",
+    notes: notesForClassification(row.classification),
+  };
+}
+
+function ownerForClassification(classification) {
+  switch (classification) {
+    case "manual-review":
+      return "Named manual reviewer";
+    case "external-evidence":
+      return "Credentialed evidence collector";
+    case "cross-platform-evidence":
+      return "Supported-host QA owner";
+    case "release-credentials":
+      return "Release engineering owner";
+    case "distribution-artifacts":
+      return "Distribution packaging owner";
+    case "local-implementation":
+      return "NEditor implementation owner";
+    case "local-proof":
+      return "NEditor verification owner";
+    case "documentation-proof":
+      return "Documentation and evidence owner";
+    default:
+      return "Release readiness owner";
+  }
+}
+
+function runbooksForClassification(classification) {
+  switch (classification) {
+    case "manual-review":
+      return ["runbooks/manual-review.md", "runbooks/rendered-export-review.md"];
+    case "external-evidence":
+      return ["runbooks/external-evidence.md", "runbooks/performance-profile.md"];
+    case "cross-platform-evidence":
+      return ["runbooks/platform-evidence.md", "runbooks/external-engine-evidence.md"];
+    case "release-credentials":
+      return ["runbooks/release-signing.md", "runbooks/platform-evidence.md"];
+    case "distribution-artifacts":
+      return ["runbooks/homebrew-release.md", "runbooks/release-signing.md"];
+    case "local-implementation":
+      return ["runbooks/spec-completion-closure.md"];
+    case "local-proof":
+      return ["runbooks/spec-completion-closure.md"];
+    case "documentation-proof":
+      return ["runbooks/spec-completion-closure.md"];
+    default:
+      return ["runbooks/spec-completion-closure.md"];
+  }
+}
+
+function returnedEvidenceForClassification(classification) {
+  switch (classification) {
+    case "manual-review":
+      return [".tmp/manual-review/<work-order-id>/signoff.json", ".tmp/manual-review/<work-order-id>/artifacts/"];
+    case "external-evidence":
+      return [".tmp/performance-profile/external/<host>/performance-profile-evidence.json"];
+    case "cross-platform-evidence":
+      return [".tmp/platform-evidence/external/<platform>/platform-evidence.json", ".tmp/external-engines/external/<platform>/external-engine-evidence.json"];
+    case "release-credentials":
+      return [".tmp/release-signing/external/<platform>/signing-evidence.json"];
+    case "distribution-artifacts":
+      return [".tmp/homebrew/release-cask-evidence.json", ".tmp/release-signing/external/macos/signing-evidence.json"];
+    case "local-implementation":
+      return ["committed source changes", "test output pasted into docs/progress.md if the matrix row changes"];
+    case "local-proof":
+      return [".tmp/<focused-proof>/report.json", "test output pasted into docs/progress.md if the matrix row changes"];
+    case "documentation-proof":
+      return ["updated docs/spec-completion-matrix.md row with exact command and artifact evidence"];
+    default:
+      return [".tmp/spec-completion/<work-order-id>/evidence.json"];
+  }
+}
+
+function validatorCommandsForClassification(classification) {
+  switch (classification) {
+    case "manual-review":
+      return ["pnpm run test:rendered-exports", "pnpm run check:a11y:manual", "pnpm run check:tables:manual"];
+    case "external-evidence":
+      return ["pnpm run check:performance-profile", "pnpm run check:ai-runtime", "pnpm run check:ai-provider"];
+    case "cross-platform-evidence":
+      return ["pnpm run check:platform-evidence", "pnpm run check:engines", "pnpm run test:tauri-webdriver"];
+    case "release-credentials":
+      return ["pnpm run check:release-signing", "pnpm run check:platform-evidence"];
+    case "distribution-artifacts":
+      return ["pnpm run check:homebrew", "pnpm run check:release-signing"];
+    case "local-implementation":
+      return ["pnpm run test:unit", "pnpm run check", "pnpm run check:spec-completion"];
+    case "local-proof":
+      return ["pnpm run test:unit", "pnpm run check:spec-completion"];
+    case "documentation-proof":
+      return ["pnpm run check:docs", "pnpm run check:spec-completion"];
+    default:
+      return ["pnpm run check:spec-completion"];
+  }
+}
+
+function objectiveForWorkOrder(row) {
+  return `Close the ${row.classification} evidence gap for ${row.specSection} / ${row.requirementArea}: ${row.remainingGap}`;
+}
+
+function acceptanceCriteriaForClassification(classification) {
+  const common = [
+    "Evidence names the reviewer or host, app version, Git commit, platform, and generated artifact paths.",
+    "Evidence is current for the source tree under review and contains no secrets, document content, API keys, or raw audio samples.",
+    "The listed validator commands pass after the evidence is copied or ingested.",
+    "pnpm run check:release-readiness and pnpm run check:spec-completion are rerun after ingestion.",
+  ];
+  switch (classification) {
+    case "manual-review":
+      return [
+        "A named reviewer signs every checklist item as pass or explicitly records a non-release-blocking exception.",
+        "Screenshots, exported files, or native-viewer artifacts are referenced by path.",
+        "No unresolved blocker remains in the sign-off JSON.",
+        ...common,
+      ];
+    case "cross-platform-evidence":
+      return [
+        "Evidence comes from the named supported host rather than the current host guessing on its behalf.",
+        "Package, WebDriver, or engine proof matches the current package version and Git commit.",
+        "Validator-shaped JSON is returned under the expected external evidence directory.",
+        ...common,
+      ];
+    case "release-credentials":
+      return [
+        "Signing, notarization, or attestation evidence is collected on a clean credentialed release host.",
+        "Artifact hashes match the distributable files used for publication.",
+        "No private certificate, token, or signing secret is stored in the evidence.",
+        ...common,
+      ];
+    case "distribution-artifacts":
+      return [
+        "The final distributable artifact exists and has a pinned SHA-256.",
+        "Homebrew or release metadata references the same signed/notarized artifact.",
+        "Installation instructions and verification commands match the published artifact.",
+        ...common,
+      ];
+    default:
+      return common;
+  }
+}
+
+function notesForClassification(classification) {
+  switch (classification) {
+    case "manual-review":
+      return "Use this as a reviewer assignment. Attach the completed sign-off to the evidence kit before marking the matrix row complete.";
+    case "cross-platform-evidence":
+      return "Run on the actual Windows/Linux/macOS host named by the gap; do not synthesize platform proof locally.";
+    case "release-credentials":
+      return "Requires release credentials. Do not check in signing secrets or unredacted notarization logs.";
+    case "distribution-artifacts":
+      return "Requires final release artifacts. Do not close from template cask or placeholder SHA evidence.";
+    default:
+      return "Close with direct code, command, artifact, and matrix evidence before claiming completion.";
+  }
+}
+
 function renderGapPlanMarkdown(openRowPlans, gapTriage, summary, status) {
   const lines = [
     "# NEditor Spec Gap Plan",
@@ -268,12 +476,82 @@ function renderGapPlanMarkdown(openRowPlans, gapTriage, summary, status) {
   return lines.join("\n");
 }
 
+function renderWorkOrdersMarkdown(workOrders, summary, status) {
+  const lines = [
+    "# NEditor Spec Completion Work Orders",
+    "",
+    `Generated: ${new Date().toISOString()}`,
+    `Status: ${status}`,
+    "",
+    "## Summary",
+    "",
+    `- Total matrix rows: ${summary.totalRows}`,
+    `- Work orders: ${workOrders.length}`,
+    `- Ready to send: ${workOrders.filter((order) => order.readyToSend).length}`,
+    "",
+    "## Work Order Index",
+    "",
+    "| ID | Owner | Classification | Requirement |",
+    "| --- | --- | --- | --- |",
+    ...workOrders.map(
+      (order) =>
+        `| ${order.id} | ${escapeMarkdownTableCell(order.owner)} | ${order.classification} | ${escapeMarkdownTableCell(`${order.specSection} / ${order.requirementArea}`)} |`,
+    ),
+    "",
+  ];
+  for (const order of workOrders) {
+    lines.push(
+      `## ${order.id}`,
+      "",
+      `Owner: ${order.owner}`,
+      `Classification: ${order.classification}`,
+      `Requirement: ${order.specSection} / ${order.requirementArea}`,
+      "",
+      "Objective:",
+      "",
+      order.objective,
+      "",
+      "Acceptance criteria:",
+      "",
+      ...order.acceptanceCriteria.map((item) => `- ${item}`),
+      "",
+      "Runbooks:",
+      "",
+      ...order.runbooks.map((item) => `- ${item}`),
+      "",
+      "Return evidence:",
+      "",
+      ...order.returns.map((item) => `- ${item}`),
+      "",
+      "Validator commands:",
+      "",
+      ...order.validatorCommands.map((item) => `- \`${item}\``),
+      "",
+      `Ingest: \`${order.ingestCommand}\``,
+      `Final readiness: \`${order.finalReadinessCommand}\``,
+      `Matrix closure: \`${order.matrixClosureCommand}\``,
+      "",
+      `Notes: ${order.notes}`,
+      "",
+    );
+  }
+  return lines.join("\n");
+}
+
 function escapeMarkdownTableCell(value) {
   return String(value ?? "")
     .replace(/\\/g, "\\\\")
     .replace(/\|/g, "\\|")
     .replace(/\r?\n/g, " ")
     .trim();
+}
+
+function slugify(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || "work-order";
 }
 
 function splitTableRow(line) {
