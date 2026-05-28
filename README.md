@@ -127,13 +127,13 @@ paths that would be handed to the app without opening a window.
 profile, variables, standard business snippets, and a local-agent handoff folder;
 use `--dry-run`
 to preview the files and `--json` for help desk automation. `ned new` creates a
-starter Markdown document from business templates such as proposal, buyer-side
-RFP, RFP response, RFQ, tender, business report, tutorial, lesson plan, lesson
-content, technical textbook, novel, podcast script, movie script, business case,
-executive brief, board decision memo, policy brief, research report, grant
-application, SOP, PRD, project charter, QBR, due-diligence memo, contract review
-brief, implementation playbook, incident postmortem, meeting decision pack, and
-market research report; add
+starter Markdown document from business templates such as blank document,
+proposal, buyer-side RFP, RFP response, RFQ, tender, business report, tutorial,
+lesson plan, lesson content, textbook, technical textbook, novel, podcast script,
+movie script, business case, executive brief, board decision memo, policy brief,
+research report, grant application, SOP, PRD, project charter, QBR,
+due-diligence memo, contract review brief, implementation playbook, incident
+postmortem, meeting decision pack, and market research report; add
 `--json` for script-friendly creation status, selected template, title, output
 path, and open status. `ned convert` and `ned export` run the same local export
 pipeline used by the app for HTML, PDF, DOCX,
@@ -612,12 +612,13 @@ web app.
 - The Templates panel now includes a business identity setup dialog for your
   name, email, phone, role, company, address, website, industry, default client,
   and brand voice; common business-development document builders for tutorials,
-  proposals, buyer-side RFPs, RFP responses, RFQs, tenders, business reports,
-  statements of work, capability statements, case studies, business cases,
-  executive briefs, board memos, policy briefs, research reports, grant
-  applications, SOPs, PRDs, project charters, QBRs, due-diligence memos,
-  contract review briefs, implementation playbooks, incident postmortems,
-  meeting decision packs, and market research reports; reusable semi-template
+  blank documents, proposals, buyer-side RFPs, RFP responses, RFQs, tenders,
+  business reports, statements of work, capability statements, case studies,
+  textbooks, technical textbooks, business cases, executive briefs, board memos,
+  policy briefs, research reports, grant applications, SOPs, PRDs, project
+  charters, QBRs, due-diligence memos, contract review briefs, implementation
+  playbooks, incident postmortems, meeting decision packs, and market research
+  reports; reusable semi-template
   document parts; and handoff options for Claude Code, Codex, OpenCode, and
   Google Antigravity.
   Each document builder shows context-aware AI step assistance for identity,

@@ -18,9 +18,11 @@ export interface BusinessProfileField {
 }
 
 export type BusinessDocumentKind =
+  | "blank"
   | "tutorial"
   | "lesson-plan"
   | "lesson-content"
+  | "textbook"
   | "technical-textbook"
   | "novel"
   | "podcast-script"
@@ -292,6 +294,15 @@ export const defaultBusinessProfile: BusinessProfile = {
 
 export const businessDocumentTemplates: BusinessDocumentTemplate[] = [
   {
+    id: "blank",
+    label: "Blank document",
+    summary: "Starts a clean document with only title, purpose, draft space, and review notes.",
+    docsLiveType: "business-brief",
+    bestFor: ["Freeform drafting", "Custom structures", "One-off documents"],
+    aiPrompt: "Start a clean document, ask for purpose, audience, source material, and review owner, then keep structure flexible until the user defines headings.",
+    outline: ["Purpose", "Audience", "Draft Section", "Open Questions", "Review Notes"],
+  },
+  {
     id: "tutorial",
     label: "Tutorial or training guide",
     summary: "Turns a process, product, or workflow into a guided learning document.",
@@ -317,6 +328,26 @@ export const businessDocumentTemplates: BusinessDocumentTemplate[] = [
     bestFor: ["Course authors", "Instructional designers", "Enablement teams"],
     aiPrompt: "Create lesson content with a hook, concise explanations, worked examples, practice activities, knowledge checks, teacher notes, and learner-facing handouts.",
     outline: ["Opening Hook", "Core Explanation", "Worked Example", "Practice Activity", "Knowledge Check", "Discussion Prompts", "Teacher Notes", "Learner Handout"],
+  },
+  {
+    id: "textbook",
+    label: "Textbook",
+    summary: "Creates a non-fiction textbook outline first, then drafts chapters sequentially with learning checks.",
+    docsLiveType: "technical-textbook",
+    bestFor: ["Course books", "Training manuals", "Long-form instructional content"],
+    aiPrompt:
+      "First create and lock the textbook plan: subject scope, audience level, prerequisites, chapter sequence, learning outcomes, examples, exercises, glossary, and assessment approach. After approval, draft chapters sequentially and finish with instructional quality review.",
+    outline: [
+      "Textbook Plan",
+      "Audience and Learning Outcomes",
+      "Chapter Outline",
+      "Chapter 1 - Foundations",
+      "Chapter 2 - Core Concepts",
+      "Chapter 3 - Worked Examples",
+      "Chapter 4 - Practice and Assessment",
+      "Glossary",
+      "Instructional Quality Review",
+    ],
   },
   {
     id: "technical-textbook",

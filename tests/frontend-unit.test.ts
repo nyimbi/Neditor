@@ -2922,6 +2922,12 @@ test("document outline library exposes built-ins and managed custom outlines", (
   const contractOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "outline-contract-review-brief")!;
   equal(contractOutline.docsLiveType, "contract-brief");
   ok(documentOutlineTemplateToPlannerText(contractOutline).includes("- Approval Checklist"));
+  const blankOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "business-blank")!;
+  equal(docsLiveDocumentTypeForOutlineSignal(blankOutline), "business-brief");
+  ok(documentOutlineTemplateToPlannerText(blankOutline).includes("- Draft Section"));
+  const generalTextbookOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "business-textbook")!;
+  equal(docsLiveDocumentTypeForOutlineSignal(generalTextbookOutline), "technical-textbook");
+  ok(documentOutlineTemplateToPlannerText(generalTextbookOutline).includes("- Chapter Outline"));
   const textbookOutline = builtInDocumentOutlineTemplates.find((template) => template.id === "business-technical-textbook")!;
   equal(docsLiveDocumentTypeForOutlineSignal(textbookOutline), "technical-textbook");
   equal(docsLiveDocumentTypeForOutlineSignal({ docsLiveType: "movie-script", id: "custom-screen-story" }), "movie-script");
@@ -3388,11 +3394,13 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(rfpResponse);
   equal(buyerRfp.label, "Request for proposal");
   equal(rfpResponse.docsLiveType, "rfp-response");
+  ok(businessDocumentTemplates.some((template) => template.id === "blank"));
   ok(businessDocumentTemplates.some((template) => template.id === "rfq"));
   ok(businessDocumentTemplates.some((template) => template.id === "report"));
   ok(businessDocumentTemplates.some((template) => template.id === "tutorial"));
   ok(businessDocumentTemplates.some((template) => template.id === "lesson-plan"));
   ok(businessDocumentTemplates.some((template) => template.id === "lesson-content"));
+  ok(businessDocumentTemplates.some((template) => template.id === "textbook"));
   ok(businessDocumentTemplates.some((template) => template.id === "technical-textbook"));
   ok(businessDocumentTemplates.some((template) => template.id === "novel"));
   ok(businessDocumentTemplates.some((template) => template.id === "podcast-script"));
