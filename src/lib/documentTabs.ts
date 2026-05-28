@@ -57,6 +57,15 @@ export function setPinnedDocumentState<T extends DocumentTab>(
   };
 }
 
+export function togglePinnedDocumentState<T extends DocumentTab>(
+  documents: T[],
+  id: string,
+): SetPinnedDocumentResult<T> | null {
+  const document = documents.find((item) => item.id === id);
+  if (!document) return null;
+  return setPinnedDocumentState(documents, id, !document.pinned);
+}
+
 export function moveDocumentTabState<T extends DocumentTab>(
   documents: T[],
   id: string,

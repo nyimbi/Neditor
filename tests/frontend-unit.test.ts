@@ -91,6 +91,7 @@ import {
   forgetDocumentPathState,
   moveDocumentTabState,
   setPinnedDocumentState,
+  togglePinnedDocumentState,
 } from "../src/lib/documentTabs.js";
 import { activeDocumentState, externalTransformEnginesState, windowTitleState } from "../src/lib/documentSelectors.js";
 import { emacsKillLineRange, emacsWordRange } from "../src/lib/emacsKeybindings.js";
@@ -735,6 +736,14 @@ test("document tab helpers close pin move and forget file state", () => {
   const unpinned = setPinnedDocumentState(pinned?.documents || [], "b", false);
   equal(unpinned?.statusMessage, "Unpinned Beta");
   equal(setPinnedDocumentState(documents, "missing", true), null);
+  const toggled = togglePinnedDocumentState(documents, "a");
+  equal(toggled?.statusMessage, "Pinned Alpha");
+  deepEqual(toggled?.documents.map((document) => `${document.id}:${document.pinned ? "pinned" : "open"}`), [
+    "a:pinned",
+    "c:pinned",
+    "b:open",
+  ]);
+  equal(togglePinnedDocumentState(documents, "missing"), null);
 
   const movedBefore = moveDocumentTabState(documents, "c", "a", "before");
   deepEqual(movedBefore?.documents.map((document) => document.id), ["c", "a", "b"]);

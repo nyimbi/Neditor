@@ -18,6 +18,7 @@ import {
   closeDocumentTabState,
   moveDocumentTabState,
   setPinnedDocumentState,
+  togglePinnedDocumentState,
 } from "../lib/documentTabs";
 import { buildDocumentCompileOptions, buildDocumentExportOptions } from "../lib/documentExportOptions";
 import { activeDocumentState, externalTransformEnginesState, windowTitleState } from "../lib/documentSelectors";
@@ -1496,9 +1497,11 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     togglePin(id: string) {
-      const document = this.documents.find((item) => item.id === id);
-      if (!document) return;
-      this.setPinned(id, !document.pinned);
+      const result = togglePinnedDocumentState(this.documents, id);
+      if (!result) return;
+      this.documents = result.documents;
+      this.statusMessage = result.statusMessage;
+      void this.persistWorkspace();
     },
     setPinned(id: string, pinned: boolean) {
       const result = setPinnedDocumentState(this.documents, id, pinned);
