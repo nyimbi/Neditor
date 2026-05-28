@@ -72,6 +72,7 @@ function validateManifest(manifest, readiness, readinessStatus) {
   requireValue(Array.isArray(manifest.missingTemplates) && manifest.missingTemplates.length === 0, "missingTemplates must be empty");
   requireValue(Array.isArray(manifest.staleTemplates) && manifest.staleTemplates.length === 0, "staleTemplates must be empty");
   validateSpecCompletionWorkOrders(manifest.specCompletionWorkOrders);
+  validateSpecCompletionRunbooks(manifest.specCompletionRunbooks, manifest.specCompletionWorkOrders);
   for (const template of copiedTemplates) {
     requireValue(template.copied === true, `template must be copied: ${template.source || template.path}`);
     requireValue(template.freshness?.status === "current", `template freshness must be current: ${template.source || template.path}`);
@@ -116,6 +117,25 @@ function validateSpecCompletionWorkOrders(workOrders) {
   requireFile(join(kitDir, workOrders.markdownPath || ""), "spec completion work-orders Markdown", 100);
 }
 
+function validateSpecCompletionRunbooks(runbooks, workOrders) {
+  requireValue(Array.isArray(runbooks), "manifest must include specCompletionRunbooks");
+  requireValue(Array.isArray(runbooks) && runbooks.length > 0, "specCompletionRunbooks must include referenced work-order runbooks");
+  const runbookPaths = new Set((Array.isArray(runbooks) ? runbooks : []).map((runbook) => runbook.path));
+  const workOrderJson = readJson(join(kitDir, workOrders?.jsonPath || ""), "spec completion work-orders JSON for runbook validation");
+  const referencedRunbooks = new Set(
+    (Array.isArray(workOrderJson?.workOrders) ? workOrderJson.workOrders : [])
+      .flatMap((order) => (Array.isArray(order.runbooks) ? order.runbooks : []))
+      .filter(Boolean),
+  );
+  for (const referenced of referencedRunbooks) {
+    requireValue(runbookPaths.has(referenced), `specCompletionRunbooks is missing referenced runbook ${referenced}`);
+  }
+  for (const runbook of Array.isArray(runbooks) ? runbooks : []) {
+    requireValue(runbook.available === true, `spec-completion runbook must be available: ${runbook.path}`);
+    requireFile(join(kitDir, runbook.path || ""), `spec-completion runbook ${runbook.path}`, 100);
+  }
+}
+
 function writeReport(manifest, readiness, readinessStatus) {
   mkdirSync(dirname(reportPath), { recursive: true });
   writeFileSync(
@@ -139,8 +159,10 @@ function writeReport(manifest, readiness, readinessStatus) {
           gaps: Array.isArray(manifest?.gaps) ? manifest.gaps.length : 0,
           copiedTemplates: Array.isArray(manifest?.copiedTemplates) ? manifest.copiedTemplates.length : 0,
           missingTemplates: Array.isArray(manifest?.missingTemplates) ? manifest.missingTemplates.length : 0,
+          missingSpecCompletionRunbooks: Array.isArray(manifest?.missingSpecCompletionRunbooks) ? manifest.missingSpecCompletionRunbooks.length : 0,
           staleTemplates: Array.isArray(manifest?.staleTemplates) ? manifest.staleTemplates.length : 0,
           runbooks: Array.isArray(manifest?.runbooks) ? manifest.runbooks.length : 0,
+          specCompletionRunbooks: Array.isArray(manifest?.specCompletionRunbooks) ? manifest.specCompletionRunbooks.length : 0,
           specWorkOrders: Number(manifest?.specCompletionWorkOrders?.total || 0),
           specWorkOrdersReady: Number(manifest?.specCompletionWorkOrders?.readyToSend || 0),
           issues: issues.length,

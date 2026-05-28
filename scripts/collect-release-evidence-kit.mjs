@@ -303,6 +303,7 @@ mkdirSync(outputDir, { recursive: true });
 
 const copiedTemplates = copyTemplates();
 const copiedSpecWorkOrders = copySpecWorkOrders();
+const copiedSpecWorkOrderRunbooks = copySpecWorkOrderRunbooks();
 const staleTemplates = copiedTemplates.filter((template) => template.copied && template.freshness.status === "stale");
 const manifest = {
   schema: "neditor.release-evidence-kit.v1",
@@ -319,7 +320,9 @@ const manifest = {
   })),
   copiedTemplates,
   specCompletionWorkOrders: copiedSpecWorkOrders,
+  specCompletionRunbooks: copiedSpecWorkOrderRunbooks,
   missingTemplates: copiedTemplates.filter((template) => !template.copied),
+  missingSpecCompletionRunbooks: copiedSpecWorkOrderRunbooks.filter((runbook) => !runbook.available),
   staleTemplates,
   runbooks: runbooks.map((runbook) => ({
     title: runbook.title,
@@ -345,6 +348,9 @@ if (!sourceTreeClean) {
 if (manifest.missingTemplates.length > 0) {
   console.log(`Missing ${manifest.missingTemplates.length} template(s); run the listed prerequisite checks and regenerate the kit.`);
 }
+if (manifest.missingSpecCompletionRunbooks.length > 0) {
+  console.log(`Missing ${manifest.missingSpecCompletionRunbooks.length} spec-completion runbook(s); add the missing runbooks and regenerate the kit.`);
+}
 if (manifest.staleTemplates.length > 0) {
   console.log(`Stale ${manifest.staleTemplates.length} template(s); rerun prerequisite checks from the current clean source and regenerate the kit.`);
 }
@@ -353,6 +359,9 @@ function writeEvidenceKitReport(manifest) {
   const reportIssues = [];
   if (!sourceTreeClean) reportIssues.push("source-tree-not-clean");
   if (manifest.missingTemplates.length > 0) reportIssues.push(`missing-templates=${manifest.missingTemplates.length}`);
+  if (manifest.missingSpecCompletionRunbooks.length > 0) {
+    reportIssues.push(`missing-spec-completion-runbooks=${manifest.missingSpecCompletionRunbooks.length}`);
+  }
   if (manifest.staleTemplates.length > 0) reportIssues.push(`stale-templates=${manifest.staleTemplates.length}`);
   if (copiedSpecWorkOrders.total !== copiedSpecWorkOrders.readyToSend) {
     reportIssues.push(`spec-work-orders-not-ready=${copiedSpecWorkOrders.total - copiedSpecWorkOrders.readyToSend}`);
@@ -378,8 +387,10 @@ function writeEvidenceKitReport(manifest) {
           gaps: manifest.gaps.length,
           copiedTemplates: manifest.copiedTemplates.length,
           missingTemplates: manifest.missingTemplates.length,
+          missingSpecCompletionRunbooks: manifest.missingSpecCompletionRunbooks.length,
           staleTemplates: manifest.staleTemplates.length,
           runbooks: manifest.runbooks.length,
+          specCompletionRunbooks: manifest.specCompletionRunbooks.length,
           specWorkOrders: copiedSpecWorkOrders.total,
           specWorkOrdersReady: copiedSpecWorkOrders.readyToSend,
           issues: reportIssues.length,
@@ -436,6 +447,41 @@ function copySpecWorkOrders() {
     readyToSend: Number(specWorkOrders?.summary?.readyToSend || 0),
     generatedAt: specWorkOrders?.generatedAt || null,
   };
+}
+
+function copySpecWorkOrderRunbooks() {
+  const generatedRunbookPaths = new Set(runbooks.map((runbook) => runbook.file));
+  const referencedRunbookPaths = new Set(
+    (Array.isArray(specWorkOrders?.workOrders) ? specWorkOrders.workOrders : [])
+      .flatMap((order) => (Array.isArray(order.runbooks) ? order.runbooks : []))
+      .filter(Boolean),
+  );
+  return [...referencedRunbookPaths].sort().map((runbookPath) => {
+    const generatedByKit = generatedRunbookPaths.has(runbookPath);
+    if (generatedByKit) {
+      return {
+        path: runbookPath,
+        source: "generated-release-kit-runbook",
+        available: true,
+        copied: false,
+        generatedByKit: true,
+      };
+    }
+    const source = join(root, runbookPath);
+    const destination = join(outputDir, runbookPath);
+    const available = existsSync(source);
+    if (available) {
+      mkdirSync(dirname(destination), { recursive: true });
+      cpSync(source, destination);
+    }
+    return {
+      path: runbookPath,
+      source: runbookPath,
+      available,
+      copied: available,
+      generatedByKit: false,
+    };
+  });
 }
 
 function inspectTemplateFreshness(path) {
@@ -533,6 +579,11 @@ function readme(manifest) {
     ? manifest.staleTemplates.map((template) => `- \`${template.source}\`: ${template.freshness.issues.join("; ")}`).join("\n")
     : "- None.";
   const workOrders = manifest.specCompletionWorkOrders || {};
+  const specRunbookLines = manifest.specCompletionRunbooks.length
+    ? manifest.specCompletionRunbooks
+        .map((runbook) => `- [${runbook.path}](${runbook.path})${runbook.generatedByKit ? " (generated for this kit)" : ""}`)
+        .join("\n")
+    : "- None.";
   const workOrderLines = workOrders.jsonCopied
     ? [
         `- JSON: [${workOrders.jsonPath}](${workOrders.jsonPath})`,
@@ -564,6 +615,10 @@ function readme(manifest) {
     "## Spec Completion Work Orders",
     "",
     workOrderLines,
+    "",
+    "## Spec Completion Runbooks",
+    "",
+    specRunbookLines,
     "",
     "## Missing Templates",
     "",
