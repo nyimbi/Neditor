@@ -41,6 +41,8 @@ const BIBLIOGRAPHY_LANGUAGES = new Set(["bibtex", "hayagriva", "bibliography"]);
 const RAW_BIBLIOGRAPHY_ENTRY_RE = /^@(?:article|book|misc|techreport|inproceedings)\s*[{(]/i;
 const HEADING_RE = /^#{1,4}\s+\S.+$/gm;
 const GENERIC_AI_PHRASE_RE = /\b(?:leverage|robust|seamless|cutting-edge|world-class|game-changing|holistic|synergy)\b/gi;
+const CITATION_TODO_RE = /(citation TODO|source needed|needs citation|TODO:\s*add citation|cite needed)/gi;
+const DEEP_RESEARCH_MARKER_RE = /provider:\s*NEditor Deep Research|^##\s+(?:Deep Research Evidence Log|Source Citation Index)\b/im;
 
 export function buildQualityRecommendations(input: QualityRecommendationInput): QualityRecommendation[] {
   const text = input.text || "";
@@ -53,6 +55,11 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
   const placeholderCount = (analysisText.match(PLACEHOLDER_RE) || []).length;
   const citationCount = (analysisText.match(CITATION_RE) || []).length;
   const bibliographyPresent = hasBibliographyEvidence(text);
+  const deepResearchDocument = DEEP_RESEARCH_MARKER_RE.test(text);
+  const deepResearchBodyCitationCount = deepResearchDocument
+    ? ((documentBodyForInlineCitationReview(analysisText).match(CITATION_RE) || []).length)
+    : citationCount;
+  const citationTodoCount = (analysisText.match(CITATION_TODO_RE) || []).length;
   const headings = (analysisText.match(HEADING_RE) || []).length;
   const longParagraphs = longParagraphCount(analysisText);
   const genericPhrases = analysisText.match(GENERIC_AI_PHRASE_RE) || [];
@@ -85,6 +92,15 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
       severity: "risk",
       recommendation: `${citationCount} citation marker(s) are present but no bibliography block is visible.`,
       action: "Insert bibliography entries or add citation TODOs for every unsupported source.",
+    });
+  }
+  if (deepResearchDocument && bibliographyPresent && !deepResearchBodyCitationCount && !citationTodoCount) {
+    recommendations.push({
+      id: "deep-research-citation-grounding",
+      label: "Deep Research citation grounding",
+      severity: "risk",
+      recommendation: "This Deep Research document has bibliography/index evidence, but no inline body citation markers or citation TODOs outside generated handoff sections.",
+      action: "Add the provided `[@key]` markers next to supported claims, or mark unsupported claims with Citation TODO before review or export.",
     });
   }
   if (unresolved) {
@@ -265,6 +281,41 @@ function longParagraphCount(text: string) {
 
 function firstHeading(text: string) {
   return text.match(/^#\s+(.+)$/m)?.[1] || "";
+}
+
+function documentBodyForInlineCitationReview(text: string) {
+  return removeMarkdownSections(text, [
+    "Source Citation Index",
+    "Bibliography",
+    "Deep Research Evidence Log",
+    "Source Library Audit",
+    "Quality Assurance & Review Handoff",
+    "Quality Assurance and Improvement Report",
+  ]);
+}
+
+function removeMarkdownSections(text: string, headings: string[]) {
+  const targets = new Set(headings.map(normalizeHeadingText));
+  const kept: string[] = [];
+  let skippedLevel = 0;
+  for (const line of text.split(/\r?\n/)) {
+    const heading = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (heading) {
+      const level = heading[1].length;
+      const title = normalizeHeadingText(heading[2]);
+      if (skippedLevel && level <= skippedLevel) skippedLevel = 0;
+      if (targets.has(title)) {
+        skippedLevel = level;
+        continue;
+      }
+    }
+    if (!skippedLevel) kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+function normalizeHeadingText(value: string) {
+  return value.trim().toLowerCase();
 }
 
 function wordCount(value: string) {

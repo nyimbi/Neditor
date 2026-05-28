@@ -362,7 +362,10 @@ a source citation index containing usable `[@key]` references, a
 audit when saved evidence is available. Draft, expansion, QA, and fallback
 generation use the same citation-key guidance, preferring saved local
 source-library keys for matching URLs and falling back to deterministic keys
-for unsaved research results.
+for unsaved research results. The quality recommendation scan treats generated
+source citation indexes as handoff evidence, not body citations, so it flags a
+Deep Research report when bibliography entries exist but no inline body
+citations or citation TODOs appear outside generated handoff sections.
 
 ## Glossary And Index
 

@@ -3574,6 +3574,79 @@ test("quality recommendations recognize tilde fenced bibliography sources", () =
   ok(!recommendations.some((item) => item.id === "citation-evidence"));
 });
 
+test("quality recommendations flag Deep Research sources that are indexed but not cited in body", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "# Report",
+      "",
+      "## Findings",
+      "",
+      "The reviewed document summarizes sourced research without inline body citation markers.",
+      "",
+      "## Source Citation Index",
+      "",
+      "| Citation | Source | Evidence | Local copy |",
+      "| --- | --- | --- | --- |",
+      "| [@agency2026] | [Policy Evidence](https://agency.gov/policy.pdf) | Controls policy. | report.neditor-sources/policy.pdf |",
+      "",
+      "## Bibliography",
+      "",
+      "[BIBLIOGRAPHY]",
+      "",
+      "## Deep Research Evidence Log",
+      "",
+      "Research loop evidence.",
+      "",
+    ].join("\n"),
+    semantic: {
+      title: "Report",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  ok(recommendations.some((item) => item.id === "deep-research-citation-grounding" && item.severity === "risk"));
+  ok(!recommendations.some((item) => item.id === "citation-evidence"));
+});
+
+test("quality recommendations accept Deep Research body citations backed by bibliography", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "# Report",
+      "",
+      "## Findings",
+      "",
+      "The reviewed document cites the source in the body. [@agency2026]",
+      "",
+      "## Source Citation Index",
+      "",
+      "| Citation | Source | Evidence | Local copy |",
+      "| --- | --- | --- | --- |",
+      "| [@agency2026] | [Policy Evidence](https://agency.gov/policy.pdf) | Controls policy. | report.neditor-sources/policy.pdf |",
+      "",
+      "## Bibliography",
+      "",
+      "[BIBLIOGRAPHY]",
+      "",
+      "## Deep Research Evidence Log",
+      "",
+      "Research loop evidence.",
+      "",
+    ].join("\n"),
+    semantic: {
+      title: "Report",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  deepEqual(recommendations.map((item) => item.id), ["qa-ready"]);
+});
+
 test("quality recommendations ignore fenced examples for deterministic risk scans", () => {
   const recommendations = buildQualityRecommendations({
     text: [

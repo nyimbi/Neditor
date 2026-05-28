@@ -477,7 +477,9 @@ web app.
   results. When the active document has been saved, Deep Research can also
   preserve the source documents it found in the same local source library for
   later review and carry the source-library audit into the standalone research
-  document. It also
+  document. Quality recommendations flag Deep Research reports whose source
+  index and bibliography exist but whose body prose never uses the provided
+  inline citation keys. It also
   exposes front matter and merged project variables from
   `.neditor/variables.yaml` as insertable placeholders
   with filters, so repeated client, owner, budget, and source values do not
