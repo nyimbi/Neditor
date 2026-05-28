@@ -23,6 +23,8 @@ import {
 import {
   assessDeepResearchSource,
   deepResearchDraftPrompt,
+  deepResearchQualityAuditMarkdown,
+  deepResearchQualityPrompt,
   estimateMarkdownPages,
   expansionPassBudget,
   pageShortfall,
@@ -4687,6 +4689,32 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   equal(expansionPassBudget(settings), 40);
   equal(pageShortfall(settings, "word ".repeat(1001)), 197);
   ok(deepResearchDraftPrompt(settings, []).includes("Target length: about 200 pages"));
+  ok(deepResearchQualityPrompt(settings, "# Draft", [], 3).includes("Quality-assure and humanize"));
+  ok(deepResearchQualityPrompt(settings, "# Draft", [], 3).includes("Quality Assurance & Review Handoff"));
+  const qaAudit = deepResearchQualityAuditMarkdown(
+    settings,
+    "# Draft\n\nThis needs a citation TODO before release.",
+    [
+      {
+        index: 1,
+        query: "AI procurement controls policy",
+        summary: "Initial source review.",
+        gaps: ["Budget evidence still missing."],
+        results: [
+          {
+            title: "Policy Evidence",
+            url: "https://agency.gov/policy.pdf",
+            snippet: "Controls policy.",
+            source: "DuckDuckGo",
+          },
+        ],
+      },
+    ],
+  );
+  ok(qaAudit.includes("Quality Assurance & Review Handoff"));
+  ok(qaAudit.includes("1 unique source candidate"));
+  ok(qaAudit.includes("Citation TODO count: 1"));
+  ok(qaAudit.includes("Budget evidence still missing."));
   equal(estimateMarkdownPages("word ".repeat(1001)), 3);
 
   const response = await executeDirectAiProviderPrompt(
@@ -6340,6 +6368,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('id: "deep-research", label: "Deep Research"'));
   ok(app.includes("openDeepResearch"));
   ok(app.includes("expansionPassBudget(settings)"));
+  ok(app.includes("deepResearchQualityPrompt(settings"));
+  ok(app.includes("ensureDeepResearchQualityAudit"));
   ok(app.includes("toggleToolbarRow"));
   ok(app.includes("markdownFenceOpener(text)"));
   ok(app.includes("isAiSourceFenceOpener(text)"));

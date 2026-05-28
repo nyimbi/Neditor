@@ -352,7 +352,10 @@ Research uses the selected AI provider, including Ollama local or remote/cloud
 endpoints, to plan iterative queries, reflect on knowledge gaps, preserve found
 source documents in the active document's local source library when enabled,
 write a sourced Markdown draft, and expand that draft toward a user-selected
-length from 1 to 200 pages before the user inserts and edits it.
+length from 1 to 200 pages. The final pass quality-assures and humanizes the
+draft, adding or preserving a review handoff section for source checks,
+citation TODOs, open gaps, and distribution cautions before the user inserts
+and edits it.
 
 ## Glossary And Index
 

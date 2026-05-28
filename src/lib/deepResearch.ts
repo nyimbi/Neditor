@@ -165,6 +165,75 @@ export function deepResearchExpansionPrompt(
   ].join("\n");
 }
 
+export function deepResearchQualityPrompt(
+  settings: DeepResearchSettings,
+  draftMarkdown: string,
+  iterations: DeepResearchIteration[],
+  currentPages = estimateMarkdownPages(draftMarkdown),
+) {
+  return [
+    `Quality-assure and humanize this ${settings.documentType} for ${settings.audience}.`,
+    `Topic: ${settings.topic}`,
+    `Target length: ${settings.targetPages} page${settings.targetPages === 1 ? "" : "s"}; current estimate: ${currentPages} page${currentPages === 1 ? "" : "s"}.`,
+    "",
+    "Mandatory review actions:",
+    "- Preserve the full Markdown document, not just review notes.",
+    "- Keep or improve the current length unless removing duplicated padding.",
+    "- Remove generic AI phrasing, overclaiming, repetition, and filler.",
+    "- Add source-verification TODOs for claims not directly grounded in the research log.",
+    "- Make executive summary, section headings, limitations, and recommendations concrete.",
+    "- Add a final 'Quality Assurance & Review Handoff' section with evidence checks, open gaps, human-review tasks, and distribution cautions.",
+    "",
+    "Research log:",
+    formatDeepResearchLog(iterations),
+    "",
+    "Draft to improve:",
+    draftMarkdown,
+    "",
+    "Return the complete review-ready Markdown document only.",
+  ].join("\n");
+}
+
+export function deepResearchQualityAuditMarkdown(
+  settings: DeepResearchSettings,
+  draftMarkdown: string,
+  iterations: DeepResearchIteration[],
+) {
+  const currentPages = estimateMarkdownPages(draftMarkdown);
+  const sources = uniqueSources(iterations);
+  const openGaps = iterations.flatMap((iteration) => iteration.gaps).filter(Boolean);
+  const citationTodos = (draftMarkdown.match(/citation TODO|\[@TODO|TODO citation/gi) || []).length;
+  const targetStatus = currentPages >= settings.targetPages
+    ? `Reached target: about ${currentPages}/${settings.targetPages} pages.`
+    : `Below target: about ${currentPages}/${settings.targetPages} pages; provider expansion should be reviewed before release.`;
+  return [
+    "## Quality Assurance & Review Handoff",
+    "",
+    `- Length status: ${targetStatus}`,
+    `- Source inventory: ${sources.length} unique source candidate${sources.length === 1 ? "" : "s"} across ${iterations.length} research iteration${iterations.length === 1 ? "" : "s"}.`,
+    `- Citation TODO count: ${citationTodos}.`,
+    `- Knowledge gaps carried forward: ${openGaps.length}.`,
+    "",
+    "### Evidence Checks",
+    "",
+    "- [ ] Open every saved source document and verify the claims that depend on it.",
+    "- [ ] Resolve citation TODOs before external distribution.",
+    "- [ ] Confirm dates, figures, named organizations, legal/regulatory claims, and recommendations against source documents.",
+    "- [ ] Preserve source-library audit evidence with the final review packet.",
+    "",
+    "### Humanization Checks",
+    "",
+    "- [ ] Remove generic AI phrasing, duplicated transitions, and unsupported certainty.",
+    "- [ ] Confirm the voice fits the stated audience and document type.",
+    "- [ ] Tighten headings so each section makes a distinct contribution.",
+    "",
+    "### Open Knowledge Gaps",
+    "",
+    ...(openGaps.length ? openGaps.slice(0, 12).map((gap) => `- ${gap}`) : ["- No explicit knowledge gaps were recorded by the research loop."]),
+    "",
+  ].join("\n");
+}
+
 export function fallbackDeepResearchQuery(settings: DeepResearchSettings, iterations: DeepResearchIteration[]) {
   const suffixes = ["overview evidence", "recent data sources", "risks limitations", "case studies", "implementation guidance"];
   const suffix = suffixes[iterations.length % suffixes.length];

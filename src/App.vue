@@ -5665,6 +5665,8 @@ import {
   deepResearchDraftPrompt,
   deepResearchExpansionPrompt,
   deepResearchQueryPrompt,
+  deepResearchQualityAuditMarkdown,
+  deepResearchQualityPrompt,
   deepResearchReflectionPrompt,
   estimateMarkdownPages,
   expansionPassBudget,
@@ -10286,6 +10288,11 @@ async function saveDeepResearchSources(results: DeepResearchSource[], loopIndex:
   return saved;
 }
 
+function ensureDeepResearchQualityAudit(settings: ReturnType<typeof deepResearchSettings>, markdown: string, iterations: DeepResearchIteration[]) {
+  if (/^##\s+Quality Assurance & Review Handoff\b/im.test(markdown)) return markdown;
+  return `${markdown.trim()}\n\n${deepResearchQualityAuditMarkdown(settings, markdown, iterations)}`;
+}
+
 async function runDeepResearchDocumentCreation() {
   const settings = deepResearchSettings();
   if (!settings.topic) {
@@ -10393,6 +10400,30 @@ async function runDeepResearchDocumentCreation() {
       } catch {
         break;
       }
+    }
+    deepResearchStatus.value = "Running quality assurance and humanization review";
+    const pagesBeforeQa = estimateMarkdownPages(deepResearchDraft.value);
+    try {
+      const reviewed = await executeDirectAiProviderPrompt(
+        {
+          profileId: settings.providerProfileId,
+          endpoint: settings.endpoint,
+          model: settings.model,
+          keyEnv: settings.keyEnv,
+          systemPrompt: "You are a document QA editor. Return a complete, source-grounded, human-review-ready Markdown document.",
+          userPrompt: deepResearchQualityPrompt(settings, deepResearchDraft.value, deepResearchIterations.value, pagesBeforeQa),
+        },
+        agentProviderApiKey.value,
+      );
+      const reviewedMarkdown = reviewed.markdown.trim();
+      const reviewedPages = estimateMarkdownPages(reviewedMarkdown);
+      if (reviewedMarkdown && (reviewedPages >= pagesBeforeQa || reviewedPages >= settings.targetPages)) {
+        deepResearchDraft.value = ensureDeepResearchQualityAudit(settings, reviewedMarkdown, deepResearchIterations.value);
+      } else {
+        deepResearchDraft.value = ensureDeepResearchQualityAudit(settings, deepResearchDraft.value, deepResearchIterations.value);
+      }
+    } catch {
+      deepResearchDraft.value = ensureDeepResearchQualityAudit(settings, deepResearchDraft.value, deepResearchIterations.value);
     }
     const finalPages = estimateMarkdownPages(deepResearchDraft.value);
     const savedSourceSuffix = deepResearchSavedSourceCount.value
