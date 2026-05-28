@@ -32,6 +32,9 @@ if (!skipBuild) {
 
 if (!skipEvidence) {
   if (!skipPrerequisiteEvidence) refreshPrerequisiteEvidence();
+  runReadinessBootstrap();
+  run("pnpm", ["run", "collect:evidence-kit"]);
+  run("pnpm", ["run", "check:evidence-kit"]);
   run("pnpm", ["run", "check:release-readiness"]);
   run("pnpm", ["run", "collect:evidence-kit"]);
   run("pnpm", ["run", "check:evidence-kit"]);
@@ -233,11 +236,27 @@ function run(command, args, env = {}) {
     stderrTail: tail(result.stderr || ""),
   };
   commandResults.push(report);
-  if (report.status !== 0) {
+  if (report.status !== 0 && !allowBootstrapReadinessFailure(report)) {
     writeCommandFailure(report);
     fail(`${report.command} failed with exit code ${report.status}`);
   }
   return result;
+}
+
+function runReadinessBootstrap() {
+  run("pnpm", ["run", "check:release-readiness"], { NEDITOR_RELEASE_CANDIDATE_BOOTSTRAP: "1" });
+}
+
+function allowBootstrapReadinessFailure(report) {
+  if (!report.env.includes("NEDITOR_RELEASE_CANDIDATE_BOOTSTRAP")) return false;
+  const readinessReport = readOptionalJson(".tmp/release-readiness/report.json");
+  const failures = Array.isArray(readinessReport?.failures) ? readinessReport.failures : [];
+  const staleEvidenceKitOnly = failures.length > 0 && failures.every((failure) => String(failure).startsWith("release-evidence-kit "));
+  if (staleEvidenceKitOnly) {
+    report.allowedFailure = true;
+    report.allowedFailureReason = "bootstrap-readiness-report-for-stale-evidence-kit";
+  }
+  return staleEvidenceKitOnly;
 }
 
 function writeCommandFailure(report) {
@@ -268,7 +287,7 @@ function renderReadme(candidate) {
     : "- None.";
   const artifactLines = candidate.artifacts.map((artifact) => `- \`${artifact.path}\` (${artifact.kind}, ${artifact.size} bytes)`).join("\n");
   const commandLines = candidate.commands.length
-    ? candidate.commands.map((command) => `- \`${command.command}\` -> ${command.status}`).join("\n")
+    ? candidate.commands.map((command) => `- \`${command.command}\` -> ${command.status}${command.allowedFailure ? ` (${command.allowedFailureReason})` : ""}`).join("\n")
     : "- No commands were run; this was created with skip flags.";
   const nextStepLines = candidate.nextSteps.map((step) => `- ${step}`).join("\n");
   return `${[

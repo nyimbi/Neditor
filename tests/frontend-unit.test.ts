@@ -8612,6 +8612,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("evidenceKitCoversReadiness"));
   ok(releaseCandidate.includes("evidenceKitReportCurrentForReadiness"));
   ok(releaseCandidate.includes("evidenceKitReport?.status === \"passed\""));
+  ok(releaseCandidate.includes("runReadinessBootstrap"));
+  ok(releaseCandidate.includes("NEDITOR_RELEASE_CANDIDATE_BOOTSTRAP"));
+  ok(releaseCandidate.includes("allowBootstrapReadinessFailure"));
+  ok(releaseCandidate.includes("bootstrap-readiness-report-for-stale-evidence-kit"));
   ok(releaseCandidate.includes("currentForSource: evidenceKitCurrentForSource"));
   ok(releaseCandidate.includes("coversReadiness: evidenceKitCoversReadiness"));
   ok(releaseCandidate.includes("reportCurrentForReadiness: evidenceKitReportCurrentForReadiness"));
