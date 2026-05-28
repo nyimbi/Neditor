@@ -1273,6 +1273,8 @@ fn run_default_reader_command(args: &[String]) -> Result<CliOutcome, String> {
 fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut json_output = false;
     let mut ids_only = false;
+    let mut markdown_id: Option<String> = None;
+    let mut title: Option<String> = None;
     let mut category: Option<String> = None;
     let mut query: Option<String> = None;
     let mut index = 0;
@@ -1280,6 +1282,22 @@ fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
         match args[index].as_str() {
             "--json" => json_output = true,
             "--ids-only" => ids_only = true,
+            "--markdown" | "--body" => {
+                index += 1;
+                markdown_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--markdown requires a template id".to_string())?
+                        .to_string(),
+                );
+            }
+            "--title" => {
+                index += 1;
+                title = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--title requires a document title".to_string())?
+                        .to_string(),
+                );
+            }
             "--category" => {
                 index += 1;
                 category = Some(
@@ -1326,6 +1344,43 @@ fn run_templates_command(args: &[String]) -> Result<CliOutcome, String> {
         .iter()
         .map(|template| template.id)
         .collect::<Vec<_>>();
+
+    if let Some(markdown_id) = markdown_id {
+        let normalized = markdown_id.trim().to_ascii_lowercase();
+        let template = document_template_catalog()
+            .into_iter()
+            .find(|template| template.id == normalized)
+            .ok_or_else(|| {
+                format!(
+                    "Unknown template '{}'. Available templates: {}",
+                    markdown_id,
+                    document_template_catalog()
+                        .iter()
+                        .map(|template| template.id)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })?;
+        let resolved_title = title.unwrap_or_else(|| template.label.to_string());
+        let markdown = new_document_markdown(template.id, &resolved_title)?;
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-template.v1",
+                    "template": template.id,
+                    "title": resolved_title,
+                    "templateDetails": template,
+                    "markdown": markdown,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: markdown,
+            exit_code: 0,
+        });
+    }
 
     if json_output {
         return Ok(CliOutcome {
@@ -7586,7 +7641,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json" -- "$cur") )
         ;;
       templates)
-        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body --title" -- "$cur") )
         ;;
       outlines)
         COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body --workspace --save --delete --name --label --summary --docs-live-type --document-type --outline-file --section --tag --best-for" -- "$cur") )
@@ -7687,7 +7742,7 @@ _ned() {{
       _arguments '*:markdown file:_files -g "*.md"' '--to[export target]:target:($targets)' '--json[print machine-readable JSON]' '--strict[treat warnings as non-zero]' '--option[set export option key=value]:option:'
       ;;
     templates)
-      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:'
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:' '--markdown[print one starter document template]:id:($templates)' '--body[alias for --markdown]:id:($templates)' '--title[set preview document title]:title:'
       ;;
     outlines)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching outline ids only]' '--category[filter by category]:category:' '--query[search outlines by text]:query:' '--search[alias for --query]:query:' '--markdown[print one outline as planner Markdown]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--save[save a workspace outline id]:id:' '--delete[delete a workspace outline id]:id:' '--name[set outline display name]:name:' '--label[alias for --name]:name:' '--summary[set outline summary]:summary:' '--docs-live-type[set Docs Live workflow]:type:' '--document-type[alias for --docs-live-type]:type:' '--outline-file[read headings from a Markdown/text file]:file:_files' '--section[add one section heading]:heading:' '--tag[add a search tag]:tag:' '--best-for[add a best-fit use case]:use:'
@@ -7827,6 +7882,9 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l query -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l search -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l markdown -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l body -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from templates' -l title -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l category -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l query -r".to_string(),
@@ -8284,7 +8342,7 @@ fn help_text() -> String {
         "  ned inspect <file.md|-> [--json]".to_string(),
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
-        "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
+        "  ned templates [--json] [--category procurement] [--query tender] [--ids-only] [--markdown id] [--title title]".to_string(),
         "  ned outlines [--workspace .] [--json] [--category Procurement] [--query RFP] [--ids-only] [--markdown id]".to_string(),
         "  ned outlines --workspace . --save custom-id --docs-live-type proposal --section \"Executive Summary\" --section \"Recommendations\" [--json]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id] [--workspace . --fill-profile]".to_string(),

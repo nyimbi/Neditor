@@ -756,6 +756,42 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     .expect("template ids only");
     assert_eq!(ids_only.message, "podcast-script\nmovie-script");
 
+    let report_preview = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "templates".to_string(),
+        "--markdown".to_string(),
+        "report".to_string(),
+        "--title".to_string(),
+        "Weekly Operating Report".to_string(),
+    ])
+    .expect("template markdown preview");
+    assert!(report_preview
+        .message
+        .contains("title: Weekly Operating Report"));
+    assert!(report_preview
+        .message
+        .contains("documentType: business-report"));
+    assert!(report_preview.message.contains("## Analysis"));
+
+    let rfp_response_preview_json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "templates".to_string(),
+        "--markdown".to_string(),
+        "rfp-response".to_string(),
+        "--title".to_string(),
+        "Buyer Response".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("template markdown preview json");
+    let preview_report: serde_json::Value =
+        serde_json::from_str(&rfp_response_preview_json.message).expect("template preview json");
+    assert_eq!(preview_report["schema"], "neditor.ned-template.v1");
+    assert_eq!(preview_report["template"], "rfp-response");
+    assert!(preview_report["markdown"]
+        .as_str()
+        .expect("preview markdown")
+        .contains("## Compliance Matrix"));
+
     let research_ids = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "templates".to_string(),
@@ -1789,6 +1825,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("evidence"));
     assert!(bash.message.contains("snippets"));
     assert!(bash.message.contains("--markdown"));
+    assert!(bash.message.contains("--title"));
     assert!(bash.message.contains("--save"));
     assert!(bash.message.contains("--outline-file"));
     assert!(bash.message.contains("--fill-profile"));
@@ -1820,6 +1857,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--evidence-root"));
     assert!(zsh.message.contains("--ids-only"));
     assert!(zsh.message.contains("--markdown"));
+    assert!(zsh.message.contains("--title"));
     assert!(zsh.message.contains("--best-for"));
     assert!(zsh.message.contains("--docs-live-type"));
     assert!(zsh.message.contains("--fill-profile"));
@@ -1841,6 +1879,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("handlers"));
     assert!(fish.message.contains("readiness"));
     assert!(fish.message.contains("evidence"));
+    assert!(fish.message.contains("-l title"));
     assert!(fish.message.contains("snippets"));
     assert!(fish.message.contains("ids-only"));
     assert!(fish.message.contains("outline-file"));

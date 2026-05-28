@@ -155,7 +155,8 @@ diagnostics, and available export targets without writing any artifacts. `ned
 templates` explains the installed starter documents with categories, summaries,
 and best-fit uses; use `ned templates --category Procurement --json` or
 `ned templates --query podcast --ids-only` when help desk scripts need filtered
-template discovery. `ned transform-templates` exposes the same built-in
+template discovery, and use `ned templates --markdown report --title "Weekly Operating Report"`
+to preview a complete starter document without creating a file. `ned transform-templates` exposes the same built-in
 calculation, chart, diagram, data, API, timeline, roadmap, QR, SQL, and schema
 starter blocks used by the visual Templates panel; use
 `ned transform-templates --category Business --transform calc --query ROI --json`

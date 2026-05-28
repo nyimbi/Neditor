@@ -8279,6 +8279,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(store.includes("workspaceDocumentOutlineTemplatesFromJson"));
   ok(store.includes("workspaceDocumentOutlineLibraryJson"));
   ok(cli.includes("snippetDetails"));
+  ok(cli.includes("neditor.ned-template.v1"));
   ok(cli.includes("neditor.ned-snippets.v1"));
   ok(cli.includes("run_transform_templates_command"));
   ok(cli.includes("neditor.ned-transform-templates.v1"));
