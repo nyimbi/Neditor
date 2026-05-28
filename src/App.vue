@@ -5670,6 +5670,7 @@ import {
   deepResearchQualityAuditMarkdown,
   deepResearchQualityPrompt,
   deepResearchReflectionPrompt,
+  deepResearchReviewPackageMarkdown,
   estimateMarkdownPages,
   expansionPassBudget,
   fallbackDeepResearchQuery,
@@ -10460,8 +10461,20 @@ async function runDeepResearchDocumentCreation() {
 
 function insertDeepResearchDraft() {
   if (!deepResearchDraft.value.trim()) return;
-  applyAgentMarkdown(deepResearchDraft.value, "append-packet");
-  store.statusMessage = "Inserted deep research draft for editing and review";
+  const reviewPackageMarkdown = deepResearchReviewPackageMarkdown(
+    deepResearchSettings(),
+    deepResearchDraft.value,
+    deepResearchIterations.value,
+    {
+      savedSourceCount: deepResearchSavedSourceCount.value,
+      bibliographySources: citationSourceLibrary.value,
+      sourceLibraryAuditMarkdown: citationSourceLibrary.value.length
+        ? citationSourceLibraryAuditMarkdown(citationSourceLibrary.value)
+        : "",
+    },
+  );
+  applyAgentMarkdown(reviewPackageMarkdown, "append-packet");
+  store.statusMessage = "Inserted deep research draft with bibliography, citations, evidence log, and source audit";
 }
 
 function openDeepResearchDraftAsDocument() {

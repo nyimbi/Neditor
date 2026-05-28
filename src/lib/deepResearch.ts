@@ -306,10 +306,32 @@ export function deepResearchDocumentMarkdown(
   const withProvenance = hasDeepResearchProvenance(withFrontMatter)
     ? withFrontMatter
     : insertAfterFrontMatter(withFrontMatter, deepResearchProvenanceBlock(settings, generatedAt));
+  return appendDeepResearchEvidenceSections(withProvenance, iterations, options);
+}
+
+export function deepResearchReviewPackageMarkdown(
+  settings: DeepResearchSettings,
+  draftMarkdown: string,
+  iterations: DeepResearchIteration[],
+  options: DeepResearchDocumentOptions = {},
+) {
+  const generatedAt = options.generatedAt || new Date().toISOString();
+  const body = draftMarkdown.trim();
+  const withProvenance = hasDeepResearchProvenance(body)
+    ? body
+    : `${deepResearchProvenanceBlock(settings, generatedAt)}\n\n${body}`;
+  return appendDeepResearchEvidenceSections(withProvenance, iterations, options);
+}
+
+function appendDeepResearchEvidenceSections(
+  markdown: string,
+  iterations: DeepResearchIteration[],
+  options: DeepResearchDocumentOptions,
+) {
   const bibliography = deepResearchBibliographyMarkdown(iterations, options.bibliographySources);
-  const withBibliographyEntries = !bibliography || hasBibliographyEntries(withProvenance)
-    ? withProvenance
-    : `${withProvenance.trim()}\n\n${bibliography}`;
+  const withBibliographyEntries = !bibliography || hasBibliographyEntries(markdown)
+    ? markdown
+    : `${markdown.trim()}\n\n${bibliography}`;
   const citationIndex = deepResearchCitationIndexMarkdown(iterations, options.bibliographySources);
   const withCitationIndex = !citationIndex || hasDeepResearchCitationIndex(withBibliographyEntries)
     ? withBibliographyEntries

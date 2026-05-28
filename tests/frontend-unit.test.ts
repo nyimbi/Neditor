@@ -28,6 +28,7 @@ import {
   deepResearchDocumentMarkdown,
   deepResearchDraftPrompt,
   deepResearchExpansionPrompt,
+  deepResearchReviewPackageMarkdown,
   fallbackResearchDraft,
   deepResearchQualityAuditMarkdown,
   deepResearchQualityPrompt,
@@ -4909,6 +4910,49 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ok(standalone.includes("## Deep Research Evidence Log"));
   ok(standalone.includes("## Source Library Audit"));
 
+  const reviewPackage = deepResearchReviewPackageMarkdown(
+    settings,
+    "# Draft\n\nBody with source review. [@agency2026]",
+    [
+      {
+        index: 1,
+        query: "AI procurement controls policy",
+        summary: "Initial source review.",
+        gaps: ["Budget evidence still missing."],
+        results: [
+          {
+            title: "Policy Evidence",
+            url: "https://agency.gov/policy.pdf",
+            snippet: "Controls policy.",
+            source: "DuckDuckGo",
+          },
+        ],
+      },
+    ],
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+      savedSourceCount: 1,
+      bibliographySources: [
+        {
+          citation_key: "agency2026",
+          title: "Policy Evidence",
+          url: "https://agency.gov/policy.pdf",
+          snippet: "Controls policy.",
+          source: "DuckDuckGo",
+          relative_path: "ai-procurement.neditor-sources/policy.pdf",
+        },
+      ],
+      sourceLibraryAuditMarkdown: "## Source Library Audit\n\n| Citation | Status |\n| --- | --- |\n| @agency2026 | OK |",
+    },
+  );
+  ok(!reviewPackage.startsWith("---"));
+  ok(reviewPackage.startsWith("```ai-source"));
+  ok(reviewPackage.includes("## Source Citation Index"));
+  ok(reviewPackage.includes("```bibliography"));
+  ok(reviewPackage.includes("[BIBLIOGRAPHY]"));
+  ok(reviewPackage.includes("## Deep Research Evidence Log"));
+  ok(reviewPackage.includes("## Source Library Audit"));
+
   const fallbackBibliography = deepResearchBibliographyMarkdown([
     {
       index: 1,
@@ -6602,9 +6646,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ensureDeepResearchQualityAudit"));
   ok(app.includes("openDeepResearchDraftAsDocument"));
   ok(app.includes("deepResearchDocumentMarkdown("));
+  ok(app.includes("deepResearchReviewPackageMarkdown("));
   ok(app.includes("bibliographySources: citationSourceLibrary.value"));
   ok(app.includes("deepResearchDraftPrompt(settings, deepResearchIterations.value, citationSourceLibrary.value)"));
   ok(app.includes("fallbackResearchDraft(settings, deepResearchIterations.value, citationSourceLibrary.value)"));
+  ok(app.includes("Inserted deep research draft with bibliography, citations, evidence log, and source audit"));
   ok(app.includes("store.newDocumentFromText(documentMarkdown"));
   ok(app.includes("toggleToolbarRow"));
   ok(app.includes("markdownFenceOpener(text)"));

@@ -479,7 +479,10 @@ web app.
   later review and carry the source-library audit into the standalone research
   document. Quality recommendations flag Deep Research reports whose source
   index and bibliography exist but whose body prose never uses the provided
-  inline citation keys. It also
+  inline citation keys. Inserting the draft into the current document appends
+  the same editable review package used by standalone reports: AI provenance,
+  bibliography data, citation index, bibliography marker, evidence log, and
+  source-library audit when available. It also
   exposes front matter and merged project variables from
   `.neditor/variables.yaml` as insertable placeholders
   with filters, so repeated client, owner, budget, and source values do not

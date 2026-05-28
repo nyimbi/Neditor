@@ -365,7 +365,11 @@ source-library keys for matching URLs and falling back to deterministic keys
 for unsaved research results. The quality recommendation scan treats generated
 source citation indexes as handoff evidence, not body citations, so it flags a
 Deep Research report when bibliography entries exist but no inline body
-citations or citation TODOs appear outside generated handoff sections.
+citations or citation TODOs appear outside generated handoff sections. The
+current-document insert action appends the same editable review package as the
+standalone document flow, omitting only standalone front matter while preserving
+AI provenance, bibliography data, citation index, bibliography marker, evidence
+log, and source-library audit.
 
 ## Glossary And Index
 
