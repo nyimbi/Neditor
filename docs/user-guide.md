@@ -413,7 +413,10 @@ sources. For multi-sheet workbooks, add `sheet: Sheet Name` or a one-based
 `sheetIndex: 2` to a `dataSources` XLSX entry to render a specific worksheet;
 the References panel's local data-source manager exposes the same worksheet
 fields when adding an XLSX source, and its file picker infers CSV, TSV, JSON,
-YAML, or XLSX type from the selected local file.
+YAML, or XLSX type from the selected local file. Use **Copy to data folder**
+after choosing an external file to copy it into the active document or
+workspace `data/` folder and replace the draft path with a portable
+document-relative path.
 
 For spreadsheet exchange, open the Tables panel and choose CSV, TSV, or XLSX
 import. Review the detected headers, rows, alignment, and formula cells, then

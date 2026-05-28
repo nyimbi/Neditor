@@ -22,6 +22,13 @@ pub(crate) struct DuplicateFileRequest {
     pub(crate) to: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct CopyDataSourceFileRequest {
+    pub(crate) source_path: String,
+    pub(crate) document_path: Option<String>,
+    pub(crate) workspace_root: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct FileResponse {
     pub(crate) path: String,
@@ -36,6 +43,15 @@ pub(crate) struct FileMetadata {
     pub(crate) exists: bool,
     pub(crate) hash: Option<String>,
     pub(crate) modified: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CopyDataSourceFileResponse {
+    pub(crate) source_path: String,
+    pub(crate) output_path: String,
+    pub(crate) relative_path: String,
+    pub(crate) bytes: u64,
+    pub(crate) sha256: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -121,6 +137,75 @@ pub(crate) fn duplicate_file(request: DuplicateFileRequest) -> Result<FileRespon
 }
 
 #[tauri::command]
+pub(crate) fn copy_data_source_file(
+    request: CopyDataSourceFileRequest,
+) -> Result<CopyDataSourceFileResponse, String> {
+    let base = data_source_copy_base(
+        request.document_path.as_deref(),
+        request.workspace_root.as_deref(),
+    )?;
+    let source_input = request.source_path.trim();
+    let source = if PathBuf::from(source_input).is_absolute() {
+        PathBuf::from(source_input)
+    } else {
+        base.join(source_input)
+    };
+    if !source.is_file() {
+        return Err("Choose an existing local data-source file to copy.".to_string());
+    }
+    let data_dir = base.join("data");
+    fs::create_dir_all(&data_dir).map_err(|err| err.to_string())?;
+    let file_name = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(safe_data_source_file_name)
+        .filter(|name| !name.trim().is_empty())
+        .ok_or_else(|| "Could not determine a safe data-source file name.".to_string())?;
+    let output = unique_data_source_output_path(&data_dir, &file_name);
+    let canonical_base = base
+        .canonicalize()
+        .map_err(|err| format!("Could not inspect data-source folder: {err}"))?;
+    let canonical_data_dir = data_dir
+        .canonicalize()
+        .map_err(|err| format!("Could not inspect data-source folder: {err}"))?;
+    if !canonical_data_dir.starts_with(&canonical_base) {
+        return Err(
+            "Data-source files must stay inside the document or workspace folder.".to_string(),
+        );
+    }
+    let initial_output = data_dir.join(&file_name);
+    if source.canonicalize().ok().as_ref() == initial_output.canonicalize().ok().as_ref() {
+        let bytes = fs::read(&initial_output).map_err(|err| err.to_string())?;
+        return Ok(CopyDataSourceFileResponse {
+            source_path: path_to_string(&source),
+            output_path: path_to_string(&initial_output),
+            relative_path: data_source_relative_path(&base, &initial_output),
+            bytes: bytes.len() as u64,
+            sha256: sha256_hex(&bytes),
+        });
+    }
+    if source.canonicalize().ok().as_ref() == output.canonicalize().ok().as_ref() {
+        let bytes = fs::read(&output).map_err(|err| err.to_string())?;
+        return Ok(CopyDataSourceFileResponse {
+            source_path: path_to_string(&source),
+            output_path: path_to_string(&output),
+            relative_path: data_source_relative_path(&base, &output),
+            bytes: bytes.len() as u64,
+            sha256: sha256_hex(&bytes),
+        });
+    }
+    fs::copy(&source, &output).map_err(|err| err.to_string())?;
+    let bytes = fs::read(&output).map_err(|err| err.to_string())?;
+    Ok(CopyDataSourceFileResponse {
+        source_path: path_to_string(&source),
+        output_path: path_to_string(&output),
+        relative_path: data_source_relative_path(&base, &output),
+        bytes: bytes.len() as u64,
+        sha256: sha256_hex(&bytes),
+    })
+}
+
+#[tauri::command]
 pub(crate) fn reveal_path(path: String) -> Result<(), String> {
     let command_spec = reveal_command_for_path(&path)?;
     Command::new(&command_spec.program)
@@ -128,6 +213,77 @@ pub(crate) fn reveal_path(path: String) -> Result<(), String> {
         .spawn()
         .map_err(|err| err.to_string())?;
     Ok(())
+}
+
+fn data_source_copy_base(
+    document_path: Option<&str>,
+    workspace_root: Option<&str>,
+) -> Result<PathBuf, String> {
+    if let Some(path) = document_path.map(str::trim).filter(|path| !path.is_empty()) {
+        let document = PathBuf::from(path);
+        if let Some(parent) = document.parent() {
+            if !parent.as_os_str().is_empty() {
+                return Ok(parent.to_path_buf());
+            }
+        }
+    }
+    if let Some(path) = workspace_root
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+    {
+        return Ok(PathBuf::from(path));
+    }
+    Err("Save the document or open a workspace before copying a data-source file.".to_string())
+}
+
+fn safe_data_source_file_name(name: &str) -> String {
+    name.chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches(['.', '-'])
+        .to_string()
+}
+
+fn unique_data_source_output_path(data_dir: &std::path::Path, file_name: &str) -> PathBuf {
+    let initial = data_dir.join(file_name);
+    if !initial.exists() {
+        return initial;
+    }
+    let path = PathBuf::from(file_name);
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("data-source");
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+    for index in 2..1000 {
+        let candidate_name = if extension.is_empty() {
+            format!("{stem}-{index}")
+        } else {
+            format!("{stem}-{index}.{extension}")
+        };
+        let candidate = data_dir.join(candidate_name);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    data_dir.join(format!("{stem}-copy"))
+}
+
+fn data_source_relative_path(base: &std::path::Path, output: &std::path::Path) -> String {
+    output
+        .strip_prefix(base)
+        .ok()
+        .map(path_to_string)
+        .unwrap_or_else(|| path_to_string(output))
 }
 
 pub(crate) fn reveal_command_for_path(path: &str) -> Result<RevealCommand, String> {

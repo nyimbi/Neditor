@@ -87,11 +87,13 @@ use export_commands::{export_document, prepare_for_export, prepare_google_docs_l
 #[cfg(test)]
 use export_commands::{ExportRequest, GoogleDocsLiveImportRequest, PrepareExportRequest};
 use filesystem::{
-    duplicate_file, file_metadata, open_file, read_file, rename_file, reveal_path, save_file,
-    save_file_as, FileResponse,
+    copy_data_source_file, duplicate_file, file_metadata, open_file, read_file, rename_file,
+    reveal_path, save_file, save_file_as, FileResponse,
 };
 #[cfg(test)]
-use filesystem::{DuplicateFileRequest, RenameFileRequest, SaveFileRequest};
+use filesystem::{
+    CopyDataSourceFileRequest, DuplicateFileRequest, RenameFileRequest, SaveFileRequest,
+};
 #[cfg(all(test, feature = "native-watch"))]
 use filesystem_watch::notify_event_should_emit;
 #[cfg(test)]
@@ -168,6 +170,7 @@ pub fn run() {
             stop_file_watcher,
             rename_file,
             duplicate_file,
+            copy_data_source_file,
             reveal_path,
             file_metadata,
             pending_cli_open_paths,

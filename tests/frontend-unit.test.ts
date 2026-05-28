@@ -8158,6 +8158,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("outlineDocsLiveTypeLabel"));
   ok(app.includes("docsLiveTypeForOutlineTemplate"));
   ok(app.includes("docsLiveDocumentTypeForOutlineSignal(template)"));
+  ok(app.includes("copyFrontMatterDataSourceFile"));
+  ok(app.includes("copy_data_source_file"));
+  ok(app.includes("Copy to data folder"));
+  ok(app.includes("dataSourceCopyBusy"));
   ok(app.includes("ned evidence --json"));
   ok(app.includes("ned default-reader --status --json"));
   ok(app.includes("ned support-bundle --output support.json"));

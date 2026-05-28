@@ -1730,6 +1730,9 @@
                 <input v-model="dataSourcePathDraft" placeholder="data/revenue.csv" />
               </label>
               <button type="button" @click="chooseFrontMatterDataSourceFile">Choose file</button>
+              <button type="button" :disabled="!dataSourcePathDraft.trim() || dataSourceCopyBusy" @click="copyFrontMatterDataSourceFile">
+                {{ dataSourceCopyBusy ? "Copying..." : "Copy to data folder" }}
+              </button>
               <label>
                 Type
                 <select v-model="dataSourceTypeDraft" aria-label="Data source type">
@@ -6129,6 +6132,13 @@ interface FileMetadataResponse {
   modified?: string | null;
   path?: string | null;
 }
+type CopyDataSourceFileResponse = {
+  source_path: string;
+  output_path: string;
+  relative_path: string;
+  bytes: number;
+  sha256: string;
+};
 
 const store = useDocumentsStore();
 type ExportTarget = typeof store.exportTarget;
@@ -6612,6 +6622,7 @@ const reviewCommentText = ref("");
 const changeNoteText = ref("");
 const citationTodoKey = ref("");
 const citationTodoNote = ref("");
+const dataSourceCopyBusy = ref(false);
 const selectedTableIndex = ref(0);
 const outlineDraftText = ref("- Executive Summary\n  - Decision Needed\n  - Key Risks\n- Financial Case\n- Next Steps");
 const outlineDraftTitle = ref("");
@@ -18124,6 +18135,34 @@ async function chooseFrontMatterDataSourceFile() {
     dataSourceSheetIndexDraft.value = "";
   }
   store.statusMessage = `Selected ${dataSourceTypeDraft.value.toUpperCase()} data source ${relativePath}`;
+}
+
+async function copyFrontMatterDataSourceFile() {
+  const sourcePath = dataSourcePathDraft.value.trim();
+  if (!sourcePath || dataSourceCopyBusy.value) return;
+  dataSourceCopyBusy.value = true;
+  try {
+    const response = await invoke<CopyDataSourceFileResponse>("copy_data_source_file", {
+      request: {
+        source_path: sourcePath,
+        document_path: active.value.path || null,
+        workspace_root: store.workspaceRoot || null,
+      },
+    });
+    dataSourcePathDraft.value = response.relative_path;
+    dataSourceNameDraft.value ||= dataSourceNameFromPath(response.relative_path);
+    dataSourceTypeDraft.value = dataSourceKindFromPath(response.relative_path);
+    if (dataSourceTypeDraft.value !== "xlsx") {
+      dataSourceSheetNameDraft.value = "";
+      dataSourceSheetIndexDraft.value = "";
+    }
+    store.statusMessage = `Copied data source to ${response.relative_path} (${response.bytes.toLocaleString()} bytes)`;
+  } catch (error) {
+    store.lastError = error instanceof Error ? error.message : String(error);
+    store.statusMessage = "Could not copy data source";
+  } finally {
+    dataSourceCopyBusy.value = false;
+  }
 }
 
 function frontMatterDataSourceRelativePath(path: string) {

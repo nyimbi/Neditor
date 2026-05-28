@@ -31,6 +31,68 @@ fn file_duplicate_and_rename_commands_move_content() {
 }
 
 #[test]
+fn copy_data_source_file_is_binary_safe_project_relative_and_collision_safe() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("neditor-data-source-copy-test-{unique}"));
+    let external = std::env::temp_dir().join(format!("neditor-data-source-external-{unique}"));
+    let docs = root.join("docs");
+    fs::create_dir_all(&docs).expect("create docs dir");
+    fs::create_dir_all(&external).expect("create external dir");
+    let document = docs.join("proposal.md");
+    let source = external.join("Revenue Sheet.xlsx");
+    let bytes = vec![0, 159, 146, 150, b'X', b'L', b'S', b'X'];
+    fs::write(&document, "# Proposal").expect("write document");
+    fs::write(&source, &bytes).expect("write binary source");
+
+    let copied = copy_data_source_file(CopyDataSourceFileRequest {
+        source_path: path_to_string(&source),
+        document_path: Some(path_to_string(&document)),
+        workspace_root: Some(path_to_string(&root)),
+    })
+    .expect("copy data source");
+
+    assert_eq!(copied.relative_path, "data/Revenue-Sheet.xlsx");
+    assert_eq!(copied.bytes, bytes.len() as u64);
+    assert_eq!(copied.sha256, sha256_hex(&bytes));
+    assert_eq!(
+        fs::read(Path::new(&copied.output_path)).expect("read copied data source"),
+        bytes
+    );
+    assert!(copied.output_path.ends_with("docs/data/Revenue-Sheet.xlsx"));
+
+    let second = copy_data_source_file(CopyDataSourceFileRequest {
+        source_path: path_to_string(&source),
+        document_path: Some(path_to_string(&document)),
+        workspace_root: Some(path_to_string(&root)),
+    })
+    .expect("copy colliding data source");
+    assert_eq!(second.relative_path, "data/Revenue-Sheet-2.xlsx");
+
+    let already_local = copy_data_source_file(CopyDataSourceFileRequest {
+        source_path: "data/Revenue-Sheet.xlsx".to_string(),
+        document_path: Some(path_to_string(&document)),
+        workspace_root: Some(path_to_string(&root)),
+    })
+    .expect("reuse local data source");
+    assert_eq!(already_local.relative_path, "data/Revenue-Sheet.xlsx");
+    assert_eq!(already_local.output_path, copied.output_path);
+
+    let missing_base = copy_data_source_file(CopyDataSourceFileRequest {
+        source_path: path_to_string(&source),
+        document_path: None,
+        workspace_root: None,
+    })
+    .expect_err("copy should require saved document or workspace");
+    assert!(missing_base.contains("Save the document or open a workspace"));
+
+    fs::remove_dir_all(root).expect("clean copy test dir");
+    fs::remove_dir_all(external).expect("clean external test dir");
+}
+
+#[test]
 fn reveal_command_for_existing_path_is_platform_specific_and_argument_safe() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
