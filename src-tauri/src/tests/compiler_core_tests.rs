@@ -1484,10 +1484,15 @@ fn compiler_reports_broken_local_markdown_links() {
         .iter()
         .find(|diagnostic| diagnostic.message.contains("Broken image path"))
         .expect("broken image diagnostic");
+    assert_eq!(broken_image.severity, "warning");
     assert_eq!(broken_image.line, Some(10));
     assert!(broken_image.column.is_some());
     assert!(broken_image.end_column > broken_image.column);
     assert_eq!(broken_image.source_file.as_deref(), Some(root_doc.as_str()));
+    assert!(broken_image
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("Create the image file")));
     assert!(broken_image
         .related
         .iter()

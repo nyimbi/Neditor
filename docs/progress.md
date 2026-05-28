@@ -5376,6 +5376,15 @@ Missing external transform engine diagnostic proof:
 | --- | --- | --- |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_reports_missing_external_engine_path_before_embedded_fallback --lib` | Pass | Focused transform proof now confirms missing external engine path diagnostics carry source file, whole-fence source range, suggestion, transform related context, and source-range breadcrumbs before the compiler falls back to embedded rendering. |
 
+Diagnostics row closure:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked citation_export_conformance_covers_required_cases --lib` | Pass | Broken citation diagnostics now have direct proof for error severity, source file, exact source range, suggested fix, and citation syntax related context. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked compiler_reports_broken_local_markdown_links --lib` | Pass | Broken image diagnostics now have direct proof for warning severity, source range, suggested fix, and target context alongside existing local-link and front-matter logo path diagnostics. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked sql_transform_requires_read_only_trusted_queries --lib` | Pass | Unsafe SQL execution remains blocked until sqlite3 is explicitly trusted, and the trust diagnostic now carries source file, whole-fence range, suggested fix, transform context, and source-range breadcrumbs. |
+| `pnpm run check:spec-completion` | Pass | The 7.3 Diagnostics row is now marked Complete after all examples in `docs/specification.md` 7.3 have direct local proof for severity/message/source/range/suggestion/related context where applicable. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

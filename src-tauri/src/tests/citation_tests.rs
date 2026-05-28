@@ -657,9 +657,16 @@ fn citation_export_conformance_covers_required_cases() {
         .iter()
         .find(|diagnostic| diagnostic.message.contains("Broken citation: missing2026"))
         .expect("broken citation diagnostic");
+    assert_eq!(broken_citation.severity, "error");
+    assert_eq!(broken_citation.source_file.as_deref(), Some("untitled.md"));
     assert_eq!(broken_citation.line, Some(11));
+    assert_eq!(broken_citation.end_line, Some(11));
     assert_eq!(broken_citation.column, Some(10));
     assert!(broken_citation.end_column > broken_citation.column);
+    assert!(broken_citation
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("Add the key")));
     assert!(broken_citation
         .related
         .iter()

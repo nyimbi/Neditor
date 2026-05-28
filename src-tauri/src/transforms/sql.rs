@@ -56,14 +56,9 @@ pub(crate) fn render_sql_table(
     }
     if !options.trusted("sql") {
         let message = "SQL transform requires explicit trust before NEditor runs sqlite3.";
-        artifact_diags.push(diag(
-            "warning",
-            message,
-            None,
-            None,
-            Some("Configure and trust the sqlite3 executable in Settings > Transforms."),
-        ));
-        diagnostics.push(diag("warning", message, None, None, None));
+        let suggestion = "Configure and trust the sqlite3 executable in Settings > Transforms.";
+        artifact_diags.push(diag("warning", message, None, None, Some(suggestion)));
+        diagnostics.push(diag("warning", message, None, None, Some(suggestion)));
         return error_block(message);
     }
     let Some(engine_path) = options.engine_path("sql") else {

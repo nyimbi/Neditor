@@ -378,6 +378,33 @@ fn sql_transform_requires_read_only_trusted_queries() {
     assert!(missing_trust
         .html
         .contains("requires explicit trust before NEditor runs sqlite3"));
+    let trust_diagnostic = missing_trust
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic
+                .message
+                .contains("requires explicit trust before NEditor runs sqlite3")
+        })
+        .expect("sql trust diagnostic");
+    assert_eq!(trust_diagnostic.severity, "warning");
+    assert_eq!(trust_diagnostic.source_file.as_deref(), Some("untitled.md"));
+    assert_eq!(trust_diagnostic.line, Some(2));
+    assert_eq!(trust_diagnostic.end_line, Some(4));
+    assert_eq!(trust_diagnostic.column, Some(1));
+    assert_eq!(trust_diagnostic.end_column, Some(4));
+    assert!(trust_diagnostic
+        .suggestion
+        .as_deref()
+        .is_some_and(|suggestion| suggestion.contains("Configure and trust")));
+    assert!(trust_diagnostic
+        .related
+        .iter()
+        .any(|related| related == "transform: sql"));
+    assert!(trust_diagnostic
+        .related
+        .iter()
+        .any(|related| related == "source range: 2-4"));
 }
 
 #[test]
