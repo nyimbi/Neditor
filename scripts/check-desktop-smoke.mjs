@@ -680,7 +680,15 @@ function validateNativeWorkflowReport(launchReport) {
     editorErgonomicsEvidence.searchReplace?.containsOriginal !== false ||
     !String(editorErgonomicsEvidence.listContinuation?.text || "").includes("- First item\n- Second item") ||
     !String(editorErgonomicsEvidence.pairing?.text || "").includes("()") ||
-    editorErgonomicsEvidence.multiCursor?.inserted !== true
+    editorErgonomicsEvidence.multiCursor?.inserted !== true ||
+    Number(editorErgonomicsEvidence.syntaxHighlighting?.heading || 0) < 1 ||
+    Number(editorErgonomicsEvidence.syntaxHighlighting?.marker || 0) < 1 ||
+    Number(editorErgonomicsEvidence.syntaxHighlighting?.blockquote || 0) < 1 ||
+    Number(editorErgonomicsEvidence.syntaxHighlighting?.listMarker || 0) < 1 ||
+    Number(editorErgonomicsEvidence.syntaxHighlighting?.strong || 0) < 1 ||
+    Number(editorErgonomicsEvidence.syntaxHighlighting?.emphasis || 0) < 1 ||
+    Number(editorErgonomicsEvidence.syntaxHighlighting?.code || 0) < 1 ||
+    Number(editorErgonomicsEvidence.syntaxHighlighting?.link || 0) < 1
   ) {
     issues.push(`native workflow report did not include editor ergonomics evidence: ${JSON.stringify(editorErgonomicsEvidence)}`);
   }

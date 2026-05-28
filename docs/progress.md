@@ -5385,6 +5385,14 @@ Diagnostics row closure:
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked sql_transform_requires_read_only_trusted_queries --lib` | Pass | Unsafe SQL execution remains blocked until sqlite3 is explicitly trusted, and the trust diagnostic now carries source file, whole-fence range, suggested fix, transform context, and source-range breadcrumbs. |
 | `pnpm run check:spec-completion` | Pass | The 7.3 Diagnostics row is now marked Complete after all examples in `docs/specification.md` 7.3 have direct local proof for severity/message/source/range/suggestion/related context where applicable. |
 
+Editor Markdown syntax styling:
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 110 frontend unit/static tests passed after adding stable editor highlight classes for headings, block quotes, list markers, strong/emphasis, inline code, links, and native-smoke evidence guards. |
+| `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke validator syntax remains valid after requiring syntax-highlighting evidence in the native editor ergonomics report. |
+| `pnpm run check:docs` | Pass | 15 Markdown files were checked after moving Markdown syntax highlighting from the editor backlog into covered work; local links resolve. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

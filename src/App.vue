@@ -13807,6 +13807,8 @@ async function collectNativeEditorErgonomicsEvidence(record: (name: string, pass
         "",
         "## Metrics",
         "",
+        "> Review the **bold result**, _italic caveat_, `code token`, and [source link](https://example.com).",
+        "",
         "- First item",
       ].join("\n"),
     );
@@ -13852,6 +13854,30 @@ async function collectNativeEditorErgonomicsEvidence(record: (name: string, pass
           (evidence.settings as { foldGutterVisible: boolean }).foldGutterVisible,
       ),
       JSON.stringify(evidence.settings),
+    );
+    evidence.syntaxHighlighting = {
+      heading: document.querySelectorAll(".cm-neditor-md-heading").length,
+      marker: document.querySelectorAll(".cm-neditor-md-marker").length,
+      blockquote: document.querySelectorAll(".cm-neditor-md-blockquote").length,
+      listMarker: document.querySelectorAll(".cm-neditor-md-list-marker").length,
+      strong: document.querySelectorAll(".cm-neditor-md-strong").length,
+      emphasis: document.querySelectorAll(".cm-neditor-md-emphasis").length,
+      code: document.querySelectorAll(".cm-neditor-md-code").length,
+      link: document.querySelectorAll(".cm-neditor-md-link").length,
+    };
+    record(
+      "native workflow rendered markdown syntax highlighting",
+      Boolean(
+        (evidence.syntaxHighlighting as { heading: number }).heading > 0 &&
+          (evidence.syntaxHighlighting as { marker: number }).marker > 0 &&
+          (evidence.syntaxHighlighting as { blockquote: number }).blockquote > 0 &&
+          (evidence.syntaxHighlighting as { listMarker: number }).listMarker > 0 &&
+          (evidence.syntaxHighlighting as { strong: number }).strong > 0 &&
+          (evidence.syntaxHighlighting as { emphasis: number }).emphasis > 0 &&
+          (evidence.syntaxHighlighting as { code: number }).code > 0 &&
+          (evidence.syntaxHighlighting as { link: number }).link > 0,
+      ),
+      JSON.stringify(evidence.syntaxHighlighting),
     );
 
     const beforeFold = document.querySelectorAll(".cm-foldPlaceholder").length;
@@ -14916,6 +14942,50 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
       ".cm-line.cm-neditor-table-source-separator": {
         color: "#64748b",
       },
+      ".cm-neditor-md-heading": {
+        color: "#0f766e",
+        fontWeight: "720",
+      },
+      ".cm-neditor-md-heading-1": {
+        fontSize: "1.18em",
+      },
+      ".cm-neditor-md-heading-2": {
+        fontSize: "1.1em",
+      },
+      ".cm-neditor-md-marker": {
+        color: "#64748b",
+        fontWeight: "650",
+      },
+      ".cm-neditor-md-blockquote": {
+        color: "#475569",
+        fontStyle: "italic",
+      },
+      ".cm-neditor-md-list-marker": {
+        color: "#7c3aed",
+        fontWeight: "700",
+      },
+      ".cm-neditor-md-code": {
+        color: "#9a3412",
+        backgroundColor: "rgba(251, 146, 60, 0.16)",
+        borderRadius: "4px",
+      },
+      ".cm-neditor-md-link": {
+        color: "#2563eb",
+        textDecoration: "underline",
+        textUnderlineOffset: "2px",
+      },
+      ".cm-neditor-md-strong": {
+        color: "#111827",
+        fontWeight: "750",
+      },
+      ".cm-neditor-md-emphasis": {
+        color: "#7c2d12",
+        fontStyle: "italic",
+      },
+      ".cm-neditor-md-strikethrough": {
+        color: "#64748b",
+        textDecoration: "line-through",
+      },
     }),
   ];
 }
@@ -14982,6 +15052,7 @@ function buildSemanticEditorDecorations(view: EditorView) {
     collectRegexDecorations(inlineDecorations, text, /\{\{=[^}\n]+\}\}/g, "cm-neditor-formula");
     collectReferenceDecorations(inlineDecorations, text, knownReferences);
     collectRegexDecorations(inlineDecorations, text, /\{\{[^}\n]+\}\}/g, "cm-neditor-variable");
+    collectMarkdownSyntaxDecorations(inlineDecorations, text);
     inlineDecorations.sort((left, right) => left.start - right.start || left.end - right.end);
     for (const decoration of inlineDecorations) {
       builder.add(
@@ -15069,6 +15140,53 @@ function collectRegexDecorations(
     if (end > start) {
       decorations.push({ start, end, className });
     }
+  }
+}
+
+function collectMarkdownSyntaxDecorations(
+  decorations: Array<{ start: number; end: number; className: string }>,
+  text: string,
+) {
+  const heading = text.match(/^(\s{0,3})(#{1,6})(\s+.+)$/);
+  if (heading) {
+    const markerStart = heading[1].length;
+    const markerEnd = markerStart + heading[2].length;
+    decorations.push({ start: 0, end: text.length, className: `cm-neditor-md-heading cm-neditor-md-heading-${heading[2].length}` });
+    decorations.push({ start: markerStart, end: markerEnd, className: "cm-neditor-md-marker" });
+  }
+
+  const quote = text.match(/^(\s*>+\s?)/);
+  if (quote) {
+    decorations.push({ start: 0, end: Math.max(quote[1].length, text.length), className: "cm-neditor-md-blockquote" });
+    decorations.push({ start: 0, end: quote[1].length, className: "cm-neditor-md-marker" });
+  }
+
+  const list = text.match(/^(\s*(?:[-+*]|\d+[.)])\s+(?:\[[ xX]\]\s+)?)/);
+  if (list) {
+    decorations.push({ start: 0, end: list[1].length, className: "cm-neditor-md-list-marker" });
+  }
+
+  collectRegexDecorations(decorations, text, /`[^`\n]+`/g, "cm-neditor-md-code");
+  collectRegexDecorations(decorations, text, /!?\[[^\]\n]+\]\([^) \n]+(?:\s+"[^"]*")?\)/g, "cm-neditor-md-link");
+  collectRegexDecorations(decorations, text, /~~[^~\n]+~~/g, "cm-neditor-md-strikethrough");
+  collectRegexDecorations(decorations, text, /(\*\*|__)[^\n]+?\1/g, "cm-neditor-md-strong");
+  collectDelimitedMarkdownDecoration(decorations, text, "*", "cm-neditor-md-emphasis");
+  collectDelimitedMarkdownDecoration(decorations, text, "_", "cm-neditor-md-emphasis");
+}
+
+function collectDelimitedMarkdownDecoration(
+  decorations: Array<{ start: number; end: number; className: string }>,
+  text: string,
+  marker: "*" | "_",
+  className: string,
+) {
+  const escaped = marker === "*" ? "\\*" : "_";
+  const pattern = new RegExp(`(^|[^${escaped}])(${escaped}[^${escaped}\\n]+${escaped})(?!${escaped})`, "g");
+  for (const match of text.matchAll(pattern)) {
+    const prefix = match[1] || "";
+    const start = (match.index ?? 0) + prefix.length;
+    const end = start + match[2].length;
+    if (end > start) decorations.push({ start, end, className });
   }
 }
 

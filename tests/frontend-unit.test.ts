@@ -8013,6 +8013,15 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow reported editor word statistics"));
   ok(app.includes("native workflow exposed spellcheck editor attributes"));
   ok(app.includes("native workflow rendered line numbers word wrap and folding gutter"));
+  ok(app.includes("collectMarkdownSyntaxDecorations"));
+  ok(app.includes("cm-neditor-md-heading"));
+  ok(app.includes("cm-neditor-md-blockquote"));
+  ok(app.includes("cm-neditor-md-list-marker"));
+  ok(app.includes("cm-neditor-md-strong"));
+  ok(app.includes("cm-neditor-md-emphasis"));
+  ok(app.includes("cm-neditor-md-code"));
+  ok(app.includes("cm-neditor-md-link"));
+  ok(app.includes("native workflow rendered markdown syntax highlighting"));
   ok(app.includes("native workflow folded and unfolded markdown visual state"));
   ok(app.includes("native workflow opened editor search panel"));
   ok(app.includes("native workflow replaced editor search target"));

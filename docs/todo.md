@@ -1570,6 +1570,9 @@ Covered:
 - Quote, bold, italic, inline-code pairing, and code-fence insertion through
   explicit Markdown commands.
 - CodeMirror find and replace.
+- Stable Markdown syntax styling for headings, emphasis, strong text, inline
+  code, links, block quotes, and list markers, with launched native smoke
+  evidence for rendered editor highlight classes.
 - Spellcheck and sentence autocapitalization editor attributes.
 - Word count, character count, and reading-time status-bar metrics.
 - Command-palette heading navigation.
@@ -1592,7 +1595,6 @@ Covered:
 
 Finish:
 
-- Markdown syntax highlighting.
 - Diagnostics gutter/range visual-state local browser/native execution proof.
 - Broader Markdown shortcut edge cases.
 - Broader Vim/Emacs modal-editing parity beyond the focused browser and
