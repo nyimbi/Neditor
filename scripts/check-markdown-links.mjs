@@ -6,6 +6,7 @@ const root = process.cwd();
 const markdownFiles = [
   "README.md",
   ...markdownFilesUnder("docs"),
+  ...markdownFilesUnder("runbooks"),
 ].sort();
 const linkPattern = /!?\[[^\]]*]\(([^)]+)\)/g;
 const absoluteUrlPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;

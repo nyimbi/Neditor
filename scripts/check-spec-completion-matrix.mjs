@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,7 @@ const allowedStatuses = new Set(["Complete", "Partial", "Unverified", "Missing",
 
 const markdown = readFileSync(matrixPath, "utf8");
 const rows = parseMatrixRows(markdown);
-const issues = validateMatrix(markdown, rows);
+let issues = validateMatrix(markdown, rows);
 const summary = summarizeRows(rows);
 const openRows = rows.filter((row) => ["Partial", "Unverified", "Missing"].includes(row.status));
 const openRowPlans = openRows.map((row) => ({
@@ -23,11 +23,12 @@ const openRowPlans = openRows.map((row) => ({
   remainingGap: row.remainingGap,
 }));
 const gapTriage = summarizeGapTriage(openRowPlans);
-const status = issues.length ? "failed" : summary.openRows > 0 ? "partial-with-release-risks" : "complete";
 const gapPlanPath = join(outputDir, "gap-plan.md");
 const workOrdersPath = join(outputDir, "work-orders.json");
 const workOrdersMarkdownPath = join(outputDir, "work-orders.md");
 const workOrders = openRowPlans.map((row, index) => buildWorkOrder(row, index));
+issues = [...issues, ...validateWorkOrderRunbooks(workOrders)];
+const status = issues.length ? "failed" : summary.openRows > 0 ? "partial-with-release-risks" : "complete";
 
 mkdirSync(outputDir, { recursive: true });
 writeFileSync(
@@ -156,6 +157,18 @@ function validateMatrix(text, rows) {
     foundIssues.push(`duplicate requirement row: ${duplicate}`);
   }
 
+  return foundIssues;
+}
+
+function validateWorkOrderRunbooks(workOrders) {
+  const foundIssues = [];
+  const runbooks = new Set(workOrders.flatMap((order) => order.runbooks || []));
+  for (const runbook of runbooks) {
+    const path = join(root, runbook);
+    if (!existsSync(path)) {
+      foundIssues.push(`work order runbook is missing: ${runbook}`);
+    }
+  }
   return foundIssues;
 }
 
