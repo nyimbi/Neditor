@@ -1396,6 +1396,87 @@
             </article>
             <p v-if="!citationTodoItems.length" class="sidebar-hint">No citation TODOs detected.</p>
           </section>
+          <section class="reference-manager" aria-label="Citation source search and deep research">
+            <header>
+              <div>
+                <strong>Source Search & Deep Research</strong>
+                <span>Search, download source documents, and draft sourced reports with Ollama or another configured provider.</span>
+              </div>
+            </header>
+            <label>
+              Search provider
+              <select v-model="citationSearchProvider">
+                <option value="duckduckgo">DuckDuckGo</option>
+                <option value="searxng">SearXNG</option>
+                <option value="tavily">Tavily</option>
+              </select>
+            </label>
+            <label v-if="citationSearchProvider === 'searxng'">
+              SearXNG URL
+              <input v-model="citationSearxngUrl" placeholder="http://127.0.0.1:8080" />
+            </label>
+            <label v-if="citationSearchProvider === 'tavily'">
+              Tavily session key
+              <input v-model="citationTavilyApiKey" type="password" autocomplete="off" placeholder="TAVILY_API_KEY or session key" />
+            </label>
+            <label>
+              Citation/source query
+              <input v-model="citationSearchQuery" type="search" placeholder="market sizing public sector ERP Kenya 2026" />
+            </label>
+            <div class="reference-actions">
+              <button type="button" :disabled="citationSearchBusy || !citationSearchQuery.trim()" @click="searchCitationSources()">
+                {{ citationSearchBusy ? "Searching..." : "Find sources" }}
+              </button>
+            </div>
+            <article v-for="source in citationSearchResults" :key="source.url" class="snapshot-row">
+              <p>{{ source.title }}</p>
+              <small>{{ source.source }} | {{ source.url }}</small>
+              <small v-if="source.snippet">{{ source.snippet }}</small>
+              <div class="reference-actions">
+                <button type="button" :disabled="citationSourceBusyUrl === source.url || !active.path" @click="downloadCitationSource(source)">
+                  {{ citationSourceBusyUrl === source.url ? "Downloading..." : "Download source" }}
+                </button>
+                <button type="button" @click="insertBlock(`[${source.title}](${source.url})`)">Insert link</button>
+              </div>
+            </article>
+            <div class="reference-inline-form">
+              <label>
+                Deep research topic
+                <input v-model="deepResearchTopic" placeholder="Topic for a sourced report" />
+              </label>
+              <label>
+                Document type
+                <input v-model="deepResearchDocumentType" placeholder="research brief, market report, policy memo" />
+              </label>
+              <label>
+                Audience
+                <input v-model="deepResearchAudience" placeholder="board, client, technical reviewers" />
+              </label>
+            </div>
+            <label>
+              Report length: {{ deepResearchTargetPages }} page{{ deepResearchTargetPages === 1 ? "" : "s" }}
+              <input v-model.number="deepResearchTargetPages" type="range" min="1" max="200" step="1" />
+            </label>
+            <div class="reference-inline-form">
+              <label>
+                Research loops
+                <input v-model.number="deepResearchIterationsTarget" type="number" min="1" max="5" />
+              </label>
+              <label>
+                Results per loop
+                <input v-model.number="deepResearchResultsPerIteration" type="number" min="3" max="12" />
+              </label>
+            </div>
+            <div class="reference-actions">
+              <button type="button" :disabled="deepResearchBusy || !deepResearchTopic.trim()" @click="runDeepResearchDocumentCreation">
+                {{ deepResearchBusy ? "Researching..." : "Create deep research draft" }}
+              </button>
+              <button type="button" :disabled="!deepResearchDraft" @click="insertDeepResearchDraft">Insert draft</button>
+              <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchLog">Insert research log</button>
+            </div>
+            <p class="sidebar-hint">{{ deepResearchStatus || "Deep research plans queries, searches, reflects on gaps, writes, and expands until it approaches the requested page count." }}</p>
+            <textarea v-if="deepResearchDraft" :value="deepResearchDraft" rows="8" readonly aria-label="Deep research draft preview"></textarea>
+          </section>
           <button
             v-for="citation in active.compile?.semantic.citation_references || []"
             :key="`${citation.key}-${citation.line}-${citation.column}`"
@@ -5355,6 +5436,7 @@ import {
   aiProviderProfiles,
   buildAiProviderRequestPackage,
   buildAiProviderResponseReviewMarkdown,
+  executeDirectAiProviderPrompt,
   executeAiProviderRequestPackage,
   formatAiProviderSourcePack,
   isLocalAgentCliProfile,
@@ -5421,6 +5503,21 @@ import {
   type ConfigurationSetupStepId,
 } from "./lib/configurationSetup";
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
+import {
+  deepResearchDraftPrompt,
+  deepResearchExpansionPrompt,
+  deepResearchQueryPrompt,
+  deepResearchReflectionPrompt,
+  estimateMarkdownPages,
+  fallbackDeepResearchQuery,
+  fallbackResearchDraft,
+  formatDeepResearchLog,
+  normalizeDeepResearchSettings,
+  parseReflection,
+  type DeepResearchIteration,
+  type DeepResearchSearchProvider,
+  type DeepResearchSource,
+} from "./lib/deepResearch";
 import {
   citationTodoAuditMarkdown,
   citationTodoComment,
@@ -5966,6 +6063,23 @@ const agentProviderPackage = ref<AiProviderRequestPackage | null>(null);
 const agentProviderApiKey = ref("");
 const agentProviderBusy = ref(false);
 const agentProviderResult = ref<AiProviderExecutionResult | null>(null);
+const citationSearchQuery = ref("");
+const citationSearchProvider = ref<DeepResearchSearchProvider>("duckduckgo");
+const citationSearxngUrl = ref("http://127.0.0.1:8080");
+const citationTavilyApiKey = ref("");
+const citationSearchBusy = ref(false);
+const citationSearchResults = ref<DeepResearchSource[]>([]);
+const citationSourceBusyUrl = ref("");
+const deepResearchTopic = ref("");
+const deepResearchDocumentType = ref("research brief");
+const deepResearchAudience = ref("business readers");
+const deepResearchTargetPages = ref(5);
+const deepResearchIterationsTarget = ref(3);
+const deepResearchResultsPerIteration = ref(5);
+const deepResearchBusy = ref(false);
+const deepResearchStatus = ref("");
+const deepResearchIterations = ref<DeepResearchIteration[]>([]);
+const deepResearchDraft = ref("");
 const googleClientId = ref(store.googleIntegration.clientId);
 const googleAccountHint = ref(store.googleIntegration.accountHint);
 const googleScopesText = ref(googleOAuthScopesText(store.googleIntegration.scopes));
@@ -8162,6 +8276,8 @@ const helpTopics = computed<HelpTopic[]>(() => [
     when: "Use this when the document needs traceable sources, labeled figures, terms, or formal references.",
     steps: [
       "Open References to inspect resolved and missing citations.",
+      "Search DuckDuckGo, SearXNG, or Tavily for source candidates and download source documents into the active document's source directory.",
+      "Use Deep Research to iterate search/reflection loops, draft a sourced document, and expand it toward the requested page count.",
       "Add bibliography, glossary, index, list of figures, and list of tables snippets when needed.",
       "Use cross reference diagnostics to find broken labels before export.",
       "Choose citation style defaults in Settings for repeat exports.",
@@ -8172,10 +8288,11 @@ const helpTopics = computed<HelpTopic[]>(() => [
     ],
     actions: [
       { label: "Open references", run: () => (store.sidebar = "references") },
+      { label: "Deep research", run: () => { store.sidebar = "references"; deepResearchTopic.value ||= active.value.compile?.semantic.title || active.value.title; } },
       { label: "Insert bibliography", run: () => insertBlock(bibliographySnippet) },
       { label: "Citation settings", run: () => (store.sidebar = "settings") },
     ],
-    keywords: ["citation", "bibliography", "glossary", "index", "cross reference"],
+    keywords: ["citation", "bibliography", "glossary", "index", "cross reference", "deep research", "source search", "searxng", "duckduckgo", "tavily"],
   },
   {
     id: "review-provenance",
@@ -8364,9 +8481,9 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
     title: "Govern provider handoffs",
     mode: "Provider review",
     summary: "Send only reviewed packages to approved AI providers and apply responses as needs-review material.",
-    detail: "Provider handoff builds a redacted request package with lifecycle context, reviewer assignments, section work queues, and safety checks; Apply response wraps returned Markdown in AI provenance before it reaches the document.",
+    detail: "Provider handoff builds a redacted request package with lifecycle context, reviewer assignments, section work queues, and safety checks; Ollama local/cloud profiles can run every AI workflow including Deep Research; Apply response wraps returned Markdown in AI provenance before it reaches the document.",
     points: [
-      "Choose the approved provider profile, model, endpoint, and session-only key.",
+      "Choose the approved provider profile, including Ollama local or Ollama cloud, model, endpoint, and session-only key when needed.",
       "Inspect the request package before any direct provider execution.",
       "Apply provider output only after previewing the response and preserving needs-review provenance.",
     ],
@@ -9529,7 +9646,196 @@ function aiProviderDefaultKeyEnv(profileId: AiProviderProfileId) {
   if (profileId === "openai-compatible" || profileId === "codex-cli") return "OPENAI_API_KEY";
   if (profileId === "anthropic-compatible" || profileId === "claude-code-cli") return "ANTHROPIC_API_KEY";
   if (profileId === "gemini-compatible" || profileId === "google-antigravity-cli") return "GOOGLE_API_KEY";
+  if (profileId === "ollama-cloud") return "OLLAMA_API_KEY";
+  if (profileId === "ollama-local") return "";
   return "NEDITOR_AI_API_KEY";
+}
+
+function deepResearchSettings() {
+  return normalizeDeepResearchSettings({
+    topic: deepResearchTopic.value || active.value.compile?.semantic.title || active.value.title,
+    documentType: deepResearchDocumentType.value,
+    audience: deepResearchAudience.value,
+    searchProvider: citationSearchProvider.value,
+    searxngUrl: citationSearxngUrl.value,
+    tavilyApiKey: citationTavilyApiKey.value,
+    iterations: deepResearchIterationsTarget.value,
+    resultsPerIteration: deepResearchResultsPerIteration.value,
+    targetPages: deepResearchTargetPages.value,
+    providerProfileId: agentProviderId.value,
+    model: agentProviderModel.value,
+    endpoint: agentProviderEndpoint.value,
+    keyEnv: agentProviderKeyEnv.value,
+  });
+}
+
+async function searchCitationSources(query = citationSearchQuery.value) {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    store.statusMessage = "Enter a citation search query";
+    return [];
+  }
+  citationSearchBusy.value = true;
+  try {
+    const response = await invoke<{ results: DeepResearchSource[] }>("search_citation_sources", {
+      request: {
+        query: trimmed,
+        provider: citationSearchProvider.value,
+        searxng_url: citationSearxngUrl.value,
+        tavily_api_key: citationTavilyApiKey.value,
+        limit: deepResearchResultsPerIteration.value,
+        document_path: active.value.path,
+      },
+    });
+    citationSearchResults.value = response.results || [];
+    store.statusMessage = `Found ${citationSearchResults.value.length} citation source candidate${citationSearchResults.value.length === 1 ? "" : "s"}`;
+    return citationSearchResults.value;
+  } catch (error) {
+    store.lastError = appErrorText(error);
+    store.statusMessage = "Citation search failed";
+    return [];
+  } finally {
+    citationSearchBusy.value = false;
+  }
+}
+
+async function downloadCitationSource(source: DeepResearchSource) {
+  if (!active.value.path) {
+    store.statusMessage = "Save the document before downloading citation sources";
+    return;
+  }
+  citationSourceBusyUrl.value = source.url;
+  try {
+    const response = await invoke<{ bibliography_stub: string; relative_path: string }>("download_citation_source", {
+      request: {
+        document_path: active.value.path,
+        url: source.url,
+        title: source.title,
+        snippet: source.snippet,
+      },
+    });
+    insertBlock(response.bibliography_stub);
+    store.statusMessage = `Downloaded source to ${response.relative_path} and inserted bibliography stub`;
+  } catch (error) {
+    store.lastError = appErrorText(error);
+    store.statusMessage = "Citation source download failed";
+  } finally {
+    citationSourceBusyUrl.value = "";
+  }
+}
+
+async function runDeepResearchDocumentCreation() {
+  const settings = deepResearchSettings();
+  if (!settings.topic) {
+    store.statusMessage = "Enter a deep research topic";
+    return;
+  }
+  deepResearchBusy.value = true;
+  deepResearchDraft.value = "";
+  deepResearchIterations.value = [];
+  try {
+    for (let index = 1; index <= settings.iterations; index += 1) {
+      deepResearchStatus.value = `Planning research query ${index}/${settings.iterations}`;
+      let query = fallbackDeepResearchQuery(settings, deepResearchIterations.value);
+      try {
+        const queryResult = await executeDirectAiProviderPrompt(
+          {
+            profileId: settings.providerProfileId,
+            endpoint: settings.endpoint,
+            model: settings.model,
+            keyEnv: settings.keyEnv,
+            systemPrompt: "You generate precise web search queries for document research. Return only the query text.",
+            userPrompt: deepResearchQueryPrompt(settings, deepResearchIterations.value),
+          },
+          agentProviderApiKey.value,
+        );
+        query = queryResult.markdown.replace(/^["'`]+|["'`]+$/g, "").split("\n")[0].trim() || query;
+      } catch {
+        query = fallbackDeepResearchQuery(settings, deepResearchIterations.value);
+      }
+      deepResearchStatus.value = `Searching ${settings.searchProvider}: ${query}`;
+      const results = await searchCitationSources(query);
+      deepResearchStatus.value = `Reflecting on ${results.length} source candidate${results.length === 1 ? "" : "s"}`;
+      let summary = results.map((result) => `- ${result.title}: ${result.snippet || result.url}`).join("\n");
+      let gaps = ["Download and inspect the most relevant source documents before approval."];
+      try {
+        const reflection = await executeDirectAiProviderPrompt(
+          {
+            profileId: settings.providerProfileId,
+            endpoint: settings.endpoint,
+            model: settings.model,
+            keyEnv: settings.keyEnv,
+            systemPrompt: "You summarize search results and identify knowledge gaps for a sourced document draft.",
+            userPrompt: deepResearchReflectionPrompt(settings, query, results, deepResearchIterations.value),
+          },
+          agentProviderApiKey.value,
+        );
+        const parsed = parseReflection(reflection.markdown);
+        summary = parsed.summary || summary;
+        gaps = parsed.gaps.length ? parsed.gaps : gaps;
+      } catch {
+        summary = summary || "No usable search results were returned.";
+      }
+      deepResearchIterations.value = [
+        ...deepResearchIterations.value,
+        { index, query, results, summary, gaps },
+      ];
+    }
+    deepResearchStatus.value = "Writing deep research draft";
+    try {
+      const draft = await executeDirectAiProviderPrompt(
+        {
+          profileId: settings.providerProfileId,
+          endpoint: settings.endpoint,
+          model: settings.model,
+          keyEnv: settings.keyEnv,
+          systemPrompt: "You create sourced Markdown documents from research logs. Return only Markdown.",
+          userPrompt: deepResearchDraftPrompt(settings, deepResearchIterations.value),
+        },
+        agentProviderApiKey.value,
+      );
+      deepResearchDraft.value = draft.markdown;
+    } catch {
+      deepResearchDraft.value = fallbackResearchDraft(settings, deepResearchIterations.value);
+    }
+    for (let pass = 1; pass <= 4 && estimateMarkdownPages(deepResearchDraft.value) < settings.targetPages; pass += 1) {
+      deepResearchStatus.value = `Expanding draft toward ${settings.targetPages} pages (${estimateMarkdownPages(deepResearchDraft.value)} ready)`;
+      try {
+        const expanded = await executeDirectAiProviderPrompt(
+          {
+            profileId: settings.providerProfileId,
+            endpoint: settings.endpoint,
+            model: settings.model,
+            keyEnv: settings.keyEnv,
+            systemPrompt: "You expand sourced Markdown documents with substantive analysis. Return the full document only.",
+            userPrompt: deepResearchExpansionPrompt(settings, deepResearchDraft.value, deepResearchIterations.value),
+          },
+          agentProviderApiKey.value,
+        );
+        deepResearchDraft.value = expanded.markdown;
+      } catch {
+        break;
+      }
+    }
+    store.statusMessage = `Deep research draft ready at about ${estimateMarkdownPages(deepResearchDraft.value)} page${estimateMarkdownPages(deepResearchDraft.value) === 1 ? "" : "s"}`;
+    deepResearchStatus.value = "Deep research draft ready";
+  } catch (error) {
+    store.lastError = appErrorText(error);
+    deepResearchStatus.value = "Deep research failed";
+  } finally {
+    deepResearchBusy.value = false;
+  }
+}
+
+function insertDeepResearchDraft() {
+  if (!deepResearchDraft.value.trim()) return;
+  applyAgentMarkdown(deepResearchDraft.value, "append");
+  store.statusMessage = "Inserted deep research draft for editing and review";
+}
+
+function insertDeepResearchLog() {
+  const log = formatDeepResearchLog(deepResearchIterations.value);
+  insertBlock(`\n## Deep Research Log\n\n${log}\n`);
 }
 function buildAgentWorkspacePlan() {
   flushEditorTextToStore();

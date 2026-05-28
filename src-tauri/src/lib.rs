@@ -6,6 +6,7 @@ use std::{collections::BTreeSet, fs, path::Path, path::PathBuf};
 mod ai_cleanup;
 mod bibliography;
 mod calculations;
+mod citation_discovery;
 pub mod cli;
 mod compile_options;
 mod compiler;
@@ -57,6 +58,7 @@ mod workspace_files;
 use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
 use ai_cleanup::AiCleanupRequest;
+use citation_discovery::{download_citation_source, search_citation_sources};
 use cli::{
     configure_default_markdown_reader, create_support_bundle, default_markdown_reader_plan,
     pending_cli_open_paths,
@@ -197,6 +199,8 @@ pub fn run() {
             run_transform,
             run_external_transform,
             cleanup_ai_paste,
+            search_citation_sources,
+            download_citation_source,
             inspect_native_tts,
             download_tts_model,
             read_text_aloud,

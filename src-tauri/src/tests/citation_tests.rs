@@ -506,6 +506,47 @@ fn compiler_loads_csl_json_object_variants_with_full_author_dates() {
 }
 
 #[test]
+fn compiler_uses_rich_csl_json_publication_metadata_in_native_styles() {
+    let response = compile(CompileRequest {
+            text: "---\ntitle: Rich CSL\nstatus: approved\napprovedBy: QA\ncitationStyle: nature\n---\n# Rich CSL\nClaim [@doe2026].\n\n```bibliography\n[\n  {\n    \"id\": \"doe2026\",\n    \"type\": \"article-journal\",\n    \"title\": \"Evidence Based Reports\",\n    \"author\": [{\"given\": \"Jane\", \"family\": \"Doe\"}, {\"given\": \"John\", \"family\": \"Smith\"}],\n    \"editor\": [{\"literal\": \"Standards Desk\"}],\n    \"issued\": {\"date-parts\": [[2026, 5, 21]]},\n    \"container-title\": \"Business Evidence Review\",\n    \"volume\": \"4\",\n    \"issue\": \"2\",\n    \"page\": \"10--18\",\n    \"DOI\": \"https://doi.org/10.1000/example\",\n    \"URL\": \"https://example.test/evidence\"\n  }\n]\n```\n[BIBLIOGRAPHY]\n".to_string(),
+            file_path: None,
+        });
+
+    assert_eq!(response.bibliography.len(), 1);
+    let entry = &response.bibliography[0];
+    assert_eq!(entry.author.as_deref(), Some("Jane Doe and John Smith"));
+    assert_eq!(entry.issued.as_deref(), Some("2026"));
+    assert_eq!(
+        entry.fields.get("journal").map(String::as_str),
+        Some("Business Evidence Review")
+    );
+    assert_eq!(entry.fields.get("number").map(String::as_str), Some("2"));
+    assert_eq!(
+        entry.fields.get("pages").map(String::as_str),
+        Some("10--18")
+    );
+    assert_eq!(
+        entry.fields.get("doi").map(String::as_str),
+        Some("https://doi.org/10.1000/example")
+    );
+    assert_eq!(
+        entry.fields.get("editor").map(String::as_str),
+        Some("Standards Desk")
+    );
+    assert_eq!(
+        entry.fields.get("issued-date").map(String::as_str),
+        Some("2026-5-21")
+    );
+    assert!(
+        response.compiled_markdown.contains(
+            "- [1] **doe2026**. Jane Doe and John Smith. Evidence Based Reports. Business Evidence Review 4, 10--18 (2026). doi: 10.1000/example"
+        ),
+        "{}",
+        response.compiled_markdown
+    );
+}
+
+#[test]
 fn compiler_loads_hayagriva_yaml_bibliography() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Hayagriva\nstatus: approved\napprovedBy: QA\ncitationStyle: author-year\n---\n# Hayagriva\nClaim [@porter1985].\n\n```hayagriva\nporter1985:\n  type: book\n  title: Competitive Advantage\n  author: Porter\n  date: 1985\n```\n[BIBLIOGRAPHY]".to_string(),

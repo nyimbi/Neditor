@@ -141,6 +141,8 @@ const AI_PROVIDER_PROFILE_IDS = [
   "anthropic-compatible",
   "gemini-compatible",
   "local-http",
+  "ollama-local",
+  "ollama-cloud",
   "local-openai",
   "private-openai",
   "claude-code-cli",

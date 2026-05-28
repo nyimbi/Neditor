@@ -6,13 +6,15 @@ export type AiProviderProfileId =
   | "anthropic-compatible"
   | "gemini-compatible"
   | "local-http"
+  | "ollama-local"
+  | "ollama-cloud"
   | "local-openai"
   | "private-openai"
   | "claude-code-cli"
   | "codex-cli"
   | "opencode-cli"
   | "google-antigravity-cli";
-export type AiProviderBodyStyle = "messages" | "system-and-messages" | "contents" | "prompt";
+export type AiProviderBodyStyle = "messages" | "system-and-messages" | "contents" | "prompt" | "ollama-chat";
 
 export interface AiProviderProfile {
   id: AiProviderProfileId;
@@ -59,6 +61,11 @@ export interface AiProviderExecutionResult {
   statusText: string;
   markdown: string;
   rawText: string;
+}
+
+export interface DirectAiProviderPromptOptions extends AiProviderRequestPackageOptions {
+  systemPrompt: string;
+  userPrompt: string;
 }
 
 export interface LocalAgentCliProfile {
@@ -127,6 +134,24 @@ export const aiProviderProfiles: AiProviderProfile[] = [
     bodyStyle: "prompt",
     authHeader: "",
     summary: "Creates a local HTTP prompt package for private model gateways.",
+  },
+  {
+    id: "ollama-local",
+    label: "Ollama local",
+    endpoint: "http://127.0.0.1:11434/api/chat",
+    model: "llama3.1",
+    bodyStyle: "ollama-chat",
+    authHeader: "",
+    summary: "Runs NEditor AI workflows against a local Ollama chat endpoint with no API key.",
+  },
+  {
+    id: "ollama-cloud",
+    label: "Ollama cloud or remote",
+    endpoint: "https://your-ollama-gateway.example/api/chat",
+    model: "llama3.1",
+    bodyStyle: "ollama-chat",
+    authHeader: "Authorization",
+    summary: "Runs NEditor AI workflows against an approved remote Ollama-compatible chat endpoint.",
   },
   {
     id: "local-openai",
@@ -273,6 +298,46 @@ export async function executeAiProviderRequestPackage(
   });
   const rawText = await response.text();
   const markdown = extractProviderMarkdown(rawText, requestPackage.profile.bodyStyle);
+  if (!response.ok) {
+    throw new Error(`Provider request failed: ${response.status} ${response.statusText}${rawText ? ` - ${rawText.slice(0, 240)}` : ""}`);
+  }
+  if (!markdown.trim()) {
+    throw new Error("Provider response did not contain usable Markdown text.");
+  }
+  return {
+    ok: response.ok,
+    status: response.status,
+    statusText: response.statusText,
+    markdown,
+    rawText,
+  };
+}
+
+export async function executeDirectAiProviderPrompt(
+  options: DirectAiProviderPromptOptions,
+  apiKey = "",
+  fetcher: AiProviderFetch = globalThis.fetch.bind(globalThis) as AiProviderFetch,
+): Promise<AiProviderExecutionResult> {
+  const baseProfile = providerProfileById(options.profileId);
+  const profile: AiProviderProfile = {
+    ...baseProfile,
+    endpoint: normalizeEndpoint(options.endpoint) || baseProfile.endpoint,
+    model: normalizeField(options.model, 120) || baseProfile.model,
+  };
+  if (!profile.endpoint) {
+    throw new Error("This provider profile is a manual handoff and does not define an endpoint.");
+  }
+  const keyEnv = normalizeEnvName(options.keyEnv) || "NEDITOR_AI_API_KEY";
+  const headers = concreteHeaders(buildHeaders(profile, keyEnv), apiKey);
+  const requestBody = buildRequestBody(profile, options.systemPrompt, options.userPrompt);
+  const endpoint = profile.endpoint.replace("{model}", encodeURIComponent(profile.model));
+  const response = await fetcher(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(requestBody),
+  });
+  const rawText = await response.text();
+  const markdown = extractProviderMarkdown(rawText, profile.bodyStyle);
   if (!response.ok) {
     throw new Error(`Provider request failed: ${response.status} ${response.statusText}${rawText ? ` - ${rawText.slice(0, 240)}` : ""}`);
   }
@@ -482,7 +547,11 @@ function extractProviderMarkdown(rawText: string, bodyStyle: AiProviderBodyStyle
     const choices = arrayValue(parsed.choices);
     const first = recordValue(choices[0]);
     const message = recordValue(first?.message);
-    return stringValue(message?.content) || stringValue(first?.text) || rawText.trim();
+    return stringValue(message?.content) || stringValue(parsed.message) || stringValue(first?.text) || rawText.trim();
+  }
+  if (bodyStyle === "ollama-chat") {
+    const message = recordValue(parsed.message);
+    return stringValue(message?.content) || stringValue(parsed.response) || stringValue(parsed.output) || rawText.trim();
   }
   if (bodyStyle === "system-and-messages") {
     const content = arrayValue(parsed.content);
@@ -541,6 +610,17 @@ function buildRequestBody(profile: AiProviderProfile, systemPrompt: string, user
       prompt: `${systemPrompt}\n\n${userPrompt}`,
       stream: false,
       temperature: 0.2,
+    };
+  }
+  if (profile.bodyStyle === "ollama-chat") {
+    return {
+      model: profile.model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      stream: false,
+      options: { temperature: 0.2 },
     };
   }
   return {

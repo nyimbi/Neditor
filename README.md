@@ -433,7 +433,8 @@ web app.
   humanization findings, outline critique, governance blockers, distribution
   blockers, lifecycle task-board context, reviewer/section work queues, JSON
   request bodies, headers, cURL starters, and safety checklists for
-  approved AI providers, localhost gateways, or private-network model gateways without storing secrets in the
+  approved AI providers, Ollama local endpoints, Ollama cloud or remote
+  endpoints, localhost gateways, or private-network model gateways without storing secrets in the
   document. If policy allows direct calls, users can run the
   request with a session-only API key, preview the provider's Markdown response,
   and apply it as review material without persisting the secret; imported
@@ -442,7 +443,14 @@ web app.
   history records the wrapped review draft that was actually inserted.
   The References panel also includes a Citation TODO workflow for adding,
   resolving, deferring, jumping to, and exporting citation blockers as a
-  reviewer-ready Markdown audit. It also exposes front matter and merged
+  reviewer-ready Markdown audit. Source Search can query DuckDuckGo, SearXNG,
+  or Tavily, download selected source documents into a document-associated
+  `.neditor-sources` directory, insert a CSL JSON bibliography stub, and retain
+  a local source manifest for review. Deep Research uses the configured AI
+  provider, including Ollama, to iterate search queries, summarize evidence,
+  identify knowledge gaps, draft a sourced report, and expand it toward a
+  slider-selected length from a 1-page brief to a 200-page report before the
+  user inserts and edits the Markdown. It also exposes front matter and merged
   project variables from `.neditor/variables.yaml` as insertable placeholders
   with filters, so repeated client, owner, budget, and source values do not
   require hand-written `{{variable}}` syntax.

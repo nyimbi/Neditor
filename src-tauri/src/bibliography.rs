@@ -792,23 +792,7 @@ fn bibtex_issued_year(raw: &str) -> Option<String> {
 }
 
 fn csl_author(entry: &Value) -> Option<String> {
-    entry
-        .get("author")
-        .and_then(Value::as_array)
-        .and_then(|authors| authors.first())
-        .and_then(|author| {
-            author
-                .as_object()
-                .and_then(author_name_from_object)
-                .or_else(|| {
-                    author
-                        .get("literal")
-                        .and_then(Value::as_str)
-                        .or_else(|| author.get("family").and_then(Value::as_str))
-                        .or_else(|| author.get("name").and_then(Value::as_str))
-                        .map(ToString::to_string)
-                })
-        })
+    csl_people(entry, "author")
 }
 
 fn csl_issued_year(entry: &Value) -> Option<String> {
@@ -839,7 +823,54 @@ fn bibliography_fields_from_value(entry: &Value) -> BTreeMap<String, String> {
             fields.insert(key.to_string(), value);
         }
     }
+    enrich_csl_field_aliases(entry, &mut fields);
     fields
+}
+
+fn enrich_csl_field_aliases(entry: &Value, fields: &mut BTreeMap<String, String>) {
+    for (source, target) in [
+        ("DOI", "doi"),
+        ("URL", "url"),
+        ("page", "pages"),
+        ("page-first", "pages"),
+        ("issue", "number"),
+        ("container-title", "journal"),
+        ("publisher-place", "address"),
+        ("collection-title", "series"),
+    ] {
+        if let Some(value) = fields.get(source).cloned() {
+            fields.entry(target.to_string()).or_insert(value);
+        }
+    }
+    if let Some(editor) = csl_people(entry, "editor") {
+        fields.entry("editor".to_string()).or_insert(editor);
+    }
+    if let Some(issued) = entry.get("issued").and_then(csl_date_value) {
+        fields.entry("issued-date".to_string()).or_insert(issued);
+    }
+}
+
+fn csl_people(entry: &Value, key: &str) -> Option<String> {
+    let people = entry
+        .get(key)
+        .and_then(Value::as_array)?
+        .iter()
+        .filter_map(|person| {
+            person
+                .as_object()
+                .and_then(author_name_from_object)
+                .or_else(|| {
+                    person
+                        .get("literal")
+                        .and_then(Value::as_str)
+                        .or_else(|| person.get("family").and_then(Value::as_str))
+                        .or_else(|| person.get("name").and_then(Value::as_str))
+                        .map(ToString::to_string)
+                })
+        })
+        .filter(|name| !name.trim().is_empty())
+        .collect::<Vec<_>>();
+    (!people.is_empty()).then(|| people.join(" and "))
 }
 
 fn bibliography_field_value(value: &Value) -> Option<String> {
@@ -906,6 +937,38 @@ fn year_from_value(value: &Value) -> Option<String> {
                     .into_iter()
                     .filter_map(|key| object.get(key))
                     .find_map(year_from_value)
+            }),
+        _ => None,
+    }
+}
+
+fn csl_date_value(value: &Value) -> Option<String> {
+    match value {
+        Value::String(value) => Some(value.trim().to_string()).filter(|value| !value.is_empty()),
+        Value::Number(value) => Some(value.to_string()).filter(|year| is_year(year)),
+        Value::Object(object) => object
+            .get("date-parts")
+            .and_then(Value::as_array)
+            .and_then(|date_parts| date_parts.first())
+            .and_then(Value::as_array)
+            .map(|parts| {
+                parts
+                    .iter()
+                    .filter_map(|part| match part {
+                        Value::String(value) => Some(value.trim().to_string()),
+                        Value::Number(value) => Some(value.to_string()),
+                        _ => None,
+                    })
+                    .filter(|part| !part.is_empty())
+                    .collect::<Vec<_>>()
+                    .join("-")
+            })
+            .filter(|date| !date.is_empty())
+            .or_else(|| {
+                ["raw", "literal", "date", "year"]
+                    .into_iter()
+                    .filter_map(|key| object.get(key))
+                    .find_map(csl_date_value)
             }),
         _ => None,
     }
@@ -1283,66 +1346,106 @@ fn author_family_name(author: &str) -> String {
 }
 
 fn apa_reference(entry: &BibliographyEntry) -> String {
+    let mut parts = Vec::new();
     match (&entry.author, &entry.issued) {
-        (Some(author), Some(year)) => {
-            format!("{} ({year}). {}.", sentence_author(author), entry.title)
-        }
-        (Some(author), None) => format!("{} {}.", sentence_author(author), entry.title),
-        (None, Some(year)) => format!("({year}). {}.", entry.title),
-        (None, None) => format!("{}.", entry.title),
+        (Some(author), Some(year)) => parts.push(format!("{} ({year}).", sentence_author(author))),
+        (Some(author), None) => parts.push(sentence_author(author)),
+        (None, Some(year)) => parts.push(format!("({year}).")),
+        (None, None) => {}
     }
+    parts.push(ensure_period(&entry.title));
+    if let Some(source) = apa_publication_source(entry) {
+        parts.push(ensure_period(&source));
+    } else if let Some(publisher) = publisher_or_institution(entry) {
+        parts.push(ensure_period(publisher));
+    }
+    if let Some(link) = doi_or_url_reference(entry, true) {
+        parts.push(link);
+    }
+    parts.join(" ")
 }
 
 fn chicago_author_date_reference(entry: &BibliographyEntry) -> String {
+    let mut parts = Vec::new();
     match (&entry.author, &entry.issued) {
-        (Some(author), Some(year)) => {
-            format!("{} {year}. {}.", sentence_author(author), entry.title)
-        }
-        (Some(author), None) => format!("{} {}.", sentence_author(author), entry.title),
-        (None, Some(year)) => format!("{year}. {}.", entry.title),
-        (None, None) => format!("{}.", entry.title),
+        (Some(author), Some(year)) => parts.push(format!("{} {year}.", sentence_author(author))),
+        (Some(author), None) => parts.push(sentence_author(author)),
+        (None, Some(year)) => parts.push(ensure_period(year)),
+        (None, None) => {}
     }
+    parts.push(ensure_period(&entry.title));
+    if let Some(source) = chicago_publication_source(entry) {
+        parts.push(ensure_period(&source));
+    } else if let Some(publisher) = publisher_or_institution(entry) {
+        parts.push(ensure_period(publisher));
+    }
+    if let Some(link) = doi_or_url_reference(entry, true) {
+        parts.push(link);
+    }
+    parts.join(" ")
 }
 
 fn mla_reference(entry: &BibliographyEntry) -> String {
-    match (&entry.author, &entry.issued) {
-        (Some(author), Some(year)) => format!(
-            "{} <em>{}</em>. {year}.",
-            sentence_author(author),
-            entry.title
-        ),
-        (Some(author), None) => format!("{} <em>{}</em>.", sentence_author(author), entry.title),
-        (None, Some(year)) => format!("<em>{}</em>. {year}.", entry.title),
-        (None, None) => format!("<em>{}</em>.", entry.title),
+    let mut parts = Vec::new();
+    if let Some(author) = entry.author.as_deref() {
+        parts.push(sentence_author(author));
     }
+    if journal_or_container(entry).is_some() {
+        parts.push(format!("\"{}.\"", entry.title));
+    } else {
+        parts.push(format!("<em>{}</em>.", entry.title));
+    }
+    if let Some(source) = mla_publication_source(entry) {
+        parts.push(ensure_period(&source));
+    } else if let Some(year) = entry.issued.as_deref() {
+        parts.push(ensure_period(year));
+    }
+    if let Some(link) = doi_or_url_reference(entry, true) {
+        parts.push(link);
+    }
+    parts.join(" ")
 }
 
 fn ieee_reference(entry: &BibliographyEntry) -> String {
-    match (&entry.author, &entry.issued) {
-        (Some(author), Some(year)) => format!(
-            "{}, \"{},\" {year}.",
-            normalize_reference_author(author),
-            entry.title
-        ),
-        (Some(author), None) => format!(
-            "{}, \"{}.\"",
-            normalize_reference_author(author),
-            entry.title
-        ),
-        (None, Some(year)) => format!("\"{},\" {year}.", entry.title),
-        (None, None) => format!("\"{}.\"", entry.title),
+    let mut value = String::new();
+    if let Some(author) = entry.author.as_deref() {
+        value.push_str(&normalize_reference_author(author));
+        value.push_str(", ");
     }
+    value.push('"');
+    value.push_str(&entry.title);
+    value.push_str(",\"");
+    if let Some(source) = ieee_publication_source(entry) {
+        value.push(' ');
+        value.push_str(&source);
+    } else if let Some(year) = entry.issued.as_deref() {
+        value.push(' ');
+        value.push_str(year);
+    }
+    value.push('.');
+    value
 }
 
 fn vancouver_reference(entry: &BibliographyEntry) -> String {
-    match (&entry.author, &entry.issued) {
-        (Some(author), Some(year)) => {
-            format!("{} {}. {year}.", sentence_author(author), entry.title)
-        }
-        (Some(author), None) => format!("{} {}.", sentence_author(author), entry.title),
-        (None, Some(year)) => format!("{}. {year}.", entry.title),
-        (None, None) => format!("{}.", entry.title),
+    let mut parts = Vec::new();
+    if let Some(author) = entry.author.as_deref() {
+        parts.push(sentence_author(author));
     }
+    parts.push(ensure_period(&entry.title));
+    if let Some(container) = journal_or_container(entry) {
+        parts.push(ensure_period(container));
+    } else if let Some(publisher) = publisher_or_institution(entry) {
+        parts.push(ensure_period(publisher));
+    }
+    if let Some(source) = year_volume_issue_pages(entry) {
+        parts.push(ensure_period(&source));
+    } else if let Some(year) = entry.issued.as_deref() {
+        parts.push(ensure_period(year));
+    }
+    if let Some(link) = doi_or_url_reference(entry, false) {
+        parts.push(link);
+    }
+    parts.join(" ")
 }
 
 fn nature_reference(entry: &BibliographyEntry) -> String {
@@ -1448,6 +1551,83 @@ fn publisher_or_institution(entry: &BibliographyEntry) -> Option<&str> {
     )
 }
 
+fn apa_publication_source(entry: &BibliographyEntry) -> Option<String> {
+    let container = journal_or_container(entry)?;
+    let mut source = container.to_string();
+    if let Some(volume) = entry_field(entry, &["volume"]) {
+        source.push_str(", ");
+        source.push_str(volume);
+        if let Some(issue) = entry_field(entry, &["number", "issue"]) {
+            source.push('(');
+            source.push_str(issue);
+            source.push(')');
+        }
+    }
+    if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+        source.push_str(", ");
+        source.push_str(pages);
+    }
+    Some(source)
+}
+
+fn chicago_publication_source(entry: &BibliographyEntry) -> Option<String> {
+    let container = journal_or_container(entry)?;
+    let mut source = container.to_string();
+    if let Some(volume) = entry_field(entry, &["volume"]) {
+        source.push(' ');
+        source.push_str(volume);
+    }
+    if let Some(issue) = entry_field(entry, &["number", "issue"]) {
+        source.push_str(" (");
+        source.push_str(issue);
+        source.push(')');
+    }
+    if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+        source.push_str(": ");
+        source.push_str(pages);
+    }
+    Some(source)
+}
+
+fn mla_publication_source(entry: &BibliographyEntry) -> Option<String> {
+    let container = journal_or_container(entry)?;
+    let mut pieces = vec![format!("<em>{container}</em>")];
+    if let Some(volume) = entry_field(entry, &["volume"]) {
+        pieces.push(format!("vol. {volume}"));
+    }
+    if let Some(issue) = entry_field(entry, &["number", "issue"]) {
+        pieces.push(format!("no. {issue}"));
+    }
+    if let Some(year) = entry.issued.as_deref() {
+        pieces.push(year.to_string());
+    }
+    if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+        pieces.push(format!("pp. {pages}"));
+    }
+    Some(pieces.join(", "))
+}
+
+fn ieee_publication_source(entry: &BibliographyEntry) -> Option<String> {
+    let container = journal_or_container(entry)?;
+    let mut pieces = vec![container.to_string()];
+    if let Some(volume) = entry_field(entry, &["volume"]) {
+        pieces.push(format!("vol. {volume}"));
+    }
+    if let Some(issue) = entry_field(entry, &["number", "issue"]) {
+        pieces.push(format!("no. {issue}"));
+    }
+    if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+        pieces.push(format!("pp. {pages}"));
+    }
+    if let Some(year) = entry.issued.as_deref() {
+        pieces.push(year.to_string());
+    }
+    if let Some(link) = doi_or_url_reference(entry, false) {
+        pieces.push(link);
+    }
+    Some(pieces.join(", "))
+}
+
 fn year_volume_issue_pages(entry: &BibliographyEntry) -> Option<String> {
     let mut value = String::new();
     if let Some(year) = entry.issued.as_deref() {
@@ -1469,6 +1649,18 @@ fn year_volume_issue_pages(entry: &BibliographyEntry) -> Option<String> {
         value.push_str(pages);
     }
     (!value.is_empty()).then_some(value)
+}
+
+fn doi_or_url_reference(entry: &BibliographyEntry, spaced_doi: bool) -> Option<String> {
+    entry_field(entry, &["doi", "DOI"])
+        .map(|doi| {
+            if spaced_doi {
+                format!("doi: {}", clean_doi(doi))
+            } else {
+                format!("doi:{}", clean_doi(doi))
+            }
+        })
+        .or_else(|| entry_field(entry, &["url", "URL"]).map(ToString::to_string))
 }
 
 fn entry_field<'a>(entry: &'a BibliographyEntry, fields: &[&str]) -> Option<&'a str> {

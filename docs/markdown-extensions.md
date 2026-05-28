@@ -297,8 +297,11 @@ metadata without treating those records as bibliography entries, supports
 brace or parenthesis entry delimiters, keeps `@` characters inside field values
 such as URLs, and accepts dotted citation keys. CSL JSON may be a root array,
 a single item object, or an object wrapping an `items`, `references`,
-`bibliography`, or `data` array; supported scalar fields are preserved in the
-exported bibliography metadata.
+`bibliography`, or `data` array; publication metadata such as `container-title`,
+`publisher`, `publisher-place`, `volume`, `issue`, `page`, `DOI`, `URL`,
+`editor`, and issued dates is preserved and mapped into deterministic native
+APA, Chicago, MLA, IEEE, Vancouver, Nature, AMA, and Elsevier-style reference
+previews.
 
 ```md
 [BIBLIOGRAPHY]
@@ -325,6 +328,17 @@ BibTeX templates, missing-key stubs, repeat citations, and editable entry
 copies. Rendered citations are keyboard focusable and expose citation-detail
 popovers in preview and HTML exports, using bibliography metadata when a key
 resolves and an explicit missing-entry message when it does not.
+
+The References panel also includes source acquisition and Deep Research
+controls. Users can search DuckDuckGo, a configured SearXNG endpoint, or Tavily
+for source candidates, download selected source documents into a
+`<document>.neditor-sources/` directory beside the active document, insert a
+CSL JSON bibliography stub, and keep a `sources.json` manifest with URL, hash,
+file path, and citation-key evidence. Deep Research uses the selected AI
+provider, including Ollama local or remote/cloud endpoints, to plan iterative
+queries, reflect on knowledge gaps, write a sourced Markdown draft, and expand
+that draft toward a user-selected length from 1 to 200 pages before the user
+inserts and edits it.
 
 ## Glossary And Index
 

@@ -13,12 +13,19 @@ import {
   aiProviderProfiles,
   buildAiProviderRequestPackage,
   buildAiProviderResponseReviewMarkdown,
+  executeDirectAiProviderPrompt,
   executeAiProviderRequestPackage,
   formatAiProviderSourcePack,
   isLocalAgentCliProfile,
   localAgentCliProfileById,
   localAgentCliProfiles,
 } from "../src/lib/aiProviderPackages.js";
+import {
+  deepResearchDraftPrompt,
+  estimateMarkdownPages,
+  normalizeDeepResearchSettings,
+  targetWordCount,
+} from "../src/lib/deepResearch.js";
 import {
   agenticWorkflowPlaybooks,
   buildAgenticApprovalGateMarkdown,
@@ -4628,13 +4635,19 @@ test("AI provider packages redact secrets and preserve agent governance context"
   ok(providerPackage.checklist.some((item) => item.includes("source-pack review item")));
   ok(providerPackage.checklist.some((item) => item.includes("approves this provider")));
 
-  const localProfiles = aiProviderProfiles.filter((profile) => profile.id === "local-openai" || profile.id === "private-openai");
-  equal(localProfiles.length, 2);
+  const localProfiles = aiProviderProfiles.filter((profile) =>
+    ["local-openai", "private-openai", "ollama-local", "ollama-cloud"].includes(profile.id),
+  );
+  equal(localProfiles.length, 4);
   for (const profile of localProfiles) {
     const localPackage = buildAiProviderRequestPackage(run, { profileId: profile.id });
-    equal(Object.keys(localPackage.redactedHeaders).includes("Authorization"), false);
-    equal(localPackage.profile.authHeader, "");
-    ok(localPackage.profile.summary.includes("gateway"));
+    if (profile.id === "ollama-cloud") {
+      equal(Object.keys(localPackage.redactedHeaders).includes("Authorization"), true);
+      ok(localPackage.profile.summary.includes("Ollama"));
+    } else {
+      equal(Object.keys(localPackage.redactedHeaders).includes("Authorization"), false);
+      equal(localPackage.profile.authHeader, "");
+    }
     ok(JSON.stringify(localPackage.requestBody).includes(localPackage.profile.model));
   }
 
@@ -4653,6 +4666,42 @@ test("AI provider packages redact secrets and preserve agent governance context"
   ok(localAgentCliProfiles.some((profile) => profile.id === "google-antigravity-cli" && profile.command === "antigravity"));
   ok(aiProviderProfiles.some((profile) => profile.id === "google-antigravity-cli" && profile.label.includes("Google Antigravity")));
   equal(isLocalAgentCliProfile("openai-compatible"), false);
+});
+
+test("Ollama provider profiles support direct AI workflows and deep research sizing", async () => {
+  const settings = normalizeDeepResearchSettings({
+    topic: "AI procurement controls",
+    providerProfileId: "ollama-local",
+    targetPages: 200,
+    iterations: 4,
+  });
+  equal(settings.providerProfileId, "ollama-local");
+  equal(settings.targetPages, 200);
+  equal(targetWordCount(settings), 100000);
+  ok(deepResearchDraftPrompt(settings, []).includes("Target length: about 200 pages"));
+  equal(estimateMarkdownPages("word ".repeat(1001)), 3);
+
+  const response = await executeDirectAiProviderPrompt(
+    {
+      profileId: "ollama-local",
+      systemPrompt: "Return Markdown.",
+      userPrompt: "Draft.",
+    },
+    "",
+    async (_input, init) => {
+      ok(init.body.includes("\"stream\":false"));
+      ok(init.body.includes("\"messages\""));
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        async text() {
+          return JSON.stringify({ message: { content: "# Draft\n\nReady." } });
+        },
+      };
+    },
+  );
+  equal(response.markdown, "# Draft\n\nReady.");
 });
 
 test("AI provider defaults normalize non-secret setup preferences", () => {
@@ -4676,6 +4725,20 @@ test("AI provider defaults normalize non-secret setup preferences", () => {
     model: "human-approved-provider",
     keyEnv: "NEDITOR_AI_API_KEY",
   });
+  deepEqual(
+    normalizeAiProviderDefaults({
+      profileId: "ollama-local",
+      endpoint: " http://127.0.0.1:11434/api/chat ",
+      model: " llama3.1 ",
+      keyEnv: "",
+    }),
+    {
+      profileId: "ollama-local",
+      endpoint: "http://127.0.0.1:11434/api/chat",
+      model: "llama3.1",
+      keyEnv: "NEDITOR_AI_API_KEY",
+    },
+  );
 });
 
 test("text-to-speech preferences normalize selected local engines", () => {
