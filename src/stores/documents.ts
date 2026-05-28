@@ -5,6 +5,7 @@ import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/p
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import { normalizeBusinessProfile, type BusinessProfile } from "../lib/businessDocuments";
+import { saveAiProviderDefaultsState, saveBusinessProfileState, saveTtsPreferencesState } from "../lib/configurationProfiles";
 import {
   closeDocumentTabState,
   forgetDocumentPathState,
@@ -599,15 +600,21 @@ export const useDocumentsStore = defineStore("documents", {
       void this.persistWorkspace();
     },
     saveBusinessProfile(profile: Partial<BusinessProfile>) {
-      this.businessProfile = normalizeBusinessProfile(profile);
+      const next = saveBusinessProfileState(this.businessProfile, profile);
+      if (!next.changed) return;
+      this.businessProfile = next.value;
       void this.persistWorkspace();
     },
     saveAiProviderDefaults(defaults: Partial<AiProviderDefaults>) {
-      this.aiProviderDefaults = normalizeAiProviderDefaults(defaults);
+      const next = saveAiProviderDefaultsState(this.aiProviderDefaults, defaults);
+      if (!next.changed) return;
+      this.aiProviderDefaults = next.value;
       void this.persistWorkspace();
     },
     saveTtsPreferences(defaults: Partial<TtsPreferences>) {
-      this.ttsPreferences = normalizeTtsPreferences(defaults);
+      const next = saveTtsPreferencesState(this.ttsPreferences, defaults);
+      if (!next.changed) return;
+      this.ttsPreferences = next.value;
       void this.persistWorkspace();
     },
     recordGuidedDemoStepComplete(stepId: string) {

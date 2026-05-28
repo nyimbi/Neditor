@@ -64,6 +64,7 @@ import {
   resolveCitationTodo,
 } from "../src/lib/citationTodoWorkflow.js";
 import { commandSearchText, compactCommandKeywords, joinCommandDescription } from "../src/lib/commandPalette.js";
+import { saveAiProviderDefaultsState, saveBusinessProfileState, saveTtsPreferencesState } from "../src/lib/configurationProfiles.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
 import {
   buildDocsLiveDraft,
@@ -3912,6 +3913,61 @@ test("text-to-speech preferences normalize selected local engines", () => {
     supertonicModelDownloadAcknowledged: false,
     supertonicModelStoragePath: "",
   });
+});
+
+test("configuration profile state helpers normalize saves and skip unchanged setup values", () => {
+  const businessProfile = normalizeBusinessProfile({
+    fullName: "Jane Doe",
+    email: "jane@example.com",
+    companyName: "Acme Advisory",
+  });
+  const sameBusinessProfile = saveBusinessProfileState(businessProfile, {
+    fullName: " Jane Doe ",
+    email: " jane@example.com ",
+    companyName: " Acme Advisory ",
+  });
+  equal(sameBusinessProfile.changed, false);
+  deepEqual(sameBusinessProfile.value, businessProfile);
+  const changedBusinessProfile = saveBusinessProfileState(businessProfile, {
+    fullName: "Jane Doe",
+    email: "jane@example.com",
+    companyName: "Acme Advisory",
+    website: " https://acme.example ",
+  });
+  equal(changedBusinessProfile.changed, true);
+  equal(changedBusinessProfile.value.website, "https://acme.example");
+
+  const providerDefaults = normalizeAiProviderDefaults({});
+  const changedProviderDefaults = saveAiProviderDefaultsState(providerDefaults, {
+    profileId: "openai-compatible",
+    endpoint: " https://api.openai.com/v1/chat/completions ",
+    model: " gpt-4.1 ",
+    keyEnv: "openai api key",
+  });
+  equal(changedProviderDefaults.changed, true);
+  deepEqual(changedProviderDefaults.value, {
+    profileId: "openai-compatible",
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    model: "gpt-4.1",
+    keyEnv: "OPENAI_API_KEY",
+  });
+  equal(saveAiProviderDefaultsState(changedProviderDefaults.value, changedProviderDefaults.value).changed, false);
+
+  const ttsPreferences = normalizeTtsPreferences({});
+  const changedTtsPreferences = saveTtsPreferencesState(ttsPreferences, {
+    engine: "supertonic-cli",
+    rate: 9,
+    supertonicSpeed: 0.1,
+    supertonicModelDownloadAcknowledged: true,
+    supertonicModelStoragePath: " ~/.cache/supertonic/models ",
+  });
+  equal(changedTtsPreferences.changed, true);
+  equal(changedTtsPreferences.value.engine, "supertonic-cli");
+  equal(changedTtsPreferences.value.rate, 2);
+  equal(changedTtsPreferences.value.supertonicSpeed, 0.7);
+  equal(changedTtsPreferences.value.supertonicModelDownloadAcknowledged, true);
+  equal(changedTtsPreferences.value.supertonicModelStoragePath, "~/.cache/supertonic/models");
+  equal(saveTtsPreferencesState(changedTtsPreferences.value, changedTtsPreferences.value).changed, false);
 });
 
 test("text-to-speech setup helpers preserve consent-gated Supertonic model details", () => {
