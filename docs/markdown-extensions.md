@@ -496,6 +496,7 @@ Native diagram transform subsets:
 | `mermaid` | Simple `flowchart` or `graph` edge diagrams such as `A[Start] --> B[End]`, including bracketed node labels and `-- label -->` edge labels. The first-release native renderer is a static preview for business flowcharts; sequence diagrams, class diagrams, state diagrams, subgraphs, styling directives, and advanced Mermaid layout features should be rendered with an external workflow before release if exact Mermaid fidelity is required. Unsupported Mermaid syntax produces a warning instead of silently implying full Mermaid compatibility. |
 | `pikchr` | Simple semicolon- or line-separated statements using `box`, `circle`/`ellipse`/`oval`, `diamond`, `cylinder`, `file`, and `arrow`, including connector labels such as `arrow "approve"`. The native renderer is a static business-diagram fallback; full Pikchr grammar, positioning, macros, variables, and precise layout require a trusted Pikchr executable. Unsupported Pikchr syntax produces a warning and the external setup path remains available for high-fidelity output. |
 | `d2` | Simple node declarations such as `customer: Customer`, nested container declarations such as `platform: Platform { api: API }`, relative container edges such as `api -> database: writes`, external dotted references such as `customer -> platform.api`, edge statements such as `customer -> crm: submits RFP`, semicolon-separated edge statements, and common layout/style attributes such as `direction`, `shape`, and `style.*` ignored so they do not appear as bogus preview nodes. Edge labels render in the SVG fallback. |
+| `plantuml` | Simple sequence and component-style arrows such as `Alice -> Bob: approve`, plus common enterprise declarations including `actor`, `participant`, `component`, `database`, `queue`, `boundary`, `control`, `entity`, `interface`, `collections`, `storage`, `folder`, `artifact`, `node`, `cloud`, `rectangle`, `package`, and `frame`. Declaration aliases such as `component "NEditor App" as App` preserve readable labels while edges target the alias. Exact PlantUML layout, styling, and full grammar still require a trusted PlantUML executable. |
 
 Example chart:
 
@@ -530,11 +531,13 @@ The same Templates panel also includes starter blocks for chart, a styled
 board scorecard chart, Vega-Lite grouped bars, opportunity scatter plots,
 risk-score tick plots, and readiness label plots,
 timeline, roadmap, ADR, Mermaid, Pikchr, DOT, PlantUML, CSV, JSON Schema,
-OpenAPI endpoints, OpenAPI reusable component libraries, and QR transforms. Duplicate any built-in template to create a
-workspace custom template, then edit the name, category, transform, tags, and
-fenced body. Template cards expose detected fill values, such as literal `calc`
-inputs or top-level structured fields, so reusable workflows are easier to
-adapt after insertion.
+OpenAPI endpoints, OpenAPI reusable component libraries, and QR transforms. The
+PlantUML starters include both a sequence flow and an enterprise component
+diagram with aliases that render through the native fallback. Duplicate any
+built-in template to create a workspace custom template, then edit the name,
+category, transform, tags, and fenced body. Template cards expose detected fill
+values, such as literal `calc` inputs or top-level structured fields, so
+reusable workflows are easier to adapt after insertion.
 
 PlantUML exports default to SVG. When a trusted PlantUML executable is
 configured, request PNG output per fence with `format=png`, `output=png`, or

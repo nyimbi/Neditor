@@ -259,6 +259,48 @@ fn external_diagram_fallbacks_render_simple_native_svgs() {
 }
 
 #[test]
+fn plantuml_native_fallback_handles_component_aliases_and_enterprise_nodes() {
+    let artifact = run_transform(
+        "plantuml".to_string(),
+        r#"@startuml
+left to right direction
+actor "Business User" as User
+component "NEditor App" as App
+database "Workspace Store" as Store
+cloud "AI Provider" as AI
+folder "Source Documents" as Sources
+User -> App: drafts response
+App --> Store: saves markdown
+App ..> AI: governed prompt
+Sources -> App: imports RFP
+@enduml
+"#
+        .to_string(),
+    )
+    .expect("plantuml native fallback");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert_eq!(artifact.execution_kind, "embedded");
+    assert!(artifact.diagnostics.is_empty());
+    for expected in [
+        "Business User",
+        "NEditor App",
+        "Workspace Store",
+        "AI Provider",
+        "Source Documents",
+        "drafts response",
+        "saves markdown",
+        "governed prompt",
+        "imports RFP",
+    ] {
+        assert!(
+            artifact.html.contains(expected),
+            "PlantUML fallback should render {expected}"
+        );
+    }
+}
+
+#[test]
 fn d2_native_fallback_handles_labels_attributes_and_semicolons() {
     let artifact = run_transform(
         "d2".to_string(),

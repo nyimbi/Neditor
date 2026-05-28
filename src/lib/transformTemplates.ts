@@ -1146,7 +1146,7 @@ customer -> platform.api: request
     "Diagrams",
     "plantuml",
     "PlantUML sequence",
-    "Creates a sequence diagram for external PlantUML rendering.",
+    "Creates a sequence diagram that works with the native fallback and external PlantUML.",
     fenced(
       "plantuml",
       `
@@ -1158,6 +1158,31 @@ Compiler --> NEditor: Static artifact
 `,
     ),
     ["diagram", "sequence"],
+  ),
+  template(
+    "plantuml-enterprise-components",
+    "Diagrams",
+    "plantuml",
+    "PlantUML enterprise components",
+    "Creates an enterprise component diagram with aliases that works with the native fallback and external PlantUML.",
+    fenced(
+      "plantuml",
+      `
+@startuml
+left to right direction
+actor "Business User" as User
+component "NEditor App" as App
+database "Workspace Store" as Store
+cloud "AI Provider" as AI
+folder "Source Documents" as Sources
+User -> App: drafts response
+App --> Store: saves markdown
+App ..> AI: governed prompt
+Sources -> App: imports RFP
+@enduml
+`,
+    ),
+    ["diagram", "plantuml", "architecture", "component", "enterprise"],
   ),
   template(
     "csv-budget",

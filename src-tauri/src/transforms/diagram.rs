@@ -679,25 +679,27 @@ fn parse_plantuml_graph(body: &str) -> MermaidGraph {
     let mut nodes = Vec::new();
     let mut seen = HashSet::new();
     let mut edges = Vec::new();
-    for line in body.lines().map(str::trim) {
+    for raw_line in body.lines().flat_map(|line| line.split(';')) {
+        let line = raw_line.trim().trim_end_matches('{').trim();
         if line.is_empty()
             || line.starts_with('\'')
             || line.starts_with("@start")
             || line.starts_with("@end")
+            || line.starts_with("skinparam")
+            || line.starts_with("left to right direction")
         {
             continue;
         }
         if let Some((keyword, rest)) = line.split_once(' ') {
-            if matches!(
-                keyword,
-                "actor" | "participant" | "component" | "database" | "queue" | "boundary"
-            ) {
-                let node = parse_plain_graph_node(rest);
+            if is_plantuml_node_keyword(keyword) {
+                let node = parse_plantuml_declaration_node(rest);
                 add_mermaid_node(&mut nodes, &mut seen, &node);
                 continue;
             }
         }
-        if let Some((left, right)) = split_first_operator(line, &["-->", "->", "<--", "<-"]) {
+        if let Some((left, right)) =
+            split_first_operator(line, &["-->", "->", "<--", "<-", "..>", ".>"])
+        {
             let from = parse_plain_graph_node(left);
             let (target, label) = split_d2_edge_label(right);
             let to = parse_plain_graph_node(target);
@@ -711,6 +713,75 @@ fn parse_plantuml_graph(body: &str) -> MermaidGraph {
         }
     }
     MermaidGraph { nodes, edges }
+}
+
+fn is_plantuml_node_keyword(keyword: &str) -> bool {
+    matches!(
+        keyword.to_ascii_lowercase().as_str(),
+        "actor"
+            | "participant"
+            | "component"
+            | "database"
+            | "queue"
+            | "boundary"
+            | "control"
+            | "entity"
+            | "interface"
+            | "collections"
+            | "storage"
+            | "folder"
+            | "artifact"
+            | "node"
+            | "cloud"
+            | "rectangle"
+            | "package"
+            | "frame"
+    )
+}
+
+fn parse_plantuml_declaration_node(text: &str) -> MermaidNode {
+    let text = text
+        .trim()
+        .trim_matches('{')
+        .trim()
+        .trim_matches(['[', ']'])
+        .trim();
+    if let Some((label, alias)) = split_plantuml_alias(text) {
+        let clean_alias = normalize_plain_node_id(alias);
+        let clean_label = clean_plantuml_label(label);
+        if !clean_alias.is_empty() {
+            return MermaidNode {
+                id: clean_alias,
+                label: clean_label,
+            };
+        }
+    }
+    if let Some(label) = extract_first_quoted(text) {
+        let id = normalize_plain_node_id(&label);
+        return MermaidNode {
+            id,
+            label: clean_plantuml_label(&label),
+        };
+    }
+    parse_plain_graph_node(text)
+}
+
+fn split_plantuml_alias(text: &str) -> Option<(&str, &str)> {
+    for marker in [" as ", " AS ", " As ", " aS "] {
+        if let Some((label, alias)) = text.rsplit_once(marker) {
+            return Some((label.trim(), alias.trim()));
+        }
+    }
+    None
+}
+
+fn clean_plantuml_label(text: &str) -> String {
+    text.trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim_matches(['[', ']'])
+        .trim()
+        .to_string()
 }
 
 fn render_edge_label(

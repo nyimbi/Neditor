@@ -7190,6 +7190,11 @@ test("transform template library covers reusable calculations and custom templat
   ok(d2ContainerTemplate.body.includes("platform: Platform {"));
   ok(d2ContainerTemplate.body.includes("customer -> platform.api"));
   ok(d2ContainerTemplate.tags.includes("container"));
+  const plantumlComponentTemplate = builtinTransformTemplates.find((template) => template.id === "plantuml-enterprise-components");
+  if (!plantumlComponentTemplate) throw new Error("missing PlantUML enterprise component template");
+  ok(plantumlComponentTemplate.body.includes('component "NEditor App" as App'));
+  ok(plantumlComponentTemplate.body.includes('cloud "AI Provider" as AI'));
+  ok(plantumlComponentTemplate.tags.includes("enterprise"));
   const vegaTickTemplate = builtinTransformTemplates.find((template) => template.id === "vega-lite-risk-ticks");
   if (!vegaTickTemplate) throw new Error("missing Vega-Lite tick template");
   ok(vegaTickTemplate.body.includes('"type": "tick"'));
