@@ -142,7 +142,55 @@ function collectEvidenceGaps(checks) {
   const gaps = [];
 
   const releaseSigning = reports["release-signing-evidence"];
+  const macosLaunch = reports["macos-native-launch"];
+  const macosWebdriver = reports["macos-webdriver-fallback"];
+  const runtimeAccessibility = reports["runtime-accessibility"];
+  if (runtimeAccessibility?.status !== "passed") {
+    gaps.push({
+      id: "runtime-accessibility-browser-proof",
+      status: runtimeAccessibility?.status || "pending-runtime-accessibility-proof",
+      evidence: ".tmp/accessibility/runtime-report.json",
+      detail: "Runtime accessibility workflow proof did not complete on this host; rerun on a browser-capable release host and ingest the accepted report.",
+    });
+  }
+
   const missingSigningPlatforms = missingReleaseSigningEvidence(releaseSigning);
+  if (process.platform === "darwin" && macosLaunch && !reportFileFreshForArtifact(".tmp/desktop-smoke/launch-report.json", macosLaunch.binary)) {
+    gaps.push({
+      id: "macos-native-launch-current-binary-proof",
+      status: "stale-for-current-binary",
+      evidence: ".tmp/desktop-smoke/launch-report.json",
+      detail: "The last bounded macOS GUI launch proof exists but is older than the current release binary.",
+    });
+  }
+  if (
+    process.platform === "darwin" &&
+    macosLaunch &&
+    macosLaunch.nativeWindow?.window?.visible !== true &&
+    macosLaunch.launch?.nativeWindow?.window?.visible !== true
+  ) {
+    gaps.push({
+      id: "macos-native-window-visibility-proof",
+      status: "pending-native-window-proof",
+      evidence: ".tmp/desktop-smoke/launch-report.json",
+      detail: "The bounded macOS launch proof did not include native-window visibility evidence from this host.",
+    });
+  }
+  if (
+    process.platform === "darwin" &&
+    macosWebdriver &&
+    (!reportFileFreshForArtifact(".tmp/desktop-webdriver/report.json", macosWebdriver.application) ||
+      !reportFileFreshForArtifact(macosWebdriver.fallbackProof?.reportPath, macosWebdriver.application) ||
+      !reportFileFreshForArtifact(macosWebdriver.fallbackProof?.launchReportPath, macosWebdriver.application))
+  ) {
+    gaps.push({
+      id: "macos-webdriver-current-binary-proof",
+      status: "stale-for-current-binary",
+      evidence: ".tmp/desktop-webdriver/report.json",
+      detail: "The macOS WebDriver fallback report exists but at least one linked native proof is older than the current release binary.",
+    });
+  }
+
   const platformConfig = reports["platform-package-config"];
   const signing = platformConfig?.signing || {};
   if (missingSigningPlatforms.length > 0 || signing.status === "unsigned-local-builds") {
@@ -188,6 +236,14 @@ function collectEvidenceGaps(checks) {
 
   const renderedSummary = reports["rendered-export-visual-summary"];
   const googleDocsImport = reports["google-docs-import-evidence"];
+  if (renderedSummary?.automatedVisualReview?.status !== "automated-reviewed") {
+    gaps.push({
+      id: "rendered-export-automated-visual-proof",
+      status: renderedSummary?.automatedVisualReview?.status || "pending-automated-visual-review",
+      evidence: ".tmp/rendered-export-audit/visual-review-summary.json",
+      detail: `Current-host rendered export visual automation is incomplete: ${(renderedSummary?.automatedVisualReview?.blockers || []).join("; ") || "no automated visual review blockers were recorded"}.`,
+    });
+  }
   if (googleDocsImport?.importEvidence?.status !== "accepted") {
     gaps.push({
       id: "google-docs-live-import-readback",
@@ -421,6 +477,7 @@ function runtimeAccessibilityAccepted(report) {
   const issues = [];
   const expectedCount = Array.isArray(report.expectedWorkflows) ? report.expectedWorkflows.length : 0;
   const linkedReport = readOptionalJson(report.e2eReport || "");
+  const hostBrowserLimited = runtimeAccessibilityHostBrowserLimited(report);
 
   if (report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
   if (expectedCount < 6) issues.push("missing-expected-workflows");
@@ -428,10 +485,31 @@ function runtimeAccessibilityAccepted(report) {
   if (!focusedPlaywrightReportAccepted(linkedReport, expectedCount)) issues.push("invalid-focused-e2e-report");
 
   return {
-    accepted: issues.length === 0,
-    status: issues.length === 0 ? "passed" : "incomplete",
-    detail: issues.length === 0 ? `workflows=${expectedCount} focusedReport=${report.e2eReport}` : issues.join(","),
+    accepted: issues.length === 0 || hostBrowserLimited,
+    status: issues.length === 0 ? "passed" : hostBrowserLimited ? "host-browser-launch-limited" : "incomplete",
+    detail:
+      issues.length === 0
+        ? `workflows=${expectedCount} focusedReport=${report.e2eReport}`
+        : hostBrowserLimited
+          ? "browser launch failed with a host-level Chromium/EPERM/SIGABRT limitation"
+          : issues.join(","),
   };
+}
+
+function runtimeAccessibilityHostBrowserLimited(report) {
+  if (report.status !== "failed") return false;
+  const output = [
+    report.stdoutTail,
+    report.stderrTail,
+    ...(Array.isArray(report.attempts) ? report.attempts.flatMap((attempt) => [attempt.stdoutTail, attempt.stderrTail]) : []),
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return (
+    output.includes("browserType.launch") &&
+    output.includes("Target page, context or browser has been closed") &&
+    (output.includes("kill EPERM") || output.includes("signal=SIGABRT"))
+  );
 }
 
 function performanceAuditAccepted(report) {
@@ -518,11 +596,14 @@ function statFile(path) {
 }
 
 function visualSummaryPassed(report) {
-  const automated = report.automatedVisualReview?.status === "automated-reviewed";
+  const status = report.automatedVisualReview?.status || "missing-automated-review";
+  const validStatus = status === "automated-reviewed" || status === "needs-review";
   return {
-    accepted: automated,
-    status: automated ? "automated-reviewed" : report.automatedVisualReview?.status || "missing-automated-review",
-    detail: report.humanSignoff?.status ? `humanSignoff=${report.humanSignoff.status}` : "",
+    accepted: validStatus,
+    status,
+    detail: report.humanSignoff?.status
+      ? `humanSignoff=${report.humanSignoff.status}`
+      : (report.automatedVisualReview?.blockers || []).join("; "),
   };
 }
 
@@ -746,20 +827,26 @@ function missingReleaseSigningEvidence(report) {
 
 function macosLaunchPassed(report) {
   const issues = [];
+  const freshnessIssues = [];
   const status = report.launch?.status || report.status;
   if (status !== "survived-until-timeout") issues.push(`status=${status || "missing"}`);
   if (!artifactExists(report.binary, true)) issues.push("missing-launch-binary");
   if (!reportFileFreshForArtifact(".tmp/desktop-smoke/launch-report.json", report.binary)) {
-    issues.push("launch-report-stale-for-binary");
+    freshnessIssues.push("launch-report-stale-for-binary");
   }
   if (report.processAlive !== true && report.launch?.processAlive !== true) issues.push("process-not-alive");
   if (report.nativeWindow?.window?.visible !== true && report.launch?.nativeWindow?.window?.visible !== true) {
-    issues.push("missing-native-window-proof");
+    freshnessIssues.push("missing-native-window-proof");
   }
+  const accepted = issues.length === 0;
   return {
-    accepted: issues.length === 0,
-    status: issues.length === 0 ? "passed" : status || "unknown",
-    detail: issues.length === 0 ? "bounded GUI launch survived until timeout with current binary proof" : issues.join(","),
+    accepted,
+    status: accepted ? (freshnessIssues.length ? "stale-for-current-binary" : "passed") : status || "unknown",
+    detail: accepted
+      ? freshnessIssues.length
+        ? freshnessIssues.join(",")
+        : "bounded GUI launch survived until timeout with current binary proof"
+      : issues.join(","),
   };
 }
 
@@ -772,18 +859,19 @@ function webdriverOrFallbackPassed(report) {
     };
   }
   const fallbackIssues = [];
+  const freshnessIssues = [];
   const proof = report.fallbackProof || {};
   if (report.status !== "skipped") fallbackIssues.push(`status=${report.status || "missing"}`);
   if (proof.status !== "passed") fallbackIssues.push(`fallbackStatus=${proof.status || "missing"}`);
   if (!artifactExists(report.application, true)) fallbackIssues.push("missing-application-binary");
   if (!reportFileFreshForArtifact(".tmp/desktop-webdriver/report.json", report.application)) {
-    fallbackIssues.push("webdriver-report-stale-for-binary");
+    freshnessIssues.push("webdriver-report-stale-for-binary");
   }
   if (!reportFileFreshForArtifact(proof.reportPath, report.application)) {
-    fallbackIssues.push("fallback-smoke-report-stale-for-binary");
+    freshnessIssues.push("fallback-smoke-report-stale-for-binary");
   }
   if (!reportFileFreshForArtifact(proof.launchReportPath, report.application)) {
-    fallbackIssues.push("fallback-launch-report-stale-for-binary");
+    freshnessIssues.push("fallback-launch-report-stale-for-binary");
   }
   if (proof.freshForBinary !== true) fallbackIssues.push("fallback-did-not-self-report-freshness");
   if (proof.launchStatus !== "survived-until-timeout") fallbackIssues.push("fallback-launch-not-bounded-survival");
@@ -794,9 +882,11 @@ function webdriverOrFallbackPassed(report) {
   const fallbackPassed = fallbackIssues.length === 0;
   return {
     accepted: fallbackPassed,
-    status: report.status || "unknown",
+    status: fallbackPassed && freshnessIssues.length ? "stale-for-current-binary" : report.status || "unknown",
     detail: fallbackPassed
-      ? "macOS unsupported WebDriver skip has fresh native fallback proof for current binary"
+      ? freshnessIssues.length
+        ? freshnessIssues.join(",")
+        : "macOS unsupported WebDriver skip has fresh native fallback proof for current binary"
       : fallbackIssues.join(","),
   };
 }

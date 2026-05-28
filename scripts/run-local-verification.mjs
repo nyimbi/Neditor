@@ -21,6 +21,7 @@ const quickCommands = [
   command("Security review evidence contract", "pnpm", ["run", "check:security-review"]),
   command("Homebrew cask packaging contract", "pnpm", ["run", "check:homebrew"]),
   command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"]),
+  command("Release candidate script syntax", "node", ["--check", "scripts/create-release-candidate.mjs"]),
   command("Markdown links", "pnpm", ["run", "check:docs"]),
   command("Spec completion matrix contract", "pnpm", ["run", "check:spec-completion"]),
   command("Table editor manual review contract", "pnpm", ["run", "check:tables:manual"]),

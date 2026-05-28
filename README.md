@@ -877,6 +877,27 @@ recognizes returned security review proof under paths such as
 `pnpm run check:security-review`, `pnpm run check:performance-profile`, and
 `pnpm run check:engines`.
 
+`pnpm run release:local` creates a local release-candidate control packet under
+`.tmp/release-candidate/`. It requires a clean Git checkout by default, builds
+the production frontend and native release binaries, refreshes prerequisite
+evidence templates, validates the release evidence kit, reruns release readiness,
+and writes
+`manifest.json`, `SHA256SUMS`, and a reviewer-facing `README.md` covering the
+current commit, version, compiled artifact hashes, readiness status, commands
+run, evidence-kit link, and remaining release gates. Use
+`node scripts/create-release-candidate.mjs --skip-build` only after a fresh
+compile when you need to regenerate hashes/readiness without rebuilding, and
+`--allow-dirty` only for a non-releaseable local dry run against the most recent
+readiness reports. `--skip-prerequisite-evidence` is available only for
+operators who have already refreshed all evidence templates for the current
+commit. Browser-heavy accessibility and performance refreshes remain opt-in via
+`--refresh-browser-evidence` so a release-candidate packet can still be created
+on hosts where Chromium is unavailable or sandbox-limited; readiness records that
+condition as an evidence gap instead of hiding it. macOS GUI launch and
+WebDriver refresh are likewise opt-in via `--refresh-native-launch-evidence`
+because headless or sandboxed hosts may not be able to produce fresh native
+window proof.
+
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`
 and the Tauri package build. It scans real installer/package artifacts, copies

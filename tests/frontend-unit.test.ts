@@ -8279,6 +8279,7 @@ test("local verification scripts expose local baseline checks", () => {
   const releaseSigning = readFileSync("scripts/check-release-signing.mjs", "utf8");
   const externalTransformDocs = readFileSync("scripts/check-external-transform-docs.mjs", "utf8");
   const externalEngineProbe = readFileSync("scripts/check-external-engines.mjs", "utf8");
+  const releaseCandidate = readFileSync("scripts/create-release-candidate.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:ai-roadmap"], "node scripts/check-ai-first-roadmap.mjs");
@@ -8310,6 +8311,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
   equal(scripts["ingest:evidence"], "node scripts/ingest-release-evidence.mjs");
+  equal(scripts["release:local"], "node scripts/create-release-candidate.mjs");
   equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
   equal(scripts.build, "vue-tsc --noEmit && vite build");
@@ -8337,6 +8339,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Release device performance profile contract", "pnpm", ["run", "check:performance-profile"])'));
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
   ok(verification.includes('command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"])'));
+  ok(verification.includes('command("Release candidate script syntax", "node", ["--check", "scripts/create-release-candidate.mjs"])'));
   ok(verification.includes('command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"])'));
   ok(verification.includes('command("Release signing evidence contract", "pnpm", ["run", "check:release-signing"])'));
   ok(verification.includes('command("Spec completion matrix contract", "pnpm", ["run", "check:spec-completion"])'));
@@ -8519,6 +8522,12 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("release-device-native-performance-profile"));
   ok(evidenceKitCollector.includes("google-docs-live-import-readback"));
   ok(evidenceKitCollector.includes("rendered-export-native-viewer-human-signoff"));
+  ok(evidenceKitCollector.includes("rendered-export-automated-visual-proof"));
+  ok(evidenceKitCollector.includes("macos-native-launch-current-binary-proof"));
+  ok(evidenceKitCollector.includes("macos-native-window-visibility-proof"));
+  ok(evidenceKitCollector.includes("macos-webdriver-current-binary-proof"));
+  ok(evidenceKitCollector.includes("runbooks/macos-native-launch.md"));
+  ok(evidenceKitCollector.includes("runtime-accessibility-browser-proof"));
   ok(evidenceKitCollector.includes("accessibility-assistive-technology-human-signoff"));
   ok(evidenceKitCollector.includes("optional-external-engines"));
   ok(evidenceKitCollector.includes("homebrew-final-cask"));
@@ -8549,6 +8558,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("gapWorkItems"));
   ok(evidenceKitCollector.includes("readyToSend"));
   ok(evidenceKitCollector.includes("validatorCommandsForRunbook"));
+  ok(evidenceKitCollector.includes("test:[a-z0-9:-]+"));
   ok(evidenceKitCollector.includes("validatorCommands"));
   ok(evidenceKitCollector.includes("finalReadinessCommand"));
   ok(evidenceKitCollector.includes("pnpm run check:release-readiness"));
@@ -8579,6 +8589,25 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("must list validator commands"));
   ok(evidenceKitChecker.includes("must list returned evidence paths"));
   ok(evidenceKitChecker.includes("must list final readiness command"));
+  ok(releaseCandidate.includes("neditor.local-release-candidate.v1"));
+  ok(releaseCandidate.includes("Release candidates must be created from a clean Git worktree"));
+  ok(releaseCandidate.includes("SHA256SUMS"));
+  ok(releaseCandidate.includes("skipPrerequisiteEvidence"));
+  ok(releaseCandidate.includes("refreshBrowserEvidence"));
+  ok(releaseCandidate.includes("refreshNativeLaunchEvidence"));
+  ok(releaseCandidate.includes("refreshPrerequisiteEvidence"));
+  ok(releaseCandidate.includes("NEDITOR_DESKTOP_SMOKE_LAUNCH"));
+  ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:release-ci\"]"));
+  ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:platform-evidence\"]"));
+  ok(releaseCandidate.includes("pnpm\", [\"run\", \"test:rendered-exports\"]"));
+  ok(releaseCandidate.includes("pnpm\", [\"run\", \"test:tauri-webdriver\"]"));
+  ok(releaseCandidate.includes("pnpm\", [\"run\", \"collect:evidence-kit\"]"));
+  ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:evidence-kit\"]"));
+  ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:release-readiness\"]"));
+  ok(releaseCandidate.includes("native:app-binary"));
+  ok(releaseCandidate.includes("native:ned-cli"));
+  ok(releaseCandidate.includes("current-host-ready-with-external-gaps"));
+  ok(releaseCandidate.includes("Regenerate this release candidate after every source, artifact, signing, or evidence change."));
   ok(evidenceIngest.includes("neditor.release-evidence-ingest.v1"));
   ok(evidenceIngest.includes("NEDITOR_RELEASE_EVIDENCE_RETURN_DIR"));
   ok(evidenceIngest.includes("homebrew-cask"));
@@ -8704,6 +8733,9 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("current-host-ready-with-external-gaps"));
   ok(script.includes("browserWorkflowAccepted"));
   ok(script.includes("runtimeAccessibilityAccepted"));
+  ok(script.includes("runtimeAccessibilityHostBrowserLimited"));
+  ok(script.includes("runtime-accessibility-browser-proof"));
+  ok(script.includes("host-browser-launch-limited"));
   ok(script.includes("performanceAuditAccepted"));
   ok(script.includes("focusedPlaywrightReportAccepted"));
   ok(script.includes("macosAppBundleAccepted"));
@@ -8714,6 +8746,9 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("launch-report-stale-for-binary"));
   ok(script.includes("webdriver-report-stale-for-binary"));
   ok(script.includes("fallback-smoke-report-stale-for-binary"));
+  ok(script.includes("macos-native-launch-current-binary-proof"));
+  ok(script.includes("macos-webdriver-current-binary-proof"));
+  ok(script.includes("macos-native-window-visibility-proof"));
   ok(script.includes("neditor.e2e-browser-workflow.v1"));
   ok(script.includes("scope !== \"full-suite\""));
   ok(script.includes("missing-docs-live-workflow-proof"));
@@ -8765,6 +8800,8 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes('blocker.id === "homebrew-release-readiness"'));
   ok(script.includes("release-signing-and-notarization"));
   ok(script.includes("accessibility-assistive-technology-human-signoff"));
+  ok(script.includes("rendered-export-automated-visual-proof"));
+  ok(script.includes("pending-automated-visual-review"));
   ok(script.includes("rendered-export-native-viewer-human-signoff"));
   ok(script.includes("renderedExportAuditAccepted"));
   ok(script.includes('"markdown-bundle", "blog", "substack", "latex", "google-docs", "epub"'));

@@ -1,0 +1,330 @@
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, extname, join, relative, resolve } from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const outputDir = resolve(process.env.NEDITOR_RELEASE_CANDIDATE_DIR || join(root, ".tmp", "release-candidate"));
+const args = new Set(process.argv.slice(2));
+const skipBuild = args.has("--skip-build");
+const allowDirty = args.has("--allow-dirty");
+const skipEvidence = args.has("--skip-evidence") || allowDirty;
+const skipPrerequisiteEvidence = args.has("--skip-prerequisite-evidence") || skipEvidence;
+const refreshBrowserEvidence = args.has("--refresh-browser-evidence");
+const refreshNativeLaunchEvidence = args.has("--refresh-native-launch-evidence");
+const commandResults = [];
+
+const packageJson = readJson("package.json");
+const tauriConfig = readJson("src-tauri/tauri.conf.json");
+const sourceCommit = git(["rev-parse", "HEAD"]).stdout.trim();
+const sourceTreeCleanBefore = gitTreeClean();
+
+if (!sourceTreeCleanBefore && !allowDirty) {
+  fail("Release candidates must be created from a clean Git worktree. Commit or stash changes, or pass --allow-dirty for a non-releaseable local dry run.");
+}
+
+if (!skipBuild) {
+  run("pnpm", ["run", "build"]);
+  run("cargo", ["build", "--manifest-path", "src-tauri/Cargo.toml", "--locked", "--release"]);
+}
+
+if (!skipEvidence) {
+  if (!skipPrerequisiteEvidence) refreshPrerequisiteEvidence();
+  run("pnpm", ["run", "collect:evidence-kit"]);
+  run("pnpm", ["run", "check:evidence-kit"]);
+  run("pnpm", ["run", "check:release-readiness"]);
+}
+
+const readiness = readJson(".tmp/release-readiness/report.json");
+const evidenceKit = readJson(".tmp/release-evidence-kit/manifest.json");
+const sourceTreeCleanAfter = gitTreeClean();
+const artifacts = collectArtifacts();
+const requiredArtifacts = ["frontend:index", "native:app-binary", "native:ned-cli"];
+const missingRequired = requiredArtifacts.filter((kind) => !artifacts.some((artifact) => artifact.kind === kind));
+
+if (missingRequired.length) {
+  fail(`Release candidate is missing required artifact(s): ${missingRequired.join(", ")}`);
+}
+
+const manifest = {
+  schema: "neditor.local-release-candidate.v1",
+  generatedAt: new Date().toISOString(),
+  releaseable: sourceTreeCleanBefore && sourceTreeCleanAfter && readiness.status === "current-host-ready-with-external-gaps",
+  product: {
+    name: tauriConfig.productName || packageJson.name,
+    packageName: packageJson.name,
+    version: packageJson.version,
+    tauriVersion: tauriConfig.version,
+    identifier: tauriConfig.identifier,
+    license: packageJson.license,
+  },
+  source: {
+    commit: sourceCommit,
+    treeCleanBefore: sourceTreeCleanBefore,
+    treeCleanAfter: sourceTreeCleanAfter,
+  },
+  host: {
+    platform: process.platform,
+    arch: process.arch,
+    node: process.version,
+  },
+  readiness: {
+    status: readiness.status,
+    summary: readiness.summary || null,
+    evidenceGapCount: evidenceGaps(readiness).length,
+    evidenceGaps: evidenceGaps(readiness).map((gap) => ({
+      id: gap.id,
+      status: gap.status,
+      returnedEvidencePaths: gap.returnedEvidencePaths || gap.returnPaths || [],
+      validatorCommands: gap.validatorCommands || [],
+      runbook: gap.runbook || null,
+    })),
+  },
+  evidenceKit: {
+    path: ".tmp/release-evidence-kit/manifest.json",
+    schema: evidenceKit.schema,
+    sourceCommit: evidenceKit.sourceCommit,
+    gapCount: Array.isArray(evidenceKit.gaps) ? evidenceKit.gaps.length : 0,
+    workItemCount: Array.isArray(evidenceKit.gapWorkItems) ? evidenceKit.gapWorkItems.length : 0,
+    specWorkOrders: evidenceKit.specCompletionWorkOrders || null,
+  },
+  artifacts,
+  commands: commandResults,
+  nextSteps: nextSteps(readiness),
+};
+
+mkdirSync(outputDir, { recursive: true });
+writeFileSync(join(outputDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+writeFileSync(join(outputDir, "SHA256SUMS"), renderSha256Sums(artifacts));
+writeFileSync(join(outputDir, "README.md"), renderReadme(manifest));
+
+console.log(`Release candidate manifest written to ${relativePath(join(outputDir, "manifest.json"))}.`);
+console.log(`Release candidate SHA256SUMS written to ${relativePath(join(outputDir, "SHA256SUMS"))}.`);
+if (!manifest.releaseable) {
+  console.log("Release candidate is not final-releaseable; inspect README.md for remaining gates.");
+}
+
+function collectArtifacts() {
+  const entries = [
+    artifact("frontend:index", "dist/index.html"),
+    artifact("native:app-binary", "src-tauri/target/release/neditor"),
+    artifact("native:ned-cli", "src-tauri/target/release/ned"),
+    ...collectFrontendAssets(),
+    ...collectBundleArtifacts(),
+  ].filter(Boolean);
+  return entries.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function refreshPrerequisiteEvidence() {
+  const commands = [
+    ["pnpm", ["run", "check:release-ci"]],
+    ["pnpm", ["run", "check:homebrew"]],
+    ["pnpm", ["run", "check:platform-packaging"]],
+    ["pnpm", ["run", "check:spec-completion"]],
+    ["pnpm", ["run", "check:a11y"]],
+    ["pnpm", ["run", "check:platform-evidence"]],
+    ["pnpm", ["run", "check:release-signing"]],
+    ["pnpm", ["run", "check:ai-provider"]],
+    ["pnpm", ["run", "check:ai-runtime"]],
+    ["pnpm", ["run", "check:security-review"]],
+    ["pnpm", ["run", "check:performance-profile"]],
+    ["pnpm", ["run", "check:google-docs-import"]],
+    ["pnpm", ["run", "test:rendered-exports"]],
+    ["pnpm", ["run", "check:tables:manual"]],
+    ["pnpm", ["run", "check:a11y:manual"]],
+    ["pnpm", ["run", "test:desktop-bundle"]],
+    ["pnpm", ["run", "test:desktop-dmg"]],
+    ["pnpm", ["run", "test:desktop-smoke"]],
+  ];
+  if (refreshBrowserEvidence) {
+    commands.push(["pnpm", ["run", "check:a11y:runtime"]], ["pnpm", ["run", "test:performance-audit"]]);
+  }
+  if (refreshNativeLaunchEvidence) {
+    commands.push(["pnpm", ["run", "test:desktop-smoke"], { NEDITOR_DESKTOP_SMOKE_LAUNCH: "1" }], ["pnpm", ["run", "test:tauri-webdriver"]]);
+  }
+  for (const [command, commandArgs, env] of commands) run(command, commandArgs, env || {});
+}
+
+function collectFrontendAssets() {
+  const assetsDir = join(root, "dist", "assets");
+  if (!existsSync(assetsDir)) return [];
+  return readdirSync(assetsDir)
+    .filter((name) => statSync(join(assetsDir, name)).isFile())
+    .map((name) => artifact(`frontend:asset:${extname(name).slice(1) || "file"}`, join("dist", "assets", name)));
+}
+
+function collectBundleArtifacts() {
+  const bundleDir = join(root, "src-tauri", "target", "release", "bundle");
+  if (!existsSync(bundleDir)) return [];
+  const output = [];
+  for (const path of walk(bundleDir)) {
+    const rel = relativePath(path);
+    if (isReleaseBundleFile(rel)) output.push(artifact(`bundle:${bundleKind(rel)}`, rel));
+  }
+  return output;
+}
+
+function artifact(kind, relPath) {
+  const path = resolve(root, relPath);
+  if (!existsSync(path) || !statSync(path).isFile()) return null;
+  const stats = statSync(path);
+  return {
+    kind,
+    path: relativePath(path),
+    size: stats.size,
+    sha256: sha256(path),
+  };
+}
+
+function isReleaseBundleFile(path) {
+  if (path.endsWith("/NEditor.app/Contents/Info.plist")) return true;
+  if (path.endsWith("/NEditor.app/Contents/MacOS/neditor")) return true;
+  if (path.endsWith("/NEditor.app/Contents/MacOS/ned")) return true;
+  return /\.(dmg|msi|exe|deb|rpm|AppImage|appimage|zip)$/i.test(path);
+}
+
+function bundleKind(path) {
+  if (path.includes(".app/Contents/")) return "macos-app";
+  const extension = extname(path).replace(".", "").toLowerCase();
+  return extension || "file";
+}
+
+function walk(directory) {
+  const output = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) output.push(...walk(path));
+    if (entry.isFile()) output.push(path);
+  }
+  return output;
+}
+
+function run(command, args, env = {}) {
+  const startedAt = new Date().toISOString();
+  const result = spawnSync(command, args, { cwd: root, encoding: "utf8", env: { ...process.env, ...env }, stdio: "pipe" });
+  const report = {
+    command: [command, ...args].join(" "),
+    env: Object.keys(env).sort(),
+    startedAt,
+    status: result.status ?? 1,
+    stdoutTail: tail(result.stdout || ""),
+    stderrTail: tail(result.stderr || ""),
+  };
+  commandResults.push(report);
+  if (report.status !== 0) {
+    writeCommandFailure(report);
+    fail(`${report.command} failed with exit code ${report.status}`);
+  }
+  return result;
+}
+
+function writeCommandFailure(report) {
+  mkdirSync(outputDir, { recursive: true });
+  writeFileSync(
+    join(outputDir, "failed-command.json"),
+    `${JSON.stringify(
+      {
+        schema: "neditor.local-release-candidate-command-failure.v1",
+        generatedAt: new Date().toISOString(),
+        sourceCommit,
+        report,
+        commands: commandResults,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+function renderSha256Sums(artifacts) {
+  return `${artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`).join("\n")}\n`;
+}
+
+function renderReadme(candidate) {
+  const gapLines = candidate.readiness.evidenceGaps.length
+    ? candidate.readiness.evidenceGaps.map((gap) => `- ${gap.id}: ${gap.status}`).join("\n")
+    : "- None.";
+  const artifactLines = candidate.artifacts.map((artifact) => `- \`${artifact.path}\` (${artifact.kind}, ${artifact.size} bytes)`).join("\n");
+  const commandLines = candidate.commands.length
+    ? candidate.commands.map((command) => `- \`${command.command}\` -> ${command.status}`).join("\n")
+    : "- No commands were run; this was created with skip flags.";
+  const nextStepLines = candidate.nextSteps.map((step) => `- ${step}`).join("\n");
+  return `${[
+    "# NEditor Local Release Candidate",
+    "",
+    `Generated: ${candidate.generatedAt}`,
+    `Version: ${candidate.product.version}`,
+    `Commit: ${candidate.source.commit}`,
+    `Releaseable on this host: ${candidate.releaseable ? "yes" : "no"}`,
+    `Readiness status: ${candidate.readiness.status}`,
+    "",
+    "## Artifacts",
+    "",
+    artifactLines,
+    "",
+    "## SHA-256 Checksums",
+    "",
+    "See `SHA256SUMS` for hashes of every compiled frontend, native binary, and discovered bundle artifact.",
+    "",
+    "## Commands",
+    "",
+    commandLines,
+    "",
+    "## Remaining Release Gates",
+    "",
+    gapLines,
+    "",
+    "## Next Steps",
+    "",
+    nextStepLines,
+    "",
+  ].join("\n")}\n`;
+}
+
+function nextSteps(readiness) {
+  const gaps = evidenceGaps(readiness);
+  if (!gaps.length) return ["Tag the release, publish signed artifacts, and archive this release-candidate directory."];
+  return [
+    "Send `.tmp/release-evidence-kit` to supported-host owners and human reviewers.",
+    "Ingest returned evidence with `pnpm run ingest:evidence -- --source /path/to/unpacked-artifacts`.",
+    "Rerun `pnpm run collect:evidence-kit`, `pnpm run check:evidence-kit`, and `pnpm run check:release-readiness`.",
+    "Regenerate this release candidate after every source, artifact, signing, or evidence change.",
+  ];
+}
+
+function evidenceGaps(readiness) {
+  return Array.isArray(readiness?.evidenceGaps) ? readiness.evidenceGaps : Array.isArray(readiness?.gaps) ? readiness.gaps : [];
+}
+
+function git(args) {
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  if (result.status !== 0) fail(`git ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
+  return result;
+}
+
+function gitTreeClean() {
+  return git(["status", "--porcelain"]).stdout.trim() === "";
+}
+
+function sha256(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function readJson(relativePath) {
+  return JSON.parse(readFileSync(join(root, relativePath), "utf8"));
+}
+
+function tail(value) {
+  return value.trim().split(/\r?\n/).filter(Boolean).slice(-10);
+}
+
+function relativePath(path) {
+  return relative(root, path).replace(/\\/g, "/");
+}
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}

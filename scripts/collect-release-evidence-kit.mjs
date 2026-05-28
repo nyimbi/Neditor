@@ -182,14 +182,38 @@ const runbooks = [
   {
     file: "runbooks/rendered-export-human-review.md",
     title: "Rendered Export Native-Viewer Human Signoff",
-    gaps: ["rendered-export-native-viewer-human-signoff"],
+    gaps: ["rendered-export-native-viewer-human-signoff", "rendered-export-automated-visual-proof"],
     commands: [
       "pnpm run test:rendered-exports",
       "Review every primary and review-case artifact in native/browser viewers.",
       "Fill templates/rendered-export/visual-review-signoff.template.json.",
       "NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/completed-signoff.json pnpm run test:rendered-exports -- --validate-signoff-only",
     ],
-    returns: ["completed visual-review-signoff JSON"],
+    returns: ["completed visual-review-signoff JSON", ".tmp/rendered-export-audit/visual-review-summary.json"],
+  },
+  {
+    file: "runbooks/macos-native-launch.md",
+    title: "macOS Native Launch And WebDriver Proof",
+    gaps: ["macos-native-launch-current-binary-proof", "macos-native-window-visibility-proof", "macos-webdriver-current-binary-proof"],
+    commands: [
+      "git fetch --all --tags",
+      `git checkout ${sourceCommit || "<source-commit>"}`,
+      "git status --porcelain",
+      "pnpm install --frozen-lockfile",
+      "pnpm run build",
+      "./node_modules/.bin/tauri build --no-bundle",
+      "pnpm run test:desktop-smoke",
+      "NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke",
+      "pnpm run test:tauri-webdriver",
+      "pnpm run check:release-readiness",
+    ],
+    returns: [
+      ".tmp/desktop-smoke/launch-report.json",
+      ".tmp/desktop-smoke/native-window-report.json",
+      ".tmp/desktop-smoke/native-ui-report.json",
+      ".tmp/desktop-smoke/native-workflow-report.json",
+      ".tmp/desktop-webdriver/report.json",
+    ],
   },
   {
     file: "runbooks/release-device-performance-profile.md",
@@ -227,7 +251,7 @@ const runbooks = [
   {
     file: "runbooks/accessibility-human-review.md",
     title: "Assistive-Technology Human Signoff",
-    gaps: ["accessibility-assistive-technology-human-signoff"],
+    gaps: ["accessibility-assistive-technology-human-signoff", "runtime-accessibility-browser-proof"],
     commands: [
       "pnpm run check:a11y",
       "pnpm run check:a11y:runtime",
@@ -236,7 +260,7 @@ const runbooks = [
       "Fill templates/accessibility/manual-review-template.json.",
       "NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/completed-signoff.json pnpm run check:a11y:manual",
     ],
-    returns: ["completed accessibility manual-review signoff JSON"],
+    returns: ["completed accessibility manual-review signoff JSON", ".tmp/accessibility/runtime-report.json"],
   },
   {
     file: "runbooks/optional-external-engines.md",
@@ -540,7 +564,7 @@ function gapWorkItems() {
 
 function validatorCommandsForRunbook(runbook) {
   const commands = runbook.commands.filter(
-    (command) => /\bpnpm run (check:[a-z0-9:-]+|test:rendered-exports)\b/i.test(command) || /^NEDITOR_[A-Z0-9_]+=/.test(command),
+    (command) => /\bpnpm run (check:[a-z0-9:-]+|test:[a-z0-9:-]+)\b/i.test(command) || /^NEDITOR_[A-Z0-9_]+=/.test(command),
   );
   return Array.from(new Set(commands));
 }
