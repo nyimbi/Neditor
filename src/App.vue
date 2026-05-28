@@ -15114,11 +15114,12 @@ function dropTabOnGroup(group: DocumentTabGroup, event?: DragEvent) {
   const document = store.documents.find((candidate) => candidate.id === tabId);
   if (group.key.startsWith("set:") && document) {
     store.setPinned(document.id, false);
-    store.setActiveDocument(document.id);
-    applyTextToDocument(document, setDocumentSetFrontMatter(document.text, group.label));
+    const currentDocument = store.documents.find((candidate) => candidate.id === document.id) || document;
+    store.setActiveDocument(currentDocument.id);
+    applyTextToDocument(currentDocument, setDocumentSetFrontMatter(currentDocument.text, group.label));
     documentSetDraft.value = group.label;
     documentSetRenameDraft.value = group.label;
-    store.statusMessage = `Added ${document.title} to ${group.label}`;
+    store.statusMessage = `Added ${currentDocument.title} to ${group.label}`;
   } else {
     store.setPinned(tabId, group.key === "pinned");
   }
@@ -15143,7 +15144,12 @@ function alignTabWithTargetGroup(document: OpenDocument, target: OpenDocument) {
   }
   if (document.pinned) store.setPinned(document.id, false);
   if (targetGroup.key.startsWith("set:")) {
-    applyTextToDocument(document, setDocumentSetFrontMatter(document.text, targetGroup.label), document.id === store.activeId);
+    const currentDocument = store.documents.find((candidate) => candidate.id === document.id) || document;
+    applyTextToDocument(
+      currentDocument,
+      setDocumentSetFrontMatter(currentDocument.text, targetGroup.label),
+      currentDocument.id === store.activeId,
+    );
     return;
   }
   if (documentSetName(document)) {
