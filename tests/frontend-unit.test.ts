@@ -2372,6 +2372,7 @@ test("front matter managers inventory data sources and document variables", () =
     "dataSources: [{name: Compact YAML, path: data/compact.yml, type: yml}, {<<: *sourceDefaults, title: Profile JSON, file: data/profile-compact.json, kind: json}]",
     "dataSources: !sources [{name: Tagged List, path: data/tagged-list.json, type: json}]",
     "dataSources: !docs!sources [{name: Handle Tagged List, path: data/handle-tagged-list.yaml, type: yaml}]",
+    "dataSources: [{name: Workbook Risk, path: data/workbook.xlsx, type: xlsx, sheet: Risk Sheet, sheetIndex: 2}]",
     "dataSources: [data/direct-inline.csv, *inlineScalarPath]",
     "dataSources: [!source &inlineSourceBase {name: Inline Source Base, path: data/inline-base.json, type: json}, {<<: *inlineSourceBase, name: Inline Source Override, path: data/inline-override.data}]",
     "dataSources: !source {name: Single Compact, path: data/single.csv, type: csv}",
@@ -2417,6 +2418,7 @@ test("front matter managers inventory data sources and document variables", () =
     ["Profile JSON", "data/profile-compact.json", "json", "ready", "dataSources"],
     ["Tagged List", "data/tagged-list.json", "json", "ready", "dataSources"],
     ["Handle Tagged List", "data/handle-tagged-list.yaml", "yaml", "ready", "dataSources"],
+    ["Workbook Risk", "data/workbook.xlsx", "xlsx", "ready", "dataSources"],
     ["Direct Inline", "data/direct-inline.csv", "csv", "ready", "dataSources"],
     ["Inline Scalar", "data/inline-scalar.tsv", "tsv", "ready", "dataSources"],
     ["Inline Source Base", "data/inline-base.json", "json", "ready", "dataSources"],
@@ -2444,6 +2446,10 @@ test("front matter managers inventory data sources and document variables", () =
     ["Profile", "data/profile.json", "json", "ready", "jsonFiles"],
     ["Aliased Profile", "data/aliased-profile.json", "json", "ready", "jsonFiles"],
   ]);
+  const workbookRisk = sources.find((row) => row.name === "Workbook Risk");
+  equal(workbookRisk?.sheetName, "Risk Sheet");
+  equal(workbookRisk?.sheetIndex, 2);
+  ok(workbookRisk?.detail.includes('worksheet "Risk Sheet"'));
 
   const variables = parseFrontMatterVariables(source);
   ok(variables.some((row) => row.key === "title" && row.value === "Demo" && row.status === "ready"));
@@ -2458,6 +2464,16 @@ test("front matter managers inventory data sources and document variables", () =
   const appended = appendFrontMatterDataSource("# Draft\n", { name: "Revenue", path: "data/revenue.csv", kind: "csv" });
   ok(appended.startsWith("---\ndataSources:"));
   equal(parseFrontMatterDataSources(appended)[0]?.status, "ready");
+  const appendedWorkbook = appendFrontMatterDataSource("# Draft\n", {
+    name: "Workbook",
+    path: "data/workbook.xlsx",
+    kind: "xlsx",
+    sheetName: "Risk Sheet",
+    sheetIndex: 2,
+  });
+  ok(appendedWorkbook.includes("sheet: \"Risk Sheet\""));
+  ok(appendedWorkbook.includes("sheetIndex: 2"));
+  equal(parseFrontMatterDataSources(appendedWorkbook)[0]?.sheetName, "Risk Sheet");
 });
 
 test("front matter managers handle CRLF quoted YAML and safer path checks", () => {
@@ -8204,6 +8220,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("insertDataSourceTemplate"));
   ok(app.includes("addFrontMatterDataSource"));
   ok(app.includes("Data source type"));
+  ok(app.includes("dataSourceSheetNameDraft"));
+  ok(app.includes("dataSourceSheetIndexDraft"));
+  ok(app.includes("Worksheet:"));
   ok(app.includes("No local CSV, TSV, JSON, YAML, or XLSX data sources declared in front matter."));
   ok(frontMatterManagers.includes("blocked-path"));
   ok(app.includes('aria-label="Document variable manager"'));

@@ -1735,6 +1735,14 @@
                   <option v-for="type in dataSourceTypeOptions" :key="type" :value="type">{{ type.toUpperCase() }}</option>
                 </select>
               </label>
+              <label v-if="dataSourceTypeDraft === 'xlsx'">
+                Worksheet
+                <input v-model="dataSourceSheetNameDraft" placeholder="Pipeline Forecast" />
+              </label>
+              <label v-if="dataSourceTypeDraft === 'xlsx'">
+                Sheet index
+                <input v-model="dataSourceSheetIndexDraft" inputmode="numeric" placeholder="2" />
+              </label>
               <button type="button" :disabled="!dataSourcePathDraft.trim()" @click="addFrontMatterDataSource">Add data source</button>
             </div>
             <div class="reference-actions">
@@ -1743,6 +1751,9 @@
             <article v-for="source in frontMatterDataSourceRows" :key="source.id" class="snapshot-row" :data-status="source.status">
               <p>{{ source.name || source.path || "Unnamed data source" }}</p>
               <small>{{ source.kind.toUpperCase() }} | {{ source.status }} | {{ source.source }}{{ source.line ? ` | line ${source.line}` : "" }}</small>
+              <small v-if="source.kind === 'xlsx' && (source.sheetName || source.sheetIndex)">
+                Worksheet: {{ source.sheetName || `#${source.sheetIndex}` }}
+              </small>
               <small v-if="source.path">{{ source.path }}</small>
               <small v-if="source.detail">{{ source.detail }}</small>
               <div class="reference-actions">
@@ -7029,6 +7040,8 @@ const indexExcludeDraft = ref("");
 const dataSourceNameDraft = ref("");
 const dataSourcePathDraft = ref("");
 const dataSourceTypeDraft = ref<SupportedDataSourceKind>("csv");
+const dataSourceSheetNameDraft = ref("");
+const dataSourceSheetIndexDraft = ref("");
 const equationEditorTemplates = [
   {
     category: "Business",
@@ -18075,12 +18088,22 @@ function applyTocSettings() {
 }
 
 function insertDataSourceTemplate() {
+  const template =
+    dataSourceTypeDraft.value === "xlsx"
+      ? {
+          name: "Workbook Forecast",
+          path: "data/forecast.xlsx",
+          kind: "xlsx" as const,
+          sheetName: dataSourceSheetNameDraft.value.trim() || "Forecast",
+          sheetIndex: Number.parseInt(dataSourceSheetIndexDraft.value.trim(), 10) || undefined,
+        }
+      : {
+          name: "Revenue",
+          path: "data/revenue.csv",
+          kind: "csv" as const,
+        };
   store.updateText(
-    appendFrontMatterDataSource(active.value.text, {
-      name: "Revenue",
-      path: "data/revenue.csv",
-      kind: "csv",
-    }),
+    appendFrontMatterDataSource(active.value.text, template),
   );
   store.statusMessage = "Inserted local data source template";
 }
@@ -18093,10 +18116,14 @@ function addFrontMatterDataSource() {
       name: dataSourceNameDraft.value.trim() || dataSourceNameFromPath(path),
       path,
       kind: dataSourceTypeDraft.value,
+      sheetName: dataSourceTypeDraft.value === "xlsx" ? dataSourceSheetNameDraft.value.trim() : "",
+      sheetIndex: dataSourceTypeDraft.value === "xlsx" ? Number.parseInt(dataSourceSheetIndexDraft.value.trim(), 10) || undefined : undefined,
     }),
   );
   dataSourceNameDraft.value = "";
   dataSourcePathDraft.value = "";
+  dataSourceSheetNameDraft.value = "";
+  dataSourceSheetIndexDraft.value = "";
   store.statusMessage = `Added ${dataSourceTypeDraft.value.toUpperCase()} data source`;
 }
 

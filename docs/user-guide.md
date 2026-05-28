@@ -410,7 +410,9 @@ artifacts. Front matter data sources can reference local CSV, TSV, JSON, YAML,
 or XLSX files; XLSX sources render a safe default worksheet as a Markdown table
 and stay under the same document-folder path safety rules as other local
 sources. For multi-sheet workbooks, add `sheet: Sheet Name` or a one-based
-`sheetIndex: 2` to a `dataSources` XLSX entry to render a specific worksheet.
+`sheetIndex: 2` to a `dataSources` XLSX entry to render a specific worksheet;
+the References panel's local data-source manager exposes the same worksheet
+fields when adding an XLSX source.
 
 For spreadsheet exchange, open the Tables panel and choose CSV, TSV, or XLSX
 import. Review the detected headers, rows, alignment, and formula cells, then

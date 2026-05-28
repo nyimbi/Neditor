@@ -7,6 +7,8 @@ export interface FrontMatterDataSourceRow {
   name: string;
   path: string;
   kind: FrontMatterDataSourceKind;
+  sheetName?: string;
+  sheetIndex?: number;
   source: string;
   status: FrontMatterDataSourceStatus;
   detail: string;
@@ -69,13 +71,19 @@ const yamlIndentedKeyValueRegex = new RegExp(`^\\s+(${yamlKeyNamePattern}):\\s*(
 
 export function appendFrontMatterDataSource(
   text: string,
-  source: { name: string; path: string; kind: SupportedDataSourceKind },
+  source: { name: string; path: string; kind: SupportedDataSourceKind; sheetName?: string; sheetIndex?: number },
 ) {
   const entry = [
     `  - name: ${yamlInlineString(source.name || dataSourceNameFromPath(source.path))}`,
     `    path: ${yamlInlineString(source.path)}`,
     `    type: ${source.kind}`,
   ];
+  if (source.kind === "xlsx") {
+    if (source.sheetName?.trim()) entry.push(`    sheet: ${yamlInlineString(source.sheetName.trim())}`);
+    if (Number.isFinite(source.sheetIndex) && Number(source.sheetIndex) > 0) {
+      entry.push(`    sheetIndex: ${Math.trunc(Number(source.sheetIndex))}`);
+    }
+  }
   const lines = startsWithFrontMatter(text) ? text.split(/\r?\n/) : ["---", "---", "", ...text.split(/\r?\n/)];
   const endIndex = lines.findIndex((candidate, index) => index > 0 && candidate.trim() === "---");
   if (endIndex <= 0) return `---\ndataSources:\n${entry.join("\n")}\n---\n\n${text}`;
@@ -626,6 +634,8 @@ function applyDataSourcePair(row: Partial<FrontMatterDataSourceRow>, pairText: s
   if (key === "name" || key === "title") row.name = value;
   if (key === "path" || key === "file") row.path = value;
   if (key === "type" || key === "kind") row.kind = normalizeDataSourceKind(value);
+  if (["sheet", "sheetName", "sheet_name", "worksheet", "worksheetName", "worksheet_name"].includes(key)) row.sheetName = value;
+  if (["sheetIndex", "sheet_index", "worksheetIndex", "worksheet_index"].includes(key)) row.sheetIndex = dataSourceSheetIndexFromText(value);
 }
 
 function resolveDataSourceScalar(value: string, anchors?: Map<string, string>) {
@@ -700,9 +710,11 @@ function normalizeFrontMatterDataSource(row: Partial<FrontMatterDataSourceRow>, 
     name: row.name || dataSourceNameFromPath(path),
     path,
     kind,
+    ...(row.sheetName ? { sheetName: row.sheetName } : {}),
+    ...(row.sheetIndex ? { sheetIndex: row.sheetIndex } : {}),
     source: row.source || "dataSources",
     status,
-    detail: dataSourceStatusDetail(status, path, kind),
+    detail: dataSourceStatusDetail(status, path, kind, row.sheetName, row.sheetIndex),
     line: row.line || 0,
   };
 }
@@ -733,11 +745,24 @@ function dataSourceStatus(path: string, kind: FrontMatterDataSourceKind): FrontM
   return "ready";
 }
 
-function dataSourceStatusDetail(status: FrontMatterDataSourceStatus, path: string, kind: FrontMatterDataSourceKind) {
+function dataSourceStatusDetail(
+  status: FrontMatterDataSourceStatus,
+  path: string,
+  kind: FrontMatterDataSourceKind,
+  sheetName?: string,
+  sheetIndex?: number,
+) {
   if (status === "missing-path") return "Add a local file path inside the document folder.";
-  if (status === "unsupported-type") return `Use CSV, TSV, JSON, or YAML instead of ${kind}.`;
+  if (status === "unsupported-type") return `Use CSV, TSV, JSON, YAML, or XLSX instead of ${kind}.`;
   if (status === "blocked-path") return `${path} is outside the document folder; keep data sources local to the project.`;
+  if (kind === "xlsx" && sheetName) return `Ready to import worksheet "${sheetName}".`;
+  if (kind === "xlsx" && sheetIndex) return `Ready to import worksheet ${sheetIndex}.`;
   return "Ready for compiler import and export manifest evidence.";
+}
+
+function dataSourceSheetIndexFromText(value: string): number | undefined {
+  const parsed = Number.parseInt(value.trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function collectMergedMetadataVariables(

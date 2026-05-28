@@ -650,7 +650,8 @@ web app.
   import is worksheet-aware: multi-sheet workbooks expose their sheet list in
   the Tables panel, and front matter XLSX data sources still import a safe
   default worksheet, or a named/indexed worksheet from `dataSources` metadata,
-  while preserving document-folder path safety. SQL transforms are read-only
+  while the References manager exposes worksheet fields for non-technical setup.
+  SQL transforms are read-only
   SQLite table queries behind explicit engine trust, and relative database paths
   resolve from the current Markdown document's folder without allowing relative
   escapes outside that folder.
