@@ -3626,6 +3626,51 @@ test("quality recommendations flag Deep Research sources that are indexed but no
   ok(!recommendations.some((item) => item.id === "citation-evidence"));
 });
 
+test("quality recommendations ignore Deep Research addenda when checking body grounding", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "# Report",
+      "",
+      "## Findings",
+      "",
+      "The reviewed document summarizes sourced research without inline body citation markers.",
+      "",
+      "## Source Citation Index Addendum",
+      "",
+      "| Citation | Source | Evidence | Local copy |",
+      "| --- | --- | --- | --- |",
+      "| [@agency2026] | [Policy Evidence](https://agency.gov/policy.pdf) | Controls policy. | report.neditor-sources/policy.pdf |",
+      "",
+      "## Bibliography",
+      "",
+      "[BIBLIOGRAPHY]",
+      "",
+      "## Deep Research Evidence Log Addendum",
+      "",
+      "## Iteration 1: AI procurement controls policy",
+      "",
+      "Research loop evidence with a handoff-only Citation TODO.",
+      "",
+      "## Source Library Audit Addendum",
+      "",
+      "| Citation key | Title | Fit | Local file | SHA-256 prefix | Review notes | URL |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
+      "| @agency2026 | Policy Evidence | not scored | report.neditor-sources/policy.pdf | abcdef1234567890 | provider: DuckDuckGo | https://agency.gov/policy.pdf |",
+      "",
+    ].join("\n"),
+    semantic: {
+      title: "Report",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  ok(recommendations.some((item) => item.id === "deep-research-citation-grounding" && item.severity === "risk"));
+  ok(!recommendations.some((item) => item.id === "citation-evidence"));
+});
+
 test("quality recommendations accept Deep Research body citation TODOs as grounding work", () => {
   const recommendations = buildQualityRecommendations({
     text: [

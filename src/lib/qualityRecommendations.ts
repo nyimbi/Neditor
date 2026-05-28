@@ -287,9 +287,12 @@ function firstHeading(text: string) {
 function documentBodyForInlineCitationReview(text: string) {
   return removeMarkdownSections(text, [
     "Source Citation Index",
+    "Source Citation Index Addendum",
     "Bibliography",
     "Deep Research Evidence Log",
+    "Deep Research Evidence Log Addendum",
     "Source Library Audit",
+    "Source Library Audit Addendum",
     "Quality Assurance & Review Handoff",
     "Quality Assurance and Improvement Report",
   ]);
@@ -305,7 +308,7 @@ function removeMarkdownSections(text: string, headings: string[]) {
       const level = heading[1].length;
       const title = normalizeHeadingText(heading[2]);
       if (skippedLevel && level <= skippedLevel) skippedLevel = 0;
-      if (targets.has(title)) {
+      if (targets.has(title) || isGeneratedHandoffHeading(title)) {
         skippedLevel = level;
         continue;
       }
@@ -317,6 +320,10 @@ function removeMarkdownSections(text: string, headings: string[]) {
 
 function normalizeHeadingText(value: string) {
   return value.trim().toLowerCase();
+}
+
+function isGeneratedHandoffHeading(value: string) {
+  return /^iteration\s+\d+\s*:/.test(value);
 }
 
 function wordCount(value: string) {
