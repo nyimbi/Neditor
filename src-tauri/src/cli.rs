@@ -159,6 +159,40 @@ struct DocumentOutlineInfo {
     tags: &'static [&'static str],
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkspaceDocumentOutline {
+    id: String,
+    label: String,
+    category: String,
+    summary: String,
+    #[serde(default)]
+    best_for: Vec<String>,
+    outline: Vec<String>,
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentOutlineEntry {
+    id: String,
+    label: String,
+    category: String,
+    summary: String,
+    best_for: Vec<String>,
+    outline: Vec<String>,
+    tags: Vec<String>,
+    source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkspaceOutlineLibrary {
+    schema: String,
+    outlines: Vec<WorkspaceDocumentOutline>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DocumentSnippetInfo {
@@ -1276,13 +1310,29 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut json_output = false;
     let mut ids_only = false;
     let mut markdown_id: Option<String> = None;
+    let mut save_id: Option<String> = None;
+    let mut delete_id: Option<String> = None;
     let mut category: Option<String> = None;
     let mut query: Option<String> = None;
+    let mut workspace = PathBuf::from(".");
+    let mut label: Option<String> = None;
+    let mut summary: Option<String> = None;
+    let mut outline_file: Option<String> = None;
+    let mut sections: Vec<String> = Vec::new();
+    let mut tags: Vec<String> = Vec::new();
+    let mut best_for: Vec<String> = Vec::new();
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
             "--json" => json_output = true,
             "--ids-only" => ids_only = true,
+            "--workspace" | "-w" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
             "--markdown" | "--body" => {
                 index += 1;
                 markdown_id = Some(
@@ -1291,11 +1341,75 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
                         .to_string(),
                 );
             }
+            "--save" => {
+                index += 1;
+                save_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--save requires an outline id".to_string())?
+                        .to_string(),
+                );
+            }
+            "--delete" => {
+                index += 1;
+                delete_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--delete requires an outline id".to_string())?
+                        .to_string(),
+                );
+            }
+            "--name" | "--label" => {
+                index += 1;
+                label = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--name requires an outline name".to_string())?
+                        .to_string(),
+                );
+            }
             "--category" => {
                 index += 1;
                 category = Some(
                     args.get(index)
                         .ok_or_else(|| "--category requires a category name".to_string())?
+                        .to_string(),
+                );
+            }
+            "--summary" => {
+                index += 1;
+                summary = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--summary requires text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--outline-file" => {
+                index += 1;
+                outline_file = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--outline-file requires a path".to_string())?
+                        .to_string(),
+                );
+            }
+            "--section" => {
+                index += 1;
+                sections.push(
+                    args.get(index)
+                        .ok_or_else(|| "--section requires heading text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--tag" => {
+                index += 1;
+                tags.push(
+                    args.get(index)
+                        .ok_or_else(|| "--tag requires text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--best-for" => {
+                index += 1;
+                best_for.push(
+                    args.get(index)
+                        .ok_or_else(|| "--best-for requires text".to_string())?
                         .to_string(),
                 );
             }
@@ -1312,6 +1426,77 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
         index += 1;
     }
 
+    if save_id.is_some() && delete_id.is_some() {
+        return Err("Use either --save or --delete, not both.".to_string());
+    }
+    if save_id.is_some() && markdown_id.is_some() {
+        return Err("Use either --save or --markdown, not both.".to_string());
+    }
+    if delete_id.is_some() && markdown_id.is_some() {
+        return Err("Use either --delete or --markdown, not both.".to_string());
+    }
+
+    if let Some(id) = save_id {
+        let saved = save_workspace_outline(
+            &workspace,
+            WorkspaceOutlineSaveInput {
+                id,
+                label,
+                category,
+                summary,
+                outline_file,
+                sections,
+                tags,
+                best_for,
+            },
+        )?;
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-outline-save.v1",
+                    "workspace": path_to_display(&workspace),
+                    "libraryPath": path_to_display(&workspace_outline_library_path(&workspace)),
+                    "outline": saved,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: format!(
+                "Saved outline {} to {}",
+                saved.id,
+                path_to_display(&workspace_outline_library_path(&workspace))
+            ),
+            exit_code: 0,
+        });
+    }
+
+    if let Some(id) = delete_id {
+        let deleted = delete_workspace_outline(&workspace, &id)?;
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-outline-delete.v1",
+                    "workspace": path_to_display(&workspace),
+                    "libraryPath": path_to_display(&workspace_outline_library_path(&workspace)),
+                    "outline": id,
+                    "deleted": deleted,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: if deleted {
+                format!("Deleted outline {id}")
+            } else {
+                format!("No workspace outline named {id} was found")
+            },
+            exit_code: 0,
+        });
+    }
+
     let category_filter = category
         .as_deref()
         .map(|value| value.trim().to_ascii_lowercase())
@@ -1320,7 +1505,8 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
         .as_deref()
         .map(|value| value.trim().to_ascii_lowercase())
         .filter(|value| !value.is_empty());
-    let outlines = document_outline_catalog()
+    let catalog = document_outline_catalog_entries(&workspace)?;
+    let outlines = catalog
         .into_iter()
         .filter(|outline| {
             category_filter.as_deref().map_or(true, |category| {
@@ -1335,16 +1521,18 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
         .collect::<Vec<_>>();
 
     if let Some(id) = markdown_id {
-        let outline = document_outline_catalog()
+        let catalog = document_outline_catalog_entries(&workspace)?;
+        let outline = catalog
             .into_iter()
             .find(|outline| outline.id == id)
             .ok_or_else(|| {
                 format!(
                     "Unknown outline '{}'. Available outlines: {}",
                     id,
-                    document_outline_catalog()
+                    document_outline_catalog_entries(&workspace)
+                        .unwrap_or_default()
                         .iter()
-                        .map(|outline| outline.id)
+                        .map(|outline| outline.id.as_str())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -1355,6 +1543,7 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
                 message: serde_json::to_string_pretty(&json!({
                     "schema": "neditor.ned-outline-markdown.v1",
                     "outline": outline.id,
+                    "source": outline.source,
                     "markdown": markdown,
                     "sectionCount": outline.outline.len(),
                 }))
@@ -1370,13 +1559,15 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
 
     let ids = outlines
         .iter()
-        .map(|outline| outline.id)
+        .map(|outline| outline.id.as_str())
         .collect::<Vec<_>>();
     if json_output {
         return Ok(CliOutcome {
             message: serde_json::to_string_pretty(&json!({
                 "schema": "neditor.ned-outlines.v1",
                 "count": outlines.len(),
+                "workspace": path_to_display(&workspace),
+                "libraryPath": path_to_display(&workspace_outline_library_path(&workspace)),
                 "filters": {
                     "category": category_filter,
                     "query": query_filter,
@@ -3866,7 +4057,294 @@ fn document_outline_catalog() -> Vec<DocumentOutlineInfo> {
     ]
 }
 
-fn outline_matches_query(outline: &DocumentOutlineInfo, query: &str) -> bool {
+struct WorkspaceOutlineSaveInput {
+    id: String,
+    label: Option<String>,
+    category: Option<String>,
+    summary: Option<String>,
+    outline_file: Option<String>,
+    sections: Vec<String>,
+    tags: Vec<String>,
+    best_for: Vec<String>,
+}
+
+fn document_outline_catalog_entries(workspace: &Path) -> Result<Vec<DocumentOutlineEntry>, String> {
+    let mut outlines = document_outline_catalog()
+        .into_iter()
+        .map(built_in_outline_entry)
+        .collect::<Vec<_>>();
+    outlines.extend(
+        read_workspace_outline_library(workspace)?
+            .outlines
+            .into_iter()
+            .map(workspace_outline_entry),
+    );
+    Ok(outlines)
+}
+
+fn built_in_outline_entry(outline: DocumentOutlineInfo) -> DocumentOutlineEntry {
+    DocumentOutlineEntry {
+        id: outline.id.to_string(),
+        label: outline.label.to_string(),
+        category: outline.category.to_string(),
+        summary: outline.summary.to_string(),
+        best_for: outline
+            .best_for
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
+        outline: outline
+            .outline
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
+        tags: outline
+            .tags
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
+        source: "builtin".to_string(),
+    }
+}
+
+fn workspace_outline_entry(outline: WorkspaceDocumentOutline) -> DocumentOutlineEntry {
+    DocumentOutlineEntry {
+        id: outline.id,
+        label: outline.label,
+        category: outline.category,
+        summary: outline.summary,
+        best_for: outline.best_for,
+        outline: outline.outline,
+        tags: outline.tags,
+        source: "workspace".to_string(),
+    }
+}
+
+fn workspace_outline_library_path(workspace: &Path) -> PathBuf {
+    workspace.join(".neditor").join("outlines.json")
+}
+
+fn read_workspace_outline_library(workspace: &Path) -> Result<WorkspaceOutlineLibrary, String> {
+    let path = workspace_outline_library_path(workspace);
+    if !path.exists() {
+        return Ok(empty_workspace_outline_library());
+    }
+    let raw = fs::read_to_string(&path).map_err(|err| {
+        format!(
+            "Could not read workspace outline library {}: {err}",
+            path.display()
+        )
+    })?;
+    let value: Value = serde_json::from_str(&raw)
+        .map_err(|err| format!("Workspace outline library is not valid JSON: {err}"))?;
+    let outlines_value = if value.is_array() {
+        value
+    } else {
+        value
+            .get("outlines")
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new()))
+    };
+    let outlines = serde_json::from_value::<Vec<WorkspaceDocumentOutline>>(outlines_value)
+        .map_err(|err| format!("Workspace outline library outlines are invalid: {err}"))?
+        .into_iter()
+        .filter_map(normalize_workspace_outline)
+        .collect::<Vec<_>>();
+    Ok(WorkspaceOutlineLibrary {
+        schema: "neditor.workspace-outlines.v1".to_string(),
+        outlines,
+    })
+}
+
+fn write_workspace_outline_library(
+    workspace: &Path,
+    library: &WorkspaceOutlineLibrary,
+) -> Result<(), String> {
+    let path = workspace_outline_library_path(workspace);
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Could not determine parent for {}", path.display()))?;
+    fs::create_dir_all(parent)
+        .map_err(|err| format!("Could not create {}: {err}", parent.display()))?;
+    let mut normalized = WorkspaceOutlineLibrary {
+        schema: "neditor.workspace-outlines.v1".to_string(),
+        outlines: library
+            .outlines
+            .iter()
+            .cloned()
+            .filter_map(normalize_workspace_outline)
+            .collect(),
+    };
+    normalized
+        .outlines
+        .sort_by(|left, right| left.id.cmp(&right.id));
+    fs::write(
+        &path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&normalized).map_err(|err| err.to_string())?
+        ),
+    )
+    .map_err(|err| {
+        format!(
+            "Could not write workspace outline library {}: {err}",
+            path.display()
+        )
+    })
+}
+
+fn empty_workspace_outline_library() -> WorkspaceOutlineLibrary {
+    WorkspaceOutlineLibrary {
+        schema: "neditor.workspace-outlines.v1".to_string(),
+        outlines: Vec::new(),
+    }
+}
+
+fn save_workspace_outline(
+    workspace: &Path,
+    input: WorkspaceOutlineSaveInput,
+) -> Result<WorkspaceDocumentOutline, String> {
+    let id = sanitize_outline_id(&input.id).ok_or_else(|| {
+        "--save requires an id with letters, numbers, dots, underscores, or hyphens".to_string()
+    })?;
+    let mut outline = input
+        .sections
+        .iter()
+        .filter_map(|section| normalize_outline_heading(section))
+        .collect::<Vec<_>>();
+    if let Some(path) = input.outline_file.as_deref() {
+        let file_text = fs::read_to_string(path)
+            .map_err(|err| format!("Could not read outline file {path}: {err}"))?;
+        outline.extend(parse_outline_text(&file_text));
+    }
+    outline = dedupe_string_vec(outline, 80);
+    if outline.is_empty() {
+        return Err(
+            "Add at least one --section or supply --outline-file with headings or bullet lines."
+                .to_string(),
+        );
+    }
+    let saved = WorkspaceDocumentOutline {
+        id,
+        label: outline_string(input.label).unwrap_or_else(|| "Custom outline".to_string()),
+        category: outline_string(input.category).unwrap_or_else(|| "Custom".to_string()),
+        summary: outline_string(input.summary).unwrap_or_else(|| {
+            format!(
+                "Reusable workspace outline with {} section(s).",
+                outline.len()
+            )
+        }),
+        best_for: dedupe_string_vec(input.best_for, 12),
+        outline,
+        tags: dedupe_string_vec(input.tags, 16),
+    };
+    let mut library = read_workspace_outline_library(workspace)?;
+    library.outlines.retain(|outline| outline.id != saved.id);
+    library.outlines.push(saved.clone());
+    write_workspace_outline_library(workspace, &library)?;
+    Ok(saved)
+}
+
+fn delete_workspace_outline(workspace: &Path, id: &str) -> Result<bool, String> {
+    let mut library = read_workspace_outline_library(workspace)?;
+    let original_len = library.outlines.len();
+    library.outlines.retain(|outline| outline.id != id);
+    let deleted = library.outlines.len() != original_len;
+    if deleted {
+        write_workspace_outline_library(workspace, &library)?;
+    }
+    Ok(deleted)
+}
+
+fn normalize_workspace_outline(
+    outline: WorkspaceDocumentOutline,
+) -> Option<WorkspaceDocumentOutline> {
+    let id = sanitize_outline_id(&outline.id)?;
+    let normalized_outline = dedupe_string_vec(outline.outline, 80);
+    if normalized_outline.is_empty() {
+        return None;
+    }
+    Some(WorkspaceDocumentOutline {
+        id,
+        label: outline_string(Some(outline.label)).unwrap_or_else(|| "Custom outline".to_string()),
+        category: outline_string(Some(outline.category)).unwrap_or_else(|| "Custom".to_string()),
+        summary: outline_string(Some(outline.summary)).unwrap_or_else(|| {
+            format!(
+                "Reusable workspace outline with {} section(s).",
+                normalized_outline.len()
+            )
+        }),
+        best_for: dedupe_string_vec(outline.best_for, 12),
+        outline: normalized_outline,
+        tags: dedupe_string_vec(outline.tags, 16),
+    })
+}
+
+fn sanitize_outline_id(value: &str) -> Option<String> {
+    let id = value.trim().to_ascii_lowercase();
+    if id.is_empty()
+        || id.len() > 80
+        || !id
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+    {
+        return None;
+    }
+    Some(id)
+}
+
+fn parse_outline_text(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(normalize_outline_heading)
+        .collect::<Vec<_>>()
+}
+
+fn normalize_outline_heading(value: &str) -> Option<String> {
+    let mut trimmed = value
+        .trim()
+        .trim_start_matches('#')
+        .trim()
+        .trim_start_matches(|ch: char| ch == '-' || ch == '*' || ch == '+')
+        .trim();
+    if let Some(numbered) = trimmed
+        .split_once(|ch: char| ch == '.' || ch == ')')
+        .and_then(|(prefix, rest)| {
+            (!prefix.is_empty() && prefix.chars().all(|ch| ch.is_ascii_digit()))
+                .then_some(rest.trim())
+        })
+        .filter(|rest| !rest.is_empty())
+    {
+        trimmed = numbered;
+    }
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed.chars().take(160).collect::<String>())
+}
+
+fn outline_string(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().chars().take(500).collect::<String>())
+        .filter(|value| !value.is_empty())
+}
+
+fn dedupe_string_vec(values: Vec<String>, limit: usize) -> Vec<String> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut output = Vec::new();
+    for value in values {
+        let cleaned = value.trim().chars().take(500).collect::<String>();
+        if cleaned.is_empty() || !seen.insert(cleaned.to_ascii_lowercase()) {
+            continue;
+        }
+        output.push(cleaned);
+        if output.len() >= limit {
+            break;
+        }
+    }
+    output
+}
+
+fn outline_matches_query(outline: &DocumentOutlineEntry, query: &str) -> bool {
     outline.id.to_ascii_lowercase().contains(query)
         || outline.label.to_ascii_lowercase().contains(query)
         || outline.category.to_ascii_lowercase().contains(query)
@@ -3885,7 +4363,7 @@ fn outline_matches_query(outline: &DocumentOutlineInfo, query: &str) -> bool {
             .any(|value| value.to_ascii_lowercase().contains(query))
 }
 
-fn outline_markdown(outline: &DocumentOutlineInfo) -> String {
+fn outline_markdown(outline: &DocumentOutlineEntry) -> String {
     outline
         .outline
         .iter()
@@ -3894,7 +4372,7 @@ fn outline_markdown(outline: &DocumentOutlineInfo) -> String {
         .join("\n")
 }
 
-fn outlines_text_report(outlines: &[DocumentOutlineInfo]) -> String {
+fn outlines_text_report(outlines: &[DocumentOutlineEntry]) -> String {
     if outlines.is_empty() {
         return "No NEditor document outlines match those filters.".to_string();
     }
@@ -3905,7 +4383,7 @@ fn outlines_text_report(outlines: &[DocumentOutlineInfo]) -> String {
             outline.id, outline.category, outline.label, outline.summary
         ));
     }
-    lines.push("Use `ned outlines --markdown <id>` to print a reusable outline for the planner or Docs Live.".to_string());
+    lines.push("Use `ned outlines --markdown <id>` to print a reusable outline, or `ned outlines --workspace . --save <id> --section \"Executive Summary\"` to add one to .neditor/outlines.json.".to_string());
     lines.join("\n")
 }
 
@@ -5567,7 +6045,7 @@ fn workspace_init_entries(root: &Path) -> Vec<(PathBuf, &'static str)> {
     vec![
         (
             base.join("README.md"),
-            "# NEditor Workspace\n\nThis folder stores reusable local project material for NEditor.\n\n- `business-profile.json` stores reusable sender, company, client, website, and brand voice values for templates, Docs Live, and handoff packages.\n- `variables.yaml` supplies project variables that documents can reference with `{{variable}}` placeholders.\n- `snippets/` stores reusable document parts for proposals, RFPs, reports, tutorials, and review handoffs.\n- `agent-handoffs/` stores generated local-agent packets for Claude Code, Codex, OpenCode, or private workflows.\n\nDo not store API keys, passwords, or client secrets in this folder.\n",
+            "# NEditor Workspace\n\nThis folder stores reusable local project material for NEditor.\n\n- `business-profile.json` stores reusable sender, company, client, website, and brand voice values for templates, Docs Live, and handoff packages.\n- `variables.yaml` supplies project variables that documents can reference with `{{variable}}` placeholders.\n- `outlines.json` stores reusable custom document outlines for planners, Docs Live, and scripted document creation.\n- `snippets/` stores reusable document parts for proposals, RFPs, reports, tutorials, and review handoffs.\n- `agent-handoffs/` stores generated local-agent packets for Claude Code, Codex, OpenCode, or private workflows.\n\nDo not store API keys, passwords, or client secrets in this folder.\n",
         ),
         (
             base.join("variables.yaml"),
@@ -5576,6 +6054,10 @@ fn workspace_init_entries(root: &Path) -> Vec<(PathBuf, &'static str)> {
         (
             base.join("business-profile.json"),
             "{\n  \"fullName\": \"Your Name\",\n  \"email\": \"you@example.com\",\n  \"phone\": \"\",\n  \"roleTitle\": \"Your Role\",\n  \"companyName\": \"Your Company\",\n  \"companyAddress\": \"\",\n  \"website\": \"https://example.com\",\n  \"industry\": \"\",\n  \"defaultClientName\": \"Client Name\",\n  \"brandVoice\": \"clear and practical\"\n}\n",
+        ),
+        (
+            base.join("outlines.json"),
+            "{\n  \"schema\": \"neditor.workspace-outlines.v1\",\n  \"outlines\": [\n    {\n      \"id\": \"quarterly-business-review\",\n      \"label\": \"Quarterly Business Review\",\n      \"category\": \"Business\",\n      \"summary\": \"Reusable executive review outline for quarterly performance, decisions, and next-step accountability.\",\n      \"bestFor\": [\n        \"board updates\",\n        \"client QBRs\",\n        \"executive operating reviews\"\n      ],\n      \"outline\": [\n        \"Executive Summary\",\n        \"Quarterly Performance Snapshot\",\n        \"Wins and Evidence\",\n        \"Issues and Risks\",\n        \"Financial Review\",\n        \"Customer and Market Signals\",\n        \"Decisions Requested\",\n        \"Next Quarter Priorities\",\n        \"Action Register\"\n      ],\n      \"tags\": [\n        \"business\",\n        \"review\",\n        \"executive\"\n      ]\n    }\n  ]\n}\n",
         ),
         (
             base.join("snippets").join("business.md"),
@@ -5611,6 +6093,7 @@ fn init_text_report(
     lines.push("Next steps:".to_string());
     lines.push("  - Run `ned profile --workspace . --set fullName=... --set companyName=...` to set reusable business identity values.".to_string());
     lines.push("  - Edit .neditor/variables.yaml with project values that are not part of the reusable business profile.".to_string());
+    lines.push("  - Run `ned outlines --workspace . --save custom-outline --section \"Executive Summary\" --section \"Recommendations\"` to add reusable custom outlines.".to_string());
     lines.push("  - Add reusable proposal, RFP, tutorial, and review handoff parts under .neditor/snippets/.".to_string());
     lines.push(
         "  - Use the Agent Workspace when you want governed local-agent handoff files.".to_string(),
@@ -5795,7 +6278,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search" -- "$cur") )
         ;;
       outlines)
-        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body --workspace --save --delete --name --label --summary --outline-file --section --tag --best-for" -- "$cur") )
         ;;
       snippets|parts)
         COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body --workspace --fill-profile --profile" -- "$cur") )
@@ -5893,7 +6376,7 @@ _ned() {{
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching template ids only]' '--category[filter by category]:category:' '--query[search templates by text]:query:' '--search[alias for --query]:query:'
       ;;
     outlines)
-      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching outline ids only]' '--category[filter by category]:category:' '--query[search outlines by text]:query:' '--search[alias for --query]:query:' '--markdown[print one outline as planner Markdown]:id:' '--body[alias for --markdown]:id:'
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching outline ids only]' '--category[filter by category]:category:' '--query[search outlines by text]:query:' '--search[alias for --query]:query:' '--markdown[print one outline as planner Markdown]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--save[save a workspace outline id]:id:' '--delete[delete a workspace outline id]:id:' '--name[set outline display name]:name:' '--label[alias for --name]:name:' '--summary[set outline summary]:summary:' '--outline-file[read headings from a Markdown/text file]:file:_files' '--section[add one section heading]:heading:' '--tag[add a search tag]:tag:' '--best-for[add a best-fit use case]:use:'
       ;;
     snippets|parts)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--fill-profile[merge saved business profile values into printed snippet Markdown]' '--profile[alias for --fill-profile]'
@@ -6033,6 +6516,16 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l search -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l markdown -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l body -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l workspace -s w -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l save -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l delete -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l name -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l label -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l summary -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l outline-file -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l section -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l tag -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from outlines' -l best-for -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from snippets parts' -l kind -r".to_string(),
@@ -6465,7 +6958,8 @@ fn help_text() -> String {
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned export <file.md> --to docx --output out.docx".to_string(),
         "  ned templates [--json] [--category procurement] [--query tender] [--ids-only]".to_string(),
-        "  ned outlines [--json] [--category Procurement] [--query RFP] [--ids-only] [--markdown id]".to_string(),
+        "  ned outlines [--workspace .] [--json] [--category Procurement] [--query RFP] [--ids-only] [--markdown id]".to_string(),
+        "  ned outlines --workspace . --save custom-id --section \"Executive Summary\" --section \"Recommendations\" [--json]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id] [--workspace . --fill-profile]".to_string(),
         "  ned profile [--workspace path] [--init] [--set fullName=...] [--get field|--fields] [--json|--markdown|--placeholders]".to_string(),
         "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--json|--markdown|--matrix]".to_string(),

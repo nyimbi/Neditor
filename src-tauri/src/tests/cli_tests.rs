@@ -86,6 +86,7 @@ fn ned_cli_initializes_project_workspace_scaffold() {
         .join(".neditor")
         .join("business-profile.json")
         .is_file());
+    assert!(root.join(".neditor").join("outlines.json").is_file());
     assert!(root
         .join(".neditor")
         .join("snippets")
@@ -103,6 +104,10 @@ fn ned_cli_initializes_project_workspace_scaffold() {
     let profile =
         fs::read_to_string(root.join(".neditor").join("business-profile.json")).expect("profile");
     assert!(profile.contains("\"companyName\""));
+    let outlines =
+        fs::read_to_string(root.join(".neditor").join("outlines.json")).expect("outlines");
+    assert!(outlines.contains("neditor.workspace-outlines.v1"));
+    assert!(outlines.contains("Quarterly Business Review"));
     assert!(profile.contains("\"brandVoice\""));
     let snippet = fs::read_to_string(root.join(".neditor").join("snippets").join("business.md"))
         .expect("snippet");
@@ -796,6 +801,92 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     assert!(outline_markdown.message.contains("- Compliance Checklist"));
     assert!(outline_markdown.message.contains("- Table of Contents"));
 
+    let outline_workspace = temp_workspace_path("outline-library");
+    let saved_outline = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--workspace".to_string(),
+        outline_workspace.to_string_lossy().to_string(),
+        "--save".to_string(),
+        "qbr-custom".to_string(),
+        "--name".to_string(),
+        "QBR Custom".to_string(),
+        "--category".to_string(),
+        "Business".to_string(),
+        "--summary".to_string(),
+        "Quarterly business review for account teams.".to_string(),
+        "--section".to_string(),
+        "Executive Summary".to_string(),
+        "--section".to_string(),
+        "Revenue Review".to_string(),
+        "--section".to_string(),
+        "Decisions Requested".to_string(),
+        "--tag".to_string(),
+        "quarterly".to_string(),
+        "--best-for".to_string(),
+        "client reviews".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("save workspace outline");
+    let saved_outline_report: serde_json::Value =
+        serde_json::from_str(&saved_outline.message).expect("saved outline json");
+    assert_eq!(
+        saved_outline_report["schema"],
+        "neditor.ned-outline-save.v1"
+    );
+    assert_eq!(saved_outline_report["outline"]["id"], "qbr-custom");
+    assert!(outline_workspace
+        .join(".neditor")
+        .join("outlines.json")
+        .is_file());
+
+    let workspace_outlines = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--workspace".to_string(),
+        outline_workspace.to_string_lossy().to_string(),
+        "--query".to_string(),
+        "quarterly".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("workspace outlines json");
+    let workspace_outline_report: serde_json::Value =
+        serde_json::from_str(&workspace_outlines.message).expect("workspace outlines json");
+    assert!(workspace_outline_report["outlineDetails"]
+        .as_array()
+        .expect("workspace outline details")
+        .iter()
+        .any(|outline| outline["id"] == "qbr-custom" && outline["source"] == "workspace"));
+
+    let workspace_markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--workspace".to_string(),
+        outline_workspace.to_string_lossy().to_string(),
+        "--markdown".to_string(),
+        "qbr-custom".to_string(),
+    ])
+    .expect("workspace outline markdown");
+    assert!(workspace_markdown.message.contains("- Revenue Review"));
+
+    let deleted_outline = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "outlines".to_string(),
+        "--workspace".to_string(),
+        outline_workspace.to_string_lossy().to_string(),
+        "--delete".to_string(),
+        "qbr-custom".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("delete workspace outline");
+    let deleted_outline_report: serde_json::Value =
+        serde_json::from_str(&deleted_outline.message).expect("deleted outline json");
+    assert_eq!(
+        deleted_outline_report["schema"],
+        "neditor.ned-outline-delete.v1"
+    );
+    assert_eq!(deleted_outline_report["deleted"], true);
+
     let targets = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "targets".to_string(),
@@ -1394,6 +1485,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("evidence"));
     assert!(bash.message.contains("snippets"));
     assert!(bash.message.contains("--markdown"));
+    assert!(bash.message.contains("--save"));
+    assert!(bash.message.contains("--outline-file"));
     assert!(bash.message.contains("--fill-profile"));
     assert!(bash.message.contains("--fields"));
     assert!(bash.message.contains("--get"));
@@ -1423,6 +1516,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--evidence-root"));
     assert!(zsh.message.contains("--ids-only"));
     assert!(zsh.message.contains("--markdown"));
+    assert!(zsh.message.contains("--best-for"));
     assert!(zsh.message.contains("--fill-profile"));
     assert!(zsh.message.contains("--fields"));
     assert!(zsh.message.contains("--get"));
@@ -1444,6 +1538,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("evidence"));
     assert!(fish.message.contains("snippets"));
     assert!(fish.message.contains("ids-only"));
+    assert!(fish.message.contains("outline-file"));
     assert!(fish.message.contains("fill-profile"));
     assert!(fish.message.contains("fields"));
     assert!(fish.message.contains("get"));

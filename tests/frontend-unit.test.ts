@@ -8094,6 +8094,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned new podcast.md --template podcast-script --json"));
   ok(app.includes("ned outlines --category Procurement --query RFP --json"));
   ok(app.includes("ned outlines --markdown rfp-technical-proposal"));
+  ok(app.includes('ned outlines --workspace . --save board-pack --section "Decision Requested" --section "Recommendation"'));
   ok(app.includes("customOutlineBestFor"));
   ok(app.includes("docsLiveTypeForOutlineTemplate"));
   ok(app.includes("normalizeDocsLiveDocumentType(signals)"));
@@ -8114,6 +8115,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(cli.includes("neditor.ned-new.v1"));
   ok(cli.includes("templateDetails"));
   ok(cli.includes("neditor.ned-outlines.v1"));
+  ok(cli.includes("neditor.workspace-outlines.v1"));
+  ok(cli.includes("neditor.ned-outline-save.v1"));
+  ok(cli.includes("neditor.ned-outline-delete.v1"));
   ok(cli.includes("outlineDetails"));
   ok(cli.includes("run_outlines_command"));
   ok(cli.includes("snippetDetails"));
