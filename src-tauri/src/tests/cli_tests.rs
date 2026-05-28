@@ -399,6 +399,11 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     .expect("rfp response json");
     let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("rfp json");
     assert_eq!(report["schema"], "neditor.ned-rfp-response.v1");
+    assert_eq!(report["profileApplied"], true);
+    assert!(report["profilePath"]
+        .as_str()
+        .expect("profile path")
+        .ends_with(".neditor/business-profile.json"));
     assert_eq!(report["analysis"]["source"]["kind"], "markdown");
     assert_eq!(
         report["analysis"]["requirements"]
@@ -479,6 +484,8 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     assert!(response_text.contains("## Requirement Response Drafts"));
     assert!(response_text.contains("Win theme: reduce implementation risk."));
     assert!(response_text.contains("SOC 2 security controls"));
+    assert!(response_text.contains("Acme Advisory"));
+    assert!(response_text.contains("Globex"));
     assert!(response_text
         .contains("<!-- ai-assisted: status=needs-review | source=NEditor ned RFP Response"));
     let matrix_text = fs::read_to_string(&matrix).expect("matrix markdown");

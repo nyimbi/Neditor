@@ -1819,12 +1819,8 @@ fn run_snippets_command(args: &[String]) -> Result<CliOutcome, String> {
                         .join(", ")
                 )
             })?;
-        let profile_path = workspace.join(".neditor").join("business-profile.json");
-        let profile = if fill_profile && profile_path.exists() {
-            Some(read_business_profile(&profile_path)?)
-        } else {
-            None
-        };
+        let (profile_path, profile) =
+            read_workspace_profile_if_requested(&workspace, fill_profile)?;
         let markdown = profile
             .as_ref()
             .map(|profile| fill_business_profile_placeholders(&snippet.body, profile))
@@ -2324,8 +2320,9 @@ fn run_rfp_response_command(
         url: source_url,
         text,
     })?;
-    let profile_path = workspace.join(".neditor").join("business-profile.json");
-    let profile = if profile_path.exists() {
+    let profile_path = workspace_business_profile_path(&workspace);
+    let profile_applied = profile_path.exists();
+    let profile = if profile_applied {
         read_business_profile(&profile_path)?
     } else {
         BusinessProfile::default()
@@ -2348,6 +2345,8 @@ fn run_rfp_response_command(
                 "analysis": analysis,
                 "responseMarkdown": response_markdown,
                 "complianceMatrixMarkdown": matrix_markdown,
+                "profileApplied": profile_applied,
+                "profilePath": path_to_display(&profile_path),
                 "outputs": {
                     "response": output.as_ref().map(|path| path_to_display(path)),
                     "matrix": matrix_output.as_ref().map(|path| path_to_display(path)),

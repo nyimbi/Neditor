@@ -224,12 +224,14 @@ or public URL sources. The command imports the source, extracts stated
 requirements, stated and implied buyer intent, capabilities, timelines, budget
 hints, evaluation criteria, mandatory attachments, risks, and verification
 questions, then writes a full response draft and/or compliance matrix with JSON
-automation output. Generated RFP responses put a compliance checklist directly
-after the cover/front matter and before `[TOC]`, then add an evaluator-driven
-proposal planning prompt, proposal outline, and section drafts for methodology,
-team, sustainability, risk, QA, validation, and compliance summary work before
-the narrative response. Public URL intake strips script/style noise, uses the page
-title when available, and decodes common HTML/XML entities before analysis. Use
+automation output that reports whether the saved business profile was applied
+and which workspace profile path supplied it. Generated RFP responses put a
+compliance checklist directly after the cover/front matter and before `[TOC]`,
+then add an evaluator-driven proposal planning prompt, proposal outline, and
+section drafts for methodology, team, sustainability, risk, QA, validation, and
+compliance summary work before the narrative response. Public URL intake strips
+script/style noise, uses the page title when available, and decodes common
+HTML/XML entities before analysis. Use
 `--context` to add win themes or bid notes, `--workspace`
 to reuse `.neditor/business-profile.json`, `--matrix` for matrix-only terminal
 output, and `--matrix-output` when a submission owner needs a separate
