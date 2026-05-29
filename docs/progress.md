@@ -5839,6 +5839,28 @@ after this commit, collect supported-host and credentialed evidence, ingest
 returned artifacts, and rerun release readiness until the candidate becomes
 final-releaseable.
 
+## 2026-05-29 Release Candidate Recommendations
+
+The support bundle now turns release-candidate state into explicit release
+manager guidance. When the candidate is missing, stale, checked but not
+releaseable, or carries candidate issues, `ned support-bundle` adds concrete
+recommendations such as creating or regenerating the release candidate, blocking
+publication, and resolving candidate issues before distribution. This closes the
+handoff gap where the bundle displayed `Release candidate: stale` but left the
+next action implicit.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 26 CLI tests passed and the debug `ned` binary built, including support-bundle recommendation coverage for non-releaseable candidate states. |
+| `src-tauri/target/debug/ned support-bundle --workspace .` | Pass | Direct smoke now recommends regenerating the stale release candidate and resolving 2 release-candidate issues before distribution. |
+| `src-tauri/target/debug/ned release-candidate` | Pass | Direct smoke still reports the existing candidate as stale, not final-releaseable, with explicit regenerate guidance. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is stable for the recommendation and test changes. |
+| `git diff --check` | Pass | The release-candidate recommendation slice has no whitespace errors. |
+
+No frontend files changed in this slice. Remaining release completion still
+requires regenerating the release candidate after committed code changes and
+then collecting the external/manual release evidence it names.
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

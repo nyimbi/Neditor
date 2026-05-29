@@ -4108,6 +4108,7 @@ fn build_support_bundle_report(
         &doctor,
         &readiness,
         &spec_completion,
+        &release_candidate,
         &engine_probe,
         &evidence_report_summary,
     );
@@ -4174,6 +4175,7 @@ fn support_bundle_recommendations(
     doctor: &Value,
     readiness: &Value,
     spec_completion: &Value,
+    release_candidate: &Value,
     engine_probe: &Value,
     evidence_report_summary: &Value,
 ) -> Vec<String> {
@@ -4202,6 +4204,34 @@ fn support_bundle_recommendations(
     if open_spec_rows > 0 {
         recommendations.push(format!(
             "Review {open_spec_rows} open specification row(s) before claiming production readiness."
+        ));
+    }
+    let candidate_status = readiness_string_field(release_candidate, "status").unwrap_or("missing");
+    let candidate_releaseable = release_candidate
+        .get("releaseable")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if candidate_status == "missing" {
+        recommendations.push(
+            "Create a release candidate with pnpm run release:local before packaging handoff."
+                .to_string(),
+        );
+    } else if candidate_status == "stale" {
+        recommendations.push(
+            "Regenerate the stale release candidate with pnpm run release:local after the latest commit and evidence updates."
+                .to_string(),
+        );
+    } else if !candidate_releaseable {
+        recommendations.push(
+            "Do not publish the release candidate until it is checked and final-releaseable."
+                .to_string(),
+        );
+    }
+    let candidate_issues = readiness_array_field(release_candidate, "issues");
+    if !candidate_issues.is_empty() {
+        recommendations.push(format!(
+            "Resolve {} release-candidate issue(s) before distribution.",
+            candidate_issues.len()
         ));
     }
     if readiness_string_field(engine_probe, "status").unwrap_or("unknown") == "missing" {

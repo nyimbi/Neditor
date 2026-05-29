@@ -2078,6 +2078,20 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         .any(|recommendation| recommendation
             .as_str()
             .is_some_and(|value| value.contains("doctor warnings"))));
+    assert!(bundle["recommendations"]
+        .as_array()
+        .expect("recommendations")
+        .iter()
+        .any(|recommendation| recommendation
+            .as_str()
+            .is_some_and(|value| value.contains("Do not publish the release candidate"))));
+    assert!(bundle["recommendations"]
+        .as_array()
+        .expect("recommendations")
+        .iter()
+        .any(|recommendation| recommendation
+            .as_str()
+            .is_some_and(|value| value.contains("release-candidate issue"))));
 
     let text = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -2118,6 +2132,10 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert!(text
         .message
         .contains("Release candidate: checked-with-release-gates (releaseable: no, artifacts: 2)"));
+    assert!(text
+        .message
+        .contains("Do not publish the release candidate"));
+    assert!(text.message.contains("Resolve 1 release-candidate issue"));
     assert!(text.message.contains("Wrote support bundle"));
     assert!(output_path.is_file());
     let written: serde_json::Value =
