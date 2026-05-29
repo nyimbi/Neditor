@@ -9325,6 +9325,9 @@ test("browser e2e runner emits structured workflow evidence for release readines
   ok(script.includes("neditor.e2e-browser-workflow.v1"));
   ok(script.includes("NEDITOR_E2E_REPORT_PATH"));
   ok(script.includes("full-suite"));
+  ok(script.includes("NEDITOR_E2E_PARALLEL"));
+  ok(script.includes("args.push(\"--workers=1\")"));
+  ok(script.includes("hasWorkerArgument"));
   ok(script.includes("focused-report.json"));
   ok(script.includes("summarizePlaywrightOutput"));
   ok(script.includes("workflowEvidence"));

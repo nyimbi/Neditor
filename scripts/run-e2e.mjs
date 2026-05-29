@@ -14,6 +14,9 @@ const binary = join(
 const cliArgs = process.argv.slice(2);
 const args = ["test", ...cliArgs];
 const scope = cliArgs.length === 0 ? "full-suite" : "focused";
+if (scope === "full-suite" && !hasWorkerArgument(cliArgs) && process.env.NEDITOR_E2E_PARALLEL !== "1") {
+  args.push("--workers=1");
+}
 const reportPath = resolve(
   process.env.NEDITOR_E2E_REPORT_PATH ||
     join(root, ".tmp", "e2e-browser", scope === "full-suite" ? "report.json" : "focused-report.json"),
@@ -58,6 +61,10 @@ function tail(output) {
     .split(/\r?\n/)
     .filter(Boolean)
     .slice(-80);
+}
+
+function hasWorkerArgument(args) {
+  return args.some((arg, index) => arg === "--workers" || arg.startsWith("--workers=") || args[index - 1] === "--workers");
 }
 
 function stripAnsi(value) {
