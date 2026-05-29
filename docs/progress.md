@@ -6023,17 +6023,36 @@ then collecting the external/manual release evidence it names.
 ## 2026-05-29 Toolbar Restore Discoverability
 
 Hidden toolbar recovery is now action-first instead of state-first. When any
-toolbar row is collapsed, the titlebar menu reads `Show toolbars`, the tray
-lists the hidden rows by name, and the floating restore control says exactly
-what it will restore, such as `Show File toolbar` or `Show toolbars` with the
-hidden-row count. The tray copy now points users to the immediate restore
-buttons and the equivalent `View > Toolbars` menu path.
+toolbar row is collapsed, the titlebar menu reads `Toolbars hidden`, the tray
+lists the hidden rows by name, and the floating plus workspace-edge restore
+controls say exactly what will be restored. The tray copy points users to the
+immediate restore buttons and the equivalent `View > Toolbars` menu path while
+the command bar still collapses to zero height when all rows are hidden.
 
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm run check` | Pass | Vue/TypeScript validation passed after the toolbar recovery copy and computed state changes. |
 | `pnpm run test:unit` | Pass | 118 frontend/static tests passed, including guards for the action-first hidden-toolbar labels and help text. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "collapses and restores command toolbars" --project chromium` | Pass | Focused Chromium workflow passed, proving users can collapse one row or all rows, see explicit show controls, restore individual/all rows, and keep the vertical writing-space gain. |
+
+## 2026-05-29 Release Candidate Browser Proof Stabilization
+
+The local release candidate flow now avoids launching Chromium from inside the
+nested Node release script, which this macOS verifier consistently rejects with
+`browserType.launch` / `SIGABRT` / `EPERM`. Browser workflow proof remains
+mandatory: run `pnpm run test:e2e` as a top-level command, then
+`pnpm run release:local` validates the current full-suite report before moving
+into native, rendered export, evidence-kit, and readiness checks. The generated
+release candidate is releaseable on this host and carries the external/manual
+evidence gaps forward as assignable release-kit work items.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/run-e2e.mjs` | Pass | Browser runner syntax is valid after adding the chunked recovery path for top-level full-suite launch aborts. |
+| `node --check scripts/create-release-candidate.mjs` | Pass | Release candidate script syntax is valid after switching to current-report validation. |
+| `pnpm run test:unit` | Pass | 118 frontend/static tests passed, including guards for full-suite browser report reuse and fallback metadata. |
+| `node scripts/run-e2e.mjs` | Pass | Full Chromium workflow proof passed with 72/72 tests and `docsLiveDraft: true` in `.tmp/e2e-browser/report.json`. |
+| `pnpm run release:local` | Pass | `.tmp/release-candidate/manifest.json` reports `releaseable: true`, readiness `current-host-ready-with-external-gaps`, 13 artifacts, 27/27 required checks accepted, 19 evidence gaps, and a current evidence kit for commit `9b2a1e3`. |
 
 ## 2026-05-29 Support Bundle Action-Plan Preview
 
