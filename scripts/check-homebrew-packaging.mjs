@@ -22,6 +22,9 @@ const suppliedCaskPath = process.env.NEDITOR_HOMEBREW_CASK
 const suppliedArtifactPath = process.env.NEDITOR_HOMEBREW_ARTIFACT
   ? resolve(process.env.NEDITOR_HOMEBREW_ARTIFACT)
   : defaultHomebrewArtifactPath();
+const materializationReportPath = process.env.NEDITOR_HOMEBREW_MATERIALIZATION_REPORT
+  ? resolve(process.env.NEDITOR_HOMEBREW_MATERIALIZATION_REPORT)
+  : defaultHomebrewMaterializationReportPath();
 const releaseSigningReport = readOptionalJson(".tmp/release-signing/report.json");
 const releaseReadinessReport = readOptionalJson(".tmp/release-readiness/report.json");
 
@@ -45,6 +48,9 @@ if (!bundleTargetsMacArtifact(tauriConfig.bundle?.targets)) {
 
 const caskEvidence = suppliedCaskPath ? validateSuppliedCask(suppliedCaskPath) : null;
 const artifactEvidence = suppliedArtifactPath ? validateSuppliedArtifact(suppliedArtifactPath, caskEvidence) : null;
+const materializationEvidence = materializationReportPath
+  ? validateMaterializationReport(materializationReportPath, caskEvidence, artifactEvidence)
+  : null;
 
 if (!suppliedCaskPath) {
   blockers.push({
@@ -87,8 +93,10 @@ writeReport({
     supplied: caskEvidence,
   },
   artifact: artifactEvidence,
+  materialization: materializationEvidence,
   qualityGates: {
     caskTemplate: issues.length === 0,
+    materializationReport: materializationReportPath ? materializationEvidence?.status === "checked" : "not-supplied",
     macosSigningAccepted: macosSigningAccepted(releaseSigningReport),
     releaseReadinessStatus: releaseReadinessReport?.status || "missing",
   },
@@ -178,6 +186,68 @@ function validateSuppliedArtifact(artifactPath, caskEvidence) {
   };
 }
 
+function validateMaterializationReport(materializationPath, caskEvidence, artifactEvidence) {
+  if (!existsSync(materializationPath)) {
+    issues.push(`Homebrew materialization report is missing: ${materializationPath}`);
+    return { status: "missing", path: materializationPath };
+  }
+  let report;
+  try {
+    report = JSON.parse(readFileSync(materializationPath, "utf8"));
+  } catch (error) {
+    issues.push(`Homebrew materialization report is not valid JSON: ${error.message}`);
+    return { status: "invalid-json", path: materializationPath };
+  }
+  if (report.schema !== "neditor.homebrew-cask-materialization.v1") {
+    issues.push("Homebrew materialization report schema must be neditor.homebrew-cask-materialization.v1");
+  }
+  if (report.appVersion !== packageJson.version) {
+    issues.push(`Homebrew materialization report appVersion ${report.appVersion || "(missing)"} must match ${packageJson.version}`);
+  }
+  if (report.releaseVersion !== packageJson.version) {
+    issues.push(`Homebrew materialization report releaseVersion ${report.releaseVersion || "(missing)"} must match ${packageJson.version}`);
+  }
+  const reportSha = report.artifact?.sha256 || "";
+  if (!/^[a-f0-9]{64}$/i.test(reportSha)) {
+    issues.push("Homebrew materialization report artifact.sha256 must be a 64-character hexadecimal digest");
+  }
+  if (artifactEvidence?.sha256 && reportSha && artifactEvidence.sha256.toLowerCase() !== reportSha.toLowerCase()) {
+    issues.push("Homebrew materialization report artifact.sha256 does not match the supplied artifact");
+  }
+  if (caskEvidence?.sha256 && reportSha && caskEvidence.sha256.toLowerCase() !== reportSha.toLowerCase()) {
+    issues.push("Homebrew materialization report artifact.sha256 does not match the supplied cask");
+  }
+  if (artifactEvidence?.bytes !== undefined && report.artifact?.bytes !== artifactEvidence.bytes) {
+    issues.push("Homebrew materialization report artifact.bytes does not match the supplied artifact size");
+  }
+  if (report.cask?.token !== "neditor") {
+    issues.push("Homebrew materialization report cask.token must be neditor");
+  }
+  if (!String(report.cask?.urlArtifactName || "").match(/^NEditor-.+-macos\.(zip|dmg)$/)) {
+    issues.push("Homebrew materialization report cask.urlArtifactName must name a versioned macOS zip or dmg");
+  }
+  if (!Array.isArray(report.nextCommands) || !report.nextCommands.some((command) => String(command).includes("pnpm run check:homebrew"))) {
+    issues.push("Homebrew materialization report must include a check:homebrew follow-up command");
+  }
+  return {
+    status: "checked",
+    path: materializationPath,
+    schema: report.schema || null,
+    appVersion: report.appVersion || null,
+    releaseVersion: report.releaseVersion || null,
+    artifact: {
+      bytes: report.artifact?.bytes ?? null,
+      sha256: reportSha || null,
+      copied: Boolean(report.artifact?.copied),
+    },
+    cask: {
+      outputPath: report.cask?.outputPath || null,
+      urlArtifactName: report.cask?.urlArtifactName || null,
+      token: report.cask?.token || null,
+    },
+  };
+}
+
 function macosSigningAccepted(report) {
   const darwin = report?.platforms?.find((platform) => platform?.platform === "darwin");
   return darwin?.status === "accepted";
@@ -195,6 +265,14 @@ function defaultHomebrewArtifactPath() {
     join(root, ".tmp", "homebrew", "external", `NEditor-${packageJson.version}-macos.dmg`),
     join(root, ".tmp", "homebrew", "external", "NEditor-macos.zip"),
     join(root, ".tmp", "homebrew", "external", "NEditor-macos.dmg"),
+  ];
+  return candidates.find((path) => existsSync(path)) || null;
+}
+
+function defaultHomebrewMaterializationReportPath() {
+  const candidates = [
+    join(root, ".tmp", "homebrew", "external", "materialize-cask-report.json"),
+    join(root, ".tmp", "homebrew", "materialize-cask-report.json"),
   ];
   return candidates.find((path) => existsSync(path)) || null;
 }

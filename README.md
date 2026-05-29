@@ -934,10 +934,11 @@ macOS distribution. It checks the cask template under
 `packaging/homebrew/Casks/neditor.rb.template`, the README and
 `docs/homebrew-distribution.md` runbook, Tauri app metadata, bundle target
 coverage, the exposed `ned` command-line helper, and optional release
-cask/artifact SHA evidence when
-`NEDITOR_HOMEBREW_CASK` and `NEDITOR_HOMEBREW_ARTIFACT` are supplied. The check
-passes the repository configuration while still reporting release blockers until
-a real SHA-pinned, signed, and notarized macOS artifact is available.
+cask/artifact/materialization SHA evidence when
+`NEDITOR_HOMEBREW_CASK`, `NEDITOR_HOMEBREW_ARTIFACT`, and
+`NEDITOR_HOMEBREW_MATERIALIZATION_REPORT` are supplied. The check passes the
+repository configuration while still reporting release blockers until a real
+SHA-pinned, signed, and notarized macOS artifact is available.
 
 `pnpm run check:platform-evidence` writes
 `.tmp/platform-evidence/report.json` and creates JSON templates under

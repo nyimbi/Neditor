@@ -81,6 +81,13 @@ const evidenceItems = [
     "NEditor-macos.dmg",
     "neditor-release-artifact",
   ]),
+  item("homebrew-materialization-report", ".tmp/homebrew/external/materialize-cask-report.json", "homebrew", [
+    "homebrew/materialize-cask-report.json",
+    "homebrew/materialization-report.json",
+    ".tmp/homebrew/materialize-cask-report.json",
+    "materialize-cask-report.json",
+    "materialization-report.json",
+  ]),
   item("google-docs-import", ".tmp/google-docs-import/external/import-evidence.json", "google-docs", [
     "google-docs-import/external/import-evidence.json",
     "google-docs/import-evidence.json",

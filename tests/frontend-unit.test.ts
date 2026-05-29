@@ -8647,6 +8647,7 @@ test("local verification scripts expose local baseline checks", () => {
   const evidenceKitCollector = readFileSync("scripts/collect-release-evidence-kit.mjs", "utf8");
   const evidenceKitChecker = readFileSync("scripts/check-release-evidence-kit.mjs", "utf8");
   const evidenceIngest = readFileSync("scripts/ingest-release-evidence.mjs", "utf8");
+  const homebrewPackaging = readFileSync("scripts/check-homebrew-packaging.mjs", "utf8");
   const releaseCi = readFileSync("scripts/check-release-ci-workflow.mjs", "utf8");
   const releaseWorkflow = readFileSync(".github/workflows/neditor-release-evidence.yml", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
@@ -8919,6 +8920,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("runbooks/homebrew-release.md"));
   ok(evidenceKitCollector.includes("pnpm run release:homebrew"));
   ok(evidenceKitCollector.includes("materialize-cask-report.json"));
+  ok(evidenceKitCollector.includes("homebrew/materialize-cask-report.json"));
   ok(evidenceKitCollector.includes("sourceTreeClean"));
   ok(evidenceKitCollector.includes("staleTemplates"));
   ok(evidenceKitCollector.includes("inspectTemplateFreshness"));
@@ -9037,8 +9039,14 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceIngest.includes("NEDITOR_RELEASE_EVIDENCE_RETURN_DIR"));
   ok(evidenceIngest.includes("homebrew-cask"));
   ok(evidenceIngest.includes("homebrew-release-artifact"));
+  ok(evidenceIngest.includes("homebrew-materialization-report"));
   ok(evidenceIngest.includes("homebrew/neditor.rb"));
+  ok(evidenceIngest.includes("homebrew/materialize-cask-report.json"));
   ok(evidenceIngest.includes("check:homebrew"));
+  ok(homebrewPackaging.includes("NEDITOR_HOMEBREW_MATERIALIZATION_REPORT"));
+  ok(homebrewPackaging.includes("neditor.homebrew-cask-materialization.v1"));
+  ok(homebrewPackaging.includes("materialization report artifact.sha256 does not match the supplied artifact"));
+  ok(homebrewPackaging.includes("materialization: materializationEvidence"));
   ok(evidenceIngest.includes("external-engine-sqlite"));
   ok(evidenceIngest.includes("platform/win32-package-artifacts.json"));
   ok(evidenceIngest.includes("ai-provider/provider-evidence.json"));

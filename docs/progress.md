@@ -68,6 +68,28 @@ evidence packet sent to release hosts.
 | `pnpm run test:unit` | Pass | Static tests verify the collector references `pnpm run release:homebrew` and `materialize-cask-report.json`. |
 | `git diff --check` | Pass | Whitespace guard passed before commit. |
 
+## 2026-05-29 Homebrew Materialization Evidence Validation
+
+Homebrew release evidence now treats `.tmp/homebrew/materialize-cask-report.json`
+as first-class returned evidence. `pnpm run ingest:evidence` recognizes
+`homebrew/materialize-cask-report.json`, copies it into
+`.tmp/homebrew/external/`, and runs the Homebrew validator. `pnpm run
+check:homebrew` now validates the materialization report schema, app/release
+version, cask token, cask artifact name, artifact byte count, artifact SHA,
+cask SHA, and follow-up validation commands when the report is supplied.
+
+This closes the audit gap where a release host could return a cask and artifact
+without the machine-readable record proving how the cask SHA was derived.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run ingest:evidence -- --source .tmp/homebrew-return` | Pass | Synthetic return bundle copied `homebrew/neditor.rb`, `homebrew/NEditor-0.1.0-macos.zip`, and `homebrew/materialize-cask-report.json`; Homebrew validation passed for the copied evidence. |
+| `node --check scripts/check-homebrew-packaging.mjs` | Pass | Verifies the Homebrew validator remains syntactically valid. |
+| `node --check scripts/ingest-release-evidence.mjs` | Pass | Verifies the ingest recognizer remains syntactically valid. |
+| `pnpm run test:unit` | Pass | Static tests verify materialization-report ingestion and Homebrew validator checks. |
+| `pnpm run check:docs` | Pass | README and release docs links still resolve after documenting the materialization report return. |
+| `pnpm run check:homebrew` | Pass with release blockers | Default report restored to the real pending blockers after removing synthetic smoke evidence. |
+
 ## 2026-05-29 Max Writing Space Preset
 
 NEditor now has a reversible **Maximize Writing Space** command. The command

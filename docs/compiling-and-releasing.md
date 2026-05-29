@@ -379,7 +379,9 @@ pnpm run check:homebrew
 `release:homebrew` computes the SHA-256, writes the concrete cask, copies the
 artifact into the Homebrew evidence directory, and records
 `.tmp/homebrew/materialize-cask-report.json`. It does not replace
-signing/notarization or release-readiness gates.
+signing/notarization or release-readiness gates. Return that JSON report with
+the cask and artifact so `check:homebrew` can verify that the cask SHA, artifact
+SHA, and materialization record agree.
 
 When Homebrew is available on the release host:
 

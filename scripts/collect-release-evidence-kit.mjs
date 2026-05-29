@@ -113,10 +113,14 @@ const runbooks = [
       "brew audit --cask --new Casks/neditor.rb",
       "brew install --cask Casks/neditor.rb",
       "brew uninstall --cask neditor",
-      "Copy the completed Casks/neditor.rb and release artifact into the return bundle.",
+      "Copy the completed Casks/neditor.rb, release artifact, and .tmp/homebrew/materialize-cask-report.json into the return bundle.",
       "pnpm run check:homebrew",
     ],
-    returns: ["homebrew/neditor.rb", `homebrew/NEditor-${packageJson.version}-macos.zip or homebrew/NEditor-${packageJson.version}-macos.dmg`],
+    returns: [
+      "homebrew/neditor.rb",
+      `homebrew/NEditor-${packageJson.version}-macos.zip or homebrew/NEditor-${packageJson.version}-macos.dmg`,
+      "homebrew/materialize-cask-report.json",
+    ],
   },
   {
     file: "runbooks/google-docs-import.md",
