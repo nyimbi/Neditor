@@ -1,6 +1,6 @@
 # NEditor Current Completion Backlog
 
-Updated: 2026-05-21
+Updated: 2026-05-29
 
 This is the active, evidence-based backlog for finishing NEditor against
 `docs/specification.md` and `docs/external-transforms.md`. It replaces the stale
@@ -77,6 +77,11 @@ NEditor is no longer a basic scaffold. The repository currently contains:
 - Local verification commands for frontend logic, browser workflows, Rust
   checks/tests, native-watch compilation, static analysis, frontend builds, and
   Tauri desktop compilation.
+- A detailed release-operator runbook in
+  [`docs/compiling-and-releasing.md`](compiling-and-releasing.md), linked from
+  the README, covering source preparation, production compilation, sidecar
+  packaging, local release candidates, release evidence, signing/notarization,
+  Homebrew handoff, and incident response.
 
 The remaining work is primarily about workflow proof, artifact fidelity,
 cross-platform validation, and reducing risk in oversized modules after
@@ -95,9 +100,13 @@ Editor keybinding mode update:
 
 ## Current Verification Snapshot
 
-Latest pushed code commit inspected before this update:
+This section starts with the current release-operator snapshot. Older evidence
+below is retained as historical trace, but the current status comes from the
+commands and reports listed here.
 
-- `25bc28f Prove snapshot and release workflows in the workbench`
+Current pushed code commit inspected before this update:
+
+- `f73397a Accept current native outline smoke evidence shape`
 
 Remote GitHub Actions are not an active verification surface for this project.
 Older run references below are retained only as historical debugging context and
@@ -105,7 +114,51 @@ must not be used as completion evidence for new work. Current completion proof
 comes from local command output, committed artifacts, rendered/manual QA, and
 explicit platform checks run outside GitHub Actions.
 
-Most recent local verification evidence:
+Current release-operator evidence, refreshed on 2026-05-29:
+
+- `pnpm run check`: passed.
+- `pnpm run test:unit`: passed.
+- `pnpm run test:e2e`: passed all 72 Chromium browser workbench workflows.
+- `./node_modules/.bin/tauri build --no-bundle`: passed and built the release
+  desktop binary at `src-tauri/target/release/neditor`, after preparing the
+  current-target `ned` sidecar under `src-tauri/binaries/`.
+- `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke`: passed native
+  launch smoke proof on the current macOS host, including outline navigation
+  evidence.
+- `pnpm run test:tauri-webdriver`: passed its current-host contract; on this
+  macOS host it records the supported native-launch fallback evidence instead
+  of claiming unavailable WebDriver coverage.
+- `pnpm run test:rendered-exports`: passed and refreshed rendered export audit
+  artifacts, including PDF generation where the local toolchain is available.
+- `pnpm run collect:evidence-kit`, `pnpm run check:evidence-kit`, and
+  `pnpm run check:release-readiness`: passed with status
+  `current-host-ready-with-external-gaps`.
+- `pnpm run check:spec-completion`: completed with
+  `partial-with-release-risks`; the generated work orders classify remaining
+  rows as external evidence, supported-platform evidence, release credentials,
+  distribution artifacts, or manual review/sign-off work.
+
+The current release-readiness gaps are not ordinary local build failures. They
+require returned evidence from supported platforms, credentialed release hosts,
+or human reviewers:
+
+- macOS release signing and notarization.
+- Windows/Linux Tauri WebDriver execution.
+- Windows package artifact proof.
+- Linux package artifact proof.
+- Google Docs live import/readback with authorized Drive access.
+- Final Homebrew cask and release artifact proof.
+- Homebrew macOS signing evidence.
+- Live AI provider endpoint proof.
+- Real-device AI runtime proof.
+- Release-device native performance profile.
+- Independent security review sign-off.
+- Spec-completion open-item closure evidence.
+- Rendered-export native-viewer human sign-off.
+- Accessibility assistive-technology human sign-off.
+- Table-editor manual supported-host sign-off.
+
+Earlier local verification evidence retained for traceability:
 
 - `cargo fmt --check`: passed in `src-tauri`.
 - `cargo check --locked`: passed in `src-tauri`.
