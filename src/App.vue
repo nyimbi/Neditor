@@ -52,6 +52,54 @@
             </div>
           </section>
         </div>
+        <div v-if="collapsedToolbarRows.length" class="app-menu toolbar-visibility-menu">
+          <button
+            type="button"
+            class="app-menu-trigger toolbar-visibility-trigger"
+            aria-label="Toolbar visibility menu"
+            :aria-expanded="toolbarVisibilityMenuOpen"
+            aria-haspopup="menu"
+            title="Toolbars are hidden. Open this menu to restore one row or show all toolbars."
+            @click="toggleToolbarVisibilityMenu"
+          >
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
+            </svg>
+            <span>Toolbars hidden</span>
+            <small>{{ collapsedToolbarRows.length }}</small>
+          </button>
+          <section v-if="toolbarVisibilityMenuOpen" class="app-menu-panel toolbar-visibility-panel" role="menu" aria-label="Toolbar visibility menu">
+            <div class="app-menu-group" role="group" aria-label="Hidden toolbar rows">
+              <span class="app-menu-group-label">Hidden toolbar rows</span>
+              <button type="button" role="menuitem" title="Show every hidden toolbar row" @click="showAllHiddenToolbars">
+                <span>Show all toolbars</span>
+                <small>Restore every hidden toolbar row now.</small>
+              </button>
+              <button
+                v-for="row in collapsedToolbarRows"
+                :key="`toolbar-visibility-${row.id}`"
+                type="button"
+                role="menuitem"
+                :title="`Show ${row.label} toolbar`"
+                @click="showHiddenToolbarFromMenu(row.id)"
+              >
+                <span>Show {{ row.label }} toolbar</span>
+                <small>Restore only the {{ row.label }} row.</small>
+              </button>
+            </div>
+            <div class="app-menu-group" role="group" aria-label="Toolbar help">
+              <span class="app-menu-group-label">Where else?</span>
+              <button type="button" role="menuitem" title="Open View menu toolbar controls" @click="openViewToolbarMenu">
+                <span>Open View > Toolbars</span>
+                <small>Use the View menu for collapse, expand, and individual row controls.</small>
+              </button>
+              <button type="button" role="menuitem" title="Open keyboard shortcut help" @click="openToolbarShortcutHelp">
+                <span>Show shortcut help</span>
+                <small>Use the command palette when toolbar rows are hidden.</small>
+              </button>
+            </div>
+          </section>
+        </div>
       </nav>
       <section class="document-tabs" aria-label="Open documents">
         <section
@@ -214,8 +262,8 @@
           <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
             <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
           </svg>
-          <span>Show toolbars</span>
-          <small>{{ hiddenToolbarSummary }}</small>
+          <span>Toolbars hidden</span>
+          <small>Click to show all rows</small>
         </button>
       </section>
     </header>
@@ -6840,6 +6888,7 @@ const docsLiveRuntimeReport = ref<AiRuntimeReadinessReport | null>(null);
 const desktopWorkflowSmokeActive = ref(false);
 const commandPaletteOpen = ref(false);
 const openAppMenuId = ref<string | null>(null);
+const toolbarVisibilityMenuOpen = ref(false);
 const writingSpaceMaximized = ref(false);
 const writingSpaceRestoreLayout = ref<WritingSpaceLayoutSnapshot | null>(null);
 const conflictOpen = ref(false);
@@ -9574,13 +9623,19 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "outline-panel", label: "Document Outline", help: "Open the outline sidebar.", run: () => showOutline() },
           { id: "exports-panel", label: "Export Panel", help: "Open distribution and export controls.", run: () => (store.sidebar = "exports") },
           { id: "settings", label: "Settings", help: "Tune toolbar, editor, preview, and accessibility settings.", run: () => (store.sidebar = "settings") },
+        ],
+      },
+      {
+        id: "toolbars",
+        label: "Toolbars",
+        items: [
           { id: "collapse-toolbars", label: "Collapse Toolbars", help: "Recover vertical writing space.", run: () => setAllCommandToolbarsCollapsed(true) },
           { id: "expand-toolbars", label: "Expand Toolbars", help: "Show all toolbar rows.", run: () => setAllCommandToolbarsCollapsed(false) },
           ...toolbarCollapseRowDefinitions.map((row) => ({
             id: `toggle-toolbar-${row.id}`,
             label: isToolbarCollapsed(row.id) ? `Show ${row.label} Toolbar` : `Hide ${row.label} Toolbar`,
             help: isToolbarCollapsed(row.id)
-              ? `Restore the ${row.label} toolbar row. Hidden rows are listed in the titlebar tray and the floating Show toolbars button.`
+              ? `Restore the ${row.label} toolbar row. Hidden rows are listed in the Toolbars hidden menu, titlebar tray, and floating restore button.`
               : `Hide the ${row.label} toolbar row and add it to the visible restore controls.`,
             run: () => toggleToolbarRow(row.id),
           })),
@@ -9748,7 +9803,7 @@ const hiddenToolbarSummary = computed(() => {
   const first = collapsedToolbarRows.value[0];
   return count === 1 && first ? `${first.label} toolbar hidden` : `${count} toolbars hidden`;
 });
-const hiddenToolbarTrayHelpText = computed(() => "Use Show all, Show toolbars, or View menu > Toolbars to restore hidden rows.");
+const hiddenToolbarTrayHelpText = computed(() => "Use Show all, the Toolbars hidden menu, the floating restore button, or View > Toolbars to restore rows.");
 const hiddenToolbarFloatingHelpText = computed(() => `${hiddenToolbarSummary.value}. Click to show every hidden toolbar row.`);
 const hiddenToolbarTrayAriaLabel = computed(() => `${hiddenToolbarSummary.value}. ${hiddenToolbarTrayHelpText.value}`);
 const normalizedToolbarCollapsedRows = (ids: string[]) =>
@@ -9775,7 +9830,7 @@ function hideToolbarRow(id: string) {
   const current = new Set(store.toolbarCollapsedRows);
   current.add(id);
   store.toolbarCollapsedRows = normalizedToolbarCollapsedRows([...current]);
-  store.statusMessage = `${toolbarRowLabel(id)} toolbar hidden; use Show toolbars, the hidden toolbars tray, or View menu to show it again`;
+  store.statusMessage = `${toolbarRowLabel(id)} toolbar hidden; use the Toolbars hidden menu, floating restore button, hidden toolbars tray, or View > Toolbars to show it again`;
 }
 function toggleToolbarRow(id: string) {
   if (isToolbarCollapsed(id)) {
@@ -9787,7 +9842,7 @@ function toggleToolbarRow(id: string) {
 function setAllCommandToolbarsCollapsed(collapsed: boolean) {
   store.toolbarCollapsedRows = collapsed ? [...toolbarCollapseRowIds] : [];
   store.statusMessage = collapsed
-    ? "All toolbars hidden; use Show toolbars, the hidden toolbars tray, or View menu to show them again"
+    ? "All toolbars hidden; use the Toolbars hidden menu, floating restore button, hidden toolbars tray, or View > Toolbars to show them again"
     : "All toolbars restored";
 }
 function maximizeWritingSpace() {
@@ -9835,10 +9890,32 @@ function toggleWritingSpaceMaximized() {
   }
 }
 function toggleAppMenu(menuId: string) {
+  toolbarVisibilityMenuOpen.value = false;
   openAppMenuId.value = openAppMenuId.value === menuId ? null : menuId;
 }
 function closeAppMenus() {
   openAppMenuId.value = null;
+  toolbarVisibilityMenuOpen.value = false;
+}
+function toggleToolbarVisibilityMenu() {
+  openAppMenuId.value = null;
+  toolbarVisibilityMenuOpen.value = !toolbarVisibilityMenuOpen.value;
+}
+function showAllHiddenToolbars() {
+  toolbarVisibilityMenuOpen.value = false;
+  setAllCommandToolbarsCollapsed(false);
+}
+function showHiddenToolbarFromMenu(id: string) {
+  toolbarVisibilityMenuOpen.value = false;
+  showToolbarRow(id);
+}
+function openViewToolbarMenu() {
+  toolbarVisibilityMenuOpen.value = false;
+  openAppMenuId.value = "view";
+}
+function openToolbarShortcutHelp() {
+  closeAppMenus();
+  openHelp("keyboard-shortcuts");
 }
 async function runAppMenuItem(item: AppMenuItem) {
   if (item.disabled) return;
@@ -12513,7 +12590,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   ...toolbarCollapseRowDefinitions.map((row) => ({
     name: `Show ${row.label} toolbar`,
     group: "View",
-    description: `Restore the ${row.label} toolbar row. Hidden rows are listed in the titlebar tray and the floating Show toolbars button.`,
+    description: `Restore the ${row.label} toolbar row. Hidden rows are listed in the Toolbars hidden menu, titlebar tray, and floating restore button.`,
     keywords: ["toolbar", "hidden", "restore", "unhide", row.label.toLowerCase()],
     run: () => showToolbarRow(row.id),
   })),
@@ -21306,8 +21383,20 @@ select:hover {
 }
 
 .app-shell[data-theme="dark"] .app-menu-group,
-.app-shell[data-theme="dark"] .app-menu-bar {
+.app-shell[data-theme="dark"] .app-menu-bar,
+.app-shell[data-theme="dark"] .toolbar-visibility-menu {
   border-color: #34465a;
+}
+
+.app-shell[data-theme="dark"] .toolbar-visibility-trigger {
+  border-color: #6f98c5;
+  background: #1d344c;
+  color: #e6f2ff;
+}
+
+.app-shell[data-theme="dark"] .toolbar-visibility-trigger small {
+  background: #6f98c5;
+  color: #0f1823;
 }
 
 .app-shell[data-theme="dark"] .tab,
@@ -21511,8 +21600,20 @@ select:hover {
   }
 
   .app-shell[data-theme="system"] .app-menu-group,
-  .app-shell[data-theme="system"] .app-menu-bar {
+  .app-shell[data-theme="system"] .app-menu-bar,
+  .app-shell[data-theme="system"] .toolbar-visibility-menu {
     border-color: #34465a;
+  }
+
+  .app-shell[data-theme="system"] .toolbar-visibility-trigger {
+    border-color: #6f98c5;
+    background: #1d344c;
+    color: #e6f2ff;
+  }
+
+  .app-shell[data-theme="system"] .toolbar-visibility-trigger small {
+    background: #6f98c5;
+    color: #0f1823;
   }
 
   .app-shell[data-theme="system"] .tab,
@@ -21765,6 +21866,15 @@ select:hover {
   background: #fff6a3;
 }
 
+.app-shell[data-high-contrast="true"] .toolbar-visibility-menu {
+  border-color: #000000;
+}
+
+.app-shell[data-high-contrast="true"] .toolbar-visibility-trigger small {
+  background: #000000;
+  color: #ffffff;
+}
+
 .app-shell[data-high-contrast="true"] :focus-visible,
 .app-shell[data-high-contrast="true"] .skip-links a:focus {
   outline: 3px solid #000000;
@@ -21865,6 +21975,47 @@ select:hover {
 .app-menu-trigger[aria-expanded="true"] {
   border-color: #c5d0dc;
   background: #eef5ff;
+}
+
+.toolbar-visibility-menu {
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 1px solid #d7dee7;
+}
+
+.toolbar-visibility-trigger {
+  display: inline-grid;
+  grid-template-columns: 13px auto auto;
+  align-items: center;
+  gap: 5px;
+  border-color: #8aa5c2;
+  background: #edf6ff;
+  color: #173e63;
+}
+
+.toolbar-visibility-trigger svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.toolbar-visibility-trigger small {
+  min-width: 16px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #315f8d;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.toolbar-visibility-panel {
+  min-width: 300px;
 }
 
 .app-menu-panel {
@@ -28095,6 +28246,13 @@ select:hover {
 
   .titlebar-toolbar-tray {
     max-width: 34vw;
+  }
+
+  .toolbar-visibility-trigger span {
+    max-width: 92px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .floating-toolbar-restore {
