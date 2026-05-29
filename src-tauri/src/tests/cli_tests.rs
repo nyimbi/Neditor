@@ -2172,6 +2172,75 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
             .as_str()
             .is_some_and(|value| value.contains("Create or refresh the release evidence kit"))));
 
+    let evidence_kit_dir = root.join("release-evidence-kit");
+    fs::create_dir_all(&evidence_kit_dir).expect("create release evidence kit fixture");
+    fs::write(
+        evidence_kit_dir.join("manifest.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schema": "neditor.release-evidence-kit.v1",
+            "generatedAt": "2026-05-26T12:46:00.000Z",
+            "sourceCommit": current_test_git_head(),
+            "sourceTreeClean": true,
+            "gapWorkItems": [
+                {
+                    "id": "homebrew-final-cask",
+                    "readyToSend": true,
+                    "status": "pending-release-cask",
+                    "detail": "Return final Homebrew cask.",
+                    "evidence": ".tmp/homebrew/homebrew-packaging-report.json",
+                    "runbooks": [
+                        {
+                            "path": "runbooks/homebrew-release.md",
+                            "title": "Homebrew Release Handoff"
+                        }
+                    ],
+                    "returns": [
+                        ".tmp/homebrew/Casks/neditor.rb",
+                        ".tmp/homebrew/homebrew-packaging-report.json"
+                    ],
+                    "validatorCommands": ["pnpm run check:release-readiness"],
+                    "ingestCommand": "pnpm run ingest:evidence -- --source /path/to/return-dir",
+                    "finalReadinessCommand": "pnpm run check:release-readiness"
+                }
+            ]
+        }))
+        .expect("release evidence kit manifest json"),
+    )
+    .expect("write release evidence kit manifest fixture");
+    let release_preview_text = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "support-bundle".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--readiness-report".to_string(),
+        readiness_gap_path.to_string_lossy().to_string(),
+        "--spec-report".to_string(),
+        spec_path.to_string_lossy().to_string(),
+        "--spec-work-orders".to_string(),
+        spec_work_orders_path.to_string_lossy().to_string(),
+        "--release-candidate-dir".to_string(),
+        release_candidate_dir.to_string_lossy().to_string(),
+        "--engine-report".to_string(),
+        engine_path.to_string_lossy().to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
+        "--evidence-kit".to_string(),
+        evidence_kit_dir.to_string_lossy().to_string(),
+    ])
+    .expect("release preview support text");
+    assert!(release_preview_text
+        .message
+        .contains("Release evidence work items:"));
+    assert!(release_preview_text
+        .message
+        .contains("Status lanes: pending-release-cask=1"));
+    assert!(release_preview_text.message.contains(
+        "homebrew-final-cask [pending-release-cask] evidence: .tmp/homebrew/homebrew-packaging-report.json; returns: 2; runbook: runbooks/homebrew-release.md"
+    ));
+    assert!(release_preview_text.message.contains(
+        "Next commands: pnpm run collect:evidence-kit -> pnpm run ingest:evidence -- --source /path/to/return-dir -> pnpm run check:release-readiness"
+    ));
+
     let covered_missing_engine_path = root.join("engine-covered-missing.json");
     fs::write(
         &covered_missing_engine_path,
@@ -2277,6 +2346,16 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert!(text
         .message
         .contains("Spec action plan: ready-to-send (2/2 work orders ready)"));
+    assert!(text.message.contains("Spec completion work orders:"));
+    assert!(text
+        .message
+        .contains("Classification lanes: cross-platform-evidence=1, manual-review=1"));
+    assert!(text
+        .message
+        .contains("Owner lanes: Named manual reviewer=1, Supported-host QA owner=1"));
+    assert!(text.message.contains(
+        "001-manual-review-native-dialogs [manual-review] owner: Named manual reviewer; 6.5 File Operations / Native dialogs; returns: 1; runbook: runbooks/manual-review.md"
+    ));
     assert!(text
         .message
         .contains("Release candidate: checked-with-release-gates (releaseable: no, artifacts: 2)"));

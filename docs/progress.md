@@ -6035,6 +6035,24 @@ buttons and the equivalent `View > Toolbars` menu path.
 | `pnpm run test:unit` | Pass | 118 frontend/static tests passed, including guards for the action-first hidden-toolbar labels and help text. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "collapses and restores command toolbars" --project chromium` | Pass | Focused Chromium workflow passed, proving users can collapse one row or all rows, see explicit show controls, restore individual/all rows, and keep the vertical writing-space gain. |
 
+## 2026-05-29 Support Bundle Action-Plan Preview
+
+The terminal `ned support-bundle` report now exposes the assignment shape of
+the generated release and spec action plans instead of only printing raw counts.
+For release evidence it shows issue previews, status-lane counts, the first
+actionable work-item IDs with evidence path, return count, and runbook. For
+spec closure it shows classification lanes, owner lanes, the first work-order
+IDs with spec section, requirement area, return count, and runbook. Both
+sections include the next command chain so release managers can assign work
+without opening the full JSON unless they need machine-readable details.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_creates_redaction_safe_support_bundles --lib` | Pass | Focused CLI support-bundle test proves release work-item previews and spec work-order classification/owner previews. |
+| `pnpm run check:cli` | Pass | 26 CLI tests passed and the debug `ned` binary rebuilt after the support-bundle text-report changes. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting stayed clean after adding action-plan preview helpers. |
+| `src-tauri/target/debug/ned support-bundle --workspace .` | Pass | Live smoke now prints release status lanes, first six release work items, spec classification/owner lanes, first six spec work orders, and next command chains. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

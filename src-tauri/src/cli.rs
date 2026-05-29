@@ -15,6 +15,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
+    collections::BTreeMap,
     env, fs,
     io::{self, Read},
     path::{Path, PathBuf},
@@ -4517,11 +4518,153 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
             }
         }
     }
+    lines.extend(release_action_plan_preview_lines(action_plan));
+    lines.extend(spec_action_plan_preview_lines(spec_action_plan));
     lines.push(
         "Use --json or --output support.json when a help desk needs machine-readable evidence."
             .to_string(),
     );
     lines.join("\n")
+}
+
+fn release_action_plan_preview_lines(action_plan: &Value) -> Vec<String> {
+    let work_items = readiness_array_field(action_plan, "workItems");
+    let issues = string_array_field(action_plan, "issues");
+    if work_items.is_empty() && issues.is_empty() {
+        return Vec::new();
+    }
+
+    let mut lines = vec!["Release evidence work items:".to_string()];
+    lines.extend(action_plan_issue_preview_lines(&issues));
+    if !work_items.is_empty() {
+        lines.push(format!(
+            "  Status lanes: {}",
+            action_plan_count_summary(&work_items, "status")
+        ));
+        for item in work_items.iter().take(6) {
+            lines.push(format!("  - {}", release_work_item_summary(item)));
+        }
+        if work_items.len() > 6 {
+            lines.push(format!(
+                "  - ... {} more release work item(s) in the JSON support bundle",
+                work_items.len() - 6
+            ));
+        }
+    }
+    if let Some(next_commands) = action_plan_next_commands(action_plan) {
+        lines.push(format!("  Next commands: {next_commands}"));
+    }
+    lines
+}
+
+fn spec_action_plan_preview_lines(action_plan: &Value) -> Vec<String> {
+    let work_orders = readiness_array_field(action_plan, "workOrders");
+    let issues = string_array_field(action_plan, "issues");
+    if work_orders.is_empty() && issues.is_empty() {
+        return Vec::new();
+    }
+
+    let mut lines = vec!["Spec completion work orders:".to_string()];
+    lines.extend(action_plan_issue_preview_lines(&issues));
+    if !work_orders.is_empty() {
+        lines.push(format!(
+            "  Classification lanes: {}",
+            action_plan_count_summary(&work_orders, "classification")
+        ));
+        lines.push(format!(
+            "  Owner lanes: {}",
+            action_plan_count_summary(&work_orders, "owner")
+        ));
+        for order in work_orders.iter().take(6) {
+            lines.push(format!("  - {}", spec_work_order_summary(order)));
+        }
+        if work_orders.len() > 6 {
+            lines.push(format!(
+                "  - ... {} more spec work order(s) in the JSON support bundle",
+                work_orders.len() - 6
+            ));
+        }
+    }
+    if let Some(next_commands) = action_plan_next_commands(action_plan) {
+        lines.push(format!("  Next commands: {next_commands}"));
+    }
+    lines
+}
+
+fn action_plan_issue_preview_lines(issues: &[String]) -> Vec<String> {
+    if issues.is_empty() {
+        return Vec::new();
+    }
+    let mut lines = vec![format!("  Issues: {}", issues.len())];
+    for issue in issues.iter().take(3) {
+        lines.push(format!("  - {issue}"));
+    }
+    if issues.len() > 3 {
+        lines.push(format!("  - ... {} more issue(s)", issues.len() - 3));
+    }
+    lines
+}
+
+fn action_plan_count_summary(items: &[Value], field: &str) -> String {
+    let mut counts = BTreeMap::<String, usize>::new();
+    for item in items {
+        let key = readiness_string_field(item, field)
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or("unspecified")
+            .to_string();
+        *counts.entry(key).or_insert(0) += 1;
+    }
+    if counts.is_empty() {
+        return "none".to_string();
+    }
+    counts
+        .into_iter()
+        .map(|(key, count)| format!("{key}={count}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn release_work_item_summary(item: &Value) -> String {
+    let id = readiness_string_field(item, "id").unwrap_or("unknown");
+    let status = readiness_string_field(item, "status").unwrap_or("unknown");
+    let evidence = readiness_string_field(item, "evidence").unwrap_or("no evidence path listed");
+    let runbook = first_runbook_label(item).unwrap_or_else(|| "no runbook listed".to_string());
+    let returns = readiness_array_field(item, "returns").len();
+    format!("{id} [{status}] evidence: {evidence}; returns: {returns}; runbook: {runbook}")
+}
+
+fn spec_work_order_summary(order: &Value) -> String {
+    let id = readiness_string_field(order, "id").unwrap_or("unknown");
+    let classification = readiness_string_field(order, "classification").unwrap_or("unknown");
+    let owner = readiness_string_field(order, "owner").unwrap_or("unassigned");
+    let section = readiness_string_field(order, "specSection").unwrap_or("unknown section");
+    let area = readiness_string_field(order, "requirementArea").unwrap_or("unknown requirement");
+    let returns = readiness_array_field(order, "returns").len();
+    let runbook = first_runbook_label(order).unwrap_or_else(|| "no runbook listed".to_string());
+    format!(
+        "{id} [{classification}] owner: {owner}; {section} / {area}; returns: {returns}; runbook: {runbook}"
+    )
+}
+
+fn first_runbook_label(item: &Value) -> Option<String> {
+    readiness_array_field(item, "runbooks")
+        .into_iter()
+        .find_map(|runbook| {
+            runbook
+                .as_str()
+                .map(str::to_string)
+                .or_else(|| readiness_string_field(&runbook, "path").map(str::to_string))
+                .or_else(|| readiness_string_field(&runbook, "title").map(str::to_string))
+        })
+}
+
+fn action_plan_next_commands(action_plan: &Value) -> Option<String> {
+    let commands = string_array_field(action_plan, "nextCommands");
+    if commands.is_empty() {
+        None
+    } else {
+        Some(commands.join(" -> "))
+    }
 }
 
 fn grouped_support_recommendations(recommendations: &[String]) -> Vec<(&'static str, Vec<String>)> {
