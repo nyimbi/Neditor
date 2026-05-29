@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" viewBox="0 0 1200 520">
+  <title id="title">NEditor local-first document workflow</title>
+  <desc id="desc">A document workflow showing brief, outline, drafting, review, evidence, export, and distribution.</desc>
+  <rect width="1200" height="520" fill="#f8fafc"/>
+  <rect x="48" y="50" width="1104" height="420" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="80" y="98" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#0f172a">Local-first business document pipeline</text>
+  <text x="80" y="132" font-family="Arial, sans-serif" font-size="16" fill="#475569">Readable Markdown becomes governed, beautiful, multi-target deliverables.</text>
+  <g font-family="Arial, sans-serif" font-size="15" text-anchor="middle">
+    <g transform="translate(105 230)">
+      <rect x="-62" y="-54" width="124" height="108" rx="14" fill="#e0f2fe" stroke="#0284c7"/>
+      <text y="-12" font-weight="700" fill="#075985">Brief</text>
+      <text y="14" fill="#0f172a">voice, notes,</text>
+      <text y="36" fill="#0f172a">RFP, URL</text>
+    </g>
+    <g transform="translate(270 230)">
+      <rect x="-70" y="-54" width="140" height="108" rx="14" fill="#dcfce7" stroke="#16a34a"/>
+      <text y="-12" font-weight="700" fill="#166534">Outline</text>
+      <text y="14" fill="#0f172a">chapters and</text>
+      <text y="36" fill="#0f172a">sections</text>
+    </g>
+    <g transform="translate(445 230)">
+      <rect x="-74" y="-54" width="148" height="108" rx="14" fill="#fef3c7" stroke="#d97706"/>
+      <text y="-12" font-weight="700" fill="#92400e">Draft</text>
+      <text y="14" fill="#0f172a">Docs Live and</text>
+      <text y="36" fill="#0f172a">templates</text>
+    </g>
+    <g transform="translate(630 230)">
+      <rect x="-74" y="-54" width="148" height="108" rx="14" fill="#fce7f3" stroke="#db2777"/>
+      <text y="-12" font-weight="700" fill="#9d174d">Review</text>
+      <text y="14" fill="#0f172a">QA, comments,</text>
+      <text y="36" fill="#0f172a">AI provenance</text>
+    </g>
+    <g transform="translate(815 230)">
+      <rect x="-74" y="-54" width="148" height="108" rx="14" fill="#ede9fe" stroke="#7c3aed"/>
+      <text y="-12" font-weight="700" fill="#5b21b6">Evidence</text>
+      <text y="14" fill="#0f172a">citations and</text>
+      <text y="36" fill="#0f172a">source files</text>
+    </g>
+    <g transform="translate(1010 230)">
+      <rect x="-84" y="-54" width="168" height="108" rx="14" fill="#ecfeff" stroke="#0891b2"/>
+      <text y="-12" font-weight="700" fill="#155e75">Export</text>
+      <text y="14" fill="#0f172a">PDF, DOCX, HTML,</text>
+      <text y="36" fill="#0f172a">LaTeX, EPUB</text>
+    </g>
+  </g>
+  <g stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)">
+    <path d="M168 230 H198"/>
+    <path d="M340 230 H370"/>
+    <path d="M519 230 H554"/>
+    <path d="M704 230 H739"/>
+    <path d="M889 230 H923"/>
+  </g>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect x="84" y="340" width="1032" height="72" rx="14" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="110" y="382" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Audit trail:</text>
+  <text x="214" y="382" font-family="Arial, sans-serif" font-size="18" fill="#334155">front matter, snapshots, source manifests, comments, AI provenance, export manifests, and release evidence.</text>
+</svg>

@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn example_project_fixtures_compile_and_export() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    let examples: [(&str, &[&str], &[&str]); 6] = [
+    let examples: [(&str, &[&str], &[&str]); 7] = [
         (
             "examples/board-paper.md",
             &["Executives and managers"][..],
@@ -40,6 +40,41 @@ fn example_project_fixtures_compile_and_export() {
                 "Product and engineering teams",
             ][..],
             &["ai-source", "comment", "review"],
+        ),
+        (
+            "examples/showcase/neditor-capability-showcase.md",
+            &[
+                "Business writers",
+                "Proposal teams",
+                "Analysts and reviewers",
+                "Release managers",
+            ][..],
+            &[
+                "include",
+                "chart",
+                "csv",
+                "tsv",
+                "mermaid",
+                "d2",
+                "plantuml",
+                "timeline",
+                "roadmap",
+                "vega-lite",
+                "geojson",
+                "topojson",
+                "stl",
+                "qr",
+                "json",
+                "yaml",
+                "openapi",
+                "json-schema",
+                "bibtex",
+                "citation",
+                "equation",
+                "ai-source",
+                "comment",
+                "review",
+            ],
         ),
     ];
     let example_paths = examples

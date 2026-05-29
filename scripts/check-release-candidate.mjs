@@ -8,7 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const candidateDir = resolveCandidateDir();
 const issues = [];
 const warnings = [];
-const requiredKinds = ["frontend:index", "native:app-binary", "native:ned-cli", "native:prepared-ned-sidecar"];
+const requiredKinds = ["frontend:index", "native:app-binary", "native:ned-cli", "native:prepared-ned-sidecar", "distribution:showcase-example"];
 
 const manifestPath = join(candidateDir, "manifest.json");
 const sumsPath = join(candidateDir, "SHA256SUMS");

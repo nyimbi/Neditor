@@ -9,6 +9,96 @@ the implementation, examples, or verification tests. The
 [specification](specification.md) remains the authority for full product scope
 and future extensions.
 
+## How To Use This Reference
+
+Use this document as the canonical authoring reference for NEditor's Markdown
+extensions. The intent is that a business user can keep writing readable
+Markdown while a technical reviewer can still predict exactly what preview,
+readiness, and export will do.
+
+Recommended path:
+
+1. Start with ordinary Markdown headings, paragraphs, lists, tables, and links.
+2. Add front matter only for metadata, governance, export defaults, or repeated
+   variables that should be visible to reviewers.
+3. Use generated-section markers such as `[TOC]` or `[BIBLIOGRAPHY]` when the
+   document needs stable review and export sections.
+4. Use fenced transforms only when the document needs executable or structured
+   evidence such as calculations, charts, diagrams, SQL tables, API summaries,
+   timelines, or source manifests.
+5. Run diagnostics and export readiness before sending the document outside the
+   drafting team.
+
+When in doubt, prefer the least powerful extension that keeps the document
+clear. For example, use a normal Markdown table for static tabular content,
+`csv` or `xlsx` import for spreadsheet data, `calc` for named calculations,
+and `sql` only when a repeatable database query is needed.
+
+## Extension Quick Reference
+
+| Extension family | Syntax example | Primary use | Review/export behavior |
+| --- | --- | --- | --- |
+| YAML front matter | `---\ntitle: Board Paper\nstatus: draft\n---` | Metadata, governance, brand, layout, data sources, citation style, release state | Parsed before body compilation; malformed YAML produces source-ranged diagnostics. |
+| Variables | `{{client}}`, `{{budget | currency}}` | Reuse client, project, finance, owner, date, and profile values | Missing values or invalid filters produce diagnostics; resolved values flow into preview/export. |
+| Inline formulas | `{{=profit / revenue | percent}}` | Small computed values inside prose | Evaluated after `calc` blocks and data values are collected; formula errors are diagnostics. |
+| Includes | `!include chapters/intro.md` | Build master documents from child Markdown files | Child front matter is stripped; include graph is watched and recorded in manifests. |
+| Generated sections | `[TOC]`, `[BIBLIOGRAPHY]`, `[INDEX]` | Insert compiled tables of contents, bibliography, glossary, index, figures, and tables | Generated from the semantic document model, excluding fenced examples. |
+| Layout directives | `{{section-break columns=2 columnGap=18pt}}` | Multi-column sections, landscape appendices, margins, page flow | Preview/export preserve layout evidence; readiness flags risky layouts. |
+| Calculation fences | ```` ```calc ```` | Named business, scientific, and mathematical calculations | Values can feed inline formulas and review evidence. |
+| Structured data fences | ```` ```csv ````, ```` ```json ````, ```` ```yaml ```` | Render readable tables or structured summaries from data | Safe deterministic rendering; formula-cell and parse errors become diagnostics. |
+| SQL fences | ```` ```sql database="data/revenue.sqlite" ```` | Repeatable read-only database-backed tables | Requires trusted `sqlite3`; only `SELECT`/`WITH` queries are accepted. |
+| Diagram fences | ```` ```mermaid ````, ```` ```plantuml ````, ```` ```d2 ```` | Static diagrams for architecture, process, and decision flows | Native fallbacks cover common syntax; trusted external engines provide higher fidelity. |
+| Chart and visual-data fences | ```` ```chart ````, ```` ```vega-lite ````, ```` ```geojson ```` | Board charts, analysis plots, maps, and static visual evidence | Rendered as static artifacts for preview and export. |
+| Citations | `[@porter1985, p. 42]` | Research and evidence-backed claims | Missing keys, duplicate keys, and unsupported styles are reported. |
+| Bibliography fences | ```` ```bibtex ````, ```` ```bibliography ```` | Inline bibliography records and CSL JSON handoff | Entries feed citations and generated bibliography output. |
+| Cross references | `{@fig:architecture}` | Link to headings, figures, tables, equations, appendices, and decisions | Duplicate or malformed labels block release-grade export. |
+| Captions and labels | `![Alt](architecture.svg){#fig:a caption="Architecture"}` | Stable figures and numbered references | Captions and labels flow into preview, references, and exports. |
+| Equations | `$$E=mc^2$$ {#eq:energy caption="Energy"}` | Business, engineering, finance, and academic math | Captioned equations become numbered referenceable blocks. |
+| Glossary fences | ```` ```glossary ```` | Define terms for generated glossary and review | Terms can feed `[GLOSSARY]`, index, and reference panels. |
+| Review comments | `<!-- comment: author: Reviewer | open | ... -->` | Keep review notes near source | Unresolved or malformed review metadata affects readiness. |
+| AI provenance | ```` ```ai-source ```` | Preserve provider, model, prompt summary, and human review state | Incomplete provenance is surfaced before external distribution. |
+
+## Compatibility And Portability Rules
+
+NEditor extensions are designed to degrade safely:
+
+- The source file remains readable Markdown. Most extensions are fenced blocks,
+  front matter, comments, or explicit markers that other Markdown tools can
+  ignore or display as plain text.
+- Do not hide business-critical meaning only inside an unsupported transform.
+  Add prose labels, captions, or review notes around generated artifacts.
+- Keep paths relative to the document folder when a document needs to move
+  between machines, repositories, or customer handoffs.
+- Prefer deterministic static transforms for release documents. External
+  engines are useful for fidelity, but they should be trusted, probed, and
+  recorded in readiness evidence.
+- Put sensitive secrets outside Markdown. Use environment-variable references,
+  session-only tokens, or local configuration for provider and publishing
+  credentials.
+- Treat generated AI text as draft material until `ai-source` provenance,
+  review metadata, citations, and approval state are complete.
+
+## Compilation Lifecycle
+
+The compiler processes a document in a predictable order:
+
+1. Read the root Markdown file and front matter.
+2. Expand includes and strip child front matter.
+3. Load workspace variables and front matter variables.
+4. Parse headings, labels, figures, tables, equations, citations, glossary
+   entries, index terms, comments, AI provenance, and layout directives.
+5. Evaluate calculations and table formulas.
+6. Render deterministic transforms and collect external-engine diagnostics.
+7. Insert generated sections.
+8. Build the semantic document model, preview HTML, and export manifests.
+9. Run export readiness for target-specific blockers and warnings.
+
+This lifecycle matters when troubleshooting. If a variable seems unresolved,
+check front matter and `.neditor/variables.yaml`. If a citation is missing,
+check bibliography fences and bibliography files. If a transform fails, check
+engine setup and trust. If an export looks wrong, check layout directives,
+readiness diagnostics, and the manifest.
+
 ## Front Matter
 
 Use YAML front matter at the top of a document:

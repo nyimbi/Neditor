@@ -69,7 +69,7 @@ const evidenceKitReportCurrentForReadiness =
   Number(evidenceKitReport.summary?.gaps || -1) === candidateEvidenceGaps.length;
 const sourceTreeCleanAfter = gitTreeClean();
 const artifacts = collectArtifacts();
-const requiredArtifacts = ["frontend:index", "native:app-binary", "native:ned-cli", "native:prepared-ned-sidecar"];
+const requiredArtifacts = ["frontend:index", "native:app-binary", "native:ned-cli", "native:prepared-ned-sidecar", "distribution:showcase-example"];
 const missingRequired = requiredArtifacts.filter((kind) => !artifacts.some((artifact) => artifact.kind === kind));
 const sidecarMismatches = preparedSidecarMismatches(artifacts);
 
@@ -149,6 +149,7 @@ function collectArtifacts() {
     artifact("native:app-binary", "src-tauri/target/release/neditor"),
     artifact("native:ned-cli", "src-tauri/target/release/ned"),
     ...collectPreparedSidecarArtifacts(),
+    ...collectDistributionExampleArtifacts(),
     ...collectFrontendAssets(),
     ...collectBundleArtifacts(),
   ].filter(Boolean);
@@ -168,6 +169,14 @@ function preparedSidecarMismatches(artifacts) {
   const cli = artifacts.find((artifact) => artifact.kind === "native:ned-cli");
   if (!cli) return [];
   return artifacts.filter((artifact) => artifact.kind === "native:prepared-ned-sidecar" && artifact.sha256 !== cli.sha256);
+}
+
+function collectDistributionExampleArtifacts() {
+  const showcaseDir = join(root, "examples", "showcase");
+  if (!existsSync(showcaseDir)) return [];
+  return walk(showcaseDir)
+    .filter((path) => statSync(path).isFile())
+    .map((path) => artifact("distribution:showcase-example", relativePath(path)));
 }
 
 function refreshPrerequisiteEvidence() {

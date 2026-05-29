@@ -111,9 +111,11 @@ import {
   buildDocsLiveQuestionnaire,
   buildDocsLiveReviewPacketMarkdown,
   buildDocsLiveSuggestedAnswers,
+  docsLiveDefaultOutlineMarkdown,
   docsLiveDocumentTypeForOutlineSignal,
   docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
+  docsLiveWizardProfile,
   extractDocsLivePlaceholders,
   normalizeDocsLiveDocumentType,
   removeDocsLivePlaceholder,
@@ -3306,6 +3308,15 @@ test("Docs Live covers business technical legal marketing and customer document 
 });
 
 test("Docs Live textbook and novel wizards plan structure before sequential chapter drafting", () => {
+  const novelProfile = docsLiveWizardProfile("novel");
+  equal(novelProfile.planningLabel, "Plot architecture");
+  ok(novelProfile.defaultOutlineMarkdown.includes("- Character Arcs"));
+  ok(novelProfile.defaultOutlineMarkdown.includes("- Narrative Quality Review"));
+  ok(novelProfile.decisionPrompts.some((prompt) => prompt.label === "Creative promise"));
+  ok(novelProfile.decisionPrompts.some((prompt) => prompt.label === "Genre and shelf"));
+  ok(novelProfile.decisionPrompts.some((prompt) => prompt.label === "Point of view and tense"));
+  ok(docsLiveDefaultOutlineMarkdown("movie-script").includes("- Beat Sheet"));
+
   const textbookDraft = buildDocsLiveDraft({
     documentType: "technical-textbook",
     title: "Distributed Systems Textbook",
@@ -7971,6 +7982,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("guidedDemoChecklistMarkdown"));
   ok(app.includes("## NEditor Guided Demo Checklist"));
   ok(app.includes("AI Agent Workspace"));
+  ok(app.includes('aria-label="Docs Live creation wizard"'));
+  ok(app.includes("docsLiveWizardSteps"));
+  ok(app.includes("handleDocsLiveDocumentTypeChange"));
+  ok(app.includes("applyDocsLiveSelectedTypeOutline"));
+  ok(app.includes("docsLiveProfile.planningLabel"));
+  ok(app.includes("Decisions to make before drafting"));
   ok(app.includes('aria-label="Docs Live placeholder manager"'));
   ok(app.includes('aria-label="AI Create intent brief"'));
   ok(app.includes("docsLiveIntentFields"));
@@ -9010,6 +9027,7 @@ test("local verification scripts expose local baseline checks", () => {
   const externalEngineProbe = readFileSync("scripts/check-external-engines.mjs", "utf8");
   const releaseCandidate = readFileSync("scripts/create-release-candidate.mjs", "utf8");
   const releaseCandidateChecker = readFileSync("scripts/check-release-candidate.mjs", "utf8");
+  const desktopBundleChecker = readFileSync("scripts/check-desktop-bundle.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:ai-roadmap"], "node scripts/check-ai-first-roadmap.mjs");
@@ -9363,6 +9381,9 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("native:prepared-ned-sidecar"));
   ok(releaseCandidate.includes("collectPreparedSidecarArtifacts"));
   ok(releaseCandidate.includes("preparedSidecarMismatches"));
+  ok(releaseCandidate.includes("distribution:showcase-example"));
+  ok(releaseCandidate.includes("collectDistributionExampleArtifacts"));
+  ok(releaseCandidate.includes("examples\", \"showcase"));
   ok(releaseCandidate.includes("Prepared ned sidecar hash does not match"));
   ok(releaseCandidate.includes("evidenceKitCurrentForSource"));
   ok(releaseCandidate.includes("evidenceKit.sourceCommit === sourceCommit"));
@@ -9385,11 +9406,14 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidateChecker.includes("SHA256SUMS"));
   ok(releaseCandidateChecker.includes("check-report.json"));
   ok(releaseCandidateChecker.includes("native:prepared-ned-sidecar"));
+  ok(releaseCandidateChecker.includes("distribution:showcase-example"));
   ok(releaseCandidateChecker.includes("Prepared ned sidecar hash must match native:ned-cli"));
   ok(releaseCandidateChecker.includes("manifest artifacts must be a non-empty array"));
   ok(releaseCandidateChecker.includes("size mismatch"));
   ok(releaseCandidateChecker.includes("SHA-256 mismatch"));
   ok(releaseCandidateChecker.includes("README.md must state whether the candidate is releaseable on this host"));
+  ok(desktopBundleChecker.includes("examples\", \"showcase\", \"neditor-capability-showcase.md"));
+  ok(desktopBundleChecker.includes("capability showcase example is missing"));
   ok(releaseCandidate.includes("readyToSend: workItem.readyToSend === true"));
   ok(releaseCandidate.includes("releaseGateLine"));
   ok(releaseCandidate.includes("runbooks: ${runbooks}; returns: ${returns}; validators: ${validators}"));

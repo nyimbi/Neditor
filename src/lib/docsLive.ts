@@ -105,6 +105,27 @@ export interface DocsLiveSuggestedAnswer {
   contextSignals: string[];
 }
 
+export interface DocsLiveDecisionPrompt {
+  key: string;
+  label: string;
+  placeholder: string;
+  help: string;
+  kind: DocsLivePlaceholderKind;
+}
+
+export interface DocsLiveWizardProfile {
+  documentType: DocsLiveDocumentType;
+  label: string;
+  planningLabel: string;
+  sequencingLabel: string;
+  qualityLabel: string;
+  unitLabel: string;
+  defaultOutlineMarkdown: string;
+  decisionPrompts: DocsLiveDecisionPrompt[];
+  planningArtifacts: string[];
+  qualityChecks: string[];
+}
+
 export interface DocsLiveWorkflowStep {
   id: string;
   label: string;
@@ -704,6 +725,29 @@ export function buildDocsLiveQuestionnaire(documentType: string, request: DocsLi
   return docsLiveQuestionnaireQuestions(documentType, request).map((question, index) => `${index + 1}. ${question}`).join("\n");
 }
 
+export function docsLiveDefaultOutlineMarkdown(documentType: string) {
+  const type = normalizeDocsLiveDocumentType(documentType);
+  return blueprints[type].defaultOutline.map((section) => `- ${section}`).join("\n");
+}
+
+export function docsLiveWizardProfile(documentType: string): DocsLiveWizardProfile {
+  const type = normalizeDocsLiveDocumentType(documentType);
+  const blueprint = blueprints[type];
+  const workflow = workflowProfileFor(blueprint);
+  return {
+    documentType: type,
+    label: blueprint.label,
+    planningLabel: workflow.planningLabel,
+    sequencingLabel: workflow.sequencingLabel,
+    qualityLabel: workflow.qualityLabel,
+    unitLabel: workflow.unitLabel,
+    defaultOutlineMarkdown: docsLiveDefaultOutlineMarkdown(type),
+    decisionPrompts: docsLiveDecisionPrompts(type, blueprint),
+    planningArtifacts: workflow.planningArtifacts,
+    qualityChecks: workflow.qualityChecks,
+  };
+}
+
 export function buildDocsLiveSuggestedAnswers(documentType: string, request: DocsLiveQuestionnaireRequest = {}): DocsLiveSuggestedAnswer[] {
   const type = normalizeDocsLiveDocumentType(documentType);
   const blueprint = blueprints[type];
@@ -744,6 +788,219 @@ function docsLiveQuestionnaireQuestions(documentType: string, request: DocsLiveQ
   }
   questions.push("What must remain visibly marked for human review before export or publication?");
   return Array.from(new Set(questions));
+}
+
+function docsLiveDecisionPrompts(type: DocsLiveDocumentType, blueprint: DocsLiveBlueprint): DocsLiveDecisionPrompt[] {
+  const common: DocsLiveDecisionPrompt[] = [
+    {
+      key: "audience",
+      label: audienceDecisionLabel(type),
+      placeholder: audienceDecisionPlaceholder(type),
+      help: audienceDecisionHelp(type),
+      kind: "client",
+    },
+    {
+      key: "outcome",
+      label: outcomeDecisionLabel(type),
+      placeholder: outcomeDecisionPlaceholder(type),
+      help: outcomeDecisionHelp(type),
+      kind: "decision",
+    },
+    {
+      key: "owner",
+      label: ownerDecisionLabel(type),
+      placeholder: ownerDecisionPlaceholder(type),
+      help: "The accountable human reviewer or decision owner for this draft.",
+      kind: "person",
+    },
+    {
+      key: "deadline",
+      label: deadlineDecisionLabel(type),
+      placeholder: deadlineDecisionPlaceholder(type),
+      help: "The date or milestone that should shape scope, length, and review urgency.",
+      kind: "date",
+    },
+    {
+      key: "distribution target",
+      label: distributionDecisionLabel(type),
+      placeholder: distributionDecisionPlaceholder(type),
+      help: "Where the document needs to land so Docs Live can shape format, tone, and readiness checks.",
+      kind: "channel",
+    },
+  ];
+  const extras = extraDecisionPrompts(type);
+  return [...common, ...extras].slice(0, blueprint.workflow ? 8 : 7);
+}
+
+function extraDecisionPrompts(type: DocsLiveDocumentType): DocsLiveDecisionPrompt[] {
+  const byType: Partial<Record<DocsLiveDocumentType, DocsLiveDecisionPrompt[]>> = {
+    novel: [
+      {
+        key: "genre promise",
+        label: "Genre and shelf",
+        placeholder: "adult speculative mystery with literary pacing",
+        help: "The commercial and creative shelf promise: what kind of reader should pick this up and why.",
+        kind: "decision",
+      },
+      {
+        key: "point of view",
+        label: "Point of view and tense",
+        placeholder: "close third, past tense, rotating two protagonists",
+        help: "A structural choice that controls voice, scene access, and continuity before prose is drafted.",
+        kind: "text",
+      },
+      {
+        key: "protagonist arc",
+        label: "Protagonist arc",
+        placeholder: "from risk-averse analyst to public whistleblower",
+        help: "The emotional business decision of the story: what change must the reader believe.",
+        kind: "decision",
+      },
+    ],
+    "technical-textbook": [
+      {
+        key: "reader level",
+        label: "Reader level",
+        placeholder: "senior undergraduate, professional engineer, executive primer",
+        help: "The learning level determines assumptions, examples, equations, and pace.",
+        kind: "decision",
+      },
+      {
+        key: "assessment model",
+        label: "Assessment model",
+        placeholder: "worked examples plus chapter exercises and capstone",
+        help: "The instructional decision that shapes chapter sequencing and quality review.",
+        kind: "decision",
+      },
+    ],
+    "podcast-script": [
+      {
+        key: "listener promise",
+        label: "Listener promise",
+        placeholder: "one practical takeaway for operations leaders in 20 minutes",
+        help: "The audio product decision that controls pacing, segment order, and handoff.",
+        kind: "decision",
+      },
+      {
+        key: "show format",
+        label: "Show format",
+        placeholder: "host monologue, interview, narrative documentary",
+        help: "The production choice that controls voice, roles, cues, and timing.",
+        kind: "channel",
+      },
+    ],
+    "movie-script": [
+      {
+        key: "logline",
+        label: "Logline",
+        placeholder: "A climate analyst must expose a rigged forecast before the auction closes.",
+        help: "The screen story decision that governs every beat, reversal, and scene test.",
+        kind: "decision",
+      },
+      {
+        key: "production constraint",
+        label: "Production constraint",
+        placeholder: "limited locations, no VFX, ensemble cast of five",
+        help: "The business constraint that keeps the screenplay draft producible.",
+        kind: "text",
+      },
+    ],
+    "rfp-response": [
+      {
+        key: "win theme",
+        label: "Win theme",
+        placeholder: "lowest-risk compliant delivery with proven team and references",
+        help: "The strategic bid decision that every outline section should reinforce.",
+        kind: "decision",
+      },
+      {
+        key: "mandatory gates",
+        label: "Mandatory gates",
+        placeholder: "signed annexes, page limit, roles, deadline, format",
+        help: "Pass/fail submission constraints that must be surfaced before drafting.",
+        kind: "source",
+      },
+    ],
+    proposal: [
+      {
+        key: "commercial model",
+        label: "Commercial model",
+        placeholder: "fixed fee, milestone billing, retainer, pilot-to-scale",
+        help: "The business decision that shapes scope, pricing, risk, and acceptance.",
+        kind: "money",
+      },
+    ],
+  };
+  return byType[type] || [];
+}
+
+function audienceDecisionLabel(type: DocsLiveDocumentType) {
+  return type === "novel" ? "Target reader" : type === "podcast-script" ? "Target listener" : type === "movie-script" ? "Target viewer" : "Audience";
+}
+
+function audienceDecisionPlaceholder(type: DocsLiveDocumentType) {
+  if (type === "novel") return "adult speculative fiction readers, YA fantasy, cozy mystery fans";
+  if (type === "podcast-script") return "CFOs, founders, field teams, teachers";
+  if (type === "movie-script") return "festival audience, streaming thriller viewers, family audience";
+  return "executive team, board, customers, learners";
+}
+
+function audienceDecisionHelp(type: DocsLiveDocumentType) {
+  if (type === "novel") return "The reader promise and market shelf, not a corporate recipient.";
+  if (type === "podcast-script") return "The listener profile determines pacing, vocabulary, and audio handoffs.";
+  if (type === "movie-script") return "The intended viewer controls tone, rating, scene density, and payoff.";
+  return "The decision-maker or reader whose needs the document must satisfy.";
+}
+
+function outcomeDecisionLabel(type: DocsLiveDocumentType) {
+  if (type === "novel") return "Creative promise";
+  if (type === "movie-script") return "Story payoff";
+  if (type === "podcast-script") return "Listener takeaway";
+  if (type === "technical-textbook" || type === "lesson-plan" || type === "lesson-content") return "Learning outcome";
+  return "Business decision";
+}
+
+function outcomeDecisionPlaceholder(type: DocsLiveDocumentType) {
+  if (type === "novel") return "reader feels the cost of truth and wants book two";
+  if (type === "movie-script") return "audience understands the protagonist's irreversible choice";
+  if (type === "podcast-script") return "listener can make one better operational decision";
+  if (type === "technical-textbook") return "reader can implement and evaluate the method independently";
+  return "approve renewal, choose vendor, fund pilot, align launch plan";
+}
+
+function outcomeDecisionHelp(type: DocsLiveDocumentType) {
+  if (type === "novel") return "The creative and business promise the story must satisfy for its target reader.";
+  if (type === "movie-script") return "The final audience effect the beat sheet and scenes must earn.";
+  if (type === "podcast-script") return "The concrete listener value the episode must deliver.";
+  if (type === "technical-textbook" || type === "lesson-plan" || type === "lesson-content") return "The measurable learning result the content must support.";
+  return "The business choice, approval, or action the document should make easier.";
+}
+
+function ownerDecisionLabel(type: DocsLiveDocumentType) {
+  return type === "novel" || type === "movie-script" ? "Creative owner" : "Owner";
+}
+
+function ownerDecisionPlaceholder(type: DocsLiveDocumentType) {
+  return type === "novel" || type === "movie-script" ? "lead author, editor, showrunner" : "Finance, Product, Legal, proposal lead";
+}
+
+function deadlineDecisionLabel(type: DocsLiveDocumentType) {
+  return type === "novel" || type === "movie-script" ? "Milestone" : "Deadline";
+}
+
+function deadlineDecisionPlaceholder(type: DocsLiveDocumentType) {
+  return type === "novel" ? "pitch package by June 1, first chapter review Friday" : "June 1, end of Q2, submission date";
+}
+
+function distributionDecisionLabel(type: DocsLiveDocumentType) {
+  return type === "novel" ? "Publishing path" : type === "movie-script" ? "Submission path" : "Distribution target";
+}
+
+function distributionDecisionPlaceholder(type: DocsLiveDocumentType) {
+  if (type === "novel") return "query package, serialized web novel, editor review, self-publish";
+  if (type === "movie-script") return "pitch deck, screenplay PDF, producers, table read";
+  if (type === "podcast-script") return "recording script, show notes, transcript, Substack";
+  return "PDF, Google Docs, Substack, board pack, tender portal";
 }
 
 export function buildDocsLiveDraft(request: DocsLiveDraftRequest): DocsLiveDraft {

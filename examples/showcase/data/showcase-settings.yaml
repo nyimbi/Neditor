@@ -1,0 +1,16 @@
+profile: showcase-delivery-pack
+defaultTargets:
+  - html
+  - pdf
+  - docx
+  - latex
+  - google-docs
+  - epub
+readiness:
+  comments: include-appendix
+  aiProvenance: include-appendix
+  bibliography: required
+  approvalMetadata: required
+publishing:
+  blog: dry-run
+  substack: manual-handoff

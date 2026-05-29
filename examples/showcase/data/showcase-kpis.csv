@@ -1,0 +1,5 @@
+Metric,Current,Target,Owner
+Source coverage,0.72,0.95,Research lead
+Review closure,0.64,0.98,Review owner
+Export readiness,0.81,1.00,Release manager
+Template reuse,0.58,0.85,Operations

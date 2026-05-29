@@ -239,7 +239,7 @@
             v-if="writingSpaceMaximized"
             class="collapsed-toolbar-pill collapsed-toolbar-pill-primary"
             type="button"
-            aria-label="Restore writing space layout"
+            aria-label="Restore layout from titlebar"
             title="Restore the sidebar, status bar, toolbar rows, and view mode you used before maximizing writing space"
             @click="restoreWritingSpace"
           >
@@ -436,8 +436,23 @@
       tabindex="-1"
     >
       <button
+        v-if="writingSpaceMaximized"
+        class="workspace-writing-restore"
+        type="button"
+        aria-label="Restore writing space layout"
+        title="Restore the sidebar, preview, status bar, toolbar rows, and view mode you used before maximizing writing space"
+        @click="restoreWritingSpace"
+      >
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path v-for="path in toolbarIconPaths('layout')" :key="path" :d="path"></path>
+        </svg>
+        <span>Restore writing</span>
+        <small>Bring back panels and toolbars</small>
+      </button>
+      <button
         v-if="collapsedToolbarRows.length"
         class="workspace-toolbar-restore"
+        :class="{ 'workspace-toolbar-restore-offset': writingSpaceMaximized }"
         type="button"
         aria-label="Toolbars hidden. Show all hidden toolbar rows"
         :title="hiddenToolbarWorkspaceHelpText"
@@ -4279,236 +4294,292 @@
           <button type="button" aria-label="Close Docs Live" @click="closeDocsLive">x</button>
         </header>
 
-        <section class="docs-live-grid">
-          <label>
-            Document type
-            <select v-model="docsLiveDocumentType" data-initial-focus @change="refreshDocsLiveQuestionnaire">
-              <option v-for="type in docsLiveDocumentTypes" :key="type.id" :value="type.id">{{ type.label }}</option>
-            </select>
-          </label>
-          <label>
-            Document title
-            <input v-model="docsLiveTitle" placeholder="Board brief, proposal, report" />
-          </label>
-          <label>
-            Drafting depth
-            <select v-model="docsLiveDraftingDepth">
-              <option v-for="depth in docsLiveDraftingDepthOptions" :key="depth.value" :value="depth.value">{{ depth.label }}</option>
-            </select>
-          </label>
-          <section class="docs-live-intent-brief docs-live-wide" aria-label="AI Create intent brief">
-            <header>
-              <div>
-                <strong>Intent Brief</strong>
-                <span>Business context required before a responsible first draft.</span>
-              </div>
-              <small>{{ docsLiveIntentCompletion }}</small>
-            </header>
-            <div class="docs-live-intent-grid">
-              <label v-for="field in docsLiveIntentFields" :key="field.key">
-                {{ field.label }}
-                <input
-                  :value="docsLivePlaceholderValue(field.key)"
-                  :placeholder="field.placeholder"
-                  @change="updateDocsLiveIntentField(field.key, inputValue($event))"
-                />
+        <section class="docs-live-wizard-shell" aria-label="Docs Live creation wizard">
+          <nav class="docs-live-stepper" aria-label="Docs Live wizard steps">
+            <button
+              v-for="(step, index) in docsLiveWizardSteps"
+              :key="step.id"
+              type="button"
+              :class="{ active: docsLiveWizardStep === step.id, complete: index < docsLiveWizardStepIndex }"
+              :aria-current="docsLiveWizardStep === step.id ? 'step' : undefined"
+              @click="setDocsLiveWizardStep(step.id)"
+            >
+              <span>{{ index + 1 }}</span>
+              <strong>{{ step.label }}</strong>
+              <small>{{ step.summary }}</small>
+            </button>
+          </nav>
+
+          <section v-if="docsLiveWizardStep === 'brief'" class="docs-live-wizard-panel" aria-label="Docs Live brief and decisions">
+            <div class="docs-live-grid docs-live-grid-compact">
+              <label>
+                Document type
+                <select v-model="docsLiveDocumentType" data-initial-focus @change="handleDocsLiveDocumentTypeChange">
+                  <option v-for="type in docsLiveDocumentTypes" :key="type.id" :value="type.id">{{ type.label }}</option>
+                </select>
+              </label>
+              <label>
+                Document title
+                <input v-model="docsLiveTitle" placeholder="Board brief, proposal, report" @change="refreshDocsLiveQuestionnaire" />
+              </label>
+              <label>
+                Drafting depth
+                <select v-model="docsLiveDraftingDepth">
+                  <option v-for="depth in docsLiveDraftingDepthOptions" :key="depth.value" :value="depth.value">{{ depth.label }}</option>
+                </select>
               </label>
             </div>
-          </section>
-          <section class="docs-live-intent-brief docs-live-wide" aria-label="AI document creation wizard stages">
-            <header>
-              <div>
-                <strong>Creation Wizard</strong>
-                <span>Identity, intent, outline, section drafting, QA, humanization, and review handoff.</span>
-              </div>
-            </header>
-            <ol class="wizard-step-list">
-              <li v-for="step in aiDocumentWizardSteps" :key="step.id">
-                <strong>{{ step.label }}</strong>
-                <span>{{ step.prompt }}</span>
-              </li>
-            </ol>
-            <div class="agent-cli-list" aria-label="Agentic local integrations">
-              <span v-for="integration in agenticCliIntegrations" :key="integration.id">
-                {{ integration.label }}
-                <code>{{ integration.command }}</code>
-              </span>
-            </div>
-          </section>
-          <label class="docs-live-wide">
-            Outline
-            <textarea v-model="docsLiveOutlineText" rows="7" placeholder="- Executive Summary&#10;- Recommendation&#10;- Next Steps"></textarea>
-          </label>
-          <section class="docs-live-voice docs-live-wide" aria-label="Voice dictation">
-            <div class="docs-live-voice-actions">
-              <button type="button" :disabled="!docsLiveSpeechAvailable" @click="toggleDocsLiveDictation">
-                {{ docsLiveListening ? "Stop dictation" : "Start dictation" }}
-              </button>
-              <button type="button" :disabled="docsLiveRuntimeChecking" @click="checkDocsLiveRuntime">
-                {{ docsLiveRuntimeChecking ? "Checking runtime..." : "Check AI runtime" }}
-              </button>
-              <span role="status">{{ docsLiveSpeechStatus }}</span>
-            </div>
-            <section v-if="docsLiveRuntimeReport" class="docs-live-runtime" aria-label="AI runtime readiness">
+
+            <section class="docs-live-type-card" aria-label="Selected Docs Live document profile">
               <header>
-                <strong>Runtime readiness</strong>
-                <span>{{ docsLiveRuntimeReport.issues.length }} issues</span>
+                <div>
+                  <strong>{{ docsLiveProfile.label }}</strong>
+                  <span>{{ docsLiveProfile.planningLabel }} -> {{ docsLiveProfile.sequencingLabel }} -> {{ docsLiveProfile.qualityLabel }}</span>
+                </div>
+                <small>{{ docsLiveProfile.unitLabel }} workflow</small>
               </header>
-              <ul>
-                <li>Speech: {{ docsLiveRuntimeReport.speechRecognition.state }} - {{ docsLiveRuntimeReport.speechRecognition.detail }}</li>
-                <li>Microphone: {{ docsLiveRuntimeReport.microphonePermission.state }} - {{ docsLiveRuntimeReport.microphonePermission.detail }}</li>
-                <li>Clipboard read: {{ docsLiveRuntimeReport.clipboardRead.state }} - {{ docsLiveRuntimeReport.clipboardRead.detail }}</li>
-                <li>Clipboard write: {{ docsLiveRuntimeReport.clipboardWrite.state }} - {{ docsLiveRuntimeReport.clipboardWrite.detail }}</li>
-              </ul>
-              <textarea :value="docsLiveRuntimeReport.markdown" rows="7" readonly aria-label="AI runtime readiness report"></textarea>
+              <div class="docs-live-profile-lists">
+                <section>
+                  <strong>Planning decisions</strong>
+                  <ul>
+                    <li v-for="artifact in docsLiveProfile.planningArtifacts.slice(0, 5)" :key="artifact">{{ artifact }}</li>
+                  </ul>
+                </section>
+                <section>
+                  <strong>Quality checks</strong>
+                  <ul>
+                    <li v-for="check in docsLiveProfile.qualityChecks.slice(0, 4)" :key="check">{{ check }}</li>
+                  </ul>
+                </section>
+              </div>
             </section>
+
+            <section class="docs-live-intent-brief" aria-label="AI Create intent brief">
+              <header>
+                <div>
+                  <strong>Decisions to make before drafting</strong>
+                  <span>These fields change with the document type and feed the outline, section queue, and QA pass.</span>
+                </div>
+                <small>{{ docsLiveIntentCompletion }}</small>
+              </header>
+              <div class="docs-live-intent-grid">
+                <label v-for="field in docsLiveIntentFields" :key="field.key" :title="field.help">
+                  {{ field.label }}
+                  <input
+                    :value="docsLivePlaceholderValue(field.key)"
+                    :placeholder="field.placeholder"
+                    @change="updateDocsLiveIntentField(field.key, inputValue($event))"
+                  />
+                  <small>{{ field.help }}</small>
+                </label>
+              </div>
+            </section>
+          </section>
+
+          <section v-else-if="docsLiveWizardStep === 'outline'" class="docs-live-wizard-panel" aria-label="Docs Live outline planner">
+            <section class="docs-live-outline-tools">
+              <label>
+                Editable outline
+                <textarea v-model="docsLiveOutlineText" rows="12" placeholder="- Executive Summary&#10;- Recommendation&#10;- Next Steps" @input="refreshDocsLiveQuestionnaire"></textarea>
+              </label>
+              <aside class="docs-live-suggested-outline" aria-label="Suggested outline for selected document type">
+                <header>
+                  <div>
+                    <strong>{{ docsLiveProfile.label }} outline</strong>
+                    <span>Generated from the selected document type.</span>
+                  </div>
+                  <button type="button" @click="applyDocsLiveSelectedTypeOutline">Use this outline</button>
+                </header>
+                <textarea :value="docsLiveSelectedTypeOutline" rows="12" readonly aria-label="Selected document type outline"></textarea>
+                <div class="docs-live-outline-actions">
+                  <button type="button" @click="loadDocsLiveOutlineFromDocument">Use document outline</button>
+                  <button type="button" @click="refreshDocsLiveQuestionnaire">Refresh questions</button>
+                </div>
+              </aside>
+            </section>
+          </section>
+
+          <section v-else-if="docsLiveWizardStep === 'context'" class="docs-live-wizard-panel" aria-label="Docs Live voice and context">
+            <section class="docs-live-voice" aria-label="Voice dictation">
+              <div class="docs-live-voice-actions">
+                <button type="button" :disabled="!docsLiveSpeechAvailable" @click="toggleDocsLiveDictation">
+                  {{ docsLiveListening ? "Stop dictation" : "Start dictation" }}
+                </button>
+                <button type="button" :disabled="docsLiveRuntimeChecking" @click="checkDocsLiveRuntime">
+                  {{ docsLiveRuntimeChecking ? "Checking runtime..." : "Check AI runtime" }}
+                </button>
+                <span role="status">{{ docsLiveSpeechStatus }}</span>
+              </div>
+              <section v-if="docsLiveRuntimeReport" class="docs-live-runtime" aria-label="AI runtime readiness">
+                <header>
+                  <strong>Runtime readiness</strong>
+                  <span>{{ docsLiveRuntimeReport.issues.length }} issues</span>
+                </header>
+                <ul>
+                  <li>Speech: {{ docsLiveRuntimeReport.speechRecognition.state }} - {{ docsLiveRuntimeReport.speechRecognition.detail }}</li>
+                  <li>Microphone: {{ docsLiveRuntimeReport.microphonePermission.state }} - {{ docsLiveRuntimeReport.microphonePermission.detail }}</li>
+                  <li>Clipboard read: {{ docsLiveRuntimeReport.clipboardRead.state }} - {{ docsLiveRuntimeReport.clipboardRead.detail }}</li>
+                  <li>Clipboard write: {{ docsLiveRuntimeReport.clipboardWrite.state }} - {{ docsLiveRuntimeReport.clipboardWrite.detail }}</li>
+                </ul>
+                <textarea :value="docsLiveRuntimeReport.markdown" rows="6" readonly aria-label="AI runtime readiness report"></textarea>
+              </section>
+              <label>
+                Spoken direction
+                <textarea v-model="docsLiveTranscript" rows="5" placeholder="Dictate what should change, who it is for, and the outcome you need." @input="refreshDocsLiveQuestionnaire"></textarea>
+              </label>
+              <p v-if="docsLiveInterimTranscript" class="sidebar-hint">{{ docsLiveInterimTranscript }}</p>
+            </section>
+
+            <div class="docs-live-context-grid">
+              <label>
+                Context and constraints
+                <textarea v-model="docsLiveContext" rows="8" placeholder="Add freeform context, constraints, examples, evidence, tone, and review expectations." @input="refreshDocsLiveQuestionnaire"></textarea>
+              </label>
+              <label>
+                AI-created questionnaire
+                <textarea v-model="docsLiveQuestionnaireText" rows="8" readonly></textarea>
+              </label>
+            </div>
+
+            <section class="docs-live-suggestions" aria-label="AI suggested optimal answers">
+              <header>
+                <div>
+                  <strong>Suggested Answers</strong>
+                  <span>Context-aware starting points for every wizard step.</span>
+                </div>
+                <button type="button" :disabled="!docsLiveSuggestedAnswers.length" @click="appendAllDocsLiveSuggestedAnswers">Use all</button>
+              </header>
+              <article v-for="suggestion in docsLiveSuggestedAnswers" :key="suggestion.id">
+                <div>
+                  <small>{{ suggestion.stepLabel }}</small>
+                  <strong>{{ suggestion.question }}</strong>
+                  <p>{{ suggestion.answer }}</p>
+                  <p class="sidebar-hint">{{ suggestion.rationale }}</p>
+                  <span>{{ suggestion.source }}</span>
+                </div>
+                <button
+                  type="button"
+                  :aria-label="`Use Docs Live suggested answer: ${suggestion.question}`"
+                  :title="`Use Docs Live suggested answer: ${suggestion.question}`"
+                  @click="appendDocsLiveSuggestedAnswer(suggestion)"
+                >
+                  Use
+                </button>
+              </article>
+            </section>
+
             <label>
-              Spoken direction
-              <textarea v-model="docsLiveTranscript" rows="6" placeholder="Dictate what should change, who it is for, and the outcome you need."></textarea>
+              Questionnaire answers
+              <textarea
+                v-model="docsLiveQuestionnaireAnswerText"
+                rows="7"
+                placeholder="1. The reader should approve renewal.&#10;2. Include usage growth, budget, risks, and named owner.&#10;3. Leave financial assumptions marked for review."
+              ></textarea>
             </label>
-            <p v-if="docsLiveInterimTranscript" class="sidebar-hint">{{ docsLiveInterimTranscript }}</p>
           </section>
-          <label>
-            Context and answers
-            <textarea v-model="docsLiveContext" rows="8" placeholder="Answer the questionnaire or add freeform context, constraints, examples, evidence, tone, and review expectations."></textarea>
-          </label>
-          <label>
-            Placeholder values
-            <textarea v-model="docsLivePlaceholderText" rows="8" placeholder="client: Acme&#10;audience: executive team&#10;deadline: June 1&#10;owner: Finance"></textarea>
-          </label>
-          <section class="docs-live-placeholder-manager docs-live-wide" aria-label="Docs Live placeholder manager">
-            <header>
-              <div>
-                <strong>Placeholder Manager</strong>
-                <span>{{ docsLivePlaceholderRows.length }} values | Missing {{ docsLiveMissingPlaceholderKeys.join(", ") || "none" }}</span>
+
+          <section v-else-if="docsLiveWizardStep === 'variables'" class="docs-live-wizard-panel" aria-label="Docs Live variables and evidence">
+            <label>
+              Placeholder values
+              <textarea v-model="docsLivePlaceholderText" rows="7" placeholder="client: Acme&#10;audience: executive team&#10;deadline: June 1&#10;owner: Finance" @input="refreshDocsLiveQuestionnaire"></textarea>
+            </label>
+            <section class="docs-live-placeholder-manager" aria-label="Docs Live placeholder manager">
+              <header>
+                <div>
+                  <strong>Placeholder Manager</strong>
+                  <span>{{ docsLivePlaceholderRows.length }} values | Missing {{ docsLiveMissingPlaceholderKeys.join(", ") || "none" }}</span>
+                </div>
+              </header>
+              <div class="docs-live-placeholder-add">
+                <label>
+                  Key
+                  <input v-model="docsLivePlaceholderKey" placeholder="client, amount, source" />
+                </label>
+                <label>
+                  Value
+                  <input v-model="docsLivePlaceholderDraftValue" placeholder="Acme, $250K, audited forecast" />
+                </label>
+                <label>
+                  Type
+                  <select v-model="docsLivePlaceholderDraftKind">
+                    <option v-for="kind in docsLivePlaceholderKindOptions" :key="kind.value" :value="kind.value">{{ kind.label }}</option>
+                  </select>
+                </label>
+                <label>
+                  Source
+                  <input v-model="docsLivePlaceholderDraftSource" placeholder="Finance workbook, GC review, customer brief" />
+                </label>
+                <label>
+                  Review
+                  <select v-model="docsLivePlaceholderDraftStatus">
+                    <option v-for="status in docsLivePlaceholderReviewStatusOptions" :key="status.value" :value="status.value">{{ status.label }}</option>
+                  </select>
+                </label>
+                <button type="button" :disabled="!docsLivePlaceholderKey.trim() || !docsLivePlaceholderDraftValue.trim()" @click="addDocsLivePlaceholder">
+                  Add value
+                </button>
               </div>
-            </header>
-            <div class="docs-live-placeholder-add">
-              <label>
-                Key
-                <input v-model="docsLivePlaceholderKey" placeholder="client, amount, source" />
-              </label>
-              <label>
-                Value
-                <input v-model="docsLivePlaceholderDraftValue" placeholder="Acme, $250K, audited forecast" />
-              </label>
-              <label>
-                Type
-                <select v-model="docsLivePlaceholderDraftKind">
-                  <option v-for="kind in docsLivePlaceholderKindOptions" :key="kind.value" :value="kind.value">{{ kind.label }}</option>
-                </select>
-              </label>
-              <label>
-                Source
-                <input v-model="docsLivePlaceholderDraftSource" placeholder="Finance workbook, GC review, customer brief" />
-              </label>
-              <label>
-                Review
-                <select v-model="docsLivePlaceholderDraftStatus">
-                  <option v-for="status in docsLivePlaceholderReviewStatusOptions" :key="status.value" :value="status.value">{{ status.label }}</option>
-                </select>
-              </label>
-              <button type="button" :disabled="!docsLivePlaceholderKey.trim() || !docsLivePlaceholderDraftValue.trim()" @click="addDocsLivePlaceholder">
-                Add value
-              </button>
-            </div>
-            <div class="docs-live-placeholder-grid" role="table" aria-label="Managed variable table">
-              <div class="docs-live-placeholder-head" role="row">
-                <span role="columnheader">Key</span>
-                <span role="columnheader">Value</span>
-                <span role="columnheader">Type</span>
-                <span role="columnheader">Source</span>
-                <span role="columnheader">Review</span>
-                <span role="columnheader">Action</span>
+              <div class="docs-live-placeholder-grid" role="table" aria-label="Managed variable table">
+                <div class="docs-live-placeholder-head" role="row">
+                  <span role="columnheader">Key</span>
+                  <span role="columnheader">Value</span>
+                  <span role="columnheader">Type</span>
+                  <span role="columnheader">Source</span>
+                  <span role="columnheader">Review</span>
+                  <span role="columnheader">Action</span>
+                </div>
+                <div v-for="entry in docsLivePlaceholderRows" :key="entry.key" role="row">
+                  <span role="cell">{{ entry.key }}</span>
+                  <input role="cell" :value="entry.value" :aria-label="`Value for ${entry.key}`" @change="updateDocsLivePlaceholder(entry.key, inputValue($event))" />
+                  <select role="cell" :value="entry.kind" :aria-label="`Type for ${entry.key}`" @change="updateDocsLivePlaceholderKind(entry.key, inputValue($event))">
+                    <option v-for="kind in docsLivePlaceholderKindOptions" :key="kind.value" :value="kind.value">{{ kind.label }}</option>
+                  </select>
+                  <input role="cell" :value="entry.source" :aria-label="`Source for ${entry.key}`" placeholder="source or evidence" @change="updateDocsLivePlaceholderMetadata(entry.key, { source: inputValue($event) })" />
+                  <select role="cell" :value="entry.reviewStatus" :aria-label="`Review status for ${entry.key}`" @change="updateDocsLivePlaceholderReviewStatus(entry.key, inputValue($event))">
+                    <option v-for="status in docsLivePlaceholderReviewStatusOptions" :key="status.value" :value="status.value">{{ status.label }}</option>
+                  </select>
+                  <button type="button" role="cell" @click="removeDocsLivePlaceholderValue(entry.key)">Remove</button>
+                </div>
               </div>
-              <div v-for="entry in docsLivePlaceholderRows" :key="entry.key" role="row">
-                <span role="cell">{{ entry.key }}</span>
-                <input
-                  role="cell"
-                  :value="entry.value"
-                  :aria-label="`Value for ${entry.key}`"
-                  @change="updateDocsLivePlaceholder(entry.key, inputValue($event))"
-                />
-                <select
-                  role="cell"
-                  :value="entry.kind"
-                  :aria-label="`Type for ${entry.key}`"
-                  @change="updateDocsLivePlaceholderKind(entry.key, inputValue($event))"
-                >
-                  <option v-for="kind in docsLivePlaceholderKindOptions" :key="kind.value" :value="kind.value">{{ kind.label }}</option>
+            </section>
+          </section>
+
+          <section v-else class="docs-live-wizard-panel" aria-label="Docs Live draft settings">
+            <div class="docs-live-draft-settings">
+              <label>
+                Apply result
+                <select v-model="docsLiveInsertMode">
+                  <option value="replace">Replace document</option>
+                  <option value="append">Append to document</option>
+                  <option value="selection">Replace selection</option>
+                  <option value="section">Replace matching section</option>
                 </select>
-                <input
-                  role="cell"
-                  :value="entry.source"
-                  :aria-label="`Source for ${entry.key}`"
-                  placeholder="source or evidence"
-                  @change="updateDocsLivePlaceholderMetadata(entry.key, { source: inputValue($event) })"
-                />
-                <select
-                  role="cell"
-                  :value="entry.reviewStatus"
-                  :aria-label="`Review status for ${entry.key}`"
-                  @change="updateDocsLivePlaceholderReviewStatus(entry.key, inputValue($event))"
-                >
-                  <option v-for="status in docsLivePlaceholderReviewStatusOptions" :key="status.value" :value="status.value">{{ status.label }}</option>
-                </select>
-                <button type="button" role="cell" @click="removeDocsLivePlaceholderValue(entry.key)">Remove</button>
-              </div>
+              </label>
+              <section class="docs-live-intent-brief" aria-label="AI document creation wizard stages">
+                <header>
+                  <div>
+                    <strong>Creation workflow</strong>
+                    <span>Identity, intent, outline, section drafting, QA, humanization, and review handoff.</span>
+                  </div>
+                </header>
+                <ol class="wizard-step-list">
+                  <li v-for="step in aiDocumentWizardSteps" :key="step.id">
+                    <strong>{{ step.label }}</strong>
+                    <span>{{ step.prompt }}</span>
+                  </li>
+                </ol>
+                <div class="agent-cli-list" aria-label="Agentic local integrations">
+                  <span v-for="integration in agenticCliIntegrations" :key="integration.id">
+                    {{ integration.label }}
+                    <code>{{ integration.command }}</code>
+                  </span>
+                </div>
+              </section>
+              <p v-if="docsLiveTargetSection" class="sidebar-hint">
+                Target section: {{ docsLiveTargetSection.heading }}. Apply draft will replace that matching Markdown section when it exists, or append the generated section when it does not.
+              </p>
             </div>
           </section>
-	          <label>
-	            AI-created questionnaire
-	            <textarea v-model="docsLiveQuestionnaireText" rows="7" readonly></textarea>
-	          </label>
-	          <section class="docs-live-suggestions docs-live-wide" aria-label="AI suggested optimal answers">
-	            <header>
-	              <div>
-	                <strong>Suggested Answers</strong>
-	                <span>Context-aware starting points for every wizard step.</span>
-	              </div>
-	              <button type="button" :disabled="!docsLiveSuggestedAnswers.length" @click="appendAllDocsLiveSuggestedAnswers">Use all</button>
-	            </header>
-	            <article v-for="suggestion in docsLiveSuggestedAnswers" :key="suggestion.id">
-	              <div>
-	                <small>{{ suggestion.stepLabel }}</small>
-	                <strong>{{ suggestion.question }}</strong>
-	                <p>{{ suggestion.answer }}</p>
-	                <p class="sidebar-hint">{{ suggestion.rationale }}</p>
-	                <span>{{ suggestion.source }}</span>
-	                <ul>
-	                  <li v-for="signal in suggestion.contextSignals" :key="signal">{{ signal }}</li>
-	                </ul>
-	              </div>
-              <button
-                type="button"
-                :aria-label="`Use Docs Live suggested answer: ${suggestion.question}`"
-                :title="`Use Docs Live suggested answer: ${suggestion.question}`"
-                @click="appendDocsLiveSuggestedAnswer(suggestion)"
-              >
-                Use
-              </button>
-	            </article>
-	          </section>
-	          <label>
-	            Questionnaire answers
-	            <textarea
-              v-model="docsLiveQuestionnaireAnswerText"
-              rows="7"
-              placeholder="1. The reader should approve renewal.&#10;2. Include usage growth, budget, risks, and named owner.&#10;3. Leave financial assumptions marked for review."
-            ></textarea>
-          </label>
-          <label>
-            Apply result
-            <select v-model="docsLiveInsertMode">
-              <option value="replace">Replace document</option>
-              <option value="append">Append to document</option>
-              <option value="selection">Replace selection</option>
-              <option value="section">Replace matching section</option>
-            </select>
-          </label>
-          <p v-if="docsLiveTargetSection" class="sidebar-hint">
-            Target section: {{ docsLiveTargetSection.heading }}. Apply draft will replace that matching Markdown section when it exists, or append the generated section when it does not.
-          </p>
         </section>
 
         <section v-if="docsLiveDraft?.issues.length" class="issue-list">
@@ -4625,9 +4696,10 @@
 
         <footer>
           <button type="button" @click="closeDocsLive">Cancel</button>
-          <button type="button" @click="refreshDocsLiveQuestionnaire">Build questionnaire</button>
-          <button type="button" @click="loadDocsLiveOutlineFromDocument">Use document outline</button>
-          <button type="submit">Generate draft</button>
+          <button type="button" :disabled="docsLiveWizardAtFirstStep" @click="goDocsLiveWizardStep(-1)">Back</button>
+          <button type="button" :disabled="docsLiveWizardAtLastStep" @click="goDocsLiveWizardStep(1)">Next</button>
+          <button type="button" @click="refreshDocsLiveQuestionnaire">Refresh questions</button>
+          <button type="submit" @click="docsLiveWizardStep = 'draft'">Generate draft</button>
           <button type="button" :disabled="!docsLiveGeneratedMarkdown" @click="applyDocsLiveDraft">Apply draft</button>
         </footer>
       </form>
@@ -6233,9 +6305,11 @@ import {
   docsLiveAuditInline,
   buildDocsLiveReviewPacketMarkdown,
   buildDocsLiveSuggestedAnswers,
+  docsLiveDefaultOutlineMarkdown,
   docsLiveDocumentTypeForOutlineSignal,
   docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
+  docsLiveWizardProfile,
   normalizeDocsLiveDocumentType,
   removeDocsLivePlaceholder,
   upsertDocsLivePlaceholder,
@@ -6246,6 +6320,7 @@ import {
   type DocsLivePlaceholderKind,
   type DocsLivePlaceholderReviewStatus,
   type DocsLiveSuggestedAnswer,
+  type DocsLiveWizardProfile,
 } from "./lib/docsLive";
 import {
   buildExportMetadataChecklist,
@@ -7015,13 +7090,16 @@ const docsLivePlaceholderReviewStatusOptions: Array<{ value: DocsLivePlaceholder
   { value: "needs-review", label: "Needs review" },
   { value: "verified", label: "Verified" },
 ];
-const docsLiveIntentFields = [
-  { key: "audience", label: "Audience", placeholder: "executive team, board, customers" },
-  { key: "outcome", label: "Outcome", placeholder: "approve renewal, align launch plan" },
-  { key: "owner", label: "Owner", placeholder: "Finance, Product, Legal" },
-  { key: "deadline", label: "Deadline", placeholder: "June 1, end of Q2" },
-  { key: "distribution target", label: "Distribution target", placeholder: "PDF, Google Docs, Substack" },
+type DocsLiveWizardStepId = "brief" | "outline" | "context" | "variables" | "draft";
+const docsLiveWizardStep = ref<DocsLiveWizardStepId>("brief");
+const docsLiveWizardSteps: Array<{ id: DocsLiveWizardStepId; label: string; summary: string }> = [
+  { id: "brief", label: "Brief", summary: "type, title, decisions" },
+  { id: "outline", label: "Outline", summary: "structure and queue" },
+  { id: "context", label: "Context", summary: "voice, sources, answers" },
+  { id: "variables", label: "Variables", summary: "placeholders and evidence" },
+  { id: "draft", label: "Draft", summary: "generate, review, apply" },
 ];
+const docsLiveLastTypeOutlineText = ref(docsLiveDefaultOutlineMarkdown("business-brief"));
 const docsLiveQuestionnaireText = ref(buildDocsLiveQuestionnaire("business-brief"));
 const docsLiveQuestionnaireAnswerText = ref("");
 const docsLiveGeneratedMarkdown = ref("");
@@ -7747,15 +7825,26 @@ const buttonHelpStyle = computed<CSSProperties>(() => ({
   transform: buttonHelp.value.placement === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
 }));
 const docsLiveSpeechAvailable = computed(() => Boolean(speechRecognitionConstructor()));
+const docsLiveProfile = computed<DocsLiveWizardProfile>(() => docsLiveWizardProfile(docsLiveDocumentType.value));
+const docsLiveIntentFields = computed(() => docsLiveProfile.value.decisionPrompts);
+const docsLiveSelectedTypeOutline = computed(() => docsLiveProfile.value.defaultOutlineMarkdown);
+const docsLiveWizardStepIndex = computed(() => docsLiveWizardSteps.findIndex((step) => step.id === docsLiveWizardStep.value));
+const docsLiveWizardAtFirstStep = computed(() => docsLiveWizardStepIndex.value <= 0);
+const docsLiveWizardAtLastStep = computed(() => docsLiveWizardStepIndex.value >= docsLiveWizardSteps.length - 1);
 const docsLivePlaceholderRows = computed(() => docsLivePlaceholderEntries(docsLivePlaceholderText.value));
-const docsLiveRequiredPlaceholderKeys = ["audience", "outcome", "owner", "deadline", "distribution target", "evidence", "tone", "reviewer"];
+const docsLiveRequiredPlaceholderKeys = computed(() => [
+  ...docsLiveIntentFields.value.slice(0, 5).map((field) => field.key),
+  "evidence",
+  "tone",
+  "reviewer",
+]);
 const docsLiveMissingPlaceholderKeys = computed(() => {
   const present = new Set(docsLivePlaceholderRows.value.map((entry) => entry.key));
-  return docsLiveRequiredPlaceholderKeys.filter((key) => !present.has(key));
+  return docsLiveRequiredPlaceholderKeys.value.filter((key) => !present.has(key));
 });
 const docsLiveIntentCompletion = computed(() => {
-  const present = docsLiveIntentFields.filter((field) => Boolean(docsLivePlaceholderValue(field.key))).length;
-  return `${present}/${docsLiveIntentFields.length} intent fields`;
+  const present = docsLiveIntentFields.value.filter((field) => Boolean(docsLivePlaceholderValue(field.key))).length;
+  return `${present}/${docsLiveIntentFields.value.length} decisions`;
 });
 const docsLiveSuggestedAnswers = computed(() =>
   buildDocsLiveSuggestedAnswers(docsLiveDocumentType.value, {
@@ -10087,7 +10176,7 @@ function maximizeWritingSpace() {
   store.toolbarTextSize = 9;
   store.splitSourcePanes = false;
   setAllCommandToolbarsCollapsed(true);
-  store.statusMessage = "Maximized writing space";
+  store.statusMessage = "Maximized writing space; use Restore writing in the editor workspace to return";
   void nextTick(() => editorView?.focus());
 }
 function restoreWritingSpace() {
@@ -12113,6 +12202,7 @@ function hydrateDocsLiveFromAgentPlan() {
   docsLiveDocumentType.value = plan.documentType;
   docsLiveTitle.value = plan.title;
   docsLiveOutlineText.value = plan.suggestedOutline;
+  docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   docsLiveContext.value = [plan.context, plan.sourcePack.markdown ? `\nManaged source pack:\n${plan.sourcePack.markdown}` : ""].filter(Boolean).join("\n");
   docsLivePlaceholderText.value = plan.placeholderText;
   docsLiveQuestionnaireAnswerText.value = plan.contextAnswers
@@ -12132,6 +12222,7 @@ function hydrateDocsLiveFromOutlineVariant(variant: AgenticOutlineVariant) {
   docsLiveDocumentType.value = plan.documentType;
   docsLiveTitle.value = `${plan.title} - ${variant.label}`;
   docsLiveOutlineText.value = variant.outline;
+  docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   docsLiveContext.value = [
     plan.context,
     "",
@@ -12182,6 +12273,7 @@ function draftAgentSectionWithDocsLive(section: AgenticSectionWorkItem) {
   docsLiveDocumentType.value = run.plan.documentType;
   docsLiveTitle.value = `${run.plan.title} - ${section.heading}`;
   docsLiveOutlineText.value = `${"  ".repeat(Math.max(0, section.level - 1))}- ${section.heading}`;
+  docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   docsLiveContext.value = [
     run.plan.context,
     "",
@@ -12220,6 +12312,7 @@ function draftAgentSectionHistoryWithDocsLive(item: AgenticSectionDraftHistoryIt
   docsLiveDocumentType.value = run.plan.documentType;
   docsLiveTitle.value = `${run.plan.title} - ${item.sectionHeading}`;
   docsLiveOutlineText.value = `- ${item.sectionHeading}`;
+  docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   docsLiveContext.value = [
     run.plan.context,
     "",
@@ -17410,6 +17503,7 @@ function sendOutlineTemplateToDocsLive(template: DocumentOutlineTemplate) {
   docsLiveOutlineText.value = documentOutlineTemplateToPlannerText(template);
   docsLiveTitle.value = template.name;
   docsLiveDocumentType.value = docsLiveTypeForOutlineTemplate(template);
+  docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   docsLiveContext.value = [
     `Selected outline template: ${template.name}`,
     `Category: ${template.category}`,
@@ -17499,6 +17593,7 @@ function openDocsLiveFromOutline() {
   docsLiveTargetSection.value = null;
   docsLiveOutlineText.value = outlineDraftText.value;
   docsLiveTitle.value = outlineDraftTitle.value || active.value.title.replace(/\.[^.]+$/, "");
+  docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   openDocsLive();
 }
 
@@ -17506,6 +17601,7 @@ function openDocsLiveFromDocumentOutline() {
   docsLiveTargetSection.value = null;
   docsLiveOutlineText.value = outlinePlanFromMarkdown(active.value.text) || outlineDraftText.value;
   docsLiveTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
+  docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   openDocsLive();
 }
 
@@ -17775,6 +17871,7 @@ function startBusinessDocumentWizard(template: BusinessDocumentTemplate) {
   docsLiveDocumentType.value = normalizeDocsLiveDocumentType(template.docsLiveType);
   docsLiveTitle.value = `${template.label} for ${store.businessProfile.defaultClientName || "Client"}`;
   docsLiveOutlineText.value = template.outline.map((item) => `- ${item}`).join("\n");
+  docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   docsLiveContext.value = businessWizardContext(template, store.businessProfile);
   docsLivePlaceholderText.value = businessProfilePlaceholderText(store.businessProfile);
   docsLiveDraftingDepth.value = template.id === "tender" || template.id === "rfp" ? "detailed" : "standard";
@@ -17948,6 +18045,7 @@ function sendRfpResponseToDocsLive() {
   docsLiveDocumentType.value = "rfp-response";
   docsLiveTitle.value = `RFP response for ${store.businessProfile.defaultClientName || analysis.source.title || "Client"}`;
   docsLiveOutlineText.value = rfpProposalOutlineBullets(analysis);
+  docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   docsLiveContext.value = [
     businessWizardContext(businessDocumentTemplates.find((template) => template.id === "rfp-response") || businessDocumentTemplates[0], store.businessProfile),
     "",
@@ -19814,9 +19912,11 @@ function openDocsLive() {
   if (!docsLiveTitle.value.trim()) docsLiveTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
   if (!docsLiveOutlineText.value.trim()) {
     docsLiveOutlineText.value = outlinePlanFromMarkdown(active.value.text) || outlineDraftText.value;
+    if (!docsLiveOutlineText.value.trim()) applyDocsLiveSelectedTypeOutline();
   }
   refreshDocsLiveQuestionnaire();
   docsLiveOpen.value = true;
+  docsLiveWizardStep.value = "brief";
   docsLiveSpeechStatus.value = docsLiveSpeechAvailable.value ? "Voice ready" : "Voice unavailable in this WebView";
 }
 
@@ -19854,6 +19954,36 @@ function refreshDocsLiveQuestionnaire() {
     transcript: docsLiveTranscript.value,
     placeholders: docsLivePlaceholderText.value,
   });
+}
+
+function handleDocsLiveDocumentTypeChange() {
+  const selectedTypeOutline = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  const currentOutline = docsLiveOutlineText.value.trim();
+  const previousTypeOutline = docsLiveLastTypeOutlineText.value.trim();
+  if (!currentOutline || currentOutline === previousTypeOutline) {
+    docsLiveOutlineText.value = selectedTypeOutline;
+    store.statusMessage = `Loaded ${docsLiveProfile.value.label.toLowerCase()} outline into Docs Live`;
+  } else {
+    store.statusMessage = `${docsLiveProfile.value.label} selected; suggested outline is ready to apply`;
+  }
+  docsLiveLastTypeOutlineText.value = selectedTypeOutline;
+  refreshDocsLiveQuestionnaire();
+}
+
+function applyDocsLiveSelectedTypeOutline() {
+  docsLiveOutlineText.value = docsLiveSelectedTypeOutline.value;
+  docsLiveLastTypeOutlineText.value = docsLiveSelectedTypeOutline.value;
+  refreshDocsLiveQuestionnaire();
+  store.statusMessage = `Applied ${docsLiveProfile.value.label.toLowerCase()} outline`;
+}
+
+function goDocsLiveWizardStep(offset: number) {
+  const nextIndex = Math.min(Math.max(docsLiveWizardStepIndex.value + offset, 0), docsLiveWizardSteps.length - 1);
+  docsLiveWizardStep.value = docsLiveWizardSteps[nextIndex]?.id || "brief";
+}
+
+function setDocsLiveWizardStep(stepId: DocsLiveWizardStepId) {
+  docsLiveWizardStep.value = stepId;
 }
 
 function appendDocsLiveSuggestedAnswer(suggestion: DocsLiveSuggestedAnswer) {
@@ -21695,6 +21825,7 @@ select:hover {
 }
 
 .app-shell[data-theme="dark"] .floating-toolbar-restore,
+.app-shell[data-theme="dark"] .workspace-writing-restore,
 .app-shell[data-theme="dark"] .workspace-toolbar-restore {
   border-color: #6f98c5;
   background: #1d344c;
@@ -21703,6 +21834,7 @@ select:hover {
 }
 
 .app-shell[data-theme="dark"] .floating-toolbar-restore small,
+.app-shell[data-theme="dark"] .workspace-writing-restore small,
 .app-shell[data-theme="dark"] .workspace-toolbar-restore small {
   color: #b7cce2;
 }
@@ -21792,8 +21924,14 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-provider-panel,
 .app-shell[data-theme="dark"] .agent-provider-output,
 .app-shell[data-theme="dark"] .docs-live-runtime,
+.app-shell[data-theme="dark"] .docs-live-stepper,
+.app-shell[data-theme="dark"] .docs-live-type-card,
+.app-shell[data-theme="dark"] .docs-live-suggested-outline,
+.app-shell[data-theme="dark"] .docs-live-draft-settings,
 .app-shell[data-theme="dark"] .docs-live-intent-brief,
 .app-shell[data-theme="dark"] .docs-live-placeholder-manager,
+.app-shell[data-theme="dark"] .docs-live-suggestions,
+.app-shell[data-theme="dark"] .docs-live-suggestions article,
 .app-shell[data-theme="dark"] .docs-live-workflow,
 .app-shell[data-theme="dark"] .configuration-setup-assistance,
 .app-shell[data-theme="dark"] .status-message,
@@ -22006,14 +22144,18 @@ select:hover {
   .app-shell[data-theme="system"] .agent-history li,
   .app-shell[data-theme="system"] .agent-run-columns article,
   .app-shell[data-theme="system"] .agent-distribution-runbooks article,
-  .app-shell[data-theme="system"] .agent-provider-panel,
-  .app-shell[data-theme="system"] .agent-provider-output,
-	  .app-shell[data-theme="system"] .docs-live-runtime,
-	  .app-shell[data-theme="system"] .docs-live-intent-brief,
-	  .app-shell[data-theme="system"] .docs-live-placeholder-manager,
-	  .app-shell[data-theme="system"] .docs-live-suggestions,
-	  .app-shell[data-theme="system"] .docs-live-suggestions article,
-	  .app-shell[data-theme="system"] .docs-live-workflow,
+.app-shell[data-theme="system"] .agent-provider-panel,
+.app-shell[data-theme="system"] .agent-provider-output,
+  .app-shell[data-theme="system"] .docs-live-runtime,
+  .app-shell[data-theme="system"] .docs-live-stepper,
+  .app-shell[data-theme="system"] .docs-live-type-card,
+  .app-shell[data-theme="system"] .docs-live-suggested-outline,
+  .app-shell[data-theme="system"] .docs-live-draft-settings,
+  .app-shell[data-theme="system"] .docs-live-intent-brief,
+  .app-shell[data-theme="system"] .docs-live-placeholder-manager,
+  .app-shell[data-theme="system"] .docs-live-suggestions,
+  .app-shell[data-theme="system"] .docs-live-suggestions article,
+  .app-shell[data-theme="system"] .docs-live-workflow,
   .app-shell[data-theme="system"] .configuration-setup-assistance,
   .app-shell[data-theme="system"] .status-message,
   .app-shell[data-theme="system"] .word-stats,
@@ -22214,6 +22356,7 @@ select:hover {
 }
 
 .app-shell[data-high-contrast="true"] .floating-toolbar-restore,
+.app-shell[data-high-contrast="true"] .workspace-writing-restore,
 .app-shell[data-high-contrast="true"] .workspace-toolbar-restore {
   border-color: #000000;
   background: #ffffff;
@@ -22855,6 +22998,10 @@ select:hover {
   line-height: 1.05;
 }
 
+.app-shell.writing-space-maximized .floating-toolbar-restore {
+  display: none;
+}
+
 .workspace-toolbar-restore {
   position: absolute;
   top: 8px;
@@ -22879,14 +23026,46 @@ select:hover {
   text-align: left;
 }
 
+.workspace-toolbar-restore-offset {
+  top: 52px;
+}
+
+.workspace-writing-restore {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 42;
+  display: inline-grid;
+  grid-template-columns: 16px auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 7px;
+  row-gap: 1px;
+  min-height: 36px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 5px 11px;
+  border: 1px solid #214f7c;
+  border-radius: 7px;
+  background: #f2f8ff;
+  color: #113a61;
+  box-shadow: 0 10px 24px rgba(24, 36, 52, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  font-weight: 875;
+  line-height: 1;
+  text-align: left;
+}
+
 .workspace-toolbar-restore:hover,
-.workspace-toolbar-restore:focus-visible {
+.workspace-toolbar-restore:focus-visible,
+.workspace-writing-restore:hover,
+.workspace-writing-restore:focus-visible {
   border-color: #174a79;
   background: #e9f4ff;
   box-shadow: 0 10px 22px rgba(24, 36, 52, 0.23), 0 0 0 3px rgba(99, 134, 180, 0.2);
 }
 
-.workspace-toolbar-restore svg {
+.workspace-toolbar-restore svg,
+.workspace-writing-restore svg {
   grid-row: 1 / span 2;
   width: 14px;
   height: 14px;
@@ -22897,7 +23076,13 @@ select:hover {
   stroke-width: 2;
 }
 
-.workspace-toolbar-restore small {
+.workspace-writing-restore svg {
+  width: 15px;
+  height: 15px;
+}
+
+.workspace-toolbar-restore small,
+.workspace-writing-restore small {
   color: #4c647f;
   font-size: 9px;
   font-weight: 750;
@@ -27821,14 +28006,91 @@ select:hover {
   width: min(1120px, 100%);
 }
 
+.docs-live-wizard-shell,
+.docs-live-wizard-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.docs-live-stepper {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid #d7dee7;
+  border-radius: 8px;
+  background: #eef3f8;
+}
+
+.docs-live-stepper button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-content: start;
+  gap: 2px 7px;
+  min-height: 48px;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.docs-live-stepper button span {
+  grid-row: 1 / span 2;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #dce6f0;
+  color: #24445f;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.docs-live-stepper button strong,
+.docs-live-stepper button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docs-live-stepper button strong {
+  font-size: 12px;
+}
+
+.docs-live-stepper button small {
+  color: #526171;
+  font-size: 10px;
+}
+
+.docs-live-stepper button.active {
+  border-color: #315f8d;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(75, 119, 166, 0.15);
+}
+
+.docs-live-stepper button.complete span,
+.docs-live-stepper button.active span {
+  background: #315f8d;
+  color: #ffffff;
+}
+
 .docs-live-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
 }
 
+.docs-live-grid-compact {
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(160px, 0.8fr);
+}
+
 .docs-live-grid label,
-.docs-live-voice {
+.docs-live-voice,
+.docs-live-context-grid label,
+.docs-live-outline-tools label,
+.docs-live-draft-settings label {
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -27903,6 +28165,60 @@ select:hover {
   padding-left: 18px;
 }
 
+.docs-live-type-card,
+.docs-live-suggested-outline,
+.docs-live-draft-settings {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d7dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.docs-live-type-card header,
+.docs-live-suggested-outline header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.docs-live-type-card header span,
+.docs-live-type-card header small,
+.docs-live-suggested-outline header span {
+  color: #526171;
+  font-size: 12px;
+}
+
+.docs-live-profile-lists,
+.docs-live-outline-tools,
+.docs-live-context-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.docs-live-profile-lists section {
+  display: grid;
+  gap: 6px;
+}
+
+.docs-live-profile-lists ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: #526171;
+  font-size: 12px;
+}
+
+.docs-live-outline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .docs-live-intent-brief,
 .docs-live-placeholder-manager,
 .docs-live-suggestions {
@@ -27933,8 +28249,19 @@ select:hover {
 
 .docs-live-intent-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
+}
+
+.docs-live-intent-grid label {
+  display: grid;
+  gap: 5px;
+}
+
+.docs-live-intent-grid label small {
+  color: #667789;
+  font-size: 10px;
+  line-height: 1.25;
 }
 
 .docs-live-placeholder-manager header,
@@ -28595,6 +28922,18 @@ select:hover {
     grid-template-columns: 1fr;
   }
 
+  .docs-live-stepper,
+  .docs-live-grid-compact,
+  .docs-live-profile-lists,
+  .docs-live-outline-tools,
+  .docs-live-context-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .docs-live-stepper button {
+    min-height: 42px;
+  }
+
   .docs-live-intent-grid {
     grid-template-columns: 1fr;
   }
@@ -28678,6 +29017,16 @@ select:hover {
   }
 
   .workspace-toolbar-restore {
+    top: 6px;
+    right: 8px;
+    max-width: calc(100vw - 18px);
+  }
+
+  .workspace-toolbar-restore-offset {
+    top: 50px;
+  }
+
+  .workspace-writing-restore {
     top: 6px;
     right: 8px;
     max-width: calc(100vw - 18px);

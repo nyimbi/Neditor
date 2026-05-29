@@ -841,6 +841,7 @@ supported targets:
 - [Research report with bibliography](examples/research-report.md)
 - [Proposal with budget tables and formulas](examples/proposal-budget.md)
 - [AI-assisted draft with review provenance](examples/ai-assisted-draft.md)
+- [NEditor capability showcase](examples/showcase/neditor-capability-showcase.md)
 
 These examples are covered by Rust fixture tests so they stay executable instead
 of becoming stale marketing samples. The tests also keep the README links in
@@ -848,7 +849,10 @@ sync and prove each example's audience metadata and representative features
 survive HTML, PDF, DOCX, PPTX, and Markdown bundle exports. Each example also
 declares local-first positioning metadata, and export tests prove that the
 delivery model and Markdown source-of-truth survive HTML metadata, Office custom
-properties, and Markdown bundle metadata.
+properties, and Markdown bundle metadata. The capability showcase is the
+canonical demo source for screenshots because it contains real document content:
+headings, generated sections, financial tables, equations, figures, diagrams,
+charts, citations, review notes, AI provenance, and export metadata.
 
 ## Planning Documents
 

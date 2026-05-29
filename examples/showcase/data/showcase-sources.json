@@ -1,0 +1,25 @@
+{
+  "records": [
+    {
+      "key": "porter1985",
+      "title": "Competitive Advantage",
+      "provider": "manual",
+      "fitScore": 0.91,
+      "localPath": "showcase.neditor-sources/porter1985.pdf"
+    },
+    {
+      "key": "iso9001",
+      "title": "Quality management principles",
+      "provider": "duckduckgo",
+      "fitScore": 0.88,
+      "localPath": "showcase.neditor-sources/iso9001.html"
+    },
+    {
+      "key": "kleppmann2019",
+      "title": "Local-first software",
+      "provider": "searxng",
+      "fitScore": 0.86,
+      "localPath": "showcase.neditor-sources/local-first.html"
+    }
+  ]
+}

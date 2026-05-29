@@ -22,15 +22,18 @@ const nedPath = firstExistingPath([
   join(appRoot, "Contents", "Resources", "binaries", "ned"),
 ]);
 const iconPath = join(appRoot, "Contents", "Resources", "icon.icns");
+const showcasePath = join(appRoot, "Contents", "Resources", "examples", "showcase", "neditor-capability-showcase.md");
 
 requireDirectory(appRoot, "macOS app bundle is missing; run ./node_modules/.bin/tauri build --bundles app first");
 requireFile(plistPath, "macOS app bundle Info.plist is missing");
 requireExecutable(executablePath, "macOS app bundle executable is missing or not executable");
 requireExecutable(nedPath, "macOS app bundle ned CLI sidecar is missing or not executable");
 requireFile(iconPath, "macOS app bundle icon is missing");
+requireFile(showcasePath, "macOS app bundle capability showcase example is missing");
 requireMinimumSize(executablePath, 1_000_000, "macOS app bundle executable is unexpectedly small");
 requireMinimumSize(nedPath, 100_000, "macOS app bundle ned CLI sidecar is unexpectedly small");
 requireMinimumSize(iconPath, 1_000, "macOS app bundle icon is unexpectedly small");
+requireMinimumSize(showcasePath, 10_000, "macOS app bundle capability showcase example is unexpectedly small");
 
 let plist = {};
 if (issues.length === 0) {
@@ -134,6 +137,10 @@ function writeBundleReport(plist) {
         icon: {
           path: relative(iconPath),
           size: statSync(iconPath).size,
+        },
+        showcase: {
+          path: relative(showcasePath),
+          size: statSync(showcasePath).size,
         },
         plist: {
           CFBundleDisplayName: plist.CFBundleDisplayName,

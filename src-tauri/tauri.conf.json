@@ -33,6 +33,9 @@
     "category": "Productivity",
     "shortDescription": "Local-first AI-assisted Markdown workbench",
     "longDescription": "NEditor is a local-first AI-assisted Markdown workbench for planning, drafting, reviewing, exporting, and publishing business documents.",
+    "resources": {
+      "../examples/showcase": "examples/showcase"
+    },
     "externalBin": [
       "binaries/ned"
     ],
