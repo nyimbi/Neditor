@@ -1743,6 +1743,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     let report_path = root.join("readiness.json");
     let spec_path = root.join("spec-completion.json");
     let spec_work_orders_path = root.join("work-orders.json");
+    let release_candidate_dir = root.join("release-candidate");
     let engine_path = root.join("engine-probe.json");
     let evidence_root = root.join("evidence");
     let output_path = root.join("support").join("bundle.json");
@@ -1881,6 +1882,86 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         serde_json::to_string_pretty(&engine_probe).expect("engine json"),
     )
     .expect("write engine fixture");
+    fs::create_dir_all(&release_candidate_dir).expect("create release candidate dir");
+    let release_candidate_source_commit = current_test_git_head();
+    fs::write(
+        release_candidate_dir.join("manifest.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schema": "neditor.local-release-candidate.v1",
+            "generatedAt": "2026-05-26T12:40:00.000Z",
+            "releaseable": false,
+            "product": {
+                "name": "NEditor",
+                "version": "0.1.0"
+            },
+            "source": {
+                "commit": release_candidate_source_commit,
+                "treeCleanBefore": true,
+                "treeCleanAfter": true
+            },
+            "readiness": {
+                "status": "current-host-ready-with-external-gaps",
+                "evidenceGaps": [
+                    {
+                        "id": "homebrew-final-cask",
+                        "status": "pending-release-cask",
+                        "detail": "Set final cask SHA."
+                    }
+                ]
+            },
+            "evidenceKit": {
+                "currentForSource": true,
+                "coversReadiness": true,
+                "reportCurrentForReadiness": true
+            },
+            "artifacts": [
+                {
+                    "kind": "frontend:index",
+                    "path": "dist/index.html",
+                    "size": 1200,
+                    "sha256": "abc123"
+                },
+                {
+                    "kind": "native:ned-cli",
+                    "path": "src-tauri/target/release/ned",
+                    "size": 3400,
+                    "sha256": "def456"
+                }
+            ],
+            "nextSteps": [
+                "Ingest returned evidence with pnpm run ingest:evidence -- --source /path/to/unpacked-artifacts."
+            ]
+        }))
+        .expect("release candidate manifest json"),
+    )
+    .expect("write release candidate manifest fixture");
+    fs::write(
+        release_candidate_dir.join("check-report.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schema": "neditor.local-release-candidate-check.v1",
+            "generatedAt": "2026-05-26T12:41:00.000Z",
+            "status": "passed",
+            "summary": {
+                "issues": 0,
+                "warnings": 1,
+                "artifacts": 2
+            },
+            "issues": [],
+            "warnings": ["fixture not final-releaseable"]
+        }))
+        .expect("release candidate check json"),
+    )
+    .expect("write release candidate check fixture");
+    fs::write(
+        release_candidate_dir.join("README.md"),
+        "# Fixture Release Candidate\n\nReleaseable on this host: no\n",
+    )
+    .expect("write release candidate readme fixture");
+    fs::write(
+        release_candidate_dir.join("SHA256SUMS"),
+        "abc123  dist/index.html\ndef456  src-tauri/target/release/ned\n",
+    )
+    .expect("write release candidate sums fixture");
     fs::create_dir_all(evidence_root.join("platform-evidence")).expect("create platform evidence");
     fs::create_dir_all(evidence_root.join("release-signing")).expect("create signing evidence");
     fs::create_dir_all(evidence_root.join("rendered-export-audit"))
@@ -1927,6 +2008,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         spec_path.to_string_lossy().to_string(),
         "--spec-work-orders".to_string(),
         spec_work_orders_path.to_string_lossy().to_string(),
+        "--release-candidate-dir".to_string(),
+        release_candidate_dir.to_string_lossy().to_string(),
         "--engine-report".to_string(),
         engine_path.to_string_lossy().to_string(),
         "--evidence-root".to_string(),
@@ -1970,6 +2053,13 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         bundle["specActionPlan"]["workOrders"][1]["runbooks"][0],
         "runbooks/platform-evidence.md"
     );
+    assert_eq!(
+        bundle["releaseCandidate"]["status"],
+        "checked-with-release-gates"
+    );
+    assert_eq!(bundle["releaseCandidate"]["releaseable"], false);
+    assert_eq!(bundle["releaseCandidate"]["summary"]["artifacts"], 2);
+    assert_eq!(bundle["releaseCandidate"]["summary"]["evidenceGaps"], 1);
     assert_eq!(bundle["engineProbe"]["status"], "complete");
     assert_eq!(bundle["engineProbe"]["summary"]["installed"], 3);
     assert_eq!(
@@ -1998,6 +2088,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         report_path.to_string_lossy().to_string(),
         "--spec-report".to_string(),
         spec_path.to_string_lossy().to_string(),
+        "--release-candidate-dir".to_string(),
+        release_candidate_dir.to_string_lossy().to_string(),
         "--engine-report".to_string(),
         engine_path.to_string_lossy().to_string(),
         "--evidence-root".to_string(),
@@ -2023,6 +2115,9 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert!(text
         .message
         .contains("Spec action plan: ready-to-send (2/2 work orders ready)"));
+    assert!(text
+        .message
+        .contains("Release candidate: checked-with-release-gates (releaseable: no, artifacts: 2)"));
     assert!(text.message.contains("Wrote support bundle"));
     assert!(output_path.is_file());
     let written: serde_json::Value =
@@ -2042,6 +2137,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         readiness_report: Some(report_path.to_string_lossy().to_string()),
         spec_report: Some(spec_path.to_string_lossy().to_string()),
         spec_work_orders: Some(spec_work_orders_path.to_string_lossy().to_string()),
+        release_candidate_dir: Some(release_candidate_dir.to_string_lossy().to_string()),
         engine_report: Some(engine_path.to_string_lossy().to_string()),
         evidence_root: Some(evidence_root.to_string_lossy().to_string()),
         evidence_kit: None,
@@ -2054,6 +2150,43 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         ipc_output_path.to_string_lossy().as_ref()
     );
     assert!(ipc_output_path.is_file());
+
+    let candidate_json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "release-candidate".to_string(),
+        "--candidate-dir".to_string(),
+        release_candidate_dir.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("release candidate json");
+    assert_eq!(candidate_json.exit_code, 0);
+    let candidate: serde_json::Value =
+        serde_json::from_str(&candidate_json.message).expect("candidate json");
+    assert_eq!(candidate["schema"], "neditor.ned-release-candidate.v1");
+    assert_eq!(candidate["status"], "checked-with-release-gates");
+    assert_eq!(candidate["summary"]["checkStatus"], "passed");
+    assert_eq!(
+        candidate["nextSteps"][0]
+            .as_str()
+            .unwrap()
+            .contains("ingest:evidence"),
+        true
+    );
+
+    let candidate_text = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "candidate".to_string(),
+        "--dir".to_string(),
+        release_candidate_dir.to_string_lossy().to_string(),
+    ])
+    .expect("release candidate text");
+    assert_eq!(candidate_text.exit_code, 0);
+    assert!(candidate_text
+        .message
+        .contains("Release candidate: checked-with-release-gates"));
+    assert!(candidate_text
+        .message
+        .contains("Releaseable on this host: no"));
 }
 
 #[test]

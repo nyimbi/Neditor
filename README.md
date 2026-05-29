@@ -273,7 +273,8 @@ report statuses into a redaction-safe JSON handoff for help desks and release
 managers. It includes setup status, command paths, report paths, evidence-gap
 summaries, open specification rows, installed or missing transform-engine
 status, AI/runtime/security/performance/sign-off evidence report status,
-release evidence action items, spec-completion work orders, and
+release evidence action items, spec-completion work orders, release-candidate
+status, and
 recommendations, but not document content or secrets. `ned completions bash`,
 `ned completions zsh`, and `ned completions fish` print shell completion
 scripts so support teams can make the command easier to discover after
@@ -1015,7 +1016,11 @@ Run `pnpm run check:release-candidate` against the generated directory before
 handoff; it independently validates `manifest.json`, `SHA256SUMS`, the README,
 artifact file sizes, SHA-256 hashes, required native/frontend artifact kinds,
 and the prepared `ned-*` sidecar hash, then writes
-`.tmp/release-candidate/check-report.json`.
+`.tmp/release-candidate/check-report.json`. `ned release-candidate --json`
+reads that same directory without rebuilding anything and summarizes candidate
+status, releaseability, artifact count, checker issues, evidence gaps, next
+steps, and follow-up commands for support scripts. Use `--strict` when a release
+automation step should fail unless the candidate is checked and final-releaseable.
 
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`
@@ -1108,6 +1113,9 @@ It also includes spec-completion work orders from
 `.tmp/spec-completion/work-orders.json` or `--spec-work-orders path`, so open
 matrix rows become assignable reviewer, supported-host, credential, and
 distribution work with runbooks, returns, validators, and closure commands.
+The bundle also includes release-candidate status from `.tmp/release-candidate`
+or `--release-candidate-dir path`, giving support teams a single redaction-safe
+view of compiled artifact hashes, checker state, and remaining release gates.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,

@@ -3255,6 +3255,14 @@
                 </dd>
               </div>
               <div>
+                <dt>Candidate</dt>
+                <dd>
+                  {{ supportBundleReport.releaseCandidate?.status || "unknown" }},
+                  {{ supportBundleReport.releaseCandidate?.releaseable ? "releaseable" : "not releaseable" }},
+                  {{ supportBundleReport.releaseCandidate?.summary?.artifacts || 0 }} artifacts
+                </dd>
+              </div>
+              <div>
                 <dt>Output</dt>
                 <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
               </div>
@@ -3289,6 +3297,20 @@
               <p v-if="supportBundleReport.specActionPlan.workOrders.length > 6" class="sidebar-hint">
                 {{ supportBundleReport.specActionPlan.workOrders.length - 6 }} more work order(s) are included in the saved JSON.
               </p>
+            </section>
+            <section v-if="supportBundleReport?.releaseCandidate" class="support-bundle-action-plan" aria-label="Release candidate status">
+              <h5>Release candidate</h5>
+              <article>
+                <strong>{{ supportBundleReport.releaseCandidate.status || "unknown" }}</strong>
+                <span>
+                  {{ supportBundleReport.releaseCandidate.releaseable ? "Final-releaseable on this host" : "Not final-releaseable on this host" }}
+                </span>
+                <small>
+                  {{ supportBundleReport.releaseCandidate.candidateDir || ".tmp/release-candidate" }} |
+                  {{ supportBundleReport.releaseCandidate.summary?.checkStatus || "missing" }} checker,
+                  {{ supportBundleReport.releaseCandidate.summary?.evidenceGaps || 0 }} evidence gap(s)
+                </small>
+              </article>
             </section>
           </section>
           <section aria-label="Recent files">
@@ -6446,6 +6468,26 @@ type SupportBundleReport = {
       ingestCommand?: string;
       matrixClosureCommand?: string;
     }>;
+  };
+  releaseCandidate?: {
+    status?: string;
+    releaseable?: boolean;
+    sourceCurrent?: boolean;
+    currentSourceCommit?: string;
+    candidateDir?: string;
+    manifestPath?: string;
+    checkReportPath?: string;
+    readmePath?: string;
+    sha256SumsPath?: string;
+    summary?: {
+      artifacts?: number;
+      evidenceGaps?: number;
+      checkStatus?: string;
+      checkIssues?: number;
+      checkWarnings?: number;
+    };
+    issues?: string[];
+    nextSteps?: string[];
   };
   specCompletion?: {
     status?: string;
@@ -18722,9 +18764,11 @@ async function createSupportBundleFromSettings(writeToFile: boolean) {
     const readyActions = report.releaseActionPlan?.readyToSendCount || 0;
     const specWorkOrders = report.specActionPlan?.workOrders?.length || 0;
     const readySpecWorkOrders = report.specActionPlan?.readyToSendCount || 0;
+    const candidateStatus = report.releaseCandidate?.status || "unknown";
+    const candidateArtifacts = report.releaseCandidate?.summary?.artifacts || 0;
     supportBundleStatus.value = report.writtenTo
       ? `Wrote support bundle to ${report.writtenTo}`
-      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${readyActions}/${actionItems} release actions ready, ${specOpenRows} open spec rows, ${readySpecWorkOrders}/${specWorkOrders} spec work orders ready, engines ${engineStatus} (${missingEngines} missing), ${evidenceAttention} evidence reports need attention`;
+      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${readyActions}/${actionItems} release actions ready, ${specOpenRows} open spec rows, ${readySpecWorkOrders}/${specWorkOrders} spec work orders ready, release candidate ${candidateStatus} (${candidateArtifacts} artifacts), engines ${engineStatus} (${missingEngines} missing), ${evidenceAttention} evidence reports need attention`;
   } catch (error) {
     supportBundleReport.value = null;
     supportBundleStatus.value = error instanceof Error ? error.message : String(error);

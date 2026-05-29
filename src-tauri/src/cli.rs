@@ -105,6 +105,8 @@ const CLI_COMMANDS: &[&str] = &[
     "release-readiness",
     "evidence",
     "evidence-status",
+    "release-candidate",
+    "candidate",
     "support",
     "support-bundle",
     "completions",
@@ -160,6 +162,7 @@ pub(crate) struct SupportBundleRequest {
     pub(crate) readiness_report: Option<String>,
     pub(crate) spec_report: Option<String>,
     pub(crate) spec_work_orders: Option<String>,
+    pub(crate) release_candidate_dir: Option<String>,
     pub(crate) engine_report: Option<String>,
     pub(crate) evidence_root: Option<String>,
     pub(crate) evidence_kit: Option<String>,
@@ -445,6 +448,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
         "evidence" | "evidence-status" => run_evidence_command(&args[2..]),
+        "release-candidate" | "candidate" => run_release_candidate_command(&args[2..]),
         "support" | "support-bundle" => run_support_bundle_command(&args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
@@ -497,6 +501,11 @@ pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Val
         .filter(|value| !value.trim().is_empty())
         .map(PathBuf::from)
         .unwrap_or_else(|| default_spec_work_orders_path(&spec_report_path));
+    let release_candidate_dir = request
+        .release_candidate_dir
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(".tmp/release-candidate"));
     let engine_report_path = request
         .engine_report
         .filter(|value| !value.trim().is_empty())
@@ -521,6 +530,7 @@ pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Val
         &readiness_report_path,
         &spec_report_path,
         &spec_work_orders_path,
+        &release_candidate_dir,
         &engine_report_path,
         &evidence_root_path,
         &evidence_kit_path,
@@ -3230,12 +3240,54 @@ fn run_evidence_command(args: &[String]) -> Result<CliOutcome, String> {
     })
 }
 
+fn run_release_candidate_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut strict = false;
+    let mut candidate_dir = PathBuf::from(".tmp/release-candidate");
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--strict" => strict = true,
+            "--candidate-dir" | "--dir" => {
+                index += 1;
+                candidate_dir = PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--candidate-dir requires a release-candidate directory".to_string()
+                })?);
+            }
+            value => return Err(format!("Unsupported release-candidate option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let report = release_candidate_status(&candidate_dir);
+    let status = readiness_string_field(&report, "status").unwrap_or("unknown");
+    let releaseable = report
+        .get("releaseable")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let exit_code = if strict && (status != "passed" || !releaseable) {
+        1
+    } else {
+        0
+    };
+    Ok(CliOutcome {
+        message: if json_output {
+            serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?
+        } else {
+            release_candidate_text_report(&report)
+        },
+        exit_code,
+    })
+}
+
 fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut json_output = false;
     let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut readiness_report_path = PathBuf::from(".tmp/release-readiness/report.json");
     let mut spec_report_path = PathBuf::from(".tmp/spec-completion/report.json");
     let mut spec_work_orders_path: Option<PathBuf> = None;
+    let mut release_candidate_dir = PathBuf::from(".tmp/release-candidate");
     let mut engine_report_path = PathBuf::from(".tmp/external-engines/probe-report.json");
     let mut evidence_root_path = PathBuf::from(".tmp");
     let mut evidence_kit_path = PathBuf::from(".tmp/release-evidence-kit/manifest.json");
@@ -3270,6 +3322,12 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
                 spec_work_orders_path = Some(PathBuf::from(args.get(index).ok_or_else(|| {
                     "--spec-work-orders requires a JSON work orders path".to_string()
                 })?));
+            }
+            "--release-candidate-dir" => {
+                index += 1;
+                release_candidate_dir = PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--release-candidate-dir requires a release-candidate directory".to_string()
+                })?);
             }
             "--engine-report" => {
                 index += 1;
@@ -3310,6 +3368,7 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
         &readiness_report_path,
         &spec_report_path,
         &spec_work_orders_path,
+        &release_candidate_dir,
         &engine_report_path,
         &evidence_root_path,
         &evidence_kit_path,
@@ -3978,6 +4037,7 @@ fn build_support_bundle_report(
     readiness_report_path: &Path,
     spec_report_path: &Path,
     spec_work_orders_path: &Path,
+    release_candidate_dir: &Path,
     engine_report_path: &Path,
     evidence_root_path: &Path,
     evidence_kit_path: &Path,
@@ -4043,6 +4103,7 @@ fn build_support_bundle_report(
     let readiness_gaps = readiness_array_field(&readiness, "evidenceGaps");
     let action_plan = readiness_action_plan(evidence_kit_path, &readiness_gaps);
     let spec_action_plan = spec_completion_action_plan(spec_work_orders_path, &spec_completion);
+    let release_candidate = release_candidate_status(release_candidate_dir);
     let recommendations = support_bundle_recommendations(
         &doctor,
         &readiness,
@@ -4082,6 +4143,7 @@ fn build_support_bundle_report(
             "openRows": support_bundle_open_spec_rows(&spec_completion, 20),
         },
         "specActionPlan": spec_action_plan,
+        "releaseCandidate": release_candidate,
         "engineProbe": {
             "reportPath": path_to_display(engine_report_path),
             "status": readiness_string_field(&engine_probe, "status").unwrap_or("unknown"),
@@ -4207,6 +4269,18 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
         .and_then(Value::as_u64)
         .unwrap_or(0);
     let spec_action_total = readiness_array_field(spec_action_plan, "workOrders").len();
+    let release_candidate = report.get("releaseCandidate").unwrap_or(&Value::Null);
+    let release_candidate_status =
+        readiness_string_field(release_candidate, "status").unwrap_or("unknown");
+    let release_candidate_releaseable = release_candidate
+        .get("releaseable")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let release_candidate_artifacts = release_candidate
+        .get("summary")
+        .and_then(|summary| summary.get("artifacts"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
     let evidence_gaps = readiness_array_field(readiness, "evidenceGaps").len();
     let failures = readiness_array_field(readiness, "failures").len();
     let recommendations = readiness_array_field(report, "recommendations")
@@ -4233,6 +4307,10 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
         ),
         format!("Release action plan: {action_status} ({action_ready}/{action_total} work items ready)"),
         format!("Spec action plan: {spec_action_status} ({spec_action_ready}/{spec_action_total} work orders ready)"),
+        format!(
+            "Release candidate: {release_candidate_status} (releaseable: {}, artifacts: {release_candidate_artifacts})",
+            if release_candidate_releaseable { "yes" } else { "no" }
+        ),
         "Privacy: no document content or secrets included".to_string(),
     ];
     if let Some(path) = written_to {
@@ -4358,6 +4436,185 @@ fn spec_completion_action_plan(work_orders_path: &Path, spec_completion: &Value)
             "pnpm run check:release-readiness"
         ]
     })
+}
+
+fn release_candidate_status(candidate_dir: &Path) -> Value {
+    let manifest_path = candidate_dir.join("manifest.json");
+    let check_report_path = candidate_dir.join("check-report.json");
+    let readme_path = candidate_dir.join("README.md");
+    let sums_path = candidate_dir.join("SHA256SUMS");
+    let manifest = match read_json_report(&manifest_path) {
+        Ok(value) => value,
+        Err(error) => {
+            return json!({
+                "schema": "neditor.ned-release-candidate.v1",
+                "status": "missing",
+                "releaseable": false,
+                "candidateDir": path_to_display(candidate_dir),
+                "manifestPath": path_to_display(&manifest_path),
+                "checkReportPath": path_to_display(&check_report_path),
+                "issues": [error],
+                "summary": {
+                    "artifacts": 0,
+                    "evidenceGaps": 0,
+                    "checkIssues": 0,
+                    "checkWarnings": 0
+                },
+                "nextCommands": [
+                    "pnpm run release:local",
+                    "pnpm run check:release-candidate"
+                ]
+            });
+        }
+    };
+    let check_report = read_json_report(&check_report_path).ok();
+    let artifacts = readiness_array_field(&manifest, "artifacts");
+    let evidence_gaps = manifest
+        .get("readiness")
+        .map(|readiness| readiness_array_field(readiness, "evidenceGaps"))
+        .unwrap_or_default();
+    let releaseable = manifest
+        .get("releaseable")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let candidate_source_commit = manifest
+        .get("source")
+        .and_then(|source| readiness_string_field(source, "commit"));
+    let current_source_commit = git_head_commit();
+    let source_current = match (candidate_source_commit, current_source_commit.as_deref()) {
+        (Some(candidate_commit), Some(current_commit)) => candidate_commit == current_commit,
+        _ => false,
+    };
+    let check_status = check_report
+        .as_ref()
+        .and_then(|report| readiness_string_field(report, "status"))
+        .unwrap_or("missing");
+    let check_issues = check_report
+        .as_ref()
+        .and_then(|report| report.get("summary"))
+        .and_then(|summary| summary.get("issues"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let check_warnings = check_report
+        .as_ref()
+        .and_then(|report| report.get("summary"))
+        .and_then(|summary| summary.get("warnings"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let mut issues = Vec::new();
+    if check_status == "missing" {
+        issues.push(
+            "Release candidate check-report.json is missing; run pnpm run check:release-candidate."
+                .to_string(),
+        );
+    }
+    if check_issues > 0 {
+        issues.push(format!(
+            "Release candidate checker reports {check_issues} issue(s)."
+        ));
+    }
+    if !source_current {
+        let candidate_commit = candidate_source_commit.unwrap_or("unknown");
+        let current_commit = current_source_commit.as_deref().unwrap_or("unknown");
+        issues.push(format!(
+            "Release candidate source commit {candidate_commit} does not match current git commit {current_commit}; regenerate with pnpm run release:local."
+        ));
+    }
+    if !releaseable {
+        issues.push("Release candidate is not final-releaseable on this host.".to_string());
+    }
+    let status = if !source_current {
+        "stale"
+    } else if check_status == "passed" && releaseable {
+        "passed"
+    } else if check_status == "passed" {
+        "checked-with-release-gates"
+    } else if check_status == "failed" {
+        "failed"
+    } else {
+        "needs-check"
+    };
+
+    json!({
+        "schema": "neditor.ned-release-candidate.v1",
+        "status": status,
+        "releaseable": releaseable,
+        "sourceCurrent": source_current,
+        "currentSourceCommit": current_source_commit,
+        "candidateDir": path_to_display(candidate_dir),
+        "manifestPath": path_to_display(&manifest_path),
+        "checkReportPath": path_to_display(&check_report_path),
+        "readmePath": path_to_display(&readme_path),
+        "sha256SumsPath": path_to_display(&sums_path),
+        "generatedAt": readiness_string_field(&manifest, "generatedAt"),
+        "product": manifest.get("product").cloned().unwrap_or_else(|| json!({})),
+        "source": manifest.get("source").cloned().unwrap_or_else(|| json!({})),
+        "readiness": manifest.get("readiness").cloned().unwrap_or_else(|| json!({})),
+        "evidenceKit": manifest.get("evidenceKit").cloned().unwrap_or_else(|| json!({})),
+        "summary": {
+            "artifacts": artifacts.len(),
+            "evidenceGaps": evidence_gaps.len(),
+            "checkStatus": check_status,
+            "checkIssues": check_issues,
+            "checkWarnings": check_warnings
+        },
+        "artifacts": artifacts,
+        "issues": issues,
+        "nextSteps": readiness_array_field(&manifest, "nextSteps"),
+        "nextCommands": [
+            "pnpm run check:release-candidate",
+            "pnpm run release:local",
+            "pnpm run check:release-readiness"
+        ]
+    })
+}
+
+fn release_candidate_text_report(report: &Value) -> String {
+    let status = readiness_string_field(report, "status").unwrap_or("unknown");
+    let candidate_dir = readiness_string_field(report, "candidateDir").unwrap_or("unknown");
+    let releaseable = report
+        .get("releaseable")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let summary = report.get("summary").unwrap_or(&Value::Null);
+    let artifacts = number_field_u64(summary, "artifacts");
+    let evidence_gaps = number_field_u64(summary, "evidenceGaps");
+    let check_status = readiness_string_field(summary, "checkStatus").unwrap_or("missing");
+    let check_issues = number_field_u64(summary, "checkIssues");
+    let check_warnings = number_field_u64(summary, "checkWarnings");
+    let mut lines = vec![
+        format!("Release candidate: {status}"),
+        format!(
+            "Releaseable on this host: {}",
+            if releaseable { "yes" } else { "no" }
+        ),
+        format!("Candidate directory: {candidate_dir}"),
+        format!("Artifacts: {artifacts}"),
+        format!("Evidence gaps: {evidence_gaps}"),
+        format!("Checker: {check_status} ({check_issues} issue(s), {check_warnings} warning(s))"),
+    ];
+    let issues = readiness_array_field(report, "issues");
+    if !issues.is_empty() {
+        lines.push("Issues:".to_string());
+        for issue in issues.iter().filter_map(Value::as_str) {
+            lines.push(format!("  - {issue}"));
+        }
+    }
+    let next_steps = readiness_array_field(report, "nextSteps");
+    if !next_steps.is_empty() {
+        lines.push("Next steps:".to_string());
+        for step in next_steps.iter().filter_map(Value::as_str) {
+            lines.push(format!("  - {step}"));
+        }
+    }
+    lines.push("Next commands:".to_string());
+    for command in readiness_array_field(report, "nextCommands")
+        .iter()
+        .filter_map(Value::as_str)
+    {
+        lines.push(format!("  - {command}"));
+    }
+    lines.join("\n")
 }
 
 fn support_bundle_open_spec_rows(report: &Value, limit: usize) -> Vec<Value> {
@@ -9672,8 +9929,11 @@ _ned() {{
       evidence|evidence-status)
         COMPREPLY=( $(compgen -W "--json --strict --evidence-root" -- "$cur") )
         ;;
+      release-candidate|candidate)
+        COMPREPLY=( $(compgen -W "--json --strict --candidate-dir --dir" -- "$cur") )
+        ;;
       support|support-bundle)
-        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --spec-work-orders --engine-report --evidence-root --evidence-kit --output" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --spec-work-orders --release-candidate-dir --engine-report --evidence-root --evidence-kit --output" -- "$cur") )
         ;;
       doctor)
         COMPREPLY=( $(compgen -W "--json --strict --workspace" -- "$cur") )
@@ -9779,8 +10039,11 @@ _ned() {{
     evidence|evidence-status)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when any evidence report needs attention]' '--evidence-root[read standard release evidence reports from a .tmp-style root]:directory:_files -/'
       ;;
+    release-candidate|candidate)
+      _arguments '--json[print machine-readable JSON]' '--strict[fail when candidate is not checked and final-releaseable]' '--candidate-dir[read a release-candidate directory]:directory:_files -/' '--dir[alias for --candidate-dir]:directory:_files -/'
+      ;;
     support|support-bundle)
-      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--spec-work-orders[attach spec-completion work orders]:file:_files' '--engine-report[attach a specific transform engine probe report]:file:_files' '--evidence-root[attach standard release evidence reports from a .tmp-style root]:directory:_files -/' '--evidence-kit[attach release evidence-kit work items]:file:_files' '--output[write support bundle JSON]:file:_files'
+      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--spec-work-orders[attach spec-completion work orders]:file:_files' '--release-candidate-dir[attach release-candidate status]:directory:_files -/' '--engine-report[attach a specific transform engine probe report]:file:_files' '--evidence-root[attach standard release evidence reports from a .tmp-style root]:directory:_files -/' '--evidence-kit[attach release evidence-kit work items]:file:_files' '--output[write support bundle JSON]:file:_files'
       ;;
     completions|completion)
       _arguments '1:shell:($shells)'
@@ -9982,6 +10245,14 @@ fn fish_completion_script() -> String {
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from evidence evidence-status' -l evidence-root -r"
             .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from release-candidate candidate' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from release-candidate candidate' -l strict"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from release-candidate candidate' -l candidate-dir -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from release-candidate candidate' -l dir -r"
+            .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l workspace -r"
@@ -9991,6 +10262,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l spec-report -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l spec-work-orders -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l release-candidate-dir -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l engine-report -r"
             .to_string(),
@@ -10466,7 +10739,9 @@ fn help_text() -> String {
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json] [--action-plan --evidence-kit .tmp/release-evidence-kit]"
             .to_string(),
         "  ned evidence [--json] [--strict] [--evidence-root .tmp]".to_string(),
-        "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--spec-work-orders path] [--engine-report path] [--evidence-root .tmp] [--evidence-kit .tmp/release-evidence-kit] [--output support.json]"
+        "  ned release-candidate [--json] [--strict] [--candidate-dir .tmp/release-candidate]"
+            .to_string(),
+        "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--spec-work-orders path] [--release-candidate-dir path] [--engine-report path] [--evidence-root .tmp] [--evidence-kit .tmp/release-evidence-kit] [--output support.json]"
             .to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),
         "  ned doctor [--json] [--strict] [--workspace path]".to_string(),

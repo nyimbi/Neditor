@@ -5811,6 +5811,34 @@ reviewer sign-off, supported-host execution, credentialed signing evidence, or
 distribution artifacts. It does make every remaining spec row assignable from
 the same support bundle used by release and help-desk teams.
 
+## 2026-05-29 Release Candidate Visibility
+
+NEditor now exposes local release-candidate state through the productized `ned`
+CLI and the redaction-safe support bundle. `ned release-candidate` reads
+`.tmp/release-candidate/manifest.json` and `check-report.json` without building
+or publishing anything, reports releaseability, artifact counts, checker status,
+remaining evidence gaps, next steps, and follow-up commands, and marks stale
+candidate packets when their source commit no longer matches the current
+checkout. The Settings support-bundle panel now shows release-candidate status,
+releaseability, artifact count, checker state, and evidence-gap count beside the
+release and spec action plans.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 26 CLI tests passed and the debug `ned` binary built, including `ned release-candidate`, stale/current commit handling, support-bundle release-candidate JSON, text summary, and IPC coverage. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed for the Settings release-candidate support-bundle UI. |
+| `pnpm run test:unit` | Pass | 118 frontend/static tests passed, including release-candidate CLI/support-bundle guards. |
+| `src-tauri/target/debug/ned release-candidate` | Pass | Direct smoke reported the existing candidate as `stale`, with 13 artifacts, passed checker status, and explicit regenerate guidance for the mismatched source commit. |
+| `src-tauri/target/debug/ned support-bundle --workspace .` | Pass | Direct smoke surfaced `Release candidate: stale (releaseable: no, artifacts: 13)` alongside release and spec action plans. |
+| `pnpm run check:docs` | Pass | 25 Markdown files checked with local links resolving after README and IPC coverage updates. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is stable for the CLI and tests. |
+| `git diff --check` | Pass | The release-candidate visibility slice has no whitespace errors. |
+
+Remaining work is still evidence execution: regenerate the release candidate
+after this commit, collect supported-host and credentialed evidence, ingest
+returned artifacts, and rerun release readiness until the candidate becomes
+final-releaseable.
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
