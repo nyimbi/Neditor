@@ -65,7 +65,7 @@
             <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
               <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
             </svg>
-            <span>Show toolbars</span>
+            <span>Toolbars hidden</span>
             <small>{{ collapsedToolbarRows.length }}</small>
           </button>
           <section v-if="toolbarVisibilityMenuOpen" class="app-menu-panel toolbar-visibility-panel" role="menu" aria-label="Toolbar visibility menu">
@@ -434,6 +434,20 @@
       :style="workspaceStyle"
       tabindex="-1"
     >
+      <button
+        v-if="collapsedToolbarRows.length"
+        class="workspace-toolbar-restore"
+        type="button"
+        aria-label="Toolbars hidden. Show all hidden toolbar rows"
+        :title="hiddenToolbarWorkspaceHelpText"
+        @click="showAllHiddenToolbars"
+      >
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
+        </svg>
+        <span>Toolbars hidden</span>
+        <small>{{ hiddenToolbarWorkspacePrompt }}</small>
+      </button>
       <section v-if="store.mode === 'outline'" id="outline-mode" class="outline-mode-pane" aria-label="Document outline mode" tabindex="-1">
         <header class="outline-mode-header">
           <div>
@@ -9804,21 +9818,27 @@ const hiddenToolbarSummary = computed(() => {
   const first = collapsedToolbarRows.value[0];
   return count === 1 && first ? `${first.label} toolbar hidden` : `${count} toolbars hidden`;
 });
-const hiddenToolbarTrayPrompt = computed(() => `Hidden: ${hiddenToolbarNames.value || "Toolbars"}`);
+const hiddenToolbarTrayPrompt = computed(() => `Toolbars hidden: ${hiddenToolbarNames.value || "Toolbars"}`);
 const hiddenToolbarRecoveryPrompt = computed(() => {
-  const first = collapsedToolbarRows.value[0];
-  return collapsedToolbarRows.value.length === 1 && first ? `Show ${first.label} toolbar` : "Show toolbars";
+  return "Toolbars hidden";
 });
 const hiddenToolbarTrayHelpText = computed(() => "Use Show all or any row button here to unhide toolbars; View > Toolbars has the same controls.");
 const hiddenToolbarFloatingHint = computed(() => {
   const count = collapsedToolbarRows.value.length;
-  return count === 1 ? "Click to restore the hidden row" : `Click to restore ${count} hidden rows`;
+  const first = collapsedToolbarRows.value[0];
+  return count === 1 && first ? `Click to show the ${first.label} toolbar` : `Click to show all ${count} hidden toolbars`;
 });
 const hiddenToolbarVisibilityMenuHelpText = computed(
   () => `${hiddenToolbarSummary.value}. Open this menu to unhide one row or show all toolbars.`,
 );
 const hiddenToolbarFloatingHelpText = computed(() => `${hiddenToolbarSummary.value}. ${hiddenToolbarFloatingHint.value}.`);
 const hiddenToolbarTrayAriaLabel = computed(() => `${hiddenToolbarSummary.value}. ${hiddenToolbarTrayHelpText.value}`);
+const hiddenToolbarWorkspacePrompt = computed(() => {
+  const count = collapsedToolbarRows.value.length;
+  const first = collapsedToolbarRows.value[0];
+  return count === 1 && first ? `Click to unhide ${first.label}` : `Click to unhide all ${count}`;
+});
+const hiddenToolbarWorkspaceHelpText = computed(() => `${hiddenToolbarSummary.value}. ${hiddenToolbarWorkspacePrompt.value}.`);
 const normalizedToolbarCollapsedRows = (ids: string[]) =>
   Array.from(new Set(ids.filter((id) => toolbarCollapseRowIds.includes(id))));
 const hasExpandedToolbarRows = computed(() => toolbarCollapseRowIds.some((id) => !store.toolbarCollapsedRows.includes(id)));
@@ -21371,14 +21391,16 @@ select:hover {
   background: #203b58;
 }
 
-.app-shell[data-theme="dark"] .floating-toolbar-restore {
+.app-shell[data-theme="dark"] .floating-toolbar-restore,
+.app-shell[data-theme="dark"] .workspace-toolbar-restore {
   border-color: #6f98c5;
   background: #1d344c;
   color: #e6f2ff;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(121, 164, 207, 0.18);
 }
 
-.app-shell[data-theme="dark"] .floating-toolbar-restore small {
+.app-shell[data-theme="dark"] .floating-toolbar-restore small,
+.app-shell[data-theme="dark"] .workspace-toolbar-restore small {
   color: #b7cce2;
 }
 
@@ -21886,6 +21908,13 @@ select:hover {
 .app-shell[data-high-contrast="true"] .toolbar-visibility-trigger small {
   background: #000000;
   color: #ffffff;
+}
+
+.app-shell[data-high-contrast="true"] .floating-toolbar-restore,
+.app-shell[data-high-contrast="true"] .workspace-toolbar-restore {
+  border-color: #000000;
+  background: #ffffff;
+  color: #000000;
 }
 
 .app-shell[data-high-contrast="true"] :focus-visible,
@@ -22523,6 +22552,55 @@ select:hover {
   line-height: 1.05;
 }
 
+.workspace-toolbar-restore {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 35;
+  display: inline-grid;
+  grid-template-columns: 15px auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 1px;
+  min-height: 32px;
+  padding: 4px 9px;
+  border: 1px solid #315f8d;
+  border-radius: 7px;
+  background: #f7fbff;
+  color: #173e63;
+  box-shadow: 0 8px 18px rgba(24, 36, 52, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1;
+  text-align: left;
+}
+
+.workspace-toolbar-restore:hover,
+.workspace-toolbar-restore:focus-visible {
+  border-color: #174a79;
+  background: #e9f4ff;
+  box-shadow: 0 10px 22px rgba(24, 36, 52, 0.23), 0 0 0 3px rgba(99, 134, 180, 0.2);
+}
+
+.workspace-toolbar-restore svg {
+  grid-row: 1 / span 2;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.workspace-toolbar-restore small {
+  color: #4c647f;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.05;
+}
+
 .command-group {
   display: inline-flex;
   align-items: center;
@@ -22730,6 +22808,7 @@ select:hover {
 }
 
 .workspace {
+  position: relative;
   display: grid;
   grid-template-columns:
     260px minmax(260px, calc((100vw - 268px) * var(--editor-ratio, 0.5))) 8px
@@ -28273,6 +28352,12 @@ select:hover {
     right: 8px;
     min-height: 32px;
     padding-inline: 8px;
+  }
+
+  .workspace-toolbar-restore {
+    top: 6px;
+    right: 8px;
+    max-width: calc(100vw - 18px);
   }
 
   .titlebar-toolbar-tray .collapsed-toolbar-tray-label {
