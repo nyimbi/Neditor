@@ -256,17 +256,56 @@ fn title_from_path(path: &Path) -> String {
 }
 
 fn docx_xml_to_text(xml: &str) -> String {
-    decode_text_entities(
-        &xml.replace("</w:p>", "\n")
-            .replace("</w:tr>", "\n")
-            .replace("</w:tc>", "\t")
-            .replace("<w:tab/>", "\t")
-            .replace("<w:br/>", "\n")
-            .split('<')
-            .map(|chunk| chunk.split_once('>').map(|(_, text)| text).unwrap_or(""))
-            .collect::<Vec<_>>()
-            .join(""),
-    )
+    let mut output = String::new();
+    let mut tag = String::new();
+    let mut in_tag = false;
+    let mut in_table_cell = false;
+    for ch in xml.chars() {
+        if in_tag {
+            if ch == '>' {
+                handle_docx_tag(&tag, &mut output, &mut in_table_cell);
+                tag.clear();
+                in_tag = false;
+            } else {
+                tag.push(ch);
+            }
+        } else if ch == '<' {
+            in_tag = true;
+        } else {
+            output.push(ch);
+        }
+    }
+    decode_text_entities(&output)
+}
+
+fn handle_docx_tag(raw_tag: &str, output: &mut String, in_table_cell: &mut bool) {
+    let trimmed = raw_tag.trim();
+    if trimmed.starts_with('?') || trimmed.starts_with('!') {
+        return;
+    }
+    let closing = trimmed.starts_with('/');
+    let normalized = trimmed
+        .trim_start_matches('/')
+        .trim_end_matches('/')
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match (closing, normalized.as_str()) {
+        (false, "w:tc") => *in_table_cell = true,
+        (true, "w:tc") => {
+            trim_trailing_whitespace(output);
+            push_text_separator(output, " | ");
+            *in_table_cell = false;
+        }
+        (true, "w:tr") => push_text_separator(output, "\n"),
+        (true, "w:tbl") => push_text_separator(output, "\n"),
+        (true, "w:p") if *in_table_cell => push_text_separator(output, " "),
+        (true, "w:p") => push_text_separator(output, "\n"),
+        (_, "w:tab") => push_text_separator(output, "\t"),
+        (_, "w:br") => push_text_separator(output, "\n"),
+        _ => {}
+    }
 }
 
 fn html_to_text(html: &str) -> String {
@@ -307,19 +346,22 @@ fn html_title(html: &str) -> Option<String> {
 }
 
 fn push_html_tag_separator(raw_tag: &str, output: &mut String) {
-    let tag = raw_tag
-        .trim()
+    let trimmed = raw_tag.trim();
+    let closing = trimmed.starts_with('/');
+    let tag = trimmed
         .trim_start_matches('/')
         .split_whitespace()
         .next()
         .unwrap_or_default()
         .trim_matches('/')
         .to_ascii_lowercase();
-    if tag.is_empty() || raw_tag.trim_start().starts_with('!') {
+    if tag.is_empty() || trimmed.starts_with('!') {
         return;
     }
     if matches!(tag.as_str(), "td" | "th") {
-        push_separator(output, '\t');
+        if closing {
+            push_text_separator(output, " | ");
+        }
     } else if matches!(
         tag.as_str(),
         "br" | "p"
@@ -340,7 +382,9 @@ fn push_html_tag_separator(raw_tag: &str, output: &mut String) {
             | "h5"
             | "h6"
     ) {
-        push_separator(output, '\n');
+        if closing || matches!(tag.as_str(), "br" | "li" | "tr" | "table") {
+            push_separator(output, '\n');
+        }
     }
 }
 
@@ -349,6 +393,24 @@ fn push_separator(output: &mut String, separator: char) {
         return;
     }
     output.push(separator);
+}
+
+fn push_text_separator(output: &mut String, separator: &str) {
+    if output.ends_with(separator) {
+        return;
+    }
+    output.push_str(separator);
+}
+
+fn trim_trailing_whitespace(output: &mut String) {
+    while output
+        .chars()
+        .last()
+        .map(|ch| ch.is_whitespace())
+        .unwrap_or(false)
+    {
+        output.pop();
+    }
 }
 
 fn remove_html_element_blocks(html: &str, element_names: &[&str]) -> String {
@@ -504,10 +566,11 @@ mod tests {
     #[test]
     fn docx_xml_text_preserves_paragraphs_and_table_cells() {
         let text = docx_xml_to_text(
-            r#"<w:p><w:r><w:t>Requirement &amp; A</w:t></w:r></w:p><w:tr><w:tc><w:p><w:r><w:t>Cell &#x32;</w:t></w:r></w:p></w:tc></w:tr>"#,
+            r#"<w:p><w:r><w:t>Requirement &amp; A</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Role</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Minimum requirement</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Points</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>Software Architect</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>5+ years &amp; degree</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>20 points</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"#,
         );
         assert!(text.contains("Requirement & A"));
-        assert!(text.contains("Cell 2"));
+        assert!(text.contains("Role | Minimum requirement | Points |"));
+        assert!(text.contains("Software Architect | 5+ years & degree | 20 points |"));
     }
 
     #[test]
@@ -549,6 +612,8 @@ mod tests {
         assert!(text.contains("RFP"));
         assert!(text.contains("Vendor must provide support & training."));
         assert!(text.contains("Submit certificates ✓"));
+        assert!(text.contains("ID | Requirement |"));
+        assert!(text.contains("1 | Submit certificates ✓ |"));
         assert!(!text.contains("alert"));
         assert!(!text.contains(".x"));
         assert!(!text.contains("<p>"));

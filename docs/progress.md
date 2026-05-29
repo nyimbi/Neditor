@@ -122,6 +122,19 @@ header rather than each row.
 | `pnpm run test:unit` | Pass | 118 frontend unit tests passed; RFP wizard coverage now proves Software Architect and Climate Data Specialist table rows become extracted requirements and team-outline evidence. |
 | `git diff --check` | Pass | Whitespace guard passed before commit. |
 
+## 2026-05-29 RFP DOCX/URL Table Preservation
+
+RFP source import now preserves table shape for DOCX and URL sources. DOCX Word
+tables and fetched HTML tables are converted into pipe-delimited rows before
+the text is normalized, so downstream RFP analysis can recognize role,
+minimum-requirement, evidence, attachment, and scoring tables instead of seeing
+flattened prose.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked rfp_import --lib` | Pass | 7 focused Rust importer tests passed, including DOCX role/minimum/points rows and HTML table rows preserved as pipe-delimited RFP evidence. |
+| `git diff --check` | Pass | Whitespace guard passed before commit. |
+
 ## 2026-05-29 Max Writing Space Preset
 
 NEditor now has a reversible **Maximize Writing Space** command. The command
