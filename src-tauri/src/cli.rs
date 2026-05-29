@@ -159,6 +159,7 @@ pub(crate) struct SupportBundleRequest {
     pub(crate) workspace: Option<String>,
     pub(crate) readiness_report: Option<String>,
     pub(crate) spec_report: Option<String>,
+    pub(crate) spec_work_orders: Option<String>,
     pub(crate) engine_report: Option<String>,
     pub(crate) evidence_root: Option<String>,
     pub(crate) evidence_kit: Option<String>,
@@ -491,6 +492,11 @@ pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Val
         .filter(|value| !value.trim().is_empty())
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(".tmp/spec-completion/report.json"));
+    let spec_work_orders_path = request
+        .spec_work_orders
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| default_spec_work_orders_path(&spec_report_path));
     let engine_report_path = request
         .engine_report
         .filter(|value| !value.trim().is_empty())
@@ -514,6 +520,7 @@ pub(crate) fn create_support_bundle(request: SupportBundleRequest) -> Result<Val
         &workspace,
         &readiness_report_path,
         &spec_report_path,
+        &spec_work_orders_path,
         &engine_report_path,
         &evidence_root_path,
         &evidence_kit_path,
@@ -3228,6 +3235,7 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut readiness_report_path = PathBuf::from(".tmp/release-readiness/report.json");
     let mut spec_report_path = PathBuf::from(".tmp/spec-completion/report.json");
+    let mut spec_work_orders_path: Option<PathBuf> = None;
     let mut engine_report_path = PathBuf::from(".tmp/external-engines/probe-report.json");
     let mut evidence_root_path = PathBuf::from(".tmp");
     let mut evidence_kit_path = PathBuf::from(".tmp/release-evidence-kit/manifest.json");
@@ -3256,6 +3264,12 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
                     args.get(index)
                         .ok_or_else(|| "--spec-report requires a JSON report path".to_string())?,
                 );
+            }
+            "--spec-work-orders" => {
+                index += 1;
+                spec_work_orders_path = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--spec-work-orders requires a JSON work orders path".to_string()
+                })?));
             }
             "--engine-report" => {
                 index += 1;
@@ -3289,10 +3303,13 @@ fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
         index += 1;
     }
 
+    let spec_work_orders_path =
+        spec_work_orders_path.unwrap_or_else(|| default_spec_work_orders_path(&spec_report_path));
     let (report, written_to) = build_support_bundle_report(
         &workspace,
         &readiness_report_path,
         &spec_report_path,
+        &spec_work_orders_path,
         &engine_report_path,
         &evidence_root_path,
         &evidence_kit_path,
@@ -3643,6 +3660,13 @@ fn evidence_kit_manifest_path(path: &Path) -> PathBuf {
     }
 }
 
+fn default_spec_work_orders_path(spec_report_path: &Path) -> PathBuf {
+    spec_report_path
+        .parent()
+        .map(|parent| parent.join("work-orders.json"))
+        .unwrap_or_else(|| PathBuf::from(".tmp/spec-completion/work-orders.json"))
+}
+
 fn readiness_action_plan(evidence_kit_path: &Path, evidence_gaps: &[Value]) -> Value {
     let manifest_path = evidence_kit_manifest_path(evidence_kit_path);
     let manifest_path_display = path_to_display(&manifest_path);
@@ -3953,6 +3977,7 @@ fn build_support_bundle_report(
     workspace: &Path,
     readiness_report_path: &Path,
     spec_report_path: &Path,
+    spec_work_orders_path: &Path,
     engine_report_path: &Path,
     evidence_root_path: &Path,
     evidence_kit_path: &Path,
@@ -4017,6 +4042,7 @@ fn build_support_bundle_report(
     let evidence_report_summary = support_bundle_evidence_report_summary(&evidence_reports);
     let readiness_gaps = readiness_array_field(&readiness, "evidenceGaps");
     let action_plan = readiness_action_plan(evidence_kit_path, &readiness_gaps);
+    let spec_action_plan = spec_completion_action_plan(spec_work_orders_path, &spec_completion);
     let recommendations = support_bundle_recommendations(
         &doctor,
         &readiness,
@@ -4034,7 +4060,7 @@ fn build_support_bundle_report(
         "privacy": {
             "documentContentIncluded": false,
             "secretsIncluded": false,
-            "note": "This bundle includes setup status, command paths, report paths, transform engine health, and release evidence summaries only."
+            "note": "This bundle includes setup status, command paths, report paths, transform engine health, release evidence summaries, and spec work orders only."
         },
         "doctor": doctor,
         "releaseReadiness": {
@@ -4055,6 +4081,7 @@ fn build_support_bundle_report(
             "summary": spec_completion.get("summary").cloned().unwrap_or_else(|| json!({})),
             "openRows": support_bundle_open_spec_rows(&spec_completion, 20),
         },
+        "specActionPlan": spec_action_plan,
         "engineProbe": {
             "reportPath": path_to_display(engine_report_path),
             "status": readiness_string_field(&engine_probe, "status").unwrap_or("unknown"),
@@ -4172,6 +4199,14 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
         .and_then(Value::as_u64)
         .unwrap_or(0);
     let action_total = readiness_array_field(action_plan, "workItems").len();
+    let spec_action_plan = report.get("specActionPlan").unwrap_or(&Value::Null);
+    let spec_action_status =
+        readiness_string_field(spec_action_plan, "status").unwrap_or("unknown");
+    let spec_action_ready = spec_action_plan
+        .get("readyToSendCount")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let spec_action_total = readiness_array_field(spec_action_plan, "workOrders").len();
     let evidence_gaps = readiness_array_field(readiness, "evidenceGaps").len();
     let failures = readiness_array_field(readiness, "failures").len();
     let recommendations = readiness_array_field(report, "recommendations")
@@ -4197,6 +4232,7 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
             "Evidence reports: {evidence_ready} ready, {evidence_attention} need attention, {evidence_missing} missing"
         ),
         format!("Release action plan: {action_status} ({action_ready}/{action_total} work items ready)"),
+        format!("Spec action plan: {spec_action_status} ({spec_action_ready}/{spec_action_total} work orders ready)"),
         "Privacy: no document content or secrets included".to_string(),
     ];
     if let Some(path) = written_to {
@@ -4248,6 +4284,80 @@ fn string_array_field(value: &Value, field: &str) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+fn spec_completion_action_plan(work_orders_path: &Path, spec_completion: &Value) -> Value {
+    let work_orders_path_display = path_to_display(work_orders_path);
+    let open_rows = spec_completion
+        .get("summary")
+        .and_then(|summary| summary.get("openRows"))
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| readiness_array_field(spec_completion, "openRows").len() as u64);
+    let work_orders_report = match read_json_report(work_orders_path) {
+        Ok(value) => value,
+        Err(error) => {
+            return json!({
+                "schema": "neditor.ned-spec-action-plan.v1",
+                "status": if open_rows == 0 { "no-open-rows" } else { "missing-work-orders" },
+                "workOrdersPath": work_orders_path_display,
+                "reportPath": readiness_string_field(spec_completion, "reportPath")
+                    .unwrap_or(".tmp/spec-completion/report.json"),
+                "openRows": open_rows,
+                "readyToSendCount": 0,
+                "workOrders": [],
+                "issues": [error],
+                "nextCommands": ["pnpm run check:spec-completion"]
+            });
+        }
+    };
+    let work_orders = readiness_array_field(&work_orders_report, "workOrders");
+    let ready_to_send_count = work_orders
+        .iter()
+        .filter(|item| {
+            item.get("readyToSend")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .count();
+    let mut issues = Vec::new();
+    if open_rows > 0 && work_orders.len() < open_rows as usize {
+        issues.push(format!(
+            "Spec work orders cover {} of {open_rows} open row(s); rerun pnpm run check:spec-completion.",
+            work_orders.len()
+        ));
+    }
+    let status = if open_rows == 0 {
+        "no-open-rows"
+    } else if !issues.is_empty() {
+        "incomplete"
+    } else if ready_to_send_count == work_orders.len() {
+        "ready-to-send"
+    } else {
+        readiness_string_field(&work_orders_report, "status").unwrap_or("needs-work")
+    };
+
+    json!({
+        "schema": "neditor.ned-spec-action-plan.v1",
+        "status": status,
+        "workOrdersPath": work_orders_path_display,
+        "matrixPath": readiness_string_field(&work_orders_report, "matrixPath")
+            .or_else(|| readiness_string_field(spec_completion, "matrixPath")),
+        "reportPath": readiness_string_field(&work_orders_report, "reportPath")
+            .or_else(|| readiness_string_field(spec_completion, "reportPath")),
+        "gapPlanPath": readiness_string_field(spec_completion, "gapPlanPath"),
+        "workOrdersMarkdownPath": readiness_string_field(spec_completion, "workOrdersMarkdownPath"),
+        "generatedAt": readiness_string_field(&work_orders_report, "generatedAt"),
+        "openRows": open_rows,
+        "readyToSendCount": ready_to_send_count,
+        "summary": work_orders_report.get("summary").cloned().unwrap_or_else(|| json!({})),
+        "workOrders": work_orders,
+        "issues": issues,
+        "nextCommands": [
+            "pnpm run check:spec-completion",
+            "pnpm run ingest:evidence -- --source /path/to/return-dir",
+            "pnpm run check:release-readiness"
+        ]
+    })
 }
 
 fn support_bundle_open_spec_rows(report: &Value, limit: usize) -> Vec<Value> {
@@ -9563,7 +9673,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --strict --evidence-root" -- "$cur") )
         ;;
       support|support-bundle)
-        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --engine-report --evidence-root --evidence-kit --output" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --spec-work-orders --engine-report --evidence-root --evidence-kit --output" -- "$cur") )
         ;;
       doctor)
         COMPREPLY=( $(compgen -W "--json --strict --workspace" -- "$cur") )
@@ -9670,7 +9780,7 @@ _ned() {{
       _arguments '--json[print machine-readable JSON]' '--strict[fail when any evidence report needs attention]' '--evidence-root[read standard release evidence reports from a .tmp-style root]:directory:_files -/'
       ;;
     support|support-bundle)
-      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--engine-report[attach a specific transform engine probe report]:file:_files' '--evidence-root[attach standard release evidence reports from a .tmp-style root]:directory:_files -/' '--evidence-kit[attach release evidence-kit work items]:file:_files' '--output[write support bundle JSON]:file:_files'
+      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--spec-work-orders[attach spec-completion work orders]:file:_files' '--engine-report[attach a specific transform engine probe report]:file:_files' '--evidence-root[attach standard release evidence reports from a .tmp-style root]:directory:_files -/' '--evidence-kit[attach release evidence-kit work items]:file:_files' '--output[write support bundle JSON]:file:_files'
       ;;
     completions|completion)
       _arguments '1:shell:($shells)'
@@ -9879,6 +9989,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l readiness-report -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l spec-report -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l spec-work-orders -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l engine-report -r"
             .to_string(),
@@ -10354,7 +10466,7 @@ fn help_text() -> String {
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json] [--action-plan --evidence-kit .tmp/release-evidence-kit]"
             .to_string(),
         "  ned evidence [--json] [--strict] [--evidence-root .tmp]".to_string(),
-        "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--engine-report path] [--evidence-root .tmp] [--evidence-kit .tmp/release-evidence-kit] [--output support.json]"
+        "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--spec-work-orders path] [--engine-report path] [--evidence-root .tmp] [--evidence-kit .tmp/release-evidence-kit] [--output support.json]"
             .to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),
         "  ned doctor [--json] [--strict] [--workspace path]".to_string(),

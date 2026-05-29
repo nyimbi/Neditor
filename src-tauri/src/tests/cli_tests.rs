@@ -1742,6 +1742,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     fs::create_dir_all(&root).expect("create support root");
     let report_path = root.join("readiness.json");
     let spec_path = root.join("spec-completion.json");
+    let spec_work_orders_path = root.join("work-orders.json");
     let engine_path = root.join("engine-probe.json");
     let evidence_root = root.join("evidence");
     let output_path = root.join("support").join("bundle.json");
@@ -1794,6 +1795,56 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         serde_json::to_string_pretty(&spec_completion).expect("spec json"),
     )
     .expect("write spec fixture");
+    let spec_work_orders = serde_json::json!({
+        "schema": "neditor.spec-completion-work-orders.v1",
+        "generatedAt": "2026-05-26T12:26:00.000Z",
+        "status": "partial-with-release-risks",
+        "matrixPath": "docs/spec-completion-matrix.md",
+        "reportPath": spec_path.to_string_lossy(),
+        "summary": {
+            "total": 2,
+            "readyToSend": 2,
+            "byClassification": {
+                "manual-review": 1,
+                "cross-platform-evidence": 1
+            }
+        },
+        "workOrders": [
+            {
+                "id": "001-manual-review-native-dialogs",
+                "readyToSend": true,
+                "owner": "Named manual reviewer",
+                "specSection": "6.5 File Operations",
+                "requirementArea": "Native dialogs",
+                "classification": "manual-review",
+                "remainingGap": "Broader native proof.",
+                "runbooks": ["runbooks/manual-review.md"],
+                "returns": [".tmp/manual-review/001/signoff.json"],
+                "validatorCommands": ["pnpm run check:a11y:manual"],
+                "ingestCommand": "pnpm run ingest:evidence -- --source <returned-evidence-dir>",
+                "matrixClosureCommand": "pnpm run check:spec-completion"
+            },
+            {
+                "id": "002-cross-platform-external-engines",
+                "readyToSend": true,
+                "owner": "Supported-host QA owner",
+                "specSection": "10.2 Safety",
+                "requirementArea": "External engines",
+                "classification": "cross-platform-evidence",
+                "remainingGap": "Cross-platform proof.",
+                "runbooks": ["runbooks/platform-evidence.md"],
+                "returns": [".tmp/platform-evidence/external/linux/platform-evidence.json"],
+                "validatorCommands": ["pnpm run check:platform-evidence"],
+                "ingestCommand": "pnpm run ingest:evidence -- --source <returned-evidence-dir>",
+                "matrixClosureCommand": "pnpm run check:spec-completion"
+            }
+        ]
+    });
+    fs::write(
+        &spec_work_orders_path,
+        serde_json::to_string_pretty(&spec_work_orders).expect("spec work orders json"),
+    )
+    .expect("write spec work orders fixture");
     let engine_probe = serde_json::json!({
         "generatedAt": "2026-05-26T12:30:00.000Z",
         "status": "complete",
@@ -1874,6 +1925,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         report_path.to_string_lossy().to_string(),
         "--spec-report".to_string(),
         spec_path.to_string_lossy().to_string(),
+        "--spec-work-orders".to_string(),
+        spec_work_orders_path.to_string_lossy().to_string(),
         "--engine-report".to_string(),
         engine_path.to_string_lossy().to_string(),
         "--evidence-root".to_string(),
@@ -1906,6 +1959,16 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert_eq!(
         bundle["specCompletion"]["openRows"][0]["requirementArea"],
         "Native dialogs"
+    );
+    assert_eq!(bundle["specActionPlan"]["status"], "ready-to-send");
+    assert_eq!(bundle["specActionPlan"]["readyToSendCount"], 2);
+    assert_eq!(
+        bundle["specActionPlan"]["workOrders"][0]["id"],
+        "001-manual-review-native-dialogs"
+    );
+    assert_eq!(
+        bundle["specActionPlan"]["workOrders"][1]["runbooks"][0],
+        "runbooks/platform-evidence.md"
     );
     assert_eq!(bundle["engineProbe"]["status"], "complete");
     assert_eq!(bundle["engineProbe"]["summary"]["installed"], 3);
@@ -1957,6 +2020,9 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert!(text
         .message
         .contains("Release action plan: no-open-gaps (0/0 work items ready)"));
+    assert!(text
+        .message
+        .contains("Spec action plan: ready-to-send (2/2 work orders ready)"));
     assert!(text.message.contains("Wrote support bundle"));
     assert!(output_path.is_file());
     let written: serde_json::Value =
@@ -1975,6 +2041,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         workspace: Some(root.to_string_lossy().to_string()),
         readiness_report: Some(report_path.to_string_lossy().to_string()),
         spec_report: Some(spec_path.to_string_lossy().to_string()),
+        spec_work_orders: Some(spec_work_orders_path.to_string_lossy().to_string()),
         engine_report: Some(engine_path.to_string_lossy().to_string()),
         evidence_root: Some(evidence_root.to_string_lossy().to_string()),
         evidence_kit: None,

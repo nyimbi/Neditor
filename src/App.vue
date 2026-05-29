@@ -3227,7 +3227,10 @@
               </div>
               <div>
                 <dt>Spec rows</dt>
-                <dd>{{ supportBundleReport.specCompletion?.summary?.openRows || 0 }} open</dd>
+                <dd>
+                  {{ supportBundleReport.specCompletion?.summary?.openRows || 0 }} open,
+                  {{ supportBundleReport.specActionPlan?.readyToSendCount || 0 }}/{{ supportBundleReport.specActionPlan?.workOrders?.length || 0 }} work orders ready
+                </dd>
               </div>
               <div>
                 <dt>Engines</dt>
@@ -3271,6 +3274,20 @@
               </article>
               <p v-if="supportBundleReport.releaseActionPlan.workItems.length > 6" class="sidebar-hint">
                 {{ supportBundleReport.releaseActionPlan.workItems.length - 6 }} more action item(s) are included in the saved JSON.
+              </p>
+            </section>
+            <section v-if="supportBundleReport?.specActionPlan?.workOrders?.length" class="support-bundle-action-plan" aria-label="Specification work orders">
+              <h5>Specification work orders</h5>
+              <article v-for="order in supportBundleReport.specActionPlan.workOrders.slice(0, 6)" :key="order.id">
+                <strong>{{ order.id }}</strong>
+                <span>{{ order.specSection }} / {{ order.requirementArea }}</span>
+                <small>
+                  {{ order.classification || "evidence" }}:
+                  {{ order.runbooks?.join(", ") || "runbook not mapped" }}
+                </small>
+              </article>
+              <p v-if="supportBundleReport.specActionPlan.workOrders.length > 6" class="sidebar-hint">
+                {{ supportBundleReport.specActionPlan.workOrders.length - 6 }} more work order(s) are included in the saved JSON.
               </p>
             </section>
           </section>
@@ -6409,6 +6426,25 @@ type SupportBundleReport = {
       ingestCommand?: string;
       finalReadinessCommand?: string;
       readyToSend?: boolean;
+    }>;
+  };
+  specActionPlan?: {
+    status?: string;
+    workOrdersPath?: string;
+    readyToSendCount?: number;
+    workOrders?: Array<{
+      id?: string;
+      readyToSend?: boolean;
+      owner?: string;
+      specSection?: string;
+      requirementArea?: string;
+      classification?: string;
+      remainingGap?: string;
+      runbooks?: string[];
+      returns?: string[];
+      validatorCommands?: string[];
+      ingestCommand?: string;
+      matrixClosureCommand?: string;
     }>;
   };
   specCompletion?: {
@@ -18684,9 +18720,11 @@ async function createSupportBundleFromSettings(writeToFile: boolean) {
     const evidenceAttention = (report.evidenceReportSummary?.attention || 0) + (report.evidenceReportSummary?.missing || 0);
     const actionItems = report.releaseActionPlan?.workItems?.length || 0;
     const readyActions = report.releaseActionPlan?.readyToSendCount || 0;
+    const specWorkOrders = report.specActionPlan?.workOrders?.length || 0;
+    const readySpecWorkOrders = report.specActionPlan?.readyToSendCount || 0;
     supportBundleStatus.value = report.writtenTo
       ? `Wrote support bundle to ${report.writtenTo}`
-      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${readyActions}/${actionItems} action items ready, ${specOpenRows} open spec rows, engines ${engineStatus} (${missingEngines} missing), ${evidenceAttention} evidence reports need attention`;
+      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${readyActions}/${actionItems} release actions ready, ${specOpenRows} open spec rows, ${readySpecWorkOrders}/${specWorkOrders} spec work orders ready, engines ${engineStatus} (${missingEngines} missing), ${evidenceAttention} evidence reports need attention`;
   } catch (error) {
     supportBundleReport.value = null;
     supportBundleStatus.value = error instanceof Error ? error.message : String(error);

@@ -272,7 +272,8 @@ spec-completion, transform-engine probe summaries, and standard release evidence
 report statuses into a redaction-safe JSON handoff for help desks and release
 managers. It includes setup status, command paths, report paths, evidence-gap
 summaries, open specification rows, installed or missing transform-engine
-status, AI/runtime/security/performance/sign-off evidence report status, and
+status, AI/runtime/security/performance/sign-off evidence report status,
+release evidence action items, spec-completion work orders, and
 recommendations, but not document content or secrets. `ned completions bash`,
 `ned completions zsh`, and `ned completions fish` print shell completion
 scripts so support teams can make the command easier to discover after
@@ -1103,6 +1104,10 @@ evidence reports have been copied into a non-default evidence directory. The
 support bundle also includes the release evidence action plan when
 `.tmp/release-evidence-kit/manifest.json` is present, so help desks can see
 which team owns each external proof item and how to validate the returned files.
+It also includes spec-completion work orders from
+`.tmp/spec-completion/work-orders.json` or `--spec-work-orders path`, so open
+matrix rows become assignable reviewer, supported-host, credential, and
+distribution work with runbooks, returns, validators, and closure commands.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,

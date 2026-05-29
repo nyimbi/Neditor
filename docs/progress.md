@@ -5784,6 +5784,33 @@ Remaining release blockers are still external/manual evidence gates: refreshed
 Google Drive authorization for live Docs import proof, cross-platform packaged
 build evidence, signing/notarization evidence, and final Homebrew cask evidence.
 
+## 2026-05-29 Spec Work Orders In Support Bundles
+
+NEditor now exposes the generated spec-completion work orders inside the
+redaction-safe support bundle instead of leaving the 68 open matrix rows buried
+in `.tmp/spec-completion/work-orders.json`. The support-bundle JSON includes a
+`specActionPlan` with all work orders, readiness counts, classification
+summary, runbooks, expected return paths, validator commands, ingest commands,
+and matrix closure commands. The Settings support-bundle panel also summarizes
+spec work-order readiness and lists the first mapped assignments so help desks
+can hand reviewers and supported-host owners concrete work without opening the
+raw `.tmp` files.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 26 CLI tests passed and the debug `ned` binary built, including `--spec-work-orders`, `specActionPlan`, and support-bundle text coverage. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed for the Settings spec work-order summary UI. |
+| `pnpm run test:unit` | Pass | 118 frontend/static tests passed, including support-bundle spec action-plan guards. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --json` | Pass | Direct smoke returned `specActionPlan` with 68 ready work orders alongside the existing release action plan. |
+| `pnpm run check:docs` | Pass | 25 Markdown files checked with local links resolving after README and IPC coverage updates. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is stable for the CLI and tests. |
+| `git diff --check` | Pass | The support-bundle spec work-order slice has no whitespace errors. |
+
+This does not close the evidence gates by itself: the rows still require named
+reviewer sign-off, supported-host execution, credentialed signing evidence, or
+distribution artifacts. It does make every remaining spec row assignable from
+the same support bundle used by release and help-desk teams.
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
