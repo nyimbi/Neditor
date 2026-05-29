@@ -183,6 +183,27 @@ by combining several separate controls manually.
 | `pnpm run test:unit` | Pass | Static and helper tests verify the max-writing-space state, menu labels, command palette entries, native menu IDs, restore path, and layout class wiring. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "collapses and restores command toolbars" --project chromium` | Pass | Focused browser workflow proves Maximize Writing Space hides the sidebar, preview, status bar, and command bar, then restores the previous writing layout. |
 
+## 2026-05-29 Hidden Toolbar Recovery
+
+Hidden toolbar recovery is now explicit. When a toolbar row is hidden, the
+titlebar tray shows the exact number of hidden rows, a plain-language recovery
+hint, a primary **Restore all** action, and individual toolbar-name restore
+buttons. The View menu also exposes per-toolbar Show/Hide entries, the command
+palette exposes searchable "Show [row] toolbar" commands with "unhide"
+keywords, and toolbar hide/show actions update the status message with the
+recovery path.
+
+This closes the discoverability gap where users could hide a toolbar but did
+not have an obvious way to show it again.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue type checking passed after adding hidden-toolbar recovery state, menu entries, and command-palette commands. |
+| `pnpm run test:unit` | Pass | Static and helper tests verify the hidden-toolbar summary, restore hint, View-menu recovery entries, command-palette unhide keywords, and row restore helpers. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "collapses and restores command toolbars" --project chromium` | Pass | Focused browser workflow proves the hidden-toolbar tray announces one hidden toolbar, exposes the restore hint, restores a single row, recovers vertical space when all rows are hidden, announces four hidden rows, and restores all rows. |
+| `pnpm run check:docs` | Pass | Markdown link validation checked 25 documentation files successfully. |
+| `git diff --check` | Pass | Whitespace guard passed before commit. |
+
 ## 2026-05-29 Release Candidate Packet Validator
 
 NEditor now has `pnpm run check:release-candidate`, a standalone validator for

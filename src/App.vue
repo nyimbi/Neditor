@@ -150,19 +150,28 @@
       </section>
 
       <section class="window-meta" aria-label="Document status">
-        <section v-if="collapsedToolbarRows.length" class="collapsed-toolbar-tray titlebar-toolbar-tray" aria-label="Hidden toolbars">
-          <span class="collapsed-toolbar-tray-label">Toolbars hidden</span>
+        <section
+          v-if="collapsedToolbarRows.length"
+          class="collapsed-toolbar-tray titlebar-toolbar-tray"
+          :aria-label="hiddenToolbarTrayAriaLabel"
+          :title="hiddenToolbarTrayHelpText"
+          aria-live="polite"
+        >
+          <span class="collapsed-toolbar-tray-label">
+            <span>{{ hiddenToolbarSummary }}</span>
+            <small>{{ hiddenToolbarTrayHelpText }}</small>
+          </span>
           <button
             class="collapsed-toolbar-pill collapsed-toolbar-pill-primary"
             type="button"
-            aria-label="Show all hidden toolbars"
-            title="Show all hidden toolbar rows"
+            aria-label="Restore all hidden toolbars"
+            title="Restore all hidden toolbar rows"
             @click="setAllCommandToolbarsCollapsed(false)"
           >
             <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
               <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
             </svg>
-            <span>Show all toolbars</span>
+            <span>Restore all</span>
           </button>
           <button
             v-for="row in collapsedToolbarRows"
@@ -176,7 +185,7 @@
             <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
               <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
             </svg>
-            <span>Show {{ row.label }}</span>
+            <span>{{ row.label }}</span>
           </button>
           <button
             v-if="writingSpaceMaximized"
@@ -9304,7 +9313,8 @@ const commandToolbarDefinitions = [
   { id: "writing", label: "Writing", groupIds: ["write", "create", "insert"] },
   { id: "review-navigation", label: "Review & Navigate", groupIds: ["navigate", "review", "quality"] },
 ];
-const toolbarCollapseRowIds = [...commandToolbarDefinitions.map((row) => row.id), "view"];
+const toolbarCollapseRowDefinitions = [...commandToolbarDefinitions.map((row) => ({ id: row.id, label: row.label })), { id: "view", label: "View" }];
+const toolbarCollapseRowIds = toolbarCollapseRowDefinitions.map((row) => row.id);
 const commandToolbarRows = computed<CommandToolbarRow[]>(() => {
   const byId = new Map(commandBarGroups.value.map((group) => [group.id, group]));
   return commandToolbarDefinitions.map((row) => ({
@@ -9407,6 +9417,14 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "settings", label: "Settings", help: "Tune toolbar, editor, preview, and accessibility settings.", run: () => (store.sidebar = "settings") },
           { id: "collapse-toolbars", label: "Collapse Toolbars", help: "Recover vertical writing space.", run: () => setAllCommandToolbarsCollapsed(true) },
           { id: "expand-toolbars", label: "Expand Toolbars", help: "Show all toolbar rows.", run: () => setAllCommandToolbarsCollapsed(false) },
+          ...toolbarCollapseRowDefinitions.map((row) => ({
+            id: `toggle-toolbar-${row.id}`,
+            label: isToolbarCollapsed(row.id) ? `Show ${row.label} Toolbar` : `Hide ${row.label} Toolbar`,
+            help: isToolbarCollapsed(row.id)
+              ? `Restore the ${row.label} toolbar row. Hidden rows are also listed in the titlebar tray.`
+              : `Hide the ${row.label} toolbar row and add it to the visible restore tray.`,
+            run: () => toggleToolbarRow(row.id),
+          })),
         ],
       },
     ],
@@ -9564,8 +9582,14 @@ const appMenus = computed<AppMenu[]>(() => [
     ],
   },
 ]);
-const toolbarCollapseRows = computed(() => [...commandToolbarRows.value.map((row) => ({ id: row.id, label: row.label })), { id: "view", label: "View" }]);
+const toolbarCollapseRows = computed(() => toolbarCollapseRowDefinitions);
 const collapsedToolbarRows = computed(() => toolbarCollapseRows.value.filter((row) => store.toolbarCollapsedRows.includes(row.id)));
+const hiddenToolbarSummary = computed(() => {
+  const count = collapsedToolbarRows.value.length;
+  return `${count} toolbar${count === 1 ? "" : "s"} hidden`;
+});
+const hiddenToolbarTrayHelpText = computed(() => "Click Restore all or a toolbar name to show it again.");
+const hiddenToolbarTrayAriaLabel = computed(() => `${hiddenToolbarSummary.value}. ${hiddenToolbarTrayHelpText.value}`);
 const normalizedToolbarCollapsedRows = (ids: string[]) =>
   Array.from(new Set(ids.filter((id) => toolbarCollapseRowIds.includes(id))));
 const hasExpandedToolbarRows = computed(() => toolbarCollapseRowIds.some((id) => !store.toolbarCollapsedRows.includes(id)));
@@ -9573,17 +9597,37 @@ const anyCommandToolbarsCollapsed = computed(() => toolbarCollapseRowIds.some((i
 function isToolbarCollapsed(id: string) {
   return store.toolbarCollapsedRows.includes(id);
 }
-function toggleToolbarRow(id: string) {
+function toolbarRowLabel(id: string) {
+  return toolbarCollapseRowDefinitions.find((row) => row.id === id)?.label || "Toolbar";
+}
+function showToolbarRow(id: string) {
   const current = new Set(store.toolbarCollapsedRows);
-  if (current.has(id)) {
-    current.delete(id);
-  } else {
-    current.add(id);
+  if (!current.has(id)) {
+    store.statusMessage = `${toolbarRowLabel(id)} toolbar is already visible`;
+    return;
   }
+  current.delete(id);
   store.toolbarCollapsedRows = normalizedToolbarCollapsedRows([...current]);
+  store.statusMessage = `${toolbarRowLabel(id)} toolbar restored`;
+}
+function hideToolbarRow(id: string) {
+  const current = new Set(store.toolbarCollapsedRows);
+  current.add(id);
+  store.toolbarCollapsedRows = normalizedToolbarCollapsedRows([...current]);
+  store.statusMessage = `${toolbarRowLabel(id)} toolbar hidden; use the hidden toolbars tray or View menu to show it again`;
+}
+function toggleToolbarRow(id: string) {
+  if (isToolbarCollapsed(id)) {
+    showToolbarRow(id);
+  } else {
+    hideToolbarRow(id);
+  }
 }
 function setAllCommandToolbarsCollapsed(collapsed: boolean) {
   store.toolbarCollapsedRows = collapsed ? [...toolbarCollapseRowIds] : [];
+  store.statusMessage = collapsed
+    ? "All toolbars hidden; use the hidden toolbars tray or View menu to show them again"
+    : "All toolbars restored";
 }
 function maximizeWritingSpace() {
   if (!writingSpaceMaximized.value) {
@@ -12305,6 +12349,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   },
   { name: "Collapse all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(true) },
   { name: "Expand all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(false) },
+  ...toolbarCollapseRowDefinitions.map((row) => ({
+    name: `Show ${row.label} toolbar`,
+    group: "View",
+    description: `Restore the ${row.label} toolbar row. Hidden rows are also listed in the titlebar tray.`,
+    keywords: ["toolbar", "hidden", "restore", "unhide", row.label.toLowerCase()],
+    run: () => showToolbarRow(row.id),
+  })),
   { name: "Bold selection", group: "Markdown", run: () => wrapSelection("**") },
   { name: "Italic selection", group: "Markdown", run: () => wrapSelection("*") },
   { name: "Inline code selection", group: "Markdown", run: () => wrapSelection("`") },
@@ -21864,7 +21915,7 @@ select:hover {
 
 .titlebar-toolbar-tray {
   flex: 1 1 auto;
-  max-width: min(52vw, 660px);
+  max-width: min(64vw, 860px);
 }
 
 .release-badge {
@@ -21992,21 +22043,33 @@ select:hover {
   min-width: 0;
   min-height: 26px;
   padding: 2px 4px;
-  border: 1px solid #bdcbd9;
+  border: 1px solid #8aa5c2;
   border-radius: 7px;
-  background: #f6f9fc;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  background: #edf6ff;
+  box-shadow: 0 0 0 1px rgba(49, 95, 141, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.82);
   overflow-x: auto;
 }
 
 .collapsed-toolbar-tray-label {
+  display: inline-flex;
   flex: 0 0 auto;
-  color: #2f4258;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 118px;
+  color: #173e63;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1;
   text-transform: uppercase;
+}
+
+.collapsed-toolbar-tray-label small {
+  color: #4c647f;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.1;
+  text-transform: none;
 }
 
 .collapsed-toolbar-pill {

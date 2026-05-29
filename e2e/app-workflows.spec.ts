@@ -2111,11 +2111,12 @@ test("collapses and restores command toolbars to recover writing space", async (
   expect(initialWorkspaceBox).not.toBeNull();
 
   await commandBar.getByRole("button", { name: "Collapse File toolbar" }).click();
-  const hiddenToolbarTray = page.getByRole("region", { name: "Hidden toolbars" });
-  await expect(hiddenToolbarTray).toContainText("Toolbars hidden");
-  await expect(hiddenToolbarTray.getByRole("button", { name: "Show all hidden toolbars" })).toContainText("Show all toolbars");
+  const hiddenToolbarTray = page.getByRole("region", { name: /toolbar.*hidden/i });
+  await expect(hiddenToolbarTray).toContainText("1 toolbar hidden");
+  await expect(hiddenToolbarTray).toContainText("Click Restore all or a toolbar name to show it again.");
+  await expect(hiddenToolbarTray.getByRole("button", { name: "Restore all hidden toolbars" })).toContainText("Restore all");
   await expect(page.getByRole("button", { name: "Show File toolbar" })).toBeVisible();
-  await expect(hiddenToolbarTray.getByRole("button", { name: "Show File toolbar" })).toContainText("Show File");
+  await expect(hiddenToolbarTray.getByRole("button", { name: "Show File toolbar" })).toContainText("File");
   await expect(commandBar.getByRole("button", { name: "Show File toolbar" })).toBeHidden();
   await expect(commandBar.getByRole("button", { name: "New" })).toBeHidden();
 
@@ -2134,9 +2135,10 @@ test("collapses and restores command toolbars to recover writing space", async (
   expect(collapsedBox!.height).toBeLessThanOrEqual(2);
   expect(collapsedWorkspaceBox!.height).toBeGreaterThan(initialWorkspaceBox!.height + 80);
   await expect(hiddenToolbarTray).toBeVisible();
-  await expect(hiddenToolbarTray.getByRole("button", { name: "Show all hidden toolbars" })).toContainText("Show all toolbars");
+  await expect(hiddenToolbarTray).toContainText("4 toolbars hidden");
+  await expect(hiddenToolbarTray.getByRole("button", { name: "Restore all hidden toolbars" })).toContainText("Restore all");
 
-  await hiddenToolbarTray.getByRole("button", { name: "Show all hidden toolbars" }).click();
+  await hiddenToolbarTray.getByRole("button", { name: "Restore all hidden toolbars" }).click();
   await expect(commandBar.getByRole("button", { name: "Collapse File toolbar" })).toBeVisible();
   await expect(commandBar.getByRole("button", { name: "New" })).toBeVisible();
   await expect(page.getByLabel("View mode")).toBeVisible();
