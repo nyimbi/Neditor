@@ -4477,7 +4477,7 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
     let recommendations = readiness_array_field(report, "recommendations")
         .iter()
         .filter_map(Value::as_str)
-        .map(|value| format!("  - {value}"))
+        .map(str::to_string)
         .collect::<Vec<_>>();
     let mut lines = vec![
         "NEditor support bundle".to_string(),
@@ -4507,15 +4507,68 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
     if let Some(path) = written_to {
         lines.push(format!("Wrote support bundle: {path}"));
     }
-    if !recommendations.is_empty() {
-        lines.push("Recommendations:".to_string());
-        lines.extend(recommendations);
+    let recommendation_groups = grouped_support_recommendations(&recommendations);
+    if !recommendation_groups.is_empty() {
+        lines.push("Recommended next actions:".to_string());
+        for (label, items) in recommendation_groups {
+            lines.push(format!("  {label}:"));
+            for item in items {
+                lines.push(format!("    - {item}"));
+            }
+        }
     }
     lines.push(
         "Use --json or --output support.json when a help desk needs machine-readable evidence."
             .to_string(),
     );
     lines.join("\n")
+}
+
+fn grouped_support_recommendations(recommendations: &[String]) -> Vec<(&'static str, Vec<String>)> {
+    let mut local_setup = Vec::new();
+    let mut release_readiness = Vec::new();
+    let mut spec_closure = Vec::new();
+    let mut evidence_collection = Vec::new();
+
+    for recommendation in recommendations {
+        match support_recommendation_bucket(recommendation) {
+            "local-setup" => local_setup.push(recommendation.clone()),
+            "spec-closure" => spec_closure.push(recommendation.clone()),
+            "evidence" => evidence_collection.push(recommendation.clone()),
+            _ => release_readiness.push(recommendation.clone()),
+        }
+    }
+
+    [
+        ("Local setup", local_setup),
+        ("Release readiness", release_readiness),
+        ("Specification closure", spec_closure),
+        ("Evidence collection", evidence_collection),
+    ]
+    .into_iter()
+    .filter(|(_, items)| !items.is_empty())
+    .collect()
+}
+
+fn support_recommendation_bucket(recommendation: &str) -> &'static str {
+    let text = recommendation.to_lowercase();
+    if text.contains("default markdown reader")
+        || text.contains("workspace scaffold")
+        || text.contains("app binary")
+        || text.contains("transform handler installer")
+    {
+        return "local-setup";
+    }
+    if text.contains("spec") || text.contains("work order") {
+        return "spec-closure";
+    }
+    if text.contains("evidence report")
+        || text.contains("evidence kit")
+        || text.contains("ingest returned evidence")
+    {
+        return "evidence";
+    }
+    "release-readiness"
 }
 
 fn readiness_item_summary(item: &Value) -> String {

@@ -2280,10 +2280,26 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert!(text
         .message
         .contains("Release candidate: checked-with-release-gates (releaseable: no, artifacts: 2)"));
+    assert!(text.message.contains("Recommended next actions:"));
+    assert!(text.message.contains("  Local setup:"));
+    assert!(text.message.contains("  Release readiness:"));
+    assert!(text.message.contains("  Specification closure:"));
+    assert!(text.message.contains("  Evidence collection:"));
     assert!(text
         .message
-        .contains("Do not publish the release candidate"));
-    assert!(text.message.contains("Resolve 1 release-candidate issue"));
+        .contains("    - Initialize the NEditor workspace scaffold"));
+    assert!(text
+        .message
+        .contains("    - Do not publish the release candidate"));
+    assert!(text
+        .message
+        .contains("    - Resolve 1 release-candidate issue"));
+    assert!(text
+        .message
+        .contains("    - Assign 2 spec-completion work order"));
+    assert!(text
+        .message
+        .contains("    - Collect or refresh 9 release evidence report"));
     assert!(text.message.contains("Wrote support bundle"));
     assert!(output_path.is_file());
     let written: serde_json::Value =

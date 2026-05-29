@@ -27,6 +27,26 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Grouped CLI Support Actions
+
+The terminal `ned support-bundle` report now mirrors the Settings support
+experience by grouping recommendations into **Local setup**, **Release
+readiness**, **Specification closure**, and **Evidence collection** sections.
+Release operators and help-desk users no longer have to infer whether a line is
+a local machine setup task, a release blocker, a spec work-order handoff, or an
+evidence-return task from one flat list.
+
+The JSON support bundle remains unchanged for automation; only the human text
+report is grouped and indented for safer handoff.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_creates_redaction_safe_support_bundles --lib` | Pass | Focused CLI coverage proves the text report includes grouped local setup, release readiness, specification closure, and evidence collection headings plus indented actionable recommendations. |
+| `pnpm run check:cli` | Pass | The full `ned_cli` suite passed and rebuilt the debug `ned` binary. |
+| `src-tauri/target/debug/ned support-bundle --workspace .` | Pass | Live terminal report now prints **Recommended next actions** grouped under Local setup, Release readiness, Specification closure, and Evidence collection. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is clean after the grouped recommendation helper. |
+| `pnpm run check:docs` | Pass | Progress-log links remain valid. |
+
 ## 2026-05-29 Release Candidate Sidecar Freshness
 
 The release evidence refresh moved the local readiness gate back to
