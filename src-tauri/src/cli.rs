@@ -4108,6 +4108,8 @@ fn build_support_bundle_report(
         &doctor,
         &readiness,
         &spec_completion,
+        &action_plan,
+        &spec_action_plan,
         &release_candidate,
         &engine_probe,
         &evidence_report_summary,
@@ -4175,6 +4177,8 @@ fn support_bundle_recommendations(
     doctor: &Value,
     readiness: &Value,
     spec_completion: &Value,
+    release_action_plan: &Value,
+    spec_action_plan: &Value,
     release_candidate: &Value,
     engine_probe: &Value,
     evidence_report_summary: &Value,
@@ -4206,6 +4210,8 @@ fn support_bundle_recommendations(
             "Review {open_spec_rows} open specification row(s) before claiming production readiness."
         ));
     }
+    recommendations.extend(release_action_plan_recommendations(release_action_plan));
+    recommendations.extend(spec_action_plan_recommendations(spec_action_plan));
     let candidate_status = readiness_string_field(release_candidate, "status").unwrap_or("missing");
     let candidate_releaseable = release_candidate
         .get("releaseable")
@@ -4259,6 +4265,98 @@ fn support_bundle_recommendations(
             .push("Support bundle is ready for installation or release review.".to_string());
     }
     recommendations
+}
+
+fn release_action_plan_recommendations(action_plan: &Value) -> Vec<String> {
+    let status = readiness_string_field(action_plan, "status").unwrap_or("missing");
+    let work_items = readiness_array_field(action_plan, "workItems");
+    let ready_count = action_plan
+        .get("readyToSendCount")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let issues = readiness_array_field(action_plan, "issues");
+    match status {
+        "no-open-gaps" => Vec::new(),
+        "missing" | "missing-evidence-kit" => vec![
+            "Create or refresh the release evidence kit with pnpm run collect:evidence-kit so release gap work items can be assigned.".to_string(),
+        ],
+        "incomplete" => {
+            if issues.iter().any(|issue| {
+                issue
+                    .as_str()
+                    .is_some_and(|value| value.contains("sourceCommit"))
+            }) {
+                vec![
+                    "Regenerate the release evidence kit with pnpm run collect:evidence-kit before sending release assignments.".to_string(),
+                ]
+            } else if !issues.is_empty() {
+                vec![format!(
+                    "Resolve {} release action-plan issue(s) before sending release evidence assignments.",
+                    issues.len()
+                )]
+            } else {
+                vec![
+                    "Regenerate release evidence work items with pnpm run collect:evidence-kit before release handoff.".to_string(),
+                ]
+            }
+        }
+        "needs-work" => {
+            let remaining = work_items.len().saturating_sub(ready_count as usize);
+            vec![format!(
+                "Complete {remaining} release evidence work item(s) before sending release assignments."
+            )]
+        }
+        "ready-to-send" if !work_items.is_empty() => vec![format!(
+            "Send {} release evidence work item(s) from the evidence kit to supported-host owners; ingest returned evidence with pnpm run ingest:evidence.",
+            work_items.len()
+        )],
+        _ if !work_items.is_empty() && ready_count < work_items.len() as u64 => {
+            let remaining = work_items.len().saturating_sub(ready_count as usize);
+            vec![format!(
+                "Complete {remaining} release evidence work item(s) before release handoff."
+            )]
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn spec_action_plan_recommendations(action_plan: &Value) -> Vec<String> {
+    let status = readiness_string_field(action_plan, "status").unwrap_or("missing");
+    let work_orders = readiness_array_field(action_plan, "workOrders");
+    let ready_count = action_plan
+        .get("readyToSendCount")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let issues = readiness_array_field(action_plan, "issues");
+    match status {
+        "no-open-rows" => Vec::new(),
+        "missing" | "missing-work-orders" => vec![
+            "Regenerate spec-completion work orders with pnpm run check:spec-completion before assigning spec closure work.".to_string(),
+        ],
+        "incomplete" => {
+            if !issues.is_empty() {
+                vec![format!(
+                    "Resolve {} spec action-plan issue(s) before spec closure handoff.",
+                    issues.len()
+                )]
+            } else {
+                vec![
+                    "Regenerate spec-completion work orders with pnpm run check:spec-completion before spec closure handoff.".to_string(),
+                ]
+            }
+        }
+        "ready-to-send" if !work_orders.is_empty() => vec![format!(
+            "Assign {} spec-completion work order(s) to owners and ingest returned evidence before claiming spec closure.",
+            work_orders.len()
+        )],
+        _ if !work_orders.is_empty() && ready_count < work_orders.len() as u64 => {
+            let remaining = work_orders.len().saturating_sub(ready_count as usize);
+            vec![format!(
+                "Complete {remaining} spec-completion work order(s) before claiming all spec gaps are assigned."
+            )]
+        }
+        _ => Vec::new(),
+    }
 }
 
 fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> String {

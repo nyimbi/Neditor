@@ -27,6 +27,29 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Support Bundle Action-Plan Recommendations
+
+NEditor support bundles now turn release and spec action-plan statuses into
+explicit operator recommendations. Missing release evidence kits tell operators
+to run `pnpm run collect:evidence-kit`; stale evidence-kit commits tell them to
+regenerate before sending assignments; ready spec work orders tell them how many
+owners must receive work and that returned evidence must be ingested before spec
+closure is claimed.
+
+Against the current repository evidence, `ned support-bundle --workspace .`
+now reports the actionable handoff items:
+
+- Regenerate the release evidence kit before sending release assignments.
+- Assign 68 spec-completion work orders and ingest returned evidence before
+  claiming spec closure.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_creates_redaction_safe_support_bundles --lib` | Pass | Focused CLI test proves ready spec work orders generate assignment guidance and a readiness gap without an evidence kit generates a collect-kit recommendation. |
+| `pnpm run check:cli` | Pass | 26 `ned_cli` tests passed and the `ned` binary rebuilt successfully. |
+| `src-tauri/target/debug/ned support-bundle --workspace .` | Pass with release blockers | Current support bundle now includes release evidence-kit regeneration and 68 spec-work-order assignment recommendations. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting remained clean after the support-bundle recommendation changes. |
+
 ## 2026-05-29 Floating Toolbar Restore Control
 
 Hidden toolbar recovery is now harder to miss. Any hidden toolbar row keeps the

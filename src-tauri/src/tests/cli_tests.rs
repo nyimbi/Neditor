@@ -2092,6 +2092,78 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         .any(|recommendation| recommendation
             .as_str()
             .is_some_and(|value| value.contains("release-candidate issue"))));
+    assert!(bundle["recommendations"]
+        .as_array()
+        .expect("recommendations")
+        .iter()
+        .any(|recommendation| recommendation
+            .as_str()
+            .is_some_and(|value| value.contains("Assign 2 spec-completion work order"))));
+
+    let readiness_gap_path = root.join("readiness-with-gap.json");
+    fs::write(
+        &readiness_gap_path,
+        serde_json::to_string_pretty(&serde_json::json!({
+            "generatedAt": "2026-05-26T12:45:00.000Z",
+            "platform": "darwin",
+            "arch": "arm64",
+            "status": "current-host-ready-with-external-gaps",
+            "summary": {
+                "requiredChecks": 2,
+                "accepted": 1,
+                "failed": 0,
+                "evidenceGaps": 1
+            },
+            "checks": [],
+            "evidenceGaps": [
+                {
+                    "id": "homebrew-final-cask",
+                    "status": "pending-release-cask",
+                    "detail": "Return final Homebrew cask."
+                }
+            ],
+            "failures": []
+        }))
+        .expect("readiness gap json"),
+    )
+    .expect("write readiness gap fixture");
+    let missing_kit_bundle = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "support-bundle".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--readiness-report".to_string(),
+        readiness_gap_path.to_string_lossy().to_string(),
+        "--spec-report".to_string(),
+        spec_path.to_string_lossy().to_string(),
+        "--spec-work-orders".to_string(),
+        spec_work_orders_path.to_string_lossy().to_string(),
+        "--release-candidate-dir".to_string(),
+        release_candidate_dir.to_string_lossy().to_string(),
+        "--engine-report".to_string(),
+        engine_path.to_string_lossy().to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
+        "--evidence-kit".to_string(),
+        root.join("missing-release-evidence-kit")
+            .to_string_lossy()
+            .to_string(),
+        "--json".to_string(),
+    ])
+    .expect("missing kit support json");
+    let missing_kit_bundle: serde_json::Value =
+        serde_json::from_str(&missing_kit_bundle.message).expect("missing kit bundle json");
+    assert_eq!(
+        missing_kit_bundle["releaseActionPlan"]["status"],
+        "missing-evidence-kit"
+    );
+    assert!(missing_kit_bundle["recommendations"]
+        .as_array()
+        .expect("missing kit recommendations")
+        .iter()
+        .any(|recommendation| recommendation
+            .as_str()
+            .is_some_and(|value| value.contains("Create or refresh the release evidence kit"))));
 
     let text = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
