@@ -32,6 +32,7 @@
     "check:release-signing": "node scripts/check-release-signing.mjs",
     "check:release-readiness": "node scripts/check-release-readiness.mjs",
     "check:security-review": "node scripts/check-security-review-evidence.mjs",
+    "check:manual-review": "node scripts/check-manual-review-evidence.mjs",
     "check:spec-completion": "node scripts/check-spec-completion-matrix.mjs",
     "check:structure": "node scripts/check-project-structure.mjs",
     "check:tables:manual": "node scripts/check-table-editor-manual-signoff.mjs",

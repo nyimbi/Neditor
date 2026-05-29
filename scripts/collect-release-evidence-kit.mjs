@@ -268,6 +268,22 @@ const runbooks = [
     returns: ["completed accessibility manual-review signoff JSON", ".tmp/accessibility/runtime-report.json"],
   },
   {
+    file: "runbooks/manual-review.md",
+    title: "Spec Manual Review Work-Order Signoffs",
+    gaps: ["spec-manual-review-work-order-signoffs"],
+    commands: [
+      "pnpm run check:spec-completion",
+      "pnpm run check:manual-review",
+      "Open .tmp/spec-completion/work-orders.md and locate the assigned manual-review work order.",
+      "Fill .tmp/manual-review/templates/<work-order-id>.template.json with named reviewer, current app version, current source commit, clean-source provenance, artifact paths, checklist outcomes, and zero unresolved blockers.",
+      "Put screenshots or native-viewer/export evidence under .tmp/manual-review/<work-order-id>/artifacts/.",
+      "pnpm run ingest:evidence -- --source .tmp/manual-review/<work-order-id>",
+      "pnpm run check:manual-review",
+      "pnpm run check:release-readiness",
+    ],
+    returns: [".tmp/manual-review/<work-order-id>/signoff.json", ".tmp/manual-review/<work-order-id>/artifacts/"],
+  },
+  {
     file: "runbooks/optional-external-engines.md",
     title: "Optional External Engine Proof",
     gaps: ["optional-external-engines"],

@@ -23,6 +23,7 @@ const requiredReports = [
     "pending-human-review",
     "human-reviewed",
   ]),
+  requiredReport("spec-manual-review-contract", ".tmp/manual-review/report.json", ["pending-human-review", "human-reviewed"]),
   requiredReport("platform-package-config", ".tmp/desktop-bundle/platform-package-config-report.json", ["passed"]),
   requiredReport("external-platform-evidence", ".tmp/platform-evidence/report.json", [], platformEvidenceAccepted),
   requiredReport("release-signing-evidence", ".tmp/release-signing/report.json", [], releaseSigningAccepted),
@@ -348,6 +349,16 @@ function collectEvidenceGaps(checks) {
       evidence: ".tmp/table-editor/manual-review-summary.json",
       detail:
         "Two-way table editing has automated proof, but completed manual source/grid/spreadsheet/export/supported-host review has not been supplied.",
+    });
+  }
+
+  const specManualReview = reports["spec-manual-review-contract"];
+  if (Number(specManualReview?.summary?.pending || 0) > 0) {
+    gaps.push({
+      id: "spec-manual-review-work-order-signoffs",
+      status: specManualReview?.status || "pending-human-review",
+      evidence: ".tmp/manual-review/report.json",
+      detail: `${Number(specManualReview?.summary?.pending || 0)} spec-completion manual review work-order signoff(s) remain pending.`,
     });
   }
 

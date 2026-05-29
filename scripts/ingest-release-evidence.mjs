@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
@@ -152,6 +152,8 @@ if (listOnly) {
     console.log(`- ${entry.id}: ${entry.destination}`);
     console.log(`  candidates: ${entry.candidates.join(", ")}`);
   }
+  console.log("- manual-review-<work-order-id>: .tmp/manual-review/external/<work-order-id>/signoff.json");
+  console.log("  candidates: any returned neditor.manual-review.signoff.v1 JSON file, with optional sibling artifacts/ directory");
   process.exit(0);
 }
 
@@ -186,6 +188,28 @@ for (const entry of evidenceItems) {
     dryRun,
   });
   categories.add(entry.category);
+}
+
+for (const found of findManualReviewSignoffs(sourceDir)) {
+  const workOrderId = String(found.data.workOrderId || "").trim();
+  const destinationDir = join(root, ".tmp", "manual-review", "external", workOrderId);
+  const destination = join(destinationDir, "signoff.json");
+  if (!dryRun) {
+    mkdirSync(destinationDir, { recursive: true });
+    cpSync(found.path, destination);
+    if (existsSync(found.artifactsDir) && statSync(found.artifactsDir).isDirectory()) {
+      cpSync(found.artifactsDir, join(destinationDir, "artifacts"), { recursive: true });
+    }
+  }
+  copied.push({
+    id: `manual-review-${workOrderId}`,
+    category: "manual-review",
+    source: relative(found.path),
+    destination: `.tmp/manual-review/external/${workOrderId}/signoff.json`,
+    bytes: statSync(found.path).size,
+    dryRun,
+  });
+  categories.add("manual-review");
 }
 
 const validations = validate ? runValidations(categories) : [];
@@ -261,6 +285,7 @@ function runValidations(categories) {
       }),
     );
   }
+  if (categories.has("manual-review")) commands.push(command("spec manual review evidence", "pnpm", ["run", "check:manual-review"]));
 
   return commands.map((entry) => {
     const result = spawnSync(entry.cmd, entry.args, {
@@ -278,6 +303,39 @@ function runValidations(categories) {
       stderrTail: tail(result.stderr),
     };
   });
+}
+
+function findManualReviewSignoffs(dir) {
+  if (!existsSync(dir)) return [];
+  return walkJson(dir).flatMap((path) => {
+    let data;
+    try {
+      data = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      return [];
+    }
+    if (data?.schema !== "neditor.manual-review.signoff.v1" || !data.workOrderId) return [];
+    return [
+      {
+        path,
+        data,
+        artifactsDir: join(dirname(path), "artifacts"),
+      },
+    ];
+  });
+}
+
+function walkJson(dir) {
+  const entries = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      entries.push(...walkJson(path));
+    } else if (entry.isFile() && entry.name.endsWith(".json")) {
+      entries.push(path);
+    }
+  }
+  return entries;
 }
 
 function command(label, cmd, args, env = {}) {

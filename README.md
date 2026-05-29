@@ -874,6 +874,13 @@ validates every matrix row has a recognized status, direct evidence, and a
 substantive remaining gap when still Partial, Unverified, or Missing, then turns
 open rows into classified work orders with owners, runbooks, expected returned
 evidence, validator commands, ingest commands, and final readiness commands.
+`pnpm run check:manual-review` complements that by writing
+`.tmp/manual-review/templates/<work-order-id>.template.json` for every
+manual-review work order and validating returned
+`.tmp/manual-review/external/<work-order-id>/signoff.json` files. Returned
+sign-offs are also recognized by `pnpm run ingest:evidence`, which copies the
+sign-off and its `artifacts/` folder into the standard manual-review evidence
+location before running the validator.
 
 ## Developer Quick Start
 
@@ -1145,6 +1152,12 @@ It also includes spec-completion work orders from
 `.tmp/spec-completion/work-orders.json` or `--spec-work-orders path`, so open
 matrix rows become assignable reviewer, supported-host, credential, and
 distribution work with runbooks, returns, validators, and closure commands.
+Manual-review returns are validator-backed: a returned
+`neditor.manual-review.signoff.v1` file for a spec work order is copied by
+`pnpm run ingest:evidence` into `.tmp/manual-review/external/`, then checked by
+`pnpm run check:manual-review` for current commit/version, clean-source
+provenance, named reviewer, relative artifact evidence, checklist status, and
+zero unresolved blockers.
 The bundle also includes release-candidate status from `.tmp/release-candidate`
 or `--release-candidate-dir path`, giving support teams a single redaction-safe
 view of compiled artifact hashes, checker state, and remaining release gates.

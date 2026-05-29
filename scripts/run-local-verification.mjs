@@ -28,6 +28,7 @@ const quickCommands = [
   command("Release candidate checker syntax", "node", ["--check", "scripts/check-release-candidate.mjs"]),
   command("Markdown links", "pnpm", ["run", "check:docs"]),
   command("Spec completion matrix contract", "pnpm", ["run", "check:spec-completion"]),
+  command("Spec manual review evidence contract", "pnpm", ["run", "check:manual-review"]),
   command("Table editor manual review contract", "pnpm", ["run", "check:tables:manual"]),
   command("Rust formatting", "cargo", ["fmt", "--check"], "src-tauri"),
   command("Rust dev check", "cargo", ["check", "--locked"], "src-tauri"),

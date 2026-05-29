@@ -178,9 +178,9 @@ unit tests, project structure, accessibility guard, dependency admission,
 external-transform documentation, AI/provider/runtime evidence contracts,
 Homebrew packaging contract, sidecar script syntax, platform packaging
 configuration, release CI workflow guard, release-candidate script syntax,
-release-candidate checker syntax, Markdown links, spec-completion matrix,
-table-editor manual review contract, Rust formatting, Rust dev check, and
-whitespace checks.
+release-candidate checker syntax, Markdown links, spec-completion matrix, spec
+manual-review evidence contract, table-editor manual review contract, Rust
+formatting, Rust dev check, and whitespace checks.
 
 ### Full Verification
 
@@ -215,6 +215,7 @@ evidence under `.tmp/`. The central commands are:
 
 ```sh
 pnpm run check:spec-completion
+pnpm run check:manual-review
 pnpm run collect:evidence-kit
 pnpm run check:evidence-kit
 pnpm run check:release-readiness

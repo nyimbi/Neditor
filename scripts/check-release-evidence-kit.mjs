@@ -26,6 +26,7 @@ const expectedRunbooks = [
   "runbooks/release-device-performance-profile.md",
   "runbooks/table-editor-human-review.md",
   "runbooks/accessibility-human-review.md",
+  "runbooks/manual-review.md",
   "runbooks/optional-external-engines.md",
   "runbooks/spec-completion-closure.md",
 ];
