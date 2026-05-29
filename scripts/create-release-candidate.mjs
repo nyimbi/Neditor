@@ -201,7 +201,7 @@ function refreshPrerequisiteEvidence() {
 }
 
 function refreshBrowserWorkflowEvidence() {
-  run("pnpm", ["run", "test:e2e"]);
+  run(process.execPath, ["scripts/run-e2e.mjs"]);
 }
 
 function collectFrontendAssets() {

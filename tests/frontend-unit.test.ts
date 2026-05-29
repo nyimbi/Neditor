@@ -9056,7 +9056,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("NEDITOR_DESKTOP_SMOKE_LAUNCH"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"prepare:sidecars\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:release-ci\"]"));
-  ok(releaseCandidate.includes("pnpm\", [\"run\", \"test:e2e\"]"));
+  ok(releaseCandidate.includes("process.execPath, [\"scripts/run-e2e.mjs\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:platform-evidence\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"test:rendered-exports\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"test:tauri-webdriver\"]"));
