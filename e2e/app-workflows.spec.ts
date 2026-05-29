@@ -1865,6 +1865,8 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await page.getByRole("button", { name: "Writing Tools menu" }).click();
   await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Edit Table at Cursor");
   await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Go to Source Table");
+  await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Two-column Section");
+  await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Wide Landscape Section");
   await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Lesson plan");
   await expect(page.getByRole("menu", { name: "Writing Tools menu" })).toContainText("Technical textbook");
   await page.keyboard.press("Escape");
@@ -4067,6 +4069,11 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await page.getByRole("button", { name: "Insert calculation Snippet" }).click();
   await expect.poll(() => editorText(page)).toContain("profit = revenue - cost");
   await expect(page.getByRole("region", { name: "Live preview" })).toContainText("profit");
+
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert two-column section");
+  await page.getByRole("button", { name: "Insert two-column section Layout" }).click();
+  await expect.poll(() => editorText(page)).toContain("columnGap: 18pt");
 
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("Insert glossary section");

@@ -6054,6 +6054,7 @@ import {
 } from "./lib/citationTodoWorkflow";
 import { citationSourceLibraryAuditMarkdown, type CitationSourceAuditItem } from "./lib/citationSourceLibrary";
 import { createDebouncedTextCommit } from "./lib/debounce";
+import { documentLayoutPresetById, documentLayoutPresets, type DocumentLayoutPresetId } from "./lib/documentLayout";
 import {
   agenticCliIntegrations,
   analyzeRfpSource,
@@ -7201,6 +7202,7 @@ type ToolbarIconName =
   | "templates"
   | "equation"
   | "toc"
+  | "layout"
   | "outline"
   | "comment"
   | "find"
@@ -7301,6 +7303,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   templates: ["M4 5h7v6H4z", "M13 5h7v6h-7z", "M4 13h7v6H4z", "M13 13h7v6h-7z"],
   equation: ["M4 8h16", "M4 16h16", "M8 12h8"],
   toc: ["M5 7h2", "M10 7h9", "M5 12h2", "M10 12h9", "M5 17h2", "M10 17h9"],
+  layout: ["M4 5h16v14H4z", "M11 5v14", "M4 11h16", "M15 14h3", "M15 17h3"],
   outline: ["M5 5h14", "M5 10h10", "M5 15h14", "M5 20h8"],
   comment: ["M5 5h14v10H9l-4 4z"],
   find: ["M11 5a6 6 0 1 1 0 12 6 6 0 0 1 0-12z", "M16 16l4 4"],
@@ -7538,7 +7541,7 @@ const listOfFiguresSnippet = "[LIST_OF_FIGURES]\n";
 const listOfTablesSnippet = "[LIST_OF_TABLES]\n";
 const glossarySectionSnippet = "[GLOSSARY]\n";
 const glossarySnippet = "```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n";
-const layoutSnippet = "```layout\ncolumns: 2\nsection: market-analysis\n```\n";
+const layoutSnippet = documentLayoutPresetById("two-column-section").snippet;
 const commentSnippet = "<!-- comment: unresolved | author: local | at: 2026-05-18T00:00:00Z | Review note. -->\n";
 const aiSnippet =
   "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\npromptSummary: \nreviewedBy: \nreviewedAt: \nstatus: needs-review\n```\n";
@@ -9491,6 +9494,8 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "biz-part", label: "Part", title: "Insert a reusable business document part", icon: "templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
       { id: "include", label: "Include", title: "Open the include document builder", icon: "include", run: () => openIncludeBuilder() },
       { id: "equation", label: "Equation", title: "Open equation editor", icon: "equation", run: () => openEquationEditor() },
+      { id: "layout-two-column", label: "2 Cols", title: "Insert a two-column business section with export-aware column spacing", icon: "layout", primary: true, run: () => insertDocumentLayoutPreset("two-column-section") },
+      { id: "layout-wide", label: "Wide", title: "Insert a single-column landscape section for wide tables or compliance matrices", icon: "layout", run: () => insertDocumentLayoutPreset("wide-landscape-section") },
       { id: "toc", label: "TOC", title: "Insert table of contents", icon: "toc", run: () => insertBlock(tocSnippet) },
       { id: "ai-source", label: "AI Source", title: "Insert AI source block", icon: "ai", run: () => insertBlock(aiSnippet) },
     ],
@@ -9692,12 +9697,26 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "figure", label: "Figure", help: "Insert a figure scaffold.", run: () => insertFigureSnippet() },
           { id: "calc", label: "Calculation", help: "Insert a calculation block.", run: () => insertBlock(calcSnippet) },
           { id: "equation", label: "Equation Editor", help: "Open equation templates and LaTeX insertion.", run: () => openEquationEditor() },
+          { id: "layout-two-column", label: "Two-column Section", help: "Insert an export-aware two-column section for polished business narratives.", run: () => insertDocumentLayoutPreset("two-column-section") },
+          { id: "layout-three-column", label: "Three-column Brief", help: "Insert a dense three-column section for short highlights, options, and decisions.", run: () => insertDocumentLayoutPreset("three-column-brief") },
+          { id: "layout-wide", label: "Wide Landscape Section", help: "Insert a single-column landscape section for wide tables, timelines, or compliance matrices.", run: () => insertDocumentLayoutPreset("wide-landscape-section") },
+          { id: "layout-reset", label: "Return to Single Column", help: "Reset the document back to normal portrait single-column flow.", run: () => insertDocumentLayoutPreset("single-column-reset") },
           { id: "toc", label: "Table of Contents", help: "Insert a generated TOC marker.", run: () => insertBlock(tocSnippet) },
           { id: "templates", label: "Transform Templates", help: "Open reusable calc, chart, diagram, data, and API templates.", run: () => openTransformTemplates() },
           { id: "sql-transform", label: "SQL Transform", help: "Insert a trusted read-only SQL transform scaffold for database-backed Markdown tables.", run: () => insertSqlTransformTemplate() },
           { id: "install-transform-handlers", label: "Install Transform Handlers", help: "Open the configurator workflow that downloads and installs Graphviz, D2, PlantUML, Pikchr, and SQLite handlers.", run: () => openTransformInstaller() },
           { id: "include-document", label: "Include Document", help: "Open the References sidebar builder for inserting another Markdown document into this one.", run: () => openIncludeBuilder() },
         ],
+      },
+      {
+        id: "layout",
+        label: "Document layout",
+        items: documentLayoutPresets.map((preset) => ({
+          id: `layout-${preset.id}`,
+          label: preset.label,
+          help: preset.summary,
+          run: () => insertDocumentLayoutPreset(preset.id),
+        })),
       },
       {
         id: "wizards",
@@ -12756,6 +12775,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Insert list of tables", group: "Snippet", run: () => insertBlock(listOfTablesSnippet) },
   { name: "Insert glossary section", group: "Snippet", run: () => insertBlock(glossarySectionSnippet) },
   { name: "Insert glossary", group: "Snippet", run: () => insertBlock(glossarySnippet) },
+  ...documentLayoutPresets.map((preset) => ({
+    name: preset.commandName,
+    group: "Layout",
+    description: preset.summary,
+    keywords: preset.keywords,
+    run: () => insertDocumentLayoutPreset(preset.id),
+  })),
   { name: "Insert layout directive", group: "Snippet", run: () => insertBlock(layoutSnippet) },
   { name: "Insert review comment", group: "Snippet", run: () => insertBlock(commentSnippet) },
   { name: "Insert AI source", group: "Snippet", run: () => insertBlock(aiSnippet) },
@@ -20116,6 +20142,12 @@ function insertBlock(block: string) {
   const position = editorView.state.selection.main.to;
   editorView.dispatch({ changes: { from: position, insert: `\n${block}\n` } });
   editorView.focus();
+}
+
+function insertDocumentLayoutPreset(id: DocumentLayoutPresetId) {
+  const preset = documentLayoutPresetById(id);
+  insertBlock(preset.snippet);
+  store.statusMessage = `Inserted ${preset.label}`;
 }
 
 function insertFigureSnippet(position: FigureCropPosition = "center") {

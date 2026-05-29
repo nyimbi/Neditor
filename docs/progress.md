@@ -27,6 +27,28 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 First-Class Multi-Column Layout Authoring
+
+Multi-column and section layout authoring is now visible from the primary
+writing surfaces instead of being discoverable only as raw Markdown syntax. The
+app has shared document layout presets for two-column business sections,
+three-column briefs, wide landscape evidence sections, and single-column reset
+sections. These presets are exposed in the Insert toolbar, Writing Tools menu,
+and command palette, so business users can create polished proposal, brief,
+report, timeline, and compliance-matrix layouts without memorizing
+`layout`/`section-break` directive syntax.
+
+The Markdown extensions guide now also documents whole-document columns,
+section-level columns, landscape/wide sections, reset-to-single-column flow,
+supported gutter keys, and export behavior for HTML, PDF, DOCX, and bundle
+manifests.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 119 frontend unit/static tests passed, including the new document layout preset coverage and static guards that the toolbar, Writing Tools menu, and command palette expose layout insertion controls. |
+| `pnpm run check` | Pass | Vue typecheck completed cleanly after adding the shared layout preset module and app wiring. |
+| Browser e2e suite | Not rerun | Existing Chromium workflow coverage was updated to assert the Writing Tools layout menu items and command-palette two-column insertion, but the browser batch was deferred to conserve battery until the next larger executable verification batch. |
+
 ## 2026-05-29 Grouped CLI Support Actions
 
 The terminal `ned support-bundle` report now mirrors the Settings support

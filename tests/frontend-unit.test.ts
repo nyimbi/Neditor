@@ -128,6 +128,7 @@ import {
   normalizeIncludeTarget,
   resolveIncludeTargetPath,
 } from "../src/lib/documentIncludes.js";
+import { documentLayoutPresetById, documentLayoutPresets } from "../src/lib/documentLayout.js";
 import {
   closeDocumentTabState,
   forgetDocumentPathState,
@@ -7440,6 +7441,26 @@ test("document include helpers normalize targets and format supported directives
   ok(includeChildDocumentStarterMarkdown("chapters/market-analysis.md").includes('title: "Market Analysis"'));
 });
 
+test("document layout presets expose first-class multi-column snippets", () => {
+  ok(documentLayoutPresets.length >= 4);
+  const twoColumn = documentLayoutPresetById("two-column-section");
+  equal(twoColumn.commandName, "Insert two-column section");
+  ok(twoColumn.snippet.includes("```layout"));
+  ok(twoColumn.snippet.includes("columns: 2"));
+  ok(twoColumn.snippet.includes("columnGap: 18pt"));
+
+  const threeColumn = documentLayoutPresetById("three-column-brief");
+  ok(threeColumn.snippet.includes("{{section-break columns=3 columnGap=14pt margins=narrow}}"));
+
+  const wide = documentLayoutPresetById("wide-landscape-section");
+  ok(wide.snippet.includes("orientation=landscape"));
+  ok(wide.snippet.includes("| Item | Owner | Date | Status | Evidence |"));
+
+  const reset = documentLayoutPresetById("single-column-reset");
+  ok(reset.snippet.includes("columns=1"));
+  ok(reset.snippet.includes("orientation=portrait"));
+});
+
 test("workbench command bar exposes icon display controls and workflow groups", () => {
   const app = readFileSync("src/App.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
@@ -7547,6 +7568,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("toggleToolbarRow"));
   ok(app.includes("markdownFenceOpener(text)"));
   ok(app.includes("isAiSourceFenceOpener(text)"));
+  ok(app.includes("documentLayoutPresets"));
+  ok(app.includes('label: "Document layout"'));
+  ok(app.includes('label: "Two-column Section"'));
+  ok(app.includes('label: "Wide Landscape Section"'));
+  ok(app.includes('id: "layout-two-column"'));
+  ok(app.includes("insertDocumentLayoutPreset"));
   ok(app.includes("stripMarkdownFencedBlocks"));
   ok(app.includes("interface CommandPaletteCommand"));
   ok(app.includes("commandSearchText(command).includes(query)"));
