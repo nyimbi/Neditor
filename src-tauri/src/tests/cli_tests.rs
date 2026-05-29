@@ -2165,6 +2165,75 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
             .as_str()
             .is_some_and(|value| value.contains("Create or refresh the release evidence kit"))));
 
+    let covered_missing_engine_path = root.join("engine-covered-missing.json");
+    fs::write(
+        &covered_missing_engine_path,
+        serde_json::to_string_pretty(&serde_json::json!({
+            "generatedAt": "2026-05-26T12:50:00.000Z",
+            "status": "complete",
+            "summary": {
+                "installed": 2,
+                "missingLocal": 1,
+                "incompatible": 0,
+                "acceptedExternalEvidence": 1,
+                "invalidExternalEvidence": 0,
+                "unresolvedMissingEvidence": 0
+            },
+            "engines": [
+                {
+                    "key": "pikchr",
+                    "name": "Pikchr",
+                    "status": "missing",
+                    "command": "pikchr or pikchr-cli",
+                    "path": null,
+                    "version": null,
+                    "smoke": null,
+                    "externalEvidence": {
+                        "status": "accepted",
+                        "path": ".tmp/external-engines/external/pikchr.json"
+                    }
+                }
+            ]
+        }))
+        .expect("covered missing engine json"),
+    )
+    .expect("write covered missing engine fixture");
+    let covered_missing_engine_bundle = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "support-bundle".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--readiness-report".to_string(),
+        report_path.to_string_lossy().to_string(),
+        "--spec-report".to_string(),
+        spec_path.to_string_lossy().to_string(),
+        "--spec-work-orders".to_string(),
+        spec_work_orders_path.to_string_lossy().to_string(),
+        "--release-candidate-dir".to_string(),
+        release_candidate_dir.to_string_lossy().to_string(),
+        "--engine-report".to_string(),
+        covered_missing_engine_path.to_string_lossy().to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("covered missing engine support json");
+    let covered_missing_engine_bundle: serde_json::Value =
+        serde_json::from_str(&covered_missing_engine_bundle.message)
+            .expect("covered missing engine bundle json");
+    assert_eq!(
+        covered_missing_engine_bundle["engineProbe"]["summary"]["missingLocal"],
+        1
+    );
+    assert!(covered_missing_engine_bundle["recommendations"]
+        .as_array()
+        .expect("covered missing recommendations")
+        .iter()
+        .all(|recommendation| !recommendation
+            .as_str()
+            .unwrap_or_default()
+            .contains("Review transform engine setup")));
+
     let text = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "support-bundle".to_string(),

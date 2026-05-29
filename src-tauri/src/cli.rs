@@ -4248,9 +4248,14 @@ fn support_bundle_recommendations(
     let missing_engines = summary_count_u64(engine_probe, "missingLocal");
     let incompatible_engines = summary_count_u64(engine_probe, "incompatible");
     let invalid_engine_evidence = summary_count_u64(engine_probe, "invalidExternalEvidence");
-    if missing_engines > 0 || incompatible_engines > 0 || invalid_engine_evidence > 0 {
+    let unresolved_missing_engine_evidence =
+        summary_count_u64(engine_probe, "unresolvedMissingEvidence");
+    let engine_setup_needs_action = unresolved_missing_engine_evidence > 0
+        || incompatible_engines > 0
+        || invalid_engine_evidence > 0;
+    if engine_setup_needs_action {
         recommendations.push(format!(
-            "Review transform engine setup: {missing_engines} missing, {incompatible_engines} incompatible, {invalid_engine_evidence} invalid external evidence item(s)."
+            "Review transform engine setup: {missing_engines} missing local engine(s), {unresolved_missing_engine_evidence} without accepted evidence, {incompatible_engines} incompatible, {invalid_engine_evidence} invalid external evidence item(s)."
         ));
     }
     let evidence_attention = number_field_u64(evidence_report_summary, "attention")

@@ -27,6 +27,26 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Transform Evidence Recommendation Precision
+
+Support-bundle recommendations now respect accepted external transform-engine
+evidence. A locally missing optional engine no longer creates a setup action
+when the engine probe status is complete and `unresolvedMissingEvidence` is
+zero. This keeps support and release operators focused on real blockers instead
+of asking them to re-review a covered Pikchr absence on the current host.
+
+The current live support bundle still reports `Transform engines: complete (9
+installed, 1 missing, 0 incompatible)` for transparency, but it no longer emits
+the previous **Review transform engine setup** recommendation because accepted
+external evidence covers the missing local engine.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_creates_redaction_safe_support_bundles --lib` | Pass | Focused support-bundle test now proves a locally missing engine with accepted external evidence and zero unresolved evidence does not emit a transform setup recommendation. |
+| `pnpm run check:cli` | Pass | 26 `ned_cli` tests passed and the `ned` binary rebuilt successfully. |
+| `src-tauri/target/debug/ned support-bundle --workspace .` | Pass with release blockers | Live support bundle no longer includes the transform setup recommendation while preserving the complete engine summary. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting remained clean after the recommendation precision change. |
+
 ## 2026-05-29 Support Bundle Action-Plan Recommendations
 
 NEditor support bundles now turn release and spec action-plan statuses into
