@@ -135,6 +135,21 @@ flattened prose.
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked rfp_import --lib` | Pass | 7 focused Rust importer tests passed, including DOCX role/minimum/points rows and HTML table rows preserved as pipe-delimited RFP evidence. |
 | `git diff --check` | Pass | Whitespace guard passed before commit. |
 
+## 2026-05-29 RFP PDF Layout Table Preservation
+
+PDF RFP import now preserves fixed-width table columns from `pdftotext -layout`
+before global whitespace normalization runs. Obvious RFP table headers such as
+role, minimum requirement, evidence, attachment, and scoring headers activate a
+short table context; subsequent layout rows are converted to pipe-delimited
+text so the compliance extractor can recover staff-role and scored requirement
+tables from PDF sources.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked rfp_import --lib` | Pass | 8 focused Rust importer tests passed, including fixed-width PDF role/minimum/points rows that remain pipe-delimited after normalization. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting stayed clean after adding PDF layout-table preservation helpers. |
+| `git diff --check` | Pass | Whitespace guard passed before commit. |
+
 ## 2026-05-29 Max Writing Space Preset
 
 NEditor now has a reversible **Maximize Writing Space** command. The command

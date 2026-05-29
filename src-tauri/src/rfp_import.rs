@@ -174,8 +174,9 @@ fn import_pdf(
         .output();
     match output {
         Ok(output) if output.status.success() => {
-            let text = String::from_utf8_lossy(&output.stdout).to_string();
-            warnings.push("PDF text extraction depends on the local pdftotext utility; verify tables and scanned pages manually.".to_string());
+            let raw = String::from_utf8_lossy(&output.stdout).to_string();
+            let text = preserve_pdf_layout_tables(&raw);
+            warnings.push("PDF text extraction depends on the local pdftotext utility; verify scanned pages and addenda manually.".to_string());
             Ok((text, title_from_path(&path), "pdftotext-layout".to_string()))
         }
         Ok(output) => Err(format!(
@@ -186,6 +187,158 @@ fn import_pdf(
             "PDF import needs the pdftotext utility on this machine, or paste extracted RFP text manually: {err}"
         )),
     }
+}
+
+fn preserve_pdf_layout_tables(text: &str) -> String {
+    let mut output = Vec::new();
+    let mut active_table_headers: Vec<String> = Vec::new();
+    for line in text.lines() {
+        let cells = pdf_layout_cells(line);
+        if cells.len() >= 2 {
+            if is_pdf_rfp_table_header_cells(&cells) {
+                active_table_headers = cells.clone();
+                output.push(format_pdf_table_row(&cells));
+                continue;
+            }
+            if !active_table_headers.is_empty()
+                && cells.len() >= 2
+                && (cells.len() == active_table_headers.len()
+                    || pdf_rfp_table_row_has_requirement_signal(&cells))
+            {
+                output.push(format_pdf_table_row(&cells));
+                continue;
+            }
+        }
+        if line.trim().is_empty() || cells.len() < 2 {
+            active_table_headers.clear();
+        }
+        output.push(line.to_string());
+    }
+    output.join("\n")
+}
+
+fn pdf_layout_cells(line: &str) -> Vec<String> {
+    let mut cells = Vec::new();
+    let mut current = String::new();
+    let mut spaces = 0usize;
+    for ch in line.trim().chars() {
+        if ch == '\t' {
+            push_pdf_cell(&mut cells, &mut current);
+            spaces = 0;
+        } else if ch == ' ' {
+            spaces += 1;
+        } else {
+            if spaces >= 2 {
+                push_pdf_cell(&mut cells, &mut current);
+            } else {
+                for _ in 0..spaces {
+                    current.push(' ');
+                }
+            }
+            spaces = 0;
+            current.push(ch);
+        }
+    }
+    if spaces == 1 {
+        current.push(' ');
+    }
+    push_pdf_cell(&mut cells, &mut current);
+    cells
+}
+
+fn push_pdf_cell(cells: &mut Vec<String>, current: &mut String) {
+    let cell = current.split_whitespace().collect::<Vec<_>>().join(" ");
+    if !cell.is_empty() {
+        cells.push(cell);
+    }
+    current.clear();
+}
+
+fn is_pdf_rfp_table_header_cells(cells: &[String]) -> bool {
+    let header_cells = cells
+        .iter()
+        .filter(|cell| is_pdf_rfp_table_header_cell(cell))
+        .count();
+    header_cells >= 2 && header_cells >= cells.len().saturating_sub(1)
+}
+
+fn is_pdf_rfp_table_header_cell(cell: &str) -> bool {
+    let clean = cell.trim();
+    if clean.is_empty() || clean.len() > 48 || clean.chars().any(|ch| ch.is_ascii_digit()) {
+        return false;
+    }
+    let lower = clean.to_ascii_lowercase();
+    [
+        "requirement",
+        "minimum",
+        "mandatory",
+        "required",
+        "criteria",
+        "criterion",
+        "role",
+        "position",
+        "personnel",
+        "qualification",
+        "experience",
+        "evidence",
+        "attachment",
+        "deliverable",
+        "annex",
+        "response",
+        "proof",
+        "point",
+        "score",
+        "weight",
+        "status",
+        "owner",
+        "section",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+fn pdf_rfp_table_row_has_requirement_signal(cells: &[String]) -> bool {
+    let row = cells.join(" ").to_ascii_lowercase();
+    [
+        "years",
+        "degree",
+        "certif",
+        "must",
+        "shall",
+        "required",
+        "mandatory",
+        "yes",
+        "pass/fail",
+        "point",
+        "pts",
+        "%",
+        "annex",
+        "form",
+        "certificate",
+        "signed",
+        "submit",
+        "deliver",
+        "provide",
+        "expert",
+        "specialist",
+        "architect",
+        "manager",
+        "lead",
+        "analyst",
+        "engineer",
+    ]
+    .iter()
+    .any(|needle| row.contains(needle))
+}
+
+fn format_pdf_table_row(cells: &[String]) -> String {
+    let mut row = cells
+        .iter()
+        .map(|cell| cell.trim())
+        .collect::<Vec<_>>()
+        .join(" | ");
+    row.push_str(" |");
+    row
 }
 
 fn import_url(
@@ -561,6 +714,34 @@ mod tests {
         .expect_err("unsupported RFP source type");
 
         assert!(error.contains("Unsupported RFP source type"));
+    }
+
+    #[test]
+    fn pdf_layout_tables_are_preserved_before_whitespace_normalization() {
+        let raw = [
+            "Customer Support RFP",
+            "",
+            "Role                  Minimum requirement                 Points",
+            "Software Architect    5+ years platform architecture      20 points",
+            "Climate Specialist    3+ years NetCDF and API delivery    10 points",
+            "",
+            "Paragraph text with normal single spaces should stay prose.",
+        ]
+        .join("\n");
+
+        let preserved = preserve_pdf_layout_tables(&raw);
+        assert!(preserved.contains("Role | Minimum requirement | Points |"));
+        assert!(
+            preserved.contains("Software Architect | 5+ years platform architecture | 20 points |")
+        );
+        assert!(preserved
+            .contains("Climate Specialist | 3+ years NetCDF and API delivery | 10 points |"));
+
+        let normalized = normalize_text(&preserved);
+        assert!(normalized.contains("Role | Minimum requirement | Points |"));
+        assert!(normalized
+            .contains("Software Architect | 5+ years platform architecture | 20 points |"));
+        assert!(normalized.contains("Paragraph text with normal single spaces should stay prose."));
     }
 
     #[test]
