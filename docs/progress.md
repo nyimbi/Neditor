@@ -27,6 +27,23 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Deploy CLI Sidecar Hardening
+
+The Deploy CLI flow now refuses to make a generated Tauri sidecar placeholder
+globally available as `ned`. CLI discovery and deployment both require a
+real-sized helper and reject the `build.rs` placeholder marker, while platform
+packaging validation now locks that runtime guard into the release contract.
+
+This closes a concrete productization risk in local/dev packaging: the fallback
+placeholder exists only so Tauri has a sidecar path during development, but it
+must never be installed into a user's PATH or treated as release-ready CLI
+evidence.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked deploy_cli --lib` | Pass | Verifies deployment, terminal status/install, conflict protection, copy/symlink idempotency, and explicit rejection of the generated sidecar placeholder. |
+| `pnpm run check:platform-packaging` | Pass | Verifies the package contract still requires `prepare:sidecars` and now requires Deploy CLI placeholder/size guards before global CLI deployment. |
+
 ## 2026-05-29 Scriptable CLI Deployment
 
 The app-level **Deploy CLI** setup is now also available as `ned deploy-cli`.

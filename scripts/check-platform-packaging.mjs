@@ -8,6 +8,7 @@ const reportPath = join(root, ".tmp", "desktop-bundle", "platform-package-config
 const packageJson = readJson("package.json");
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
 const cargoToml = readText("src-tauri/Cargo.toml");
+const cliSource = readText("src-tauri/src/cli.rs");
 const licenseText = readText("LICENSE");
 const issues = [];
 
@@ -75,6 +76,12 @@ if (!cliEvidence.prepareScriptExists) {
 }
 if (!cliEvidence.ignoredGeneratedSidecars) {
   issues.push(".gitignore must exclude generated ned sidecar binaries");
+}
+if (!cliEvidence.deployRejectsPlaceholderSidecars) {
+  issues.push("Deploy CLI runtime must reject generated ned sidecar placeholders before making ned globally available");
+}
+if (!cliEvidence.deployRequiresRealBinarySize) {
+  issues.push("Deploy CLI runtime must require a real-sized ned sidecar before making ned globally available");
 }
 for (const extension of ["md", "markdown", "mdown", "mkd"]) {
   if (!fileAssociationEvidence.extensions.includes(extension)) {
@@ -146,6 +153,12 @@ function collectCliEvidence(bundle) {
     sourceExists: existsSync(join(root, "src-tauri", "src", "bin", "ned.rs")),
     prepareScriptExists: existsSync(join(root, "scripts", "prepare-ned-sidecar.mjs")),
     ignoredGeneratedSidecars: readText(".gitignore").includes("src-tauri/binaries/ned-*"),
+    deployRejectsPlaceholderSidecars:
+      cliSource.includes("NED_SIDECAR_PLACEHOLDER_MARKER") &&
+      cliSource.includes("generated sidecar placeholder"),
+    deployRequiresRealBinarySize:
+      cliSource.includes("MIN_DEPLOYABLE_NED_BYTES") &&
+      cliSource.includes("too small to be a packaged CLI binary"),
   };
 }
 
