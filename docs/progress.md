@@ -27,6 +27,23 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Prepared CLI Sidecar Smoke
+
+The sidecar preparation script now verifies the copied release `ned` helper by
+executing `--version` and requiring it to match `package.json` before packaging
+accepts it. The platform packaging audit also checks for that smoke step, so the
+release contract now proves more than "a large file exists": it proves the file
+is a runnable NEditor CLI helper at the expected app version.
+
+This complements the Deploy CLI placeholder guard by catching bad sidecars at
+creation time, before the app bundle or Homebrew release workflow can consume
+them.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/prepare-ned-sidecar.mjs` | Pass | Verifies the sidecar preparation script remains syntactically valid after adding the runnable `--version` smoke. |
+| `pnpm run check:platform-packaging` | Pass | Verifies the packaging contract requires `prepare:sidecars`, Deploy CLI placeholder guards, and the sidecar `--version` smoke before release packaging. |
+
 ## 2026-05-29 Deploy CLI Sidecar Hardening
 
 The Deploy CLI flow now refuses to make a generated Tauri sidecar placeholder

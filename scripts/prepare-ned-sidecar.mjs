@@ -1,10 +1,11 @@
-import { copyFileSync, chmodSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const manifestPath = join(root, "src-tauri", "Cargo.toml");
 const binariesDir = join(root, "src-tauri", "binaries");
 const extension = process.platform === "win32" ? ".exe" : "";
@@ -24,8 +25,22 @@ const stat = statSync(target);
 if (!stat.isFile() || stat.size < 100_000) {
   fail(`prepared ned sidecar is unexpectedly small or missing: ${relative(target)}`);
 }
+smokePreparedSidecar(target);
 
 console.log(`Prepared ned sidecar ${relative(target)} (${stat.size} bytes).`);
+
+function smokePreparedSidecar(path) {
+  const result = spawnSync(path, ["--version"], { encoding: "utf8" });
+  if (result.status !== 0) {
+    const detail = result.stderr || result.stdout || `exit ${result.status}`;
+    fail(`prepared ned sidecar did not run --version successfully: ${detail}`);
+  }
+  const expected = `ned ${packageJson.version}`;
+  const actual = result.stdout.trim();
+  if (actual !== expected) {
+    fail(`prepared ned sidecar version mismatch: expected ${expected}, found ${actual || "(empty output)"}`);
+  }
+}
 
 function rustTargetTriple() {
   const direct = spawnSync("rustc", ["--print", "host-tuple"], { encoding: "utf8" });

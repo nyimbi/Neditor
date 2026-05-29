@@ -9,6 +9,7 @@ const packageJson = readJson("package.json");
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
 const cargoToml = readText("src-tauri/Cargo.toml");
 const cliSource = readText("src-tauri/src/cli.rs");
+const prepareSidecarSource = readText("scripts/prepare-ned-sidecar.mjs");
 const licenseText = readText("LICENSE");
 const issues = [];
 
@@ -82,6 +83,9 @@ if (!cliEvidence.deployRejectsPlaceholderSidecars) {
 }
 if (!cliEvidence.deployRequiresRealBinarySize) {
   issues.push("Deploy CLI runtime must require a real-sized ned sidecar before making ned globally available");
+}
+if (!cliEvidence.prepareScriptRunsVersionSmoke) {
+  issues.push("ned sidecar preparation must run the copied helper with --version before release packaging accepts it");
 }
 for (const extension of ["md", "markdown", "mdown", "mkd"]) {
   if (!fileAssociationEvidence.extensions.includes(extension)) {
@@ -159,6 +163,10 @@ function collectCliEvidence(bundle) {
     deployRequiresRealBinarySize:
       cliSource.includes("MIN_DEPLOYABLE_NED_BYTES") &&
       cliSource.includes("too small to be a packaged CLI binary"),
+    prepareScriptRunsVersionSmoke:
+      prepareSidecarSource.includes("smokePreparedSidecar") &&
+      prepareSidecarSource.includes('"--version"') &&
+      prepareSidecarSource.includes("prepared ned sidecar version mismatch"),
   };
 }
 

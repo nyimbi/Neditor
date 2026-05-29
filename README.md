@@ -1189,6 +1189,8 @@ pnpm run test:desktop-dmg
 
 `pnpm run prepare:sidecars` builds the release `ned` helper and copies it to the
 target-triple sidecar name that Tauri expects from `bundle.externalBin`.
+It then runs the copied helper with `--version` and requires it to match the app
+version before packaging accepts the sidecar.
 `tauri build` also runs that step through `beforeBuildCommand`, so release hosts
 cannot accidentally package NEditor without the CLI helper.
 
