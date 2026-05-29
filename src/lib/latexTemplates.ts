@@ -1,4 +1,4 @@
-import type { CustomLatexTemplateProfile, LatexTemplatePreset } from "./workspacePersistence.js";
+import { normalizeCustomLatexTemplateProfiles, type CustomLatexTemplateProfile, type LatexTemplatePreset } from "./workspacePersistence.js";
 
 export interface LatexTemplateProfile {
   id: LatexTemplatePreset;
@@ -118,6 +118,71 @@ export function blankCustomLatexTemplateProfile(): CustomLatexTemplateProfile {
   };
 }
 
+function normalizedWorkspaceRoot(root: string) {
+  return root.trim().replace(/[\\/]+$/g, "");
+}
+
+export function workspaceLatexTemplateLibraryPath(root: string) {
+  const normalizedRoot = normalizedWorkspaceRoot(root);
+  return normalizedRoot ? `${normalizedRoot}/.neditor/latex-templates.json` : ".neditor/latex-templates.json";
+}
+
+export function workspaceLatexTemplatesFromJson(text: string): CustomLatexTemplateProfile[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  const templates = Array.isArray(value)
+    ? value
+    : typeof value === "object" && value !== null && Array.isArray((value as Record<string, unknown>).templates)
+      ? ((value as Record<string, unknown>).templates as unknown[])
+      : [];
+  return normalizeLatexTemplateLibraryItems(templates);
+}
+
+export function workspaceLatexTemplateLibraryJson(templates: CustomLatexTemplateProfile[]) {
+  const normalized = normalizeLatexTemplateLibraryItems(templates).map((template) => ({
+    id: template.id,
+    name: template.name,
+    summary: template.summary,
+    documentClass: template.documentClass,
+    classOptions: template.classOptions,
+    packages: template.packages,
+    geometry: template.geometry,
+    hypersetup: template.hypersetup,
+    header: template.header,
+    chapterStyle: template.chapterStyle,
+    bestFor: template.bestFor,
+    sourcePath: template.sourcePath,
+  }));
+  return `${JSON.stringify({ schema: "neditor.workspace-latex-templates.v1", templates: normalized }, null, 2)}\n`;
+}
+
+function normalizeLatexTemplateLibraryItems(value: unknown): CustomLatexTemplateProfile[] {
+  if (!Array.isArray(value)) return [];
+  const mapped = value.map((item) => {
+    if (!item || typeof item !== "object") return item;
+    const record = item as Record<string, unknown>;
+    return {
+      id: record.id,
+      name: record.name ?? record.label,
+      summary: record.summary,
+      documentClass: record.documentClass ?? record.document_class,
+      classOptions: record.classOptions ?? record.class_options,
+      packages: record.packages,
+      geometry: record.geometry,
+      hypersetup: record.hypersetup,
+      header: record.header,
+      chapterStyle: record.chapterStyle ?? record.chapter_style,
+      bestFor: record.bestFor ?? record.best_for,
+      sourcePath: record.sourcePath ?? record.source_path,
+    };
+  });
+  return normalizeCustomLatexTemplateProfiles(mapped);
+}
+
 export function latexTemplateProfilesForPicker(customTemplates: CustomLatexTemplateProfile[]): LatexTemplateProfile[] {
   return [
     ...latexTemplateProfiles,
@@ -156,7 +221,8 @@ export function saveCustomLatexTemplateProfileState(
   draft: CustomLatexTemplateProfile,
   createId: (name: string) => string = createCustomLatexTemplateId,
 ) {
-  const id = draft.id.trim() || createId(draft.name);
+  const draftId = draft.id.trim();
+  const id = !draftId || builtInLatexTemplateIds.has(draftId) ? createId(draft.name) : draftId;
   const profile: CustomLatexTemplateProfile = {
     ...blankCustomLatexTemplateProfile(),
     ...draft,
@@ -166,9 +232,11 @@ export function saveCustomLatexTemplateProfileState(
     bestFor: draft.bestFor.map((item) => item.trim()).filter(Boolean).slice(0, 8),
   };
   const existing = templates.some((template) => template.id === id);
+  const nextTemplates = existing ? templates.map((template) => (template.id === id ? profile : template)) : [...templates, profile].slice(0, 40);
   return {
     profile,
-    templates: existing ? templates.map((template) => (template.id === id ? profile : template)) : [...templates, profile].slice(0, 40),
+    templates: nextTemplates,
+    changed: true,
     statusMessage: `Saved LaTeX template "${profile.name}"`,
   };
 }
@@ -182,6 +250,7 @@ export function deleteCustomLatexTemplateProfileState(
   return {
     templates: templates.filter((template) => template.id !== id),
     activeTemplateId: activeTemplateId === id ? "article" : activeTemplateId,
+    changed: templates.some((template) => template.id === id),
     statusMessage: profile ? `Deleted LaTeX template "${profile.name}"` : "",
   };
 }

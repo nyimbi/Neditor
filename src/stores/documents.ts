@@ -41,6 +41,9 @@ import { applyExportProfileState, deleteExportProfileState, saveExportProfileSta
 import {
   deleteCustomLatexTemplateProfileState,
   saveCustomLatexTemplateProfileState,
+  workspaceLatexTemplateLibraryJson,
+  workspaceLatexTemplateLibraryPath,
+  workspaceLatexTemplatesFromJson,
 } from "../lib/latexTemplates";
 import {
   applyExportFailureState,
@@ -1362,6 +1365,7 @@ export const useDocumentsStore = defineStore("documents", {
       this.customLatexTemplates = normalizeCustomLatexTemplateProfiles(result.templates);
       this.exportDefaults.latexTemplate = result.profile.id;
       this.statusMessage = result.statusMessage;
+      if (this.workspaceRoot) void this.saveWorkspaceLatexTemplate(result.profile);
       void this.persistWorkspace();
       return result.profile;
     },
@@ -1369,8 +1373,105 @@ export const useDocumentsStore = defineStore("documents", {
       const result = deleteCustomLatexTemplateProfileState(this.customLatexTemplates, this.exportDefaults.latexTemplate, id);
       this.customLatexTemplates = result.templates;
       this.exportDefaults.latexTemplate = result.activeTemplateId;
+      if (this.workspaceRoot) void this.deleteWorkspaceLatexTemplate(id);
       if (result.statusMessage) this.statusMessage = result.statusMessage;
       void this.persistWorkspace();
+    },
+    async importCustomLatexTemplateLibrary(templates: CustomLatexTemplateProfile[]) {
+      let nextTemplates = this.customLatexTemplates;
+      let imported = 0;
+      let lastProfile: CustomLatexTemplateProfile | null = null;
+      for (const template of normalizeCustomLatexTemplateProfiles(templates)) {
+        const next = saveCustomLatexTemplateProfileState(nextTemplates, template);
+        nextTemplates = normalizeCustomLatexTemplateProfiles(next.templates);
+        lastProfile = next.profile;
+        imported += 1;
+      }
+      if (!imported) return 0;
+      this.customLatexTemplates = nextTemplates;
+      if (lastProfile) this.exportDefaults.latexTemplate = lastProfile.id;
+      if (this.workspaceRoot) await this.saveWorkspaceLatexTemplateLibrary(this.customLatexTemplates);
+      this.statusMessage = `Imported ${imported} LaTeX template${imported === 1 ? "" : "s"} into the app library`;
+      await this.persistWorkspace();
+      return imported;
+    },
+    async loadWorkspaceLatexTemplates() {
+      if (!this.workspaceRoot) return false;
+      try {
+        const path = workspaceLatexTemplateLibraryPath(this.workspaceRoot);
+        const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
+        const workspaceTemplates = workspaceLatexTemplatesFromJson(response.text);
+        if (!workspaceTemplates.length) return true;
+        const imported = await this.importCustomLatexTemplateLibrary(workspaceTemplates);
+        if (imported) {
+          this.statusMessage = `Loaded ${workspaceTemplates.length} workspace LaTeX template${workspaceTemplates.length === 1 ? "" : "s"} from .neditor/latex-templates.json`;
+        }
+        return true;
+      } catch (error) {
+        const message = errorText(error);
+        if (!message.toLowerCase().includes("no such file") && !message.toLowerCase().includes("not found")) {
+          this.lastError = message;
+        }
+        return false;
+      }
+    },
+    async saveWorkspaceLatexTemplate(template: CustomLatexTemplateProfile) {
+      if (!this.workspaceRoot) return false;
+      const path = workspaceLatexTemplateLibraryPath(this.workspaceRoot);
+      let workspaceTemplates: CustomLatexTemplateProfile[] = [];
+      try {
+        const existing = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
+        workspaceTemplates = workspaceLatexTemplatesFromJson(existing.text);
+      } catch (error) {
+        const message = errorText(error);
+        if (!message.toLowerCase().includes("no such file") && !message.toLowerCase().includes("not found")) {
+          this.lastError = message;
+        }
+      }
+      const next = saveCustomLatexTemplateProfileState(workspaceTemplates, template);
+      await invoke("save_file", {
+        request: {
+          path,
+          text: workspaceLatexTemplateLibraryJson(next.templates),
+          expected_hash: null,
+        },
+      });
+      return true;
+    },
+    async saveWorkspaceLatexTemplateLibrary(templates: CustomLatexTemplateProfile[]) {
+      if (!this.workspaceRoot) return false;
+      await invoke("save_file", {
+        request: {
+          path: workspaceLatexTemplateLibraryPath(this.workspaceRoot),
+          text: workspaceLatexTemplateLibraryJson(templates),
+          expected_hash: null,
+        },
+      });
+      return true;
+    },
+    async deleteWorkspaceLatexTemplate(id: string) {
+      if (!this.workspaceRoot) return false;
+      const path = workspaceLatexTemplateLibraryPath(this.workspaceRoot);
+      try {
+        const existing = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
+        const workspaceTemplates = workspaceLatexTemplatesFromJson(existing.text);
+        const next = deleteCustomLatexTemplateProfileState(workspaceTemplates, this.exportDefaults.latexTemplate, id);
+        if (!next.changed) return true;
+        await invoke("save_file", {
+          request: {
+            path,
+            text: workspaceLatexTemplateLibraryJson(next.templates),
+            expected_hash: null,
+          },
+        });
+        return true;
+      } catch (error) {
+        const message = errorText(error);
+        if (!message.toLowerCase().includes("no such file") && !message.toLowerCase().includes("not found")) {
+          this.lastError = message;
+        }
+        return false;
+      }
     },
     async setTransformTrust(name: string, trusted: boolean) {
       this.trustedTransformEngines = setTransformBooleanFlag(this.trustedTransformEngines, name, trusted);

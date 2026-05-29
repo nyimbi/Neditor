@@ -654,6 +654,11 @@ names in the class field, one package or preamble line per package row, and
 house-style page/header commands in the header field. This keeps Markdown
 portable while still letting the export stage produce TeX that matches client,
 publisher, proposal, textbook, or internal report conventions.
+The same panel can sync custom profiles with `.neditor/latex-templates.json`,
+show the portable library JSON, and import JSON libraries created by
+`ned latex-templates --export-library`. This lets proposal, publishing, and
+technical-writing teams keep a reviewed LaTeX template library under project
+control while still selecting those profiles from the app.
 Front matter `targetPersona` entries are carried into the HTML cover metadata,
 plain text/Markdown bundle text, bundled metadata, and DOCX/PPTX custom
 properties so exported examples keep their intended audience visible.

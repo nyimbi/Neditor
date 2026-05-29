@@ -145,6 +145,11 @@ import {
   formatExportMetadataChecklistSummary,
 } from "../src/lib/exportMetadataChecklist.js";
 import {
+  workspaceLatexTemplateLibraryJson,
+  workspaceLatexTemplateLibraryPath,
+  workspaceLatexTemplatesFromJson,
+} from "../src/lib/latexTemplates.js";
+import {
   buildPublishingHandoff,
   buildPublishingRequestPreview,
   publishingPrimaryContent,
@@ -3034,6 +3039,71 @@ test("document outline library exposes built-ins and managed custom outlines", (
   equal(imported[0].bestFor[0], "Client reviews");
   ok(documentOutlineTemplateToPlannerText({ outline: imported[0].outline }).includes("  - Revenue Review"));
   equal(workspaceOutlineLibraryPath("/workspace/project/"), "/workspace/project/.neditor/outlines.json");
+});
+
+test("LaTeX template libraries round trip between app preferences and workspace JSON", () => {
+  const libraryJson = workspaceLatexTemplateLibraryJson([
+    {
+      id: "custom-latex-board",
+      name: "Board TeX",
+      summary: "Board report style.",
+      documentClass: "memoir",
+      classOptions: "12pt,oneside",
+      packages: ["\\usepackage{booktabs}", "\\usepackage{longtable}"],
+      geometry: "margin=0.75in",
+      hypersetup: "colorlinks=true,linkcolor=black,urlcolor=blue",
+      header: "\\pagestyle{plain}",
+      chapterStyle: true,
+      bestFor: ["Board packs"],
+      sourcePath: "templates/board.tex",
+    },
+    {
+      id: "rfp-response",
+      name: "Built-in collision should not round-trip",
+      summary: "",
+      documentClass: "article",
+      classOptions: "11pt",
+      packages: [],
+      geometry: "margin=1in",
+      hypersetup: "colorlinks=true",
+      header: "",
+      chapterStyle: false,
+      bestFor: [],
+      sourcePath: "",
+    },
+  ]);
+  ok(libraryJson.includes("neditor.workspace-latex-templates.v1"));
+  ok(libraryJson.includes('"documentClass": "memoir"'));
+  ok(!libraryJson.includes("Built-in collision should not round-trip"));
+
+  const imported = workspaceLatexTemplatesFromJson(
+    JSON.stringify({
+      schema: "neditor.workspace-latex-templates.v1",
+      templates: [
+        {
+          id: "custom_latex_grant",
+          label: "Grant Proposal TeX",
+          summary: "Foundation proposal style.",
+          document_class: "scrartcl",
+          class_options: "11pt,oneside",
+          packages: ["\\usepackage{booktabs}"],
+          geometry: "margin=1in",
+          hypersetup: "colorlinks=true",
+          header: "\\pagestyle{plain}",
+          chapter_style: false,
+          best_for: ["grant proposals"],
+          source_path: "templates/grant.tex",
+        },
+      ],
+    }),
+  );
+  equal(imported.length, 1);
+  equal(imported[0].id, "custom_latex_grant");
+  equal(imported[0].name, "Grant Proposal TeX");
+  equal(imported[0].documentClass, "scrartcl");
+  equal(imported[0].classOptions, "11pt,oneside");
+  equal(imported[0].sourcePath, "templates/grant.tex");
+  equal(workspaceLatexTemplateLibraryPath("/workspace/project/"), "/workspace/project/.neditor/latex-templates.json");
 });
 
 test("Docs Live turns outline, voice context, and placeholders into a reviewable draft", () => {
@@ -8517,8 +8587,16 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned outlines --category Procurement --query RFP --json"));
   ok(app.includes("ned outlines --markdown business-report"));
   ok(app.includes('ned outlines --workspace . --save board-pack --docs-live-type board-memo --section "Decision Requested" --section "Recommendation"'));
+  ok(app.includes("ned latex-templates --query proposal --json"));
+  ok(app.includes("ned latex-templates --preamble rfp-response"));
   ok(app.includes("Sync workspace outlines"));
   ok(app.includes("workspaceOutlineSyncStatus"));
+  ok(app.includes("Sync workspace library"));
+  ok(app.includes("Portable LaTeX template library"));
+  ok(app.includes("workspaceLatexTemplateLibraryPath"));
+  ok(store.includes("workspaceLatexTemplateLibraryJson"));
+  ok(store.includes("loadWorkspaceLatexTemplates"));
+  ok(store.includes("saveWorkspaceLatexTemplateLibrary"));
   ok(app.includes("customOutlineBestFor"));
   ok(app.includes("Docs Live workflow"));
   ok(app.includes("outlineDocsLiveTypeLabel"));

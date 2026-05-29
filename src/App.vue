@@ -2252,6 +2252,26 @@
             </ul>
             <details class="custom-template-editor">
               <summary>Manage company LaTeX templates</summary>
+              <section class="template-library-sync" aria-label="Portable LaTeX template library">
+                <header>
+                  <h4>Portable library</h4>
+                  <span>{{ store.customLatexTemplates.length }} custom</span>
+                </header>
+                <p class="sidebar-hint">
+                  {{ latexTemplateWorkspaceSyncStatus || (store.workspaceRoot ? `Syncs with ${workspaceLatexTemplateLibraryPath(store.workspaceRoot)} for CLI and app reuse.` : "Open a workspace folder to sync .neditor/latex-templates.json.") }}
+                </p>
+                <div class="template-actions">
+                  <button type="button" :disabled="!store.workspaceRoot || latexTemplateWorkspaceSyncBusy" @click="syncWorkspaceLatexTemplates">
+                    {{ latexTemplateWorkspaceSyncBusy ? "Syncing..." : "Sync workspace library" }}
+                  </button>
+                  <button type="button" :disabled="!store.workspaceRoot || latexTemplateWorkspaceSyncBusy" @click="saveLatexTemplatesToWorkspace">
+                    Save library to workspace
+                  </button>
+                  <button type="button" @click="previewLatexTemplateLibraryJson">Show library JSON</button>
+                  <button type="button" :disabled="!latexTemplateLibraryJsonText.trim()" @click="importLatexTemplateLibraryJson">Import JSON below</button>
+                </div>
+                <textarea v-model="latexTemplateLibraryJsonText" rows="5" aria-label="Portable LaTeX template library JSON" placeholder="{ &quot;schema&quot;: &quot;neditor.workspace-latex-templates.v1&quot;, &quot;templates&quot;: [] }"></textarea>
+              </section>
               <label>
                 Name
                 <input v-model="latexTemplateDraft.name" type="text" />
@@ -3364,7 +3384,7 @@
           <section v-show="selectedConfigurationSection === 'files'" class="configuration-center-panel" aria-label="Recent documents configuration">
           <section aria-label="Command line and default reader setup">
             <h3>Command line and default reader</h3>
-            <p class="sidebar-hint">Use <code>ned file.md</code> to open Markdown, <code>ned open file.md --dry-run --json</code> to verify file handoff, <code>ned init . --json</code> to create a reusable <code>.neditor</code> project scaffold, <code>ned profile --workspace . --set companyName=Acme --json</code> to set reusable business identity, <code>ned profile --fields --json</code> to list identity fields and aliases, <code>ned profile --workspace . --get companyName</code> to print one value for scripts, <code>ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json</code> to analyze an RFP and write a response plus compliance matrix, <code>ned analyze-rfp - --matrix</code> to turn piped RFP text into a matrix, <code>ned templates --category Procurement --json</code> to discover filtered starters, <code>ned templates --markdown report --workspace . --fill-profile</code> to preview profile-aware starter Markdown, <code>ned transform-templates --category Business --transform calc --query ROI --json</code> to discover reusable calc/chart/diagram/data blocks, <code>ned outlines --category Procurement --query RFP --json</code> to discover reusable document outlines, <code>ned outlines --markdown business-report</code> to print an outline for the planner or Docs Live, <code>ned outlines --workspace . --save board-pack --docs-live-type board-memo --section "Decision Requested" --section "Recommendation"</code> to add a reusable workspace outline, <code>ned snippets --workspace . --markdown business-contact-block --fill-profile</code> to print profile-aware reusable document parts, <code>ned new tender.md --template tender --workspace . --fill-profile --json</code> or <code>ned new podcast.md --template podcast-script --workspace . --fill-profile --json</code> to start from business and publishing scaffolds, <code>ned inspect file.md --json</code> for no-write document inventory, <code>ned validate file.md --to pdf --json</code> for no-write readiness checks, <code>ned convert file.md --to pdf,docx,html --output-dir exports</code> for headless delivery packs, <code>ned convert - --to html --stdout</code> for pipe automation, <code>ned targets</code> or <code>ned handlers --commands-only</code> for setup discovery, <code>ned readiness --json</code> for release gap summaries, <code>ned readiness --action-plan</code> for assignable release evidence work items, <code>ned evidence --json</code> for release evidence report status, <code>ned default-reader --status --json</code> for default Markdown reader setup, <code>ned support-bundle --output support.json</code> for help desk handoffs, <code>ned completions zsh</code> for shell setup, and <code>ned doctor --workspace . --json</code> for setup checks.</p>
+            <p class="sidebar-hint">Use <code>ned file.md</code> to open Markdown, <code>ned open file.md --dry-run --json</code> to verify file handoff, <code>ned init . --json</code> to create a reusable <code>.neditor</code> project scaffold, <code>ned profile --workspace . --set companyName=Acme --json</code> to set reusable business identity, <code>ned profile --fields --json</code> to list identity fields and aliases, <code>ned profile --workspace . --get companyName</code> to print one value for scripts, <code>ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json</code> to analyze an RFP and write a response plus compliance matrix, <code>ned analyze-rfp - --matrix</code> to turn piped RFP text into a matrix, <code>ned templates --category Procurement --json</code> to discover filtered starters, <code>ned templates --markdown report --workspace . --fill-profile</code> to preview profile-aware starter Markdown, <code>ned transform-templates --category Business --transform calc --query ROI --json</code> to discover reusable calc/chart/diagram/data blocks, <code>ned outlines --category Procurement --query RFP --json</code> to discover reusable document outlines, <code>ned outlines --markdown business-report</code> to print an outline for the planner or Docs Live, <code>ned outlines --workspace . --save board-pack --docs-live-type board-memo --section "Decision Requested" --section "Recommendation"</code> to add a reusable workspace outline, <code>ned latex-templates --query proposal --json</code> to discover reusable LaTeX profiles, <code>ned latex-templates --preamble rfp-response</code> to review a profile preamble, <code>ned snippets --workspace . --markdown business-contact-block --fill-profile</code> to print profile-aware reusable document parts, <code>ned new tender.md --template tender --workspace . --fill-profile --json</code> or <code>ned new podcast.md --template podcast-script --workspace . --fill-profile --json</code> to start from business and publishing scaffolds, <code>ned inspect file.md --json</code> for no-write document inventory, <code>ned validate file.md --to pdf --json</code> for no-write readiness checks, <code>ned convert file.md --to pdf,docx,html --output-dir exports</code> for headless delivery packs, <code>ned convert - --to html --stdout</code> for pipe automation, <code>ned targets</code> or <code>ned handlers --commands-only</code> for setup discovery, <code>ned readiness --json</code> for release gap summaries, <code>ned readiness --action-plan</code> for assignable release evidence work items, <code>ned evidence --json</code> for release evidence report status, <code>ned default-reader --status --json</code> for default Markdown reader setup, <code>ned support-bundle --output support.json</code> for help desk handoffs, <code>ned completions zsh</code> for shell setup, and <code>ned doctor --workspace . --json</code> for setup checks.</p>
             <div class="support-bundle-actions">
               <button type="button" :disabled="cliDeployBusy || cliDeployPlan?.supported === false" title="Install the packaged ned helper into a user-level command directory" @click="deployCliGlobally">
                 {{ cliDeployBusy ? "Deploying..." : "Deploy CLI" }}
@@ -6173,6 +6193,9 @@ import { documentLayoutPresetById, documentLayoutPresets, type DocumentLayoutPre
 import {
   blankCustomLatexTemplateProfile,
   latexTemplateProfilesForPicker,
+  workspaceLatexTemplateLibraryJson,
+  workspaceLatexTemplateLibraryPath,
+  workspaceLatexTemplatesFromJson,
 } from "./lib/latexTemplates";
 import {
   agenticCliIntegrations,
@@ -7108,6 +7131,9 @@ const exportProfileName = ref("Client delivery");
 const latexTemplateDraft = ref(blankCustomLatexTemplateProfile());
 const latexTemplatePackagesDraft = ref(latexTemplateDraft.value.packages.join("\n"));
 const latexTemplateBestForDraft = ref(latexTemplateDraft.value.bestFor.join("\n"));
+const latexTemplateLibraryJsonText = ref("");
+const latexTemplateWorkspaceSyncBusy = ref(false);
+const latexTemplateWorkspaceSyncStatus = ref("");
 const exportReadinessNotes = ref("");
 const publishingDestinationName = ref("CMS publishing bridge");
 const publishingTargetKind = ref<PublishingTargetKind>("generic-webhook");
@@ -19418,6 +19444,58 @@ function saveLatexTemplateDraft() {
   latexTemplateDraft.value = { ...profile, packages: [...profile.packages], bestFor: [...profile.bestFor] };
   latexTemplatePackagesDraft.value = profile.packages.join("\n");
   latexTemplateBestForDraft.value = profile.bestFor.join("\n");
+}
+
+function previewLatexTemplateLibraryJson() {
+  latexTemplateLibraryJsonText.value = workspaceLatexTemplateLibraryJson(store.customLatexTemplates);
+  latexTemplateWorkspaceSyncStatus.value = `Prepared portable library JSON for ${store.customLatexTemplates.length} custom LaTeX template${store.customLatexTemplates.length === 1 ? "" : "s"}`;
+  store.statusMessage = latexTemplateWorkspaceSyncStatus.value;
+}
+
+async function importLatexTemplateLibraryJson() {
+  const templates = workspaceLatexTemplatesFromJson(latexTemplateLibraryJsonText.value);
+  if (!templates.length) {
+    latexTemplateWorkspaceSyncStatus.value = "No valid custom LaTeX templates found in the JSON";
+    store.lastError = latexTemplateWorkspaceSyncStatus.value;
+    return;
+  }
+  const imported = await store.importCustomLatexTemplateLibrary(templates);
+  latexTemplateLibraryJsonText.value = workspaceLatexTemplateLibraryJson(store.customLatexTemplates);
+  latexTemplateWorkspaceSyncStatus.value = `Imported ${imported} LaTeX template${imported === 1 ? "" : "s"} from portable JSON`;
+  store.statusMessage = latexTemplateWorkspaceSyncStatus.value;
+}
+
+async function syncWorkspaceLatexTemplates() {
+  latexTemplateWorkspaceSyncBusy.value = true;
+  try {
+    const loaded = await store.loadWorkspaceLatexTemplates();
+    latexTemplateLibraryJsonText.value = workspaceLatexTemplateLibraryJson(store.customLatexTemplates);
+    latexTemplateWorkspaceSyncStatus.value = loaded
+      ? "Workspace LaTeX template library synced from .neditor/latex-templates.json"
+      : "Open a workspace with .neditor/latex-templates.json to sync reusable LaTeX profiles";
+    store.statusMessage = latexTemplateWorkspaceSyncStatus.value;
+  } catch (error) {
+    latexTemplateWorkspaceSyncStatus.value = error instanceof Error ? error.message : String(error);
+    store.lastError = latexTemplateWorkspaceSyncStatus.value;
+  } finally {
+    latexTemplateWorkspaceSyncBusy.value = false;
+  }
+}
+
+async function saveLatexTemplatesToWorkspace() {
+  if (!store.workspaceRoot) return;
+  latexTemplateWorkspaceSyncBusy.value = true;
+  try {
+    await store.saveWorkspaceLatexTemplateLibrary(store.customLatexTemplates);
+    latexTemplateLibraryJsonText.value = workspaceLatexTemplateLibraryJson(store.customLatexTemplates);
+    latexTemplateWorkspaceSyncStatus.value = `Saved ${store.customLatexTemplates.length} custom LaTeX template${store.customLatexTemplates.length === 1 ? "" : "s"} to .neditor/latex-templates.json`;
+    store.statusMessage = latexTemplateWorkspaceSyncStatus.value;
+  } catch (error) {
+    latexTemplateWorkspaceSyncStatus.value = error instanceof Error ? error.message : String(error);
+    store.lastError = latexTemplateWorkspaceSyncStatus.value;
+  } finally {
+    latexTemplateWorkspaceSyncBusy.value = false;
+  }
 }
 
 async function prepareForExport() {
