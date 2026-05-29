@@ -1361,6 +1361,50 @@ fn prepare_for_export_validates_brand_and_default_style_options() {
 }
 
 #[test]
+fn prepare_for_export_accepts_custom_latex_template_profiles() {
+    let source =
+        "---\ntitle: Custom TeX\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-29\n---\n# Custom TeX\n".to_string();
+    let valid = prepare_for_export(PrepareExportRequest {
+        text: source.clone(),
+        file_path: None,
+        target: "latex".to_string(),
+        options: json!({
+            "warnOnDirtyGit": false,
+            "latexTemplate": "custom-latex-board",
+            "latexTemplateProfile": {
+                "id": "custom-latex-board",
+                "label": "Board House Style",
+                "documentClass": "memoir",
+                "classOptions": "12pt",
+                "packages": ["\\usepackage{booktabs}"],
+                "geometry": "margin=0.75in",
+                "hypersetup": "colorlinks=true",
+                "header": "\\pagestyle{plain}",
+                "chapterStyle": true
+            }
+        }),
+    });
+    assert!(valid.ready, "{:#?}", valid.diagnostics);
+
+    let invalid = prepare_for_export(PrepareExportRequest {
+        text: source,
+        file_path: None,
+        target: "latex".to_string(),
+        options: json!({
+            "warnOnDirtyGit": false,
+            "latexTemplate": "custom-latex-board",
+            "latexTemplateProfile": {
+                "id": "different",
+                "label": "Broken",
+                "documentClass": "memoir"
+            }
+        }),
+    });
+    assert!(!invalid.ready);
+    assert_readiness_contains(&invalid, "latexTemplateProfile.id must match latexTemplate");
+}
+
+#[test]
 fn prepare_for_export_reports_target_specific_release_metadata_blockers() {
     let draft_presentation =
         "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: in-review\n---\n# Board Deck\n"

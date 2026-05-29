@@ -250,6 +250,40 @@ fn latex_template_option_controls_document_class_and_headings() {
 }
 
 #[test]
+fn latex_custom_template_profile_renders_saved_house_style() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: House Style\nstatus: approved\n---\n# Client Report\n\nBody."
+            .to_string(),
+        file_path: None,
+    });
+    let mut manifest = response.export_manifest.clone();
+    manifest.export_target = "latex".to_string();
+    manifest.export_options = json!({
+        "latexTemplate": "custom-latex-board",
+        "latexTemplateProfile": {
+            "id": "custom-latex-board",
+            "label": "Board House Style",
+            "documentClass": "memoir",
+            "classOptions": "12pt,oneside",
+            "packages": ["\\usepackage{booktabs}", "\\usepackage{xcolor}"],
+            "geometry": "margin=0.75in",
+            "hypersetup": "colorlinks=true,linkcolor=black,urlcolor=blue",
+            "header": "\\pagestyle{plain}",
+            "chapterStyle": true
+        }
+    });
+
+    let latex = String::from_utf8(render_latex_bytes(&response, &manifest).expect("latex bytes"))
+        .expect("latex utf8");
+    assert!(latex.contains("% LaTeX template: Board House Style (custom-latex-board)"));
+    assert!(latex.contains("\\documentclass[12pt,oneside]{memoir}"));
+    assert!(latex.contains("\\usepackage{booktabs}"));
+    assert!(latex.contains("\\geometry{margin=0.75in}"));
+    assert!(latex.contains("\\pagestyle{plain}"));
+    assert!(latex.contains("\\chapter{Client Report}"));
+}
+
+#[test]
 fn export_layout_metadata_controls_page_size_and_margins() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Page Layout\nstatus: approved\napprovedBy: QA\nlayout:\n  pageSize: Letter\n  margins: wide\n  orientation: landscape\n---\n# Page Layout\n\nBody.".to_string(),

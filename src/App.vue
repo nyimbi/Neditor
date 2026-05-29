@@ -2241,8 +2241,8 @@
             <label>
               Template profile
               <select v-model="store.exportDefaults.latexTemplate">
-                <option v-for="profile in latexTemplateProfiles" :key="profile.id" :value="profile.id">
-                  {{ profile.label }}
+                <option v-for="profile in availableLatexTemplateProfiles" :key="profile.id" :value="profile.id">
+                  {{ profile.label }}{{ profile.source === "custom" ? " (custom)" : "" }}
                 </option>
               </select>
             </label>
@@ -2250,6 +2250,59 @@
             <ul class="template-meta-summary" aria-label="LaTeX template best fit">
               <li v-for="item in activeLatexTemplateProfile.bestFor" :key="item">{{ item }}</li>
             </ul>
+            <details class="custom-template-editor">
+              <summary>Manage company LaTeX templates</summary>
+              <label>
+                Name
+                <input v-model="latexTemplateDraft.name" type="text" />
+              </label>
+              <label>
+                Document class
+                <input v-model="latexTemplateDraft.documentClass" type="text" placeholder="article, report, book, memoir" />
+              </label>
+              <label>
+                Class options
+                <input v-model="latexTemplateDraft.classOptions" type="text" placeholder="11pt,oneside" />
+              </label>
+              <label>
+                Packages and preamble package lines
+                <textarea v-model="latexTemplatePackagesDraft" rows="5" aria-label="LaTeX package lines"></textarea>
+              </label>
+              <label>
+                Geometry
+                <input v-model="latexTemplateDraft.geometry" type="text" placeholder="margin=1in" />
+              </label>
+              <label>
+                Hyperref setup
+                <input v-model="latexTemplateDraft.hypersetup" type="text" placeholder="colorlinks=true,linkcolor=blue,urlcolor=blue" />
+              </label>
+              <label>
+                Header or house-style preamble
+                <textarea v-model="latexTemplateDraft.header" rows="4" aria-label="LaTeX header preamble"></textarea>
+              </label>
+              <label>
+                Best for
+                <textarea v-model="latexTemplateBestForDraft" rows="3" aria-label="LaTeX template best for"></textarea>
+              </label>
+              <label><input v-model="latexTemplateDraft.chapterStyle" type="checkbox" /> Use chapter-style headings</label>
+              <div class="template-actions">
+                <button class="template-action-primary" type="button" @click="saveLatexTemplateDraft">Save template</button>
+                <button type="button" @click="resetLatexTemplateDraft">Reset draft</button>
+              </div>
+              <article v-for="template in store.customLatexTemplates" :key="template.id" class="template-card">
+                <header class="template-card-header">
+                  <div>
+                    <strong>{{ template.name }}</strong>
+                    <small>{{ template.documentClass }} / {{ template.classOptions }}</small>
+                  </div>
+                </header>
+                <p>{{ template.summary || "Custom LaTeX template profile." }}</p>
+                <div class="template-actions">
+                  <button type="button" @click="editLatexTemplate(template.id)">Edit</button>
+                  <button type="button" @click="store.deleteCustomLatexTemplate(template.id)">Delete</button>
+                </div>
+              </article>
+            </details>
           </section>
           <section
             v-if="exportDistributionChecklist.length"
@@ -6117,7 +6170,10 @@ import {
 import { citationSourceLibraryAuditMarkdown, type CitationSourceAuditItem } from "./lib/citationSourceLibrary";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import { documentLayoutPresetById, documentLayoutPresets, type DocumentLayoutPresetId } from "./lib/documentLayout";
-import { latexTemplateProfiles } from "./lib/latexTemplates";
+import {
+  blankCustomLatexTemplateProfile,
+  latexTemplateProfilesForPicker,
+} from "./lib/latexTemplates";
 import {
   agenticCliIntegrations,
   analyzeRfpSource,
@@ -7049,6 +7105,9 @@ const rfpImportBusy = ref(false);
 const rfpImportMessage = ref("");
 const draggedTabId = ref("");
 const exportProfileName = ref("Client delivery");
+const latexTemplateDraft = ref(blankCustomLatexTemplateProfile());
+const latexTemplatePackagesDraft = ref(latexTemplateDraft.value.packages.join("\n"));
+const latexTemplateBestForDraft = ref(latexTemplateDraft.value.bestFor.join("\n"));
 const exportReadinessNotes = ref("");
 const publishingDestinationName = ref("CMS publishing bridge");
 const publishingTargetKind = ref<PublishingTargetKind>("generic-webhook");
@@ -7626,8 +7685,9 @@ let docsLiveRecognition: SpeechRecognitionLike | null = null;
 
 const active = computed(() => store.activeDocument);
 const activeExportProfile = computed(() => store.exportProfiles.find((profile) => profile.id === store.activeExportProfileId) || null);
+const availableLatexTemplateProfiles = computed(() => latexTemplateProfilesForPicker(store.customLatexTemplates));
 const activeLatexTemplateProfile = computed(() =>
-  latexTemplateProfiles.find((profile) => profile.id === store.exportDefaults.latexTemplate) || latexTemplateProfiles[0],
+  availableLatexTemplateProfiles.value.find((profile) => profile.id === store.exportDefaults.latexTemplate) || availableLatexTemplateProfiles.value[0],
 );
 const exportProfileSummary = computed(() => {
   const profile = activeExportProfile.value;
@@ -7643,7 +7703,7 @@ const exportProfileSummary = computed(() => {
   const brand = profile.brandProfileDefaults.name || profile.brandProfileDefaults.color;
   const latexTemplate =
     profile.exportTarget === "latex"
-      ? ` / ${latexTemplateProfiles.find((template) => template.id === profile.exportDefaults.latexTemplate)?.label || profile.exportDefaults.latexTemplate}`
+      ? ` / ${availableLatexTemplateProfiles.value.find((template) => template.id === profile.exportDefaults.latexTemplate)?.label || profile.exportDefaults.latexTemplate}`
       : "";
   return `${profile.exportTarget.toUpperCase()} / ${profile.exportDefaults.layoutPreset}${latexTemplate}${brand ? ` / ${brand}` : ""}${enabled.length ? ` / ${enabled.join(", ")}` : ""}`;
 });
@@ -19332,6 +19392,32 @@ function saveExportProfileFromPanel() {
 function deleteActiveExportProfile() {
   if (!store.activeExportProfileId) return;
   store.deleteExportProfile(store.activeExportProfileId);
+}
+
+function resetLatexTemplateDraft() {
+  latexTemplateDraft.value = blankCustomLatexTemplateProfile();
+  latexTemplatePackagesDraft.value = latexTemplateDraft.value.packages.join("\n");
+  latexTemplateBestForDraft.value = latexTemplateDraft.value.bestFor.join("\n");
+}
+
+function editLatexTemplate(id: string) {
+  const template = store.customLatexTemplates.find((item) => item.id === id);
+  if (!template) return;
+  latexTemplateDraft.value = { ...template, packages: [...template.packages], bestFor: [...template.bestFor] };
+  latexTemplatePackagesDraft.value = template.packages.join("\n");
+  latexTemplateBestForDraft.value = template.bestFor.join("\n");
+}
+
+function saveLatexTemplateDraft() {
+  const draft = {
+    ...latexTemplateDraft.value,
+    packages: latexTemplatePackagesDraft.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+    bestFor: latexTemplateBestForDraft.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+  };
+  const profile = store.saveCustomLatexTemplate(draft);
+  latexTemplateDraft.value = { ...profile, packages: [...profile.packages], bestFor: [...profile.bestFor] };
+  latexTemplatePackagesDraft.value = profile.packages.join("\n");
+  latexTemplateBestForDraft.value = profile.bestFor.join("\n");
 }
 
 async function prepareForExport() {

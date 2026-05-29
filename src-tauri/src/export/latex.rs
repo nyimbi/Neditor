@@ -18,14 +18,14 @@ pub(crate) fn render_latex_bytes(
         "\\documentclass[{}]{{{}}}\n",
         template.class_options, template.document_class
     ));
-    for package in template.packages {
+    for package in &template.packages {
         output.push_str(package);
         output.push('\n');
     }
     output.push_str(&format!("\\geometry{{{}}}\n", template.geometry));
     output.push_str(&format!("\\hypersetup{{{}}}\n", template.hypersetup));
-    if let Some(header) = template.header {
-        output.push_str(header);
+    if !template.header.trim().is_empty() {
+        output.push_str(&template.header);
         output.push('\n');
     }
     output.push('\n');
@@ -53,14 +53,14 @@ pub(crate) fn render_latex_bytes(
 }
 
 struct LatexTemplateSpec {
-    id: &'static str,
-    label: &'static str,
-    document_class: &'static str,
-    class_options: &'static str,
-    packages: &'static [&'static str],
-    geometry: &'static str,
-    hypersetup: &'static str,
-    header: Option<&'static str>,
+    id: String,
+    label: String,
+    document_class: String,
+    class_options: String,
+    packages: Vec<String>,
+    geometry: String,
+    hypersetup: String,
+    header: String,
     chapter_style: bool,
 }
 
@@ -94,96 +94,176 @@ const BUSINESS_LATEX_PACKAGES: &[&str] = &[
 ];
 
 fn latex_template_spec(options: &Value) -> LatexTemplateSpec {
+    if let Some(spec) = custom_latex_template_spec(options) {
+        return spec;
+    }
     match options.get("latexTemplate").and_then(Value::as_str) {
         Some("business-report") => LatexTemplateSpec {
-            id: "business-report",
-            label: "Business Report",
-            document_class: "report",
-            class_options: "11pt",
-            packages: BUSINESS_LATEX_PACKAGES,
-            geometry: "margin=0.9in",
-            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Business Report}",
-            header: Some("\\pagestyle{fancy}\\fancyhf{}\\lhead{NEditor}\\rhead{Business Report}\\cfoot{\\thepage}"),
+            id: "business-report".to_string(),
+            label: "Business Report".to_string(),
+            document_class: "report".to_string(),
+            class_options: "11pt".to_string(),
+            packages: package_vec(BUSINESS_LATEX_PACKAGES),
+            geometry: "margin=0.9in".to_string(),
+            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Business Report}".to_string(),
+            header: "\\pagestyle{fancy}\\fancyhf{}\\lhead{NEditor}\\rhead{Business Report}\\cfoot{\\thepage}".to_string(),
             chapter_style: true,
         },
         Some("proposal") => LatexTemplateSpec {
-            id: "proposal",
-            label: "Proposal",
-            document_class: "article",
-            class_options: "11pt",
-            packages: BUSINESS_LATEX_PACKAGES,
-            geometry: "margin=0.85in",
-            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Proposal}",
-            header: Some("\\pagestyle{fancy}\\fancyhf{}\\lhead{Proposal}\\rhead{\\thepage}"),
+            id: "proposal".to_string(),
+            label: "Proposal".to_string(),
+            document_class: "article".to_string(),
+            class_options: "11pt".to_string(),
+            packages: package_vec(BUSINESS_LATEX_PACKAGES),
+            geometry: "margin=0.85in".to_string(),
+            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Proposal}".to_string(),
+            header: "\\pagestyle{fancy}\\fancyhf{}\\lhead{Proposal}\\rhead{\\thepage}".to_string(),
             chapter_style: false,
         },
         Some("rfp-response") => LatexTemplateSpec {
-            id: "rfp-response",
-            label: "RFP Response",
-            document_class: "article",
-            class_options: "11pt",
-            packages: BUSINESS_LATEX_PACKAGES,
-            geometry: "margin=0.8in",
-            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor RFP Response}",
-            header: Some("\\pagestyle{fancy}\\fancyhf{}\\lhead{Compliance Response}\\rhead{\\thepage}"),
+            id: "rfp-response".to_string(),
+            label: "RFP Response".to_string(),
+            document_class: "article".to_string(),
+            class_options: "11pt".to_string(),
+            packages: package_vec(BUSINESS_LATEX_PACKAGES),
+            geometry: "margin=0.8in".to_string(),
+            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor RFP Response}".to_string(),
+            header: "\\pagestyle{fancy}\\fancyhf{}\\lhead{Compliance Response}\\rhead{\\thepage}".to_string(),
             chapter_style: false,
         },
         Some("technical-report") => LatexTemplateSpec {
-            id: "technical-report",
-            label: "Technical Report",
-            document_class: "report",
-            class_options: "11pt",
-            packages: BASE_LATEX_PACKAGES,
-            geometry: "margin=1in",
-            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Technical Report}",
-            header: None,
+            id: "technical-report".to_string(),
+            label: "Technical Report".to_string(),
+            document_class: "report".to_string(),
+            class_options: "11pt".to_string(),
+            packages: package_vec(BASE_LATEX_PACKAGES),
+            geometry: "margin=1in".to_string(),
+            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Technical Report}".to_string(),
+            header: String::new(),
             chapter_style: true,
         },
         Some("academic-paper") => LatexTemplateSpec {
-            id: "academic-paper",
-            label: "Academic Paper",
-            document_class: "article",
-            class_options: "11pt",
-            packages: BASE_LATEX_PACKAGES,
-            geometry: "margin=1in",
-            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Academic Paper}",
-            header: None,
+            id: "academic-paper".to_string(),
+            label: "Academic Paper".to_string(),
+            document_class: "article".to_string(),
+            class_options: "11pt".to_string(),
+            packages: package_vec(BASE_LATEX_PACKAGES),
+            geometry: "margin=1in".to_string(),
+            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Academic Paper}".to_string(),
+            header: String::new(),
             chapter_style: false,
         },
         Some("textbook") => LatexTemplateSpec {
-            id: "textbook",
-            label: "Textbook",
-            document_class: "book",
-            class_options: "11pt,oneside",
-            packages: BASE_LATEX_PACKAGES,
-            geometry: "margin=1in",
-            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Textbook}",
-            header: None,
+            id: "textbook".to_string(),
+            label: "Textbook".to_string(),
+            document_class: "book".to_string(),
+            class_options: "11pt,oneside".to_string(),
+            packages: package_vec(BASE_LATEX_PACKAGES),
+            geometry: "margin=1in".to_string(),
+            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Textbook}".to_string(),
+            header: String::new(),
             chapter_style: true,
         },
         Some("book") => LatexTemplateSpec {
-            id: "book",
-            label: "Book",
-            document_class: "book",
-            class_options: "11pt,oneside",
-            packages: BASE_LATEX_PACKAGES,
-            geometry: "margin=1in",
-            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Book}",
-            header: None,
+            id: "book".to_string(),
+            label: "Book".to_string(),
+            document_class: "book".to_string(),
+            class_options: "11pt,oneside".to_string(),
+            packages: package_vec(BASE_LATEX_PACKAGES),
+            geometry: "margin=1in".to_string(),
+            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={NEditor Book}".to_string(),
+            header: String::new(),
             chapter_style: true,
         },
         _ => LatexTemplateSpec {
-            id: "article",
-            label: "Article",
-            document_class: "article",
-            class_options: "11pt",
-            packages: BASE_LATEX_PACKAGES,
-            geometry: "margin=1in",
-            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
-            header: None,
+            id: "article".to_string(),
+            label: "Article".to_string(),
+            document_class: "article".to_string(),
+            class_options: "11pt".to_string(),
+            packages: package_vec(BASE_LATEX_PACKAGES),
+            geometry: "margin=1in".to_string(),
+            hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue".to_string(),
+            header: String::new(),
             chapter_style: false,
         },
     }
+}
+
+fn package_vec(packages: &[&str]) -> Vec<String> {
+    packages.iter().map(|package| package.to_string()).collect()
+}
+
+fn custom_latex_template_spec(options: &Value) -> Option<LatexTemplateSpec> {
+    let profile = options.get("latexTemplateProfile")?.as_object()?;
+    let id = profile.get("id")?.as_str()?.trim();
+    let selected = options.get("latexTemplate").and_then(Value::as_str)?.trim();
+    if id.is_empty() || id != selected {
+        return None;
+    }
+    let document_class = profile
+        .get("documentClass")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("article");
+    let packages = profile
+        .get("packages")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .take(24)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .filter(|items| !items.is_empty())
+        .unwrap_or_else(|| package_vec(BASE_LATEX_PACKAGES));
+    Some(LatexTemplateSpec {
+        id: id.to_string(),
+        label: profile
+            .get("label")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("Custom LaTeX Template")
+            .to_string(),
+        document_class: document_class.to_string(),
+        class_options: profile
+            .get("classOptions")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("11pt")
+            .to_string(),
+        packages,
+        geometry: profile
+            .get("geometry")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("margin=1in")
+            .to_string(),
+        hypersetup: profile
+            .get("hypersetup")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("colorlinks=true,linkcolor=blue,urlcolor=blue")
+            .to_string(),
+        header: profile
+            .get("header")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string(),
+        chapter_style: profile
+            .get("chapterStyle")
+            .and_then(Value::as_bool)
+            .unwrap_or(matches!(document_class, "book" | "report" | "memoir")),
+    })
 }
 
 fn render_latex_metadata(response: &CompileResponse, manifest: &ExportManifest) -> String {

@@ -1,10 +1,23 @@
-import type { LatexTemplatePreset } from "./workspacePersistence.js";
+import type { CustomLatexTemplateProfile, LatexTemplatePreset } from "./workspacePersistence.js";
 
 export interface LatexTemplateProfile {
   id: LatexTemplatePreset;
   label: string;
   summary: string;
   bestFor: string[];
+  source: "built-in" | "custom";
+}
+
+export interface LatexTemplateExportProfile {
+  id: string;
+  label: string;
+  documentClass: string;
+  classOptions: string;
+  packages: string[];
+  geometry: string;
+  hypersetup: string;
+  header: string;
+  chapterStyle: boolean;
 }
 
 export const latexTemplateProfiles: LatexTemplateProfile[] = [
@@ -13,51 +26,162 @@ export const latexTemplateProfiles: LatexTemplateProfile[] = [
     label: "Article",
     summary: "Clean default for short papers, memos, and general TeX handoff.",
     bestFor: ["Short reports", "Technical notes", "General-purpose export"],
+    source: "built-in",
   },
   {
     id: "business-report",
     label: "Business Report",
     summary: "Executive-facing report layout with stronger headings and audit metadata.",
     bestFor: ["Consulting reports", "Board packs", "Management documents"],
+    source: "built-in",
   },
   {
     id: "proposal",
     label: "Proposal",
     summary: "Proposal-oriented layout tuned for scope, approach, team, and commercial narrative.",
     bestFor: ["Proposals", "Statements of work", "Business development"],
+    source: "built-in",
   },
   {
     id: "rfp-response",
     label: "RFP Response",
     summary: "Compliance-first template with room for requirements, matrices, and attachments.",
     bestFor: ["RFP responses", "Tenders", "RFQs"],
+    source: "built-in",
   },
   {
     id: "technical-report",
     label: "Technical Report",
     summary: "Report class with math, figures, long tables, source references, and appendices.",
     bestFor: ["Architecture reports", "Research reports", "Engineering documentation"],
+    source: "built-in",
   },
   {
     id: "academic-paper",
     label: "Academic Paper",
     summary: "Article class with bibliography and citation-friendly defaults.",
     bestFor: ["Academic papers", "Research briefs", "Conference drafts"],
+    source: "built-in",
   },
   {
     id: "textbook",
     label: "Textbook",
     summary: "Book class structure for chapter-based long-form technical or instructional material.",
     bestFor: ["Textbooks", "Tutorial manuals", "Course material"],
+    source: "built-in",
   },
   {
     id: "book",
     label: "Book",
     summary: "Book class structure for long-form manuscripts and multi-chapter documents.",
     bestFor: ["Books", "Novels", "Long-form manuscripts"],
+    source: "built-in",
   },
 ];
+const builtInLatexTemplateIds = new Set(latexTemplateProfiles.map((profile) => profile.id));
 
 export function latexTemplateProfileById(id: LatexTemplatePreset) {
   return latexTemplateProfiles.find((profile) => profile.id === id) || latexTemplateProfiles[0];
+}
+
+export function createCustomLatexTemplateId(name: string) {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return `custom-latex-${slug || Date.now().toString(36)}`;
+}
+
+export function blankCustomLatexTemplateProfile(): CustomLatexTemplateProfile {
+  return {
+    id: "",
+    name: "Company LaTeX template",
+    summary: "Reusable organization or publisher LaTeX profile.",
+    documentClass: "article",
+    classOptions: "11pt",
+    packages: [
+      "\\usepackage[utf8]{inputenc}",
+      "\\usepackage[T1]{fontenc}",
+      "\\usepackage{geometry}",
+      "\\usepackage{hyperref}",
+      "\\usepackage{longtable}",
+      "\\usepackage{graphicx}",
+    ],
+    geometry: "margin=1in",
+    hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
+    header: "",
+    chapterStyle: false,
+    bestFor: ["Company reports", "Client deliverables"],
+    sourcePath: "",
+  };
+}
+
+export function latexTemplateProfilesForPicker(customTemplates: CustomLatexTemplateProfile[]): LatexTemplateProfile[] {
+  return [
+    ...latexTemplateProfiles,
+    ...customTemplates.map((template) => ({
+      id: template.id,
+      label: template.name,
+      summary: template.summary || `Custom ${template.documentClass} LaTeX profile.`,
+      bestFor: template.bestFor.length ? template.bestFor : ["Custom LaTeX handoff"],
+      source: "custom" as const,
+    })),
+  ];
+}
+
+export function latexTemplateExportProfileForSelection(
+  selectedId: string,
+  customTemplates: CustomLatexTemplateProfile[],
+): LatexTemplateExportProfile | null {
+  if (builtInLatexTemplateIds.has(selectedId)) return null;
+  const template = customTemplates.find((item) => item.id === selectedId);
+  if (!template) return null;
+  return {
+    id: template.id,
+    label: template.name,
+    documentClass: template.documentClass,
+    classOptions: template.classOptions || "11pt",
+    packages: template.packages,
+    geometry: template.geometry || "margin=1in",
+    hypersetup: template.hypersetup || "colorlinks=true,linkcolor=blue,urlcolor=blue",
+    header: template.header,
+    chapterStyle: template.chapterStyle,
+  };
+}
+
+export function saveCustomLatexTemplateProfileState(
+  templates: CustomLatexTemplateProfile[],
+  draft: CustomLatexTemplateProfile,
+  createId: (name: string) => string = createCustomLatexTemplateId,
+) {
+  const id = draft.id.trim() || createId(draft.name);
+  const profile: CustomLatexTemplateProfile = {
+    ...blankCustomLatexTemplateProfile(),
+    ...draft,
+    id,
+    name: draft.name.trim() || "Company LaTeX template",
+    packages: draft.packages.map((item) => item.trim()).filter(Boolean).slice(0, 24),
+    bestFor: draft.bestFor.map((item) => item.trim()).filter(Boolean).slice(0, 8),
+  };
+  const existing = templates.some((template) => template.id === id);
+  return {
+    profile,
+    templates: existing ? templates.map((template) => (template.id === id ? profile : template)) : [...templates, profile].slice(0, 40),
+    statusMessage: `Saved LaTeX template "${profile.name}"`,
+  };
+}
+
+export function deleteCustomLatexTemplateProfileState(
+  templates: CustomLatexTemplateProfile[],
+  activeTemplateId: string,
+  id: string,
+) {
+  const profile = templates.find((template) => template.id === id);
+  return {
+    templates: templates.filter((template) => template.id !== id),
+    activeTemplateId: activeTemplateId === id ? "article" : activeTemplateId,
+    statusMessage: profile ? `Deleted LaTeX template "${profile.name}"` : "",
+  };
 }

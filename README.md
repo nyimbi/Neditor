@@ -802,6 +802,14 @@ LaTeX template profile, comments appendix, AI provenance appendix, glossary appe
 citation style, brand profile, dirty-Git warnings, transform engine settings,
 and draft watermark behavior.
 
+For LaTeX-heavy teams, the Export panel can save custom company or publisher
+template profiles alongside the built-in article, report, proposal, RFP,
+textbook, and book profiles. A profile captures the document class, class
+options, package/preamble lines, geometry, hyperref setup, optional header
+preamble, and chapter-style heading mode so a large LaTeX template library can
+be reused as governed export profiles rather than copied into every Markdown
+file.
+
 ## Example Projects
 
 The repository ships example documents that compile and export through the

@@ -43,7 +43,8 @@ export type LatexTemplatePreset =
   | "technical-report"
   | "academic-paper"
   | "textbook"
-  | "book";
+  | "book"
+  | string;
 export type PreviewTheme = "match" | "light" | "dark";
 export type SnapshotStorage = "app-data" | "project-local";
 export type ExportTarget =
@@ -91,6 +92,21 @@ export interface ExportDefaults {
   includeProvenance: boolean;
   includeGlossary: boolean;
   includeAgenda: boolean;
+}
+
+export interface CustomLatexTemplateProfile {
+  id: string;
+  name: string;
+  summary: string;
+  documentClass: string;
+  classOptions: string;
+  packages: string[];
+  geometry: string;
+  hypersetup: string;
+  header: string;
+  chapterStyle: boolean;
+  bestFor: string[];
+  sourcePath: string;
 }
 
 export interface BibliographyDefaults {
@@ -440,6 +456,7 @@ export interface PersistedWorkspace {
   transformInputModes?: Record<string, TransformInputMode>;
   transformTimeoutMs?: number;
   customTransformTemplates?: CustomTransformTemplate[];
+  customLatexTemplates?: Partial<CustomLatexTemplateProfile>[];
   customDocumentOutlineTemplates?: CustomDocumentOutlineTemplate[];
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
   agentRunHistory?: Partial<AgentRunHistoryItem>[];
@@ -558,7 +575,68 @@ export function normalizeLatexTemplatePreset(value: unknown): LatexTemplatePrese
     value === "book" ||
     value === "article"
     ? value
-    : "article";
+    : typeof value === "string" && /^[a-z0-9][a-z0-9._:-]{0,79}$/i.test(value.trim())
+      ? value.trim()
+      : "article";
+}
+
+function isBuiltInLatexTemplateId(value: string) {
+  return [
+    "article",
+    "business-report",
+    "proposal",
+    "rfp-response",
+    "technical-report",
+    "academic-paper",
+    "textbook",
+    "book",
+  ].includes(value);
+}
+
+function normalizedStringList(value: unknown, limit: number, itemLimit = 160) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const normalized = item.trim().slice(0, itemLimit);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+export function normalizeCustomLatexTemplateProfiles(value: unknown): CustomLatexTemplateProfile[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const profiles: CustomLatexTemplateProfile[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const id = normalizeLatexTemplatePreset(item.id);
+    if (isBuiltInLatexTemplateId(id) || seen.has(id)) continue;
+    const name = normalizedString(item.name, 80) || `LaTeX template ${profiles.length + 1}`;
+    const documentClass = normalizedString(item.documentClass, 60) || "article";
+    const profile: CustomLatexTemplateProfile = {
+      id,
+      name,
+      summary: normalizedString(item.summary, 240),
+      documentClass,
+      classOptions: normalizedString(item.classOptions, 80) || "11pt",
+      packages: normalizedStringList(item.packages, 24, 180),
+      geometry: normalizedString(item.geometry, 160) || "margin=1in",
+      hypersetup: normalizedString(item.hypersetup, 240) || "colorlinks=true,linkcolor=blue,urlcolor=blue",
+      header: normalizedString(item.header, 1000),
+      chapterStyle: typeof item.chapterStyle === "boolean" ? item.chapterStyle : ["book", "report", "memoir"].includes(documentClass),
+      bestFor: normalizedStringList(item.bestFor, 8, 80),
+      sourcePath: normalizedString(item.sourcePath, 1024),
+    };
+    seen.add(profile.id);
+    profiles.push(profile);
+    if (profiles.length >= 40) break;
+  }
+  return profiles;
 }
 
 export function normalizeExportDefaults(
@@ -1297,6 +1375,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   const transformTimeoutMs = numberValue(raw.transformTimeoutMs);
   if (transformTimeoutMs !== undefined) migrated.transformTimeoutMs = Math.min(Math.max(transformTimeoutMs, 1), 30000);
   migrated.customTransformTemplates = normalizeCustomTransformTemplates(raw.customTransformTemplates);
+  migrated.customLatexTemplates = normalizeCustomLatexTemplateProfiles(raw.customLatexTemplates);
   migrated.customDocumentOutlineTemplates = normalizeCustomDocumentOutlineTemplates(raw.customDocumentOutlineTemplates);
   return migrated;
 }

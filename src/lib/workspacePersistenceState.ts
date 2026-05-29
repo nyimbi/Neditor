@@ -10,6 +10,7 @@ import {
   normalizeAiProviderDefaults,
   normalizeBibliographyDefaults,
   normalizeBrandProfileDefaults,
+  normalizeCustomLatexTemplateProfiles,
   normalizeDocsLiveDraftHistory,
   normalizeExportDefaults,
   normalizeExportProfiles,
@@ -80,6 +81,7 @@ export interface WorkspacePersistenceStateInput {
   transformInputModes: RequiredPersistedValue<"transformInputModes">;
   transformTimeoutMs: number;
   customTransformTemplates: RequiredPersistedValue<"customTransformTemplates">;
+  customLatexTemplates: RequiredPersistedValue<"customLatexTemplates">;
   customDocumentOutlineTemplates: RequiredPersistedValue<"customDocumentOutlineTemplates">;
 }
 
@@ -143,6 +145,7 @@ export function applyPersistedWorkspacePreferenceState(
     transformTimeoutMs:
       typeof persisted.transformTimeoutMs === "number" ? Math.min(Math.max(persisted.transformTimeoutMs, 1), 30000) : current.transformTimeoutMs,
     customTransformTemplates: normalizeCustomTransformTemplates(persisted.customTransformTemplates),
+    customLatexTemplates: normalizeCustomLatexTemplateProfiles(persisted.customLatexTemplates),
     customDocumentOutlineTemplates: normalizeCustomDocumentOutlineTemplates(persisted.customDocumentOutlineTemplates),
   };
   const restoreRequest = persisted.openFiles?.length
@@ -226,6 +229,7 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     transformInputModes: state.transformInputModes,
     transformTimeoutMs: state.transformTimeoutMs,
     customTransformTemplates: state.customTransformTemplates,
+    customLatexTemplates: state.customLatexTemplates,
     customDocumentOutlineTemplates: state.customDocumentOutlineTemplates,
   });
 }

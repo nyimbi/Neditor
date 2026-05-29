@@ -638,10 +638,22 @@ transform engine settings, and draft watermark behavior.
 When the target is LaTeX, choose a template profile in the Export panel before
 writing the `.tex` file. The current built-ins cover article, business report,
 proposal, RFP response, technical report, academic paper, textbook, and book
-layouts. NEditor records the selected profile in saved export profiles and
-emits template-specific document classes, packages, margins, headers, and
-heading levels, making the generated source a practical bridge to larger
-LaTeX house-style or publisher template libraries.
+layouts. Use **Manage company LaTeX templates** in the same panel to add
+organization, publisher, or client house styles from a larger LaTeX template
+library. A saved custom profile records the document class, class options,
+package/preamble lines, geometry, hyperref setup, optional header preamble,
+chapter-style heading preference, and best-fit notes. NEditor stores the
+profile locally, makes it available in the same template picker as the built-ins,
+records the selected profile in saved export profiles, validates it before
+export, and emits template-specific document classes, packages, margins,
+headers, and heading levels in the generated `.tex` file.
+
+For large external LaTeX libraries, create one custom profile per reusable
+house style instead of pasting an entire archive into a document. Keep class
+names in the class field, one package or preamble line per package row, and
+house-style page/header commands in the header field. This keeps Markdown
+portable while still letting the export stage produce TeX that matches client,
+publisher, proposal, textbook, or internal report conventions.
 Front matter `targetPersona` entries are carried into the HTML cover metadata,
 plain text/Markdown bundle text, bundled metadata, and DOCX/PPTX custom
 properties so exported examples keep their intended audience visible.

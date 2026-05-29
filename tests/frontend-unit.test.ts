@@ -532,6 +532,22 @@ test("document export option helpers normalize compile export and transform sett
       includeAgenda: true,
     },
     gitIntegration: { enabled: true, warnOnDirtyExport: true },
+    customLatexTemplates: [
+      {
+        id: "rfp-response",
+        name: "Ignored built-in collision",
+        summary: "",
+        documentClass: "article",
+        classOptions: "11pt",
+        packages: [],
+        geometry: "margin=1in",
+        hypersetup: "colorlinks=true",
+        header: "",
+        chapterStyle: false,
+        bestFor: [],
+        sourcePath: "",
+      },
+    ],
     semanticStatus: "draft",
   });
   equal(exportOptions.includeManifest, false);
@@ -539,15 +555,44 @@ test("document export option helpers normalize compile export and transform sett
   equal(exportOptions.warnOnDirtyGit, true);
   equal(exportOptions.watermark, "DRAFT");
   equal(exportOptions.defaultBrandProfile.watermark, "Confidential");
+  equal(exportOptions.latexTemplate, "rfp-response");
+  equal(exportOptions.latexTemplateProfile, undefined);
 
   const reviewedExportOptions = buildDocumentExportOptions({
     ...baseState,
-    exportDefaults: { ...exportOptions, includeManifest: true },
+    exportDefaults: { ...exportOptions, includeManifest: true, latexTemplate: "custom-latex-board" },
     gitIntegration: { enabled: false, warnOnDirtyExport: true },
+    customLatexTemplates: [
+      {
+        id: "custom-latex-board",
+        name: "Board TeX",
+        summary: "Board report style.",
+        documentClass: "memoir",
+        classOptions: "12pt,oneside",
+        packages: ["\\usepackage{booktabs}"],
+        geometry: "margin=0.75in",
+        hypersetup: "colorlinks=true",
+        header: "\\pagestyle{plain}",
+        chapterStyle: true,
+        bestFor: ["Board packs"],
+        sourcePath: "templates/board.tex",
+      },
+    ],
     semanticStatus: "approved",
   });
   equal(reviewedExportOptions.warnOnDirtyGit, false);
   equal(reviewedExportOptions.watermark, "Confidential");
+  deepEqual(reviewedExportOptions.latexTemplateProfile, {
+    id: "custom-latex-board",
+    label: "Board TeX",
+    documentClass: "memoir",
+    classOptions: "12pt,oneside",
+    packages: ["\\usepackage{booktabs}"],
+    geometry: "margin=0.75in",
+    hypersetup: "colorlinks=true",
+    header: "\\pagestyle{plain}",
+    chapterStyle: true,
+  });
 });
 
 test("export workflow state helpers preserve progress success failure and readiness state", () => {
@@ -6696,6 +6741,24 @@ test("workspace persistence migration versions and normalizes saved settings", (
       },
       { id: "missing-body", name: "Ignored" },
     ],
+    customLatexTemplates: [
+      {
+        id: "custom-latex-board",
+        name: " Board TeX ",
+        summary: " Board report style. ",
+        documentClass: " memoir ",
+        classOptions: " 12pt,oneside ",
+        packages: [" \\usepackage{booktabs} ", "\\usepackage{booktabs}", 42],
+        geometry: " margin=0.75in ",
+        hypersetup: " colorlinks=true ",
+        header: " \\pagestyle{plain} ",
+        chapterStyle: true,
+        bestFor: [" Board packs ", ""],
+        sourcePath: " templates/board.tex ",
+      },
+      { id: "custom-latex-board", name: "Duplicate ignored" },
+      { name: "Missing id ignored" },
+    ],
     customDocumentOutlineTemplates: [
       {
         id: "outline-qbr",
@@ -7060,6 +7123,22 @@ test("workspace persistence migration versions and normalizes saved settings", (
       tags: ["margin"],
     },
   ]);
+  deepEqual(migrated.customLatexTemplates, [
+    {
+      id: "custom-latex-board",
+      name: "Board TeX",
+      summary: "Board report style.",
+      documentClass: "memoir",
+      classOptions: "12pt,oneside",
+      packages: ["\\usepackage{booktabs}"],
+      geometry: "margin=0.75in",
+      hypersetup: "colorlinks=true",
+      header: "\\pagestyle{plain}",
+      chapterStyle: true,
+      bestFor: ["Board packs"],
+      sourcePath: "templates/board.tex",
+    },
+  ]);
   deepEqual(migrated.customDocumentOutlineTemplates, [
     {
       id: "outline-qbr",
@@ -7170,6 +7249,7 @@ test("workspace persistence state helper builds normalized store snapshots", () 
     transformInputModes: { dot: "file" },
     transformTimeoutMs: 45_000,
     customTransformTemplates: [],
+    customLatexTemplates: [],
     customDocumentOutlineTemplates: [],
   });
 
@@ -7250,6 +7330,7 @@ test("workspace persistence state helper applies persisted preferences and resto
     transformInputModes: {},
     transformTimeoutMs: 5000,
     customTransformTemplates: [],
+    customLatexTemplates: [],
     customDocumentOutlineTemplates: [],
   } satisfies Parameters<typeof applyPersistedWorkspacePreferenceState>[0];
 
@@ -8648,7 +8729,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('id: "publish", label: "Publish", title: "Open blog, Substack, or CMS publishing handoff"'));
   ok(app.includes('aria-label="Public export metadata options"'));
   ok(app.includes('aria-label="LaTeX template options"'));
-  ok(app.includes("latexTemplateProfiles"));
+  ok(app.includes("latexTemplateProfilesForPicker"));
+  ok(app.includes("Manage company LaTeX templates"));
   ok(app.includes("store.exportDefaults.latexTemplate"));
   ok(app.includes('aria-label="Distribution metadata checklist"'));
   ok(app.includes('aria-label="AI export readiness assistance"'));

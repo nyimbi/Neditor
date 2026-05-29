@@ -39,6 +39,10 @@ import { buildDocumentCompileOptions, buildDocumentExportOptions } from "../lib/
 import { activeDocumentState, externalTransformEnginesState, windowTitleState } from "../lib/documentSelectors";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../lib/exportProfiles";
 import {
+  deleteCustomLatexTemplateProfileState,
+  saveCustomLatexTemplateProfileState,
+} from "../lib/latexTemplates";
+import {
   applyExportFailureState,
   applyExportReadinessState,
   applyExportSuccessState,
@@ -129,6 +133,7 @@ import {
   normalizeAiProviderDefaults,
   normalizeBibliographyDefaults,
   normalizeBrandProfileDefaults,
+  normalizeCustomLatexTemplateProfiles,
   normalizeGitIntegrationPreferences,
   normalizeTtsPreferences,
   type DocsLiveDraftHistoryItem,
@@ -138,6 +143,7 @@ import {
   type ExportTarget,
   type AgentRunHistoryItem,
   type AiProviderDefaults,
+  type CustomLatexTemplateProfile,
   type GoogleIntegrationPreferences,
   type PersistedScrollPosition,
   type PreviewTheme,
@@ -415,6 +421,7 @@ export const useDocumentsStore = defineStore("documents", {
     transformInputModes: {} as Record<string, "stdin" | "file">,
     transformTimeoutMs: 5000,
     customTransformTemplates: [] as CustomTransformTemplate[],
+    customLatexTemplates: [] as CustomLatexTemplateProfile[],
     customDocumentOutlineTemplates: [] as CustomDocumentOutlineTemplate[],
     transformProbeResults: {} as Record<string, TransformProbeResult>,
     snapshots: [] as SnapshotListItem[],
@@ -1273,6 +1280,7 @@ export const useDocumentsStore = defineStore("documents", {
         disabledTransformEngines: this.disabledTransformEngines,
         transformInputModes: this.transformInputModes,
         transformTimeoutMs: this.transformTimeoutMs,
+        customLatexTemplates: this.customLatexTemplates,
         semanticStatus: this.activeDocument.compile?.semantic.status,
       });
     },
@@ -1348,6 +1356,21 @@ export const useDocumentsStore = defineStore("documents", {
       this.trustedTransformEngines = next.trustedTransformEngines;
       this.transformProbeResults = next.transformProbeResults;
       await this.persistWorkspace();
+    },
+    saveCustomLatexTemplate(template: CustomLatexTemplateProfile) {
+      const result = saveCustomLatexTemplateProfileState(this.customLatexTemplates, template);
+      this.customLatexTemplates = normalizeCustomLatexTemplateProfiles(result.templates);
+      this.exportDefaults.latexTemplate = result.profile.id;
+      this.statusMessage = result.statusMessage;
+      void this.persistWorkspace();
+      return result.profile;
+    },
+    deleteCustomLatexTemplate(id: string) {
+      const result = deleteCustomLatexTemplateProfileState(this.customLatexTemplates, this.exportDefaults.latexTemplate, id);
+      this.customLatexTemplates = result.templates;
+      this.exportDefaults.latexTemplate = result.activeTemplateId;
+      if (result.statusMessage) this.statusMessage = result.statusMessage;
+      void this.persistWorkspace();
     },
     async setTransformTrust(name: string, trusted: boolean) {
       this.trustedTransformEngines = setTransformBooleanFlag(this.trustedTransformEngines, name, trusted);

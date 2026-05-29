@@ -4,10 +4,12 @@ import {
   normalizeExportDefaults,
   type BibliographyDefaults,
   type BrandProfileDefaults,
+  type CustomLatexTemplateProfile,
   type ExportDefaults,
   type GitIntegrationPreferences,
   type TransformInputMode,
 } from "./workspacePersistence.js";
+import { latexTemplateExportProfileForSelection } from "./latexTemplates.js";
 
 export interface DocumentTransformOptionState {
   transformEnginePaths: Record<string, string>;
@@ -25,6 +27,7 @@ export interface DocumentCompileOptionState extends DocumentTransformOptionState
 export interface DocumentExportOptionState extends DocumentCompileOptionState {
   exportDefaults: ExportDefaults;
   gitIntegration: GitIntegrationPreferences;
+  customLatexTemplates?: CustomLatexTemplateProfile[];
   semanticStatus?: string | null;
 }
 
@@ -55,6 +58,7 @@ export function buildDocumentExportOptions(state: DocumentExportOptionState) {
     pageNumbers: defaults.pageNumbers,
     layoutPreset: defaults.layoutPreset,
     latexTemplate: defaults.latexTemplate,
+    latexTemplateProfile: latexTemplateExportProfileForSelection(defaults.latexTemplate, state.customLatexTemplates || []) || undefined,
     includeComments: defaults.includeComments,
     includeProvenance: defaults.includeProvenance,
     includeGlossary: defaults.includeGlossary,
