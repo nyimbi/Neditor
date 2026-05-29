@@ -972,12 +972,12 @@ recognizes returned security review proof under paths such as
 
 `pnpm run release:local` creates a local release-candidate control packet under
 `.tmp/release-candidate/`. It requires a clean Git checkout by default, builds
-the production frontend and native release binaries, refreshes prerequisite
-evidence templates, validates the release evidence kit, reruns release readiness,
-and writes
+the production frontend and native release binaries, prepares the version-smoked
+Tauri `ned-*` sidecar, refreshes prerequisite evidence templates, validates the
+release evidence kit, reruns release readiness, and writes
 `manifest.json`, `SHA256SUMS`, and a reviewer-facing `README.md` covering the
-current commit, version, compiled artifact hashes, readiness status, commands
-run, evidence-kit link, and remaining release gates. Use
+current commit, version, compiled artifact hashes, prepared sidecar hash,
+readiness status, commands run, evidence-kit link, and remaining release gates. Use
 `node scripts/create-release-candidate.mjs --skip-build` only after a fresh
 compile when you need to regenerate hashes/readiness without rebuilding, and
 `--allow-dirty` only for a non-releaseable local dry run against the most recent

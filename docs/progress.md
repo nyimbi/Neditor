@@ -27,6 +27,24 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Release Candidate Sidecar Evidence
+
+The local release-candidate generator now prepares the version-smoked Tauri
+`ned-*` sidecar whenever it builds a candidate, requires that prepared sidecar
+as a first-class artifact, includes it in `SHA256SUMS`, and fails if the
+prepared sidecar hash diverges from `src-tauri/target/release/ned`.
+
+This closes a release-handoff gap: the candidate packet now proves the exact CLI
+helper that Tauri packages and Deploy CLI exposes, not only the raw release CLI
+binary.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/create-release-candidate.mjs` | Pass | Verifies the release-candidate script remains syntactically valid after adding prepared-sidecar artifact collection and mismatch checks. |
+| `pnpm run test:unit` | Pass | Static tests verify release-candidate generation runs `prepare:sidecars`, requires `native:prepared-ned-sidecar`, and rejects sidecar/CLI hash mismatches. |
+| `pnpm run prepare:sidecars` | Pass | Rebuilt and version-smoked `src-tauri/binaries/ned-aarch64-apple-darwin` at 5,043,152 bytes. |
+| `node scripts/create-release-candidate.mjs --skip-build --skip-evidence --allow-dirty` | Pass with expected non-releaseable status | No-build dry run wrote `.tmp/release-candidate/manifest.json` and `SHA256SUMS` with both `native:prepared-ned-sidecar` and `native:ned-cli`; a prior dry run correctly failed while the prepared sidecar was stale. |
+
 ## 2026-05-29 Quick Verification Packaging Guards
 
 The routine `pnpm run verify:local` baseline now includes the sidecar

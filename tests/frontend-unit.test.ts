@@ -8963,6 +8963,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("refreshNativeLaunchEvidence"));
   ok(releaseCandidate.includes("refreshPrerequisiteEvidence"));
   ok(releaseCandidate.includes("NEDITOR_DESKTOP_SMOKE_LAUNCH"));
+  ok(releaseCandidate.includes("pnpm\", [\"run\", \"prepare:sidecars\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:release-ci\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:platform-evidence\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"test:rendered-exports\"]"));
@@ -8973,6 +8974,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("releaseCandidateGaps"));
   ok(releaseCandidate.includes("evidenceWorkItemsById"));
   ok(releaseCandidate.includes("readOptionalJson(\".tmp/release-evidence-kit/report.json\")"));
+  ok(releaseCandidate.includes("native:prepared-ned-sidecar"));
+  ok(releaseCandidate.includes("collectPreparedSidecarArtifacts"));
+  ok(releaseCandidate.includes("preparedSidecarMismatches"));
+  ok(releaseCandidate.includes("Prepared ned sidecar hash does not match"));
   ok(releaseCandidate.includes("evidenceKitCurrentForSource"));
   ok(releaseCandidate.includes("evidenceKit.sourceCommit === sourceCommit"));
   ok(releaseCandidate.includes("evidenceKitCoversReadiness"));

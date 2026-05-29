@@ -28,6 +28,7 @@ if (!sourceTreeCleanBefore && !allowDirty) {
 if (!skipBuild) {
   run("pnpm", ["run", "build"]);
   run("cargo", ["build", "--manifest-path", "src-tauri/Cargo.toml", "--locked", "--release"]);
+  run("pnpm", ["run", "prepare:sidecars"]);
 }
 
 if (!skipEvidence) {
@@ -59,11 +60,15 @@ const evidenceKitReportCurrentForReadiness =
   Number(evidenceKitReport.summary?.gaps || -1) === candidateEvidenceGaps.length;
 const sourceTreeCleanAfter = gitTreeClean();
 const artifacts = collectArtifacts();
-const requiredArtifacts = ["frontend:index", "native:app-binary", "native:ned-cli"];
+const requiredArtifacts = ["frontend:index", "native:app-binary", "native:ned-cli", "native:prepared-ned-sidecar"];
 const missingRequired = requiredArtifacts.filter((kind) => !artifacts.some((artifact) => artifact.kind === kind));
+const sidecarMismatches = preparedSidecarMismatches(artifacts);
 
 if (missingRequired.length) {
   fail(`Release candidate is missing required artifact(s): ${missingRequired.join(", ")}`);
+}
+if (sidecarMismatches.length) {
+  fail(`Prepared ned sidecar hash does not match the release CLI binary: ${sidecarMismatches.map((artifact) => artifact.path).join(", ")}`);
 }
 
 const manifest = {
@@ -134,10 +139,26 @@ function collectArtifacts() {
     artifact("frontend:index", "dist/index.html"),
     artifact("native:app-binary", "src-tauri/target/release/neditor"),
     artifact("native:ned-cli", "src-tauri/target/release/ned"),
+    ...collectPreparedSidecarArtifacts(),
     ...collectFrontendAssets(),
     ...collectBundleArtifacts(),
   ].filter(Boolean);
   return entries.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function collectPreparedSidecarArtifacts() {
+  const binariesDir = join(root, "src-tauri", "binaries");
+  if (!existsSync(binariesDir)) return [];
+  return readdirSync(binariesDir)
+    .filter((name) => /^ned-[^/\\]+(?:\.exe)?$/.test(name))
+    .filter((name) => statSync(join(binariesDir, name)).isFile())
+    .map((name) => artifact("native:prepared-ned-sidecar", join("src-tauri", "binaries", name)));
+}
+
+function preparedSidecarMismatches(artifacts) {
+  const cli = artifacts.find((artifact) => artifact.kind === "native:ned-cli");
+  if (!cli) return [];
+  return artifacts.filter((artifact) => artifact.kind === "native:prepared-ned-sidecar" && artifact.sha256 !== cli.sha256);
 }
 
 function refreshPrerequisiteEvidence() {
