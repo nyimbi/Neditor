@@ -103,6 +103,11 @@ ned outlines --markdown business-report
 ned outlines --markdown outline-rfp-technical-proposal
 ned outlines --workspace . --save board-pack --name "Board Pack" --docs-live-type board-memo --section "Decision Requested" --section "Recommendation" --json
 ned outlines --workspace . --markdown board-pack
+ned latex-templates --query proposal --json
+ned latex-templates --preamble rfp-response
+ned latex-templates --workspace . --save custom-latex-client --document-class article --name "Client Report" --package "\\usepackage{booktabs}" --json
+ned latex-templates --workspace . --export-library company-latex-templates.json --json
+ned latex-templates --workspace . --import company-latex-templates.json --json
 ned snippets --kind procurement --json
 ned snippets --workspace . --markdown business-contact-block --fill-profile
 ned profile --fields --json
@@ -139,8 +144,8 @@ prepare:sidecars` before distribution.
 use `ned open file.md --dry-run --json` when a setup script needs to verify the
 paths that would be handed to the app without opening a window.
 `ned init` creates a reusable `.neditor` project scaffold with a business
-profile, variables, standard business snippets, and a local-agent handoff folder;
-use `--dry-run`
+profile, variables, reusable outlines, a portable LaTeX template profile
+library, standard business snippets, and a local-agent handoff folder; use `--dry-run`
 to preview the files and `--json` for help desk automation. `ned new` creates a
 starter Markdown document from business templates such as blank document,
 proposal, buyer-side RFP, RFP response, RFQ, tender, business report, tutorial,
@@ -200,6 +205,16 @@ to print it, and `ned outlines --workspace . --delete board-pack --json` to
 remove it. Outline entries also carry an explicit Docs Live workflow such as
 `rfp-response`, `technical-textbook`, `novel`, `podcast-script`, or
 `movie-script` so app and CLI selections open the right AI drafting path.
+`ned latex-templates` exposes the same LaTeX export profile model used by the
+Export panel. Built-in profiles cover article, business report, proposal, RFP
+response, technical report, academic paper, textbook, and book handoffs; teams
+can keep company, publisher, client, grant, or journal profiles in
+`.neditor/latex-templates.json`. Use
+`ned latex-templates --workspace . --save custom-latex-client --document-class article --name "Client Report" --package "\\usepackage{booktabs}" --json`
+to add a governed profile, `ned latex-templates --workspace . --preamble custom-latex-client`
+to print the reusable preamble, and `--import` / `--export-library` to move
+large LaTeX template libraries between projects without copying preamble text
+into every document.
 The CLI starter library and visual Templates panel now share the app's expanded
 business-development, governance, research, funding, product, operations, and
 legal starter set, including statements of work, capability statements, case
@@ -809,6 +824,11 @@ options, package/preamble lines, geometry, hyperref setup, optional header
 preamble, and chapter-style heading mode so a large LaTeX template library can
 be reused as governed export profiles rather than copied into every Markdown
 file.
+The same profile format is available from the CLI through
+`.neditor/latex-templates.json`; `ned latex-templates --import` brings an
+existing team library into a workspace, `--export-library` writes a portable
+JSON library, and `--preamble <id>` prints the exact preamble for review by
+LaTeX specialists.
 
 ## Example Projects
 

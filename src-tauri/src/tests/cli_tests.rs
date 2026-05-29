@@ -88,6 +88,7 @@ fn ned_cli_initializes_project_workspace_scaffold() {
         .join("business-profile.json")
         .is_file());
     assert!(root.join(".neditor").join("outlines.json").is_file());
+    assert!(root.join(".neditor").join("latex-templates.json").is_file());
     assert!(root
         .join(".neditor")
         .join("snippets")
@@ -109,6 +110,10 @@ fn ned_cli_initializes_project_workspace_scaffold() {
         fs::read_to_string(root.join(".neditor").join("outlines.json")).expect("outlines");
     assert!(outlines.contains("neditor.workspace-outlines.v1"));
     assert!(outlines.contains("Quarterly Business Review"));
+    let latex_templates = fs::read_to_string(root.join(".neditor").join("latex-templates.json"))
+        .expect("latex templates");
+    assert!(latex_templates.contains("neditor.workspace-latex-templates.v1"));
+    assert!(latex_templates.contains("Client Report House Style"));
     assert!(profile.contains("\"brandVoice\""));
     let snippet = fs::read_to_string(root.join(".neditor").join("snippets").join("business.md"))
         .expect("snippet");
@@ -1504,6 +1509,168 @@ fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
         .as_array()
         .expect("targets")
         .contains(&serde_json::json!("epub")));
+}
+
+#[test]
+fn ned_cli_manages_latex_template_libraries() {
+    let builtin = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "latex-templates".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("latex template json");
+    let builtin_report: serde_json::Value =
+        serde_json::from_str(&builtin.message).expect("latex template report");
+    assert_eq!(builtin_report["schema"], "neditor.ned-latex-templates.v1");
+    assert_eq!(builtin_report["count"], 8);
+    assert!(builtin_report["templates"]
+        .as_array()
+        .expect("latex templates")
+        .contains(&serde_json::json!("rfp-response")));
+
+    let workspace = temp_workspace_path("latex-template-library");
+    let saved = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "latex-templates".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--save".to_string(),
+        "custom-latex-board".to_string(),
+        "--name".to_string(),
+        "Board House Style".to_string(),
+        "--summary".to_string(),
+        "Tight board-paper LaTeX profile.".to_string(),
+        "--document-class".to_string(),
+        "memoir".to_string(),
+        "--class-options".to_string(),
+        "12pt,oneside".to_string(),
+        "--package".to_string(),
+        "\\usepackage{booktabs}".to_string(),
+        "--package".to_string(),
+        "\\usepackage{longtable}".to_string(),
+        "--geometry".to_string(),
+        "margin=0.75in".to_string(),
+        "--hypersetup".to_string(),
+        "colorlinks=true,linkcolor=black,urlcolor=blue".to_string(),
+        "--header".to_string(),
+        "\\pagestyle{plain}".to_string(),
+        "--chapter-style".to_string(),
+        "--best-for".to_string(),
+        "board packs".to_string(),
+        "--source-path".to_string(),
+        "templates/board.tex".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("save latex template");
+    let saved_report: serde_json::Value =
+        serde_json::from_str(&saved.message).expect("saved latex template json");
+    assert_eq!(saved_report["schema"], "neditor.ned-latex-template-save.v1");
+    assert_eq!(saved_report["template"]["id"], "custom-latex-board");
+    assert_eq!(saved_report["template"]["documentClass"], "memoir");
+    assert_eq!(saved_report["template"]["chapterStyle"], true);
+    assert!(workspace
+        .join(".neditor")
+        .join("latex-templates.json")
+        .is_file());
+
+    let filtered = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "latex-templates".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--query".to_string(),
+        "board".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("filtered latex templates");
+    let filtered_report: serde_json::Value =
+        serde_json::from_str(&filtered.message).expect("filtered latex template json");
+    assert!(filtered_report["templateDetails"]
+        .as_array()
+        .expect("template details")
+        .iter()
+        .any(|template| template["id"] == "custom-latex-board"
+            && template["source"] == "workspace"
+            && template["sourcePath"] == "templates/board.tex"));
+
+    let preamble = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "latex-templates".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--preamble".to_string(),
+        "custom-latex-board".to_string(),
+    ])
+    .expect("latex template preamble");
+    assert!(preamble
+        .message
+        .contains("\\documentclass[12pt,oneside]{memoir}"));
+    assert!(preamble.message.contains("\\usepackage{booktabs}"));
+    assert!(preamble.message.contains("\\pagestyle{plain}"));
+
+    let export_path = workspace.join("company-latex-templates.json");
+    let exported = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "latex-templates".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--export-library".to_string(),
+        export_path.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("export latex templates");
+    let exported_report: serde_json::Value =
+        serde_json::from_str(&exported.message).expect("export latex template json");
+    assert_eq!(exported_report["exported"], 1);
+    assert!(export_path.is_file());
+
+    let imported_workspace = temp_workspace_path("latex-template-import");
+    let imported = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "latex-templates".to_string(),
+        "--workspace".to_string(),
+        imported_workspace.to_string_lossy().to_string(),
+        "--import".to_string(),
+        export_path.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("import latex templates");
+    let imported_report: serde_json::Value =
+        serde_json::from_str(&imported.message).expect("import latex template json");
+    assert_eq!(
+        imported_report["schema"],
+        "neditor.ned-latex-template-import.v1"
+    );
+    assert_eq!(imported_report["imported"], 1);
+
+    let imported_ids = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "latex-templates".to_string(),
+        "--workspace".to_string(),
+        imported_workspace.to_string_lossy().to_string(),
+        "--query".to_string(),
+        "board".to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("imported latex ids");
+    assert!(imported_ids
+        .message
+        .lines()
+        .any(|id| id == "custom-latex-board"));
+
+    let deleted = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "latex-templates".to_string(),
+        "--workspace".to_string(),
+        imported_workspace.to_string_lossy().to_string(),
+        "--delete".to_string(),
+        "custom-latex-board".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("delete latex template");
+    let deleted_report: serde_json::Value =
+        serde_json::from_str(&deleted.message).expect("delete latex template json");
+    assert_eq!(deleted_report["deleted"], true);
 }
 
 #[test]

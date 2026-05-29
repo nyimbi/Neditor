@@ -90,6 +90,8 @@ const CLI_COMMANDS: &[&str] = &[
     "check",
     "templates",
     "outlines",
+    "latex-templates",
+    "tex-templates",
     "snippets",
     "parts",
     "transform-templates",
@@ -250,6 +252,85 @@ struct DocumentOutlineEntry {
 struct WorkspaceOutlineLibrary {
     schema: String,
     outlines: Vec<WorkspaceDocumentOutline>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BuiltInLatexTemplateInfo {
+    id: &'static str,
+    name: &'static str,
+    summary: &'static str,
+    document_class: &'static str,
+    class_options: &'static str,
+    packages: &'static [&'static str],
+    geometry: &'static str,
+    hypersetup: &'static str,
+    header: &'static str,
+    chapter_style: bool,
+    best_for: &'static [&'static str],
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkspaceLatexTemplate {
+    id: String,
+    name: String,
+    summary: String,
+    document_class: String,
+    class_options: String,
+    #[serde(default)]
+    packages: Vec<String>,
+    geometry: String,
+    hypersetup: String,
+    #[serde(default)]
+    header: String,
+    #[serde(default)]
+    chapter_style: bool,
+    #[serde(default)]
+    best_for: Vec<String>,
+    #[serde(default)]
+    source_path: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LatexTemplateEntry {
+    id: String,
+    name: String,
+    summary: String,
+    document_class: String,
+    class_options: String,
+    packages: Vec<String>,
+    geometry: String,
+    hypersetup: String,
+    header: String,
+    chapter_style: bool,
+    best_for: Vec<String>,
+    source_path: String,
+    source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkspaceLatexTemplateLibrary {
+    schema: String,
+    templates: Vec<WorkspaceLatexTemplate>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct LatexTemplateSaveInput {
+    id: String,
+    name: Option<String>,
+    summary: Option<String>,
+    document_class: Option<String>,
+    class_options: Option<String>,
+    packages: Vec<String>,
+    geometry: Option<String>,
+    hypersetup: Option<String>,
+    header: Option<String>,
+    chapter_style: Option<bool>,
+    best_for: Vec<String>,
+    source_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -441,6 +522,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "validate" | "check" => run_validate_command(&args[2..], stdin_text),
         "templates" => run_templates_command(&args[2..]),
         "outlines" => run_outlines_command(&args[2..]),
+        "latex-templates" | "tex-templates" => run_latex_templates_command(&args[2..]),
         "snippets" | "parts" => run_snippets_command(&args[2..]),
         "transform-templates" | "xforms" => run_transform_templates_command(&args[2..]),
         "profile" | "business-profile" => run_profile_command(&args[2..]),
@@ -2356,6 +2438,338 @@ fn run_outlines_command(args: &[String]) -> Result<CliOutcome, String> {
     }
     Ok(CliOutcome {
         message: outlines_text_report(&outlines),
+        exit_code: 0,
+    })
+}
+
+fn run_latex_templates_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut ids_only = false;
+    let mut preamble_id: Option<String> = None;
+    let mut save_id: Option<String> = None;
+    let mut delete_id: Option<String> = None;
+    let mut import_path: Option<String> = None;
+    let mut export_library_path: Option<String> = None;
+    let mut query: Option<String> = None;
+    let mut workspace = PathBuf::from(".");
+    let mut input = LatexTemplateSaveInput::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--ids-only" => ids_only = true,
+            "--workspace" | "-w" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
+            "--preamble" | "--tex" => {
+                index += 1;
+                preamble_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--preamble requires a LaTeX template id".to_string())?
+                        .to_string(),
+                );
+            }
+            "--save" => {
+                index += 1;
+                let id = args
+                    .get(index)
+                    .ok_or_else(|| "--save requires a LaTeX template id".to_string())?
+                    .to_string();
+                input.id = id.clone();
+                save_id = Some(id);
+            }
+            "--delete" => {
+                index += 1;
+                delete_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--delete requires a LaTeX template id".to_string())?
+                        .to_string(),
+                );
+            }
+            "--import" => {
+                index += 1;
+                import_path = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--import requires a JSON library path".to_string())?
+                        .to_string(),
+                );
+            }
+            "--export-library" => {
+                index += 1;
+                export_library_path = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--export-library requires an output JSON path".to_string())?
+                        .to_string(),
+                );
+            }
+            "--query" | "--search" => {
+                index += 1;
+                query = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--query requires search text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--name" | "--label" => {
+                index += 1;
+                input.name = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--name requires a template name".to_string())?
+                        .to_string(),
+                );
+            }
+            "--summary" => {
+                index += 1;
+                input.summary = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--summary requires text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--document-class" | "--class" => {
+                index += 1;
+                input.document_class = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--document-class requires a class name".to_string())?
+                        .to_string(),
+                );
+            }
+            "--class-options" => {
+                index += 1;
+                input.class_options = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--class-options requires text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--package" => {
+                index += 1;
+                input.packages.push(
+                    args.get(index)
+                        .ok_or_else(|| "--package requires a preamble line".to_string())?
+                        .to_string(),
+                );
+            }
+            "--geometry" => {
+                index += 1;
+                input.geometry = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--geometry requires text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--hypersetup" => {
+                index += 1;
+                input.hypersetup = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--hypersetup requires text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--header" => {
+                index += 1;
+                input.header = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--header requires a preamble line".to_string())?
+                        .to_string(),
+                );
+            }
+            "--chapter-style" => input.chapter_style = Some(true),
+            "--no-chapter-style" => input.chapter_style = Some(false),
+            "--best-for" => {
+                index += 1;
+                input.best_for.push(
+                    args.get(index)
+                        .ok_or_else(|| "--best-for requires text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--source-path" => {
+                index += 1;
+                input.source_path = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--source-path requires text".to_string())?
+                        .to_string(),
+                );
+            }
+            value => return Err(format!("Unsupported latex-templates option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let mutation_count = usize::from(save_id.is_some())
+        + usize::from(delete_id.is_some())
+        + usize::from(import_path.is_some())
+        + usize::from(export_library_path.is_some());
+    if mutation_count > 1 {
+        return Err("Use only one of --save, --delete, --import, or --export-library.".to_string());
+    }
+    if mutation_count > 0 && preamble_id.is_some() {
+        return Err("Use either a library mutation option or --preamble, not both.".to_string());
+    }
+
+    if save_id.is_some() {
+        let saved = save_workspace_latex_template(&workspace, input)?;
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-latex-template-save.v1",
+                    "workspace": path_to_display(&workspace),
+                    "libraryPath": path_to_display(&workspace_latex_template_library_path(&workspace)),
+                    "template": saved,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: format!(
+                "Saved LaTeX template {} to {}",
+                saved.id,
+                path_to_display(&workspace_latex_template_library_path(&workspace))
+            ),
+            exit_code: 0,
+        });
+    }
+
+    if let Some(id) = delete_id {
+        let deleted = delete_workspace_latex_template(&workspace, &id)?;
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-latex-template-delete.v1",
+                    "workspace": path_to_display(&workspace),
+                    "libraryPath": path_to_display(&workspace_latex_template_library_path(&workspace)),
+                    "template": id,
+                    "deleted": deleted,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: if deleted {
+                format!("Deleted LaTeX template {id}")
+            } else {
+                format!("No workspace LaTeX template named {id} was found")
+            },
+            exit_code: 0,
+        });
+    }
+
+    if let Some(path) = import_path {
+        let imported = import_workspace_latex_templates(&workspace, Path::new(&path))?;
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-latex-template-import.v1",
+                    "workspace": path_to_display(&workspace),
+                    "libraryPath": path_to_display(&workspace_latex_template_library_path(&workspace)),
+                    "importPath": path,
+                    "imported": imported.len(),
+                    "templates": imported,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: format!("Imported {} LaTeX template(s)", imported.len()),
+            exit_code: 0,
+        });
+    }
+
+    if let Some(path) = export_library_path {
+        let exported = export_workspace_latex_template_library(&workspace, Path::new(&path))?;
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-latex-template-export.v1",
+                    "workspace": path_to_display(&workspace),
+                    "libraryPath": path_to_display(&workspace_latex_template_library_path(&workspace)),
+                    "output": path,
+                    "exported": exported,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: format!("Exported {exported} workspace LaTeX template(s)"),
+            exit_code: 0,
+        });
+    }
+
+    if let Some(id) = preamble_id {
+        let catalog = latex_template_catalog_entries(&workspace)?;
+        let template = catalog
+            .into_iter()
+            .find(|template| template.id == id)
+            .ok_or_else(|| format!("Unknown LaTeX template '{id}'"))?;
+        let preamble = latex_template_preamble(&template);
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-latex-template-preamble.v1",
+                    "template": template.id,
+                    "source": template.source,
+                    "preamble": preamble,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: preamble,
+            exit_code: 0,
+        });
+    }
+
+    let query_filter = query
+        .as_deref()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty());
+    let templates = latex_template_catalog_entries(&workspace)?
+        .into_iter()
+        .filter(|template| {
+            query_filter
+                .as_deref()
+                .map_or(true, |query| latex_template_matches_query(template, query))
+        })
+        .collect::<Vec<_>>();
+    let ids = templates
+        .iter()
+        .map(|template| template.id.as_str())
+        .collect::<Vec<_>>();
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-latex-templates.v1",
+                "count": templates.len(),
+                "workspace": path_to_display(&workspace),
+                "libraryPath": path_to_display(&workspace_latex_template_library_path(&workspace)),
+                "filters": {
+                    "query": query_filter,
+                },
+                "templates": ids,
+                "templateDetails": templates,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    if ids_only {
+        return Ok(CliOutcome {
+            message: ids.join("\n"),
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: latex_templates_text_report(&templates),
         exit_code: 0,
     })
 }
@@ -6936,6 +7350,521 @@ fn outlines_text_report(outlines: &[DocumentOutlineEntry]) -> String {
     lines.join("\n")
 }
 
+const LATEX_BASE_PACKAGES: &[&str] = &[
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage[T1]{fontenc}",
+    "\\usepackage{geometry}",
+    "\\usepackage{hyperref}",
+    "\\usepackage{longtable}",
+    "\\usepackage{booktabs}",
+    "\\usepackage{graphicx}",
+];
+const LATEX_REPORT_PACKAGES: &[&str] = &[
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage[T1]{fontenc}",
+    "\\usepackage{geometry}",
+    "\\usepackage{hyperref}",
+    "\\usepackage{longtable}",
+    "\\usepackage{booktabs}",
+    "\\usepackage{graphicx}",
+    "\\usepackage{fancyhdr}",
+];
+const LATEX_TECHNICAL_PACKAGES: &[&str] = &[
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage[T1]{fontenc}",
+    "\\usepackage{geometry}",
+    "\\usepackage{hyperref}",
+    "\\usepackage{longtable}",
+    "\\usepackage{booktabs}",
+    "\\usepackage{graphicx}",
+    "\\usepackage{amsmath}",
+    "\\usepackage{amssymb}",
+    "\\usepackage{listings}",
+];
+const LATEX_ACADEMIC_PACKAGES: &[&str] = &[
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage[T1]{fontenc}",
+    "\\usepackage{geometry}",
+    "\\usepackage{hyperref}",
+    "\\usepackage{longtable}",
+    "\\usepackage{booktabs}",
+    "\\usepackage{graphicx}",
+    "\\usepackage{amsmath}",
+    "\\usepackage{natbib}",
+];
+const LATEX_BOOK_PACKAGES: &[&str] = &[
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage[T1]{fontenc}",
+    "\\usepackage{geometry}",
+    "\\usepackage{hyperref}",
+    "\\usepackage{longtable}",
+    "\\usepackage{booktabs}",
+    "\\usepackage{graphicx}",
+    "\\usepackage{amsmath}",
+    "\\usepackage{makeidx}",
+];
+
+const BUILT_IN_LATEX_TEMPLATES: &[BuiltInLatexTemplateInfo] = &[
+    BuiltInLatexTemplateInfo {
+        id: "article",
+        name: "Article",
+        summary: "Clean default for short papers, memos, and general TeX handoff.",
+        document_class: "article",
+        class_options: "11pt",
+        packages: LATEX_BASE_PACKAGES,
+        geometry: "margin=1in",
+        hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
+        header: "",
+        chapter_style: false,
+        best_for: &["short reports", "technical notes", "general-purpose export"],
+    },
+    BuiltInLatexTemplateInfo {
+        id: "business-report",
+        name: "Business Report",
+        summary: "Executive-facing report layout with stronger headings and audit metadata.",
+        document_class: "article",
+        class_options: "11pt",
+        packages: LATEX_REPORT_PACKAGES,
+        geometry: "margin=0.85in",
+        hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
+        header: "\\pagestyle{fancy}",
+        chapter_style: false,
+        best_for: &["consulting reports", "board packs", "management documents"],
+    },
+    BuiltInLatexTemplateInfo {
+        id: "proposal",
+        name: "Proposal",
+        summary:
+            "Proposal-oriented layout tuned for scope, approach, team, and commercial narrative.",
+        document_class: "article",
+        class_options: "11pt",
+        packages: LATEX_REPORT_PACKAGES,
+        geometry: "margin=0.85in",
+        hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
+        header: "\\pagestyle{fancy}",
+        chapter_style: false,
+        best_for: &["proposals", "statements of work", "business development"],
+    },
+    BuiltInLatexTemplateInfo {
+        id: "rfp-response",
+        name: "RFP Response",
+        summary: "Compliance-first template with room for requirements, matrices, and attachments.",
+        document_class: "article",
+        class_options: "11pt",
+        packages: LATEX_REPORT_PACKAGES,
+        geometry: "margin=0.8in",
+        hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
+        header: "\\pagestyle{fancy}",
+        chapter_style: false,
+        best_for: &["RFP responses", "tenders", "RFQs"],
+    },
+    BuiltInLatexTemplateInfo {
+        id: "technical-report",
+        name: "Technical Report",
+        summary: "Report class with math, figures, long tables, source references, and appendices.",
+        document_class: "report",
+        class_options: "11pt",
+        packages: LATEX_TECHNICAL_PACKAGES,
+        geometry: "margin=1in",
+        hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
+        header: "",
+        chapter_style: true,
+        best_for: &[
+            "architecture reports",
+            "research reports",
+            "engineering documentation",
+        ],
+    },
+    BuiltInLatexTemplateInfo {
+        id: "academic-paper",
+        name: "Academic Paper",
+        summary: "Article class with bibliography and citation-friendly defaults.",
+        document_class: "article",
+        class_options: "11pt",
+        packages: LATEX_ACADEMIC_PACKAGES,
+        geometry: "margin=1in",
+        hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
+        header: "",
+        chapter_style: false,
+        best_for: &["academic papers", "research briefs", "conference drafts"],
+    },
+    BuiltInLatexTemplateInfo {
+        id: "textbook",
+        name: "Textbook",
+        summary: "Book class structure for chapter-based technical or instructional material.",
+        document_class: "book",
+        class_options: "11pt,oneside",
+        packages: LATEX_BOOK_PACKAGES,
+        geometry: "margin=1in",
+        hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
+        header: "\\makeindex",
+        chapter_style: true,
+        best_for: &["textbooks", "tutorial manuals", "course material"],
+    },
+    BuiltInLatexTemplateInfo {
+        id: "book",
+        name: "Book",
+        summary: "Book class structure for long-form manuscripts and multi-chapter documents.",
+        document_class: "book",
+        class_options: "11pt,oneside",
+        packages: LATEX_BOOK_PACKAGES,
+        geometry: "margin=1in",
+        hypersetup: "colorlinks=true,linkcolor=blue,urlcolor=blue",
+        header: "\\makeindex",
+        chapter_style: true,
+        best_for: &["books", "novels", "long-form manuscripts"],
+    },
+];
+
+fn latex_template_catalog_entries(workspace: &Path) -> Result<Vec<LatexTemplateEntry>, String> {
+    let mut templates = BUILT_IN_LATEX_TEMPLATES
+        .iter()
+        .map(built_in_latex_template_entry)
+        .collect::<Vec<_>>();
+    templates.extend(
+        read_workspace_latex_template_library(workspace)?
+            .templates
+            .into_iter()
+            .map(workspace_latex_template_entry),
+    );
+    Ok(templates)
+}
+
+fn built_in_latex_template_entry(template: &BuiltInLatexTemplateInfo) -> LatexTemplateEntry {
+    LatexTemplateEntry {
+        id: template.id.to_string(),
+        name: template.name.to_string(),
+        summary: template.summary.to_string(),
+        document_class: template.document_class.to_string(),
+        class_options: template.class_options.to_string(),
+        packages: template
+            .packages
+            .iter()
+            .map(|package| (*package).to_string())
+            .collect(),
+        geometry: template.geometry.to_string(),
+        hypersetup: template.hypersetup.to_string(),
+        header: template.header.to_string(),
+        chapter_style: template.chapter_style,
+        best_for: template
+            .best_for
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
+        source_path: String::new(),
+        source: "built-in".to_string(),
+    }
+}
+
+fn workspace_latex_template_entry(template: WorkspaceLatexTemplate) -> LatexTemplateEntry {
+    LatexTemplateEntry {
+        id: template.id,
+        name: template.name,
+        summary: template.summary,
+        document_class: template.document_class,
+        class_options: template.class_options,
+        packages: template.packages,
+        geometry: template.geometry,
+        hypersetup: template.hypersetup,
+        header: template.header,
+        chapter_style: template.chapter_style,
+        best_for: template.best_for,
+        source_path: template.source_path,
+        source: "workspace".to_string(),
+    }
+}
+
+fn workspace_latex_template_library_path(workspace: &Path) -> PathBuf {
+    workspace.join(".neditor").join("latex-templates.json")
+}
+
+fn read_workspace_latex_template_library(
+    workspace: &Path,
+) -> Result<WorkspaceLatexTemplateLibrary, String> {
+    let path = workspace_latex_template_library_path(workspace);
+    if !path.exists() {
+        return Ok(empty_workspace_latex_template_library());
+    }
+    read_workspace_latex_template_library_file(&path)
+}
+
+fn read_workspace_latex_template_library_file(
+    path: &Path,
+) -> Result<WorkspaceLatexTemplateLibrary, String> {
+    let raw = fs::read_to_string(path).map_err(|err| {
+        format!(
+            "Could not read workspace LaTeX template library {}: {err}",
+            path.display()
+        )
+    })?;
+    let value: Value = serde_json::from_str(&raw)
+        .map_err(|err| format!("LaTeX template library is not valid JSON: {err}"))?;
+    let templates_value = if value.is_array() {
+        value
+    } else {
+        value
+            .get("templates")
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new()))
+    };
+    let templates = serde_json::from_value::<Vec<WorkspaceLatexTemplate>>(templates_value)
+        .map_err(|err| format!("LaTeX template library templates are invalid: {err}"))?
+        .into_iter()
+        .filter_map(normalize_workspace_latex_template)
+        .collect::<Vec<_>>();
+    Ok(WorkspaceLatexTemplateLibrary {
+        schema: "neditor.workspace-latex-templates.v1".to_string(),
+        templates,
+    })
+}
+
+fn write_workspace_latex_template_library(
+    workspace: &Path,
+    library: &WorkspaceLatexTemplateLibrary,
+) -> Result<(), String> {
+    let path = workspace_latex_template_library_path(workspace);
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Could not determine parent for {}", path.display()))?;
+    fs::create_dir_all(parent)
+        .map_err(|err| format!("Could not create {}: {err}", parent.display()))?;
+    let mut normalized = WorkspaceLatexTemplateLibrary {
+        schema: "neditor.workspace-latex-templates.v1".to_string(),
+        templates: library
+            .templates
+            .iter()
+            .cloned()
+            .filter_map(normalize_workspace_latex_template)
+            .collect(),
+    };
+    normalized
+        .templates
+        .sort_by(|left, right| left.id.cmp(&right.id));
+    fs::write(
+        &path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&normalized).map_err(|err| err.to_string())?
+        ),
+    )
+    .map_err(|err| {
+        format!(
+            "Could not write workspace LaTeX template library {}: {err}",
+            path.display()
+        )
+    })
+}
+
+fn empty_workspace_latex_template_library() -> WorkspaceLatexTemplateLibrary {
+    WorkspaceLatexTemplateLibrary {
+        schema: "neditor.workspace-latex-templates.v1".to_string(),
+        templates: Vec::new(),
+    }
+}
+
+fn save_workspace_latex_template(
+    workspace: &Path,
+    input: LatexTemplateSaveInput,
+) -> Result<WorkspaceLatexTemplate, String> {
+    let id = sanitize_outline_id(&input.id).ok_or_else(|| {
+        "--save requires an id with letters, numbers, dots, underscores, or hyphens".to_string()
+    })?;
+    if is_built_in_latex_template_id(&id) {
+        return Err("Workspace LaTeX template ids cannot shadow built-in templates.".to_string());
+    }
+    let document_class = normalize_latex_class_name(input.document_class).ok_or_else(|| {
+        "--document-class must be a LaTeX class name such as article, report, book, memoir, or scrartcl."
+            .to_string()
+    })?;
+    let template = WorkspaceLatexTemplate {
+        id,
+        name: outline_string(input.name).unwrap_or_else(|| "Company LaTeX template".to_string()),
+        summary: outline_string(input.summary)
+            .unwrap_or_else(|| format!("Reusable {document_class} LaTeX export profile.")),
+        document_class,
+        class_options: outline_string(input.class_options).unwrap_or_else(|| "11pt".to_string()),
+        packages: dedupe_string_vec(input.packages, 24),
+        geometry: outline_string(input.geometry).unwrap_or_else(|| "margin=1in".to_string()),
+        hypersetup: outline_string(input.hypersetup)
+            .unwrap_or_else(|| "colorlinks=true,linkcolor=blue,urlcolor=blue".to_string()),
+        header: outline_string(input.header).unwrap_or_default(),
+        chapter_style: input.chapter_style.unwrap_or(false),
+        best_for: dedupe_string_vec(input.best_for, 12),
+        source_path: outline_string(input.source_path).unwrap_or_default(),
+    };
+    let saved = normalize_workspace_latex_template(template)
+        .ok_or_else(|| "LaTeX template did not contain enough valid information.".to_string())?;
+    let mut library = read_workspace_latex_template_library(workspace)?;
+    library.templates.retain(|template| template.id != saved.id);
+    library.templates.push(saved.clone());
+    write_workspace_latex_template_library(workspace, &library)?;
+    Ok(saved)
+}
+
+fn delete_workspace_latex_template(workspace: &Path, id: &str) -> Result<bool, String> {
+    let mut library = read_workspace_latex_template_library(workspace)?;
+    let original_len = library.templates.len();
+    library.templates.retain(|template| template.id != id);
+    let deleted = library.templates.len() != original_len;
+    if deleted {
+        write_workspace_latex_template_library(workspace, &library)?;
+    }
+    Ok(deleted)
+}
+
+fn import_workspace_latex_templates(
+    workspace: &Path,
+    path: &Path,
+) -> Result<Vec<WorkspaceLatexTemplate>, String> {
+    let imported = read_workspace_latex_template_library_file(path)?;
+    let mut library = read_workspace_latex_template_library(workspace)?;
+    let mut saved = Vec::new();
+    for template in imported.templates {
+        library
+            .templates
+            .retain(|existing| existing.id != template.id);
+        library.templates.push(template.clone());
+        saved.push(template);
+    }
+    write_workspace_latex_template_library(workspace, &library)?;
+    Ok(saved)
+}
+
+fn export_workspace_latex_template_library(workspace: &Path, path: &Path) -> Result<usize, String> {
+    let library = read_workspace_latex_template_library(workspace)?;
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("Could not create {}: {err}", parent.display()))?;
+    }
+    fs::write(
+        path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&library).map_err(|err| err.to_string())?
+        ),
+    )
+    .map_err(|err| {
+        format!(
+            "Could not export LaTeX template library to {}: {err}",
+            path.display()
+        )
+    })?;
+    Ok(library.templates.len())
+}
+
+fn normalize_workspace_latex_template(
+    template: WorkspaceLatexTemplate,
+) -> Option<WorkspaceLatexTemplate> {
+    let id = sanitize_outline_id(&template.id)?;
+    if is_built_in_latex_template_id(&id) {
+        return None;
+    }
+    let document_class = normalize_latex_class_name(Some(template.document_class))?;
+    Some(WorkspaceLatexTemplate {
+        id,
+        name: outline_string(Some(template.name))
+            .unwrap_or_else(|| "Company LaTeX template".to_string()),
+        summary: outline_string(Some(template.summary))
+            .unwrap_or_else(|| format!("Reusable {document_class} LaTeX export profile.")),
+        document_class,
+        class_options: outline_string(Some(template.class_options))
+            .unwrap_or_else(|| "11pt".to_string()),
+        packages: dedupe_string_vec(template.packages, 24),
+        geometry: outline_string(Some(template.geometry))
+            .unwrap_or_else(|| "margin=1in".to_string()),
+        hypersetup: outline_string(Some(template.hypersetup))
+            .unwrap_or_else(|| "colorlinks=true,linkcolor=blue,urlcolor=blue".to_string()),
+        header: outline_string(Some(template.header)).unwrap_or_default(),
+        chapter_style: template.chapter_style,
+        best_for: dedupe_string_vec(template.best_for, 12),
+        source_path: outline_string(Some(template.source_path)).unwrap_or_default(),
+    })
+}
+
+fn normalize_latex_class_name(value: Option<String>) -> Option<String> {
+    let class_name = value?.trim().chars().take(80).collect::<String>();
+    if class_name.is_empty()
+        || !class_name
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+    {
+        return None;
+    }
+    Some(class_name)
+}
+
+fn is_built_in_latex_template_id(id: &str) -> bool {
+    BUILT_IN_LATEX_TEMPLATES
+        .iter()
+        .any(|template| template.id == id)
+}
+
+fn latex_template_matches_query(template: &LatexTemplateEntry, query: &str) -> bool {
+    template.id.to_ascii_lowercase().contains(query)
+        || template.name.to_ascii_lowercase().contains(query)
+        || template.summary.to_ascii_lowercase().contains(query)
+        || template.document_class.to_ascii_lowercase().contains(query)
+        || template.class_options.to_ascii_lowercase().contains(query)
+        || template.geometry.to_ascii_lowercase().contains(query)
+        || template.hypersetup.to_ascii_lowercase().contains(query)
+        || template.header.to_ascii_lowercase().contains(query)
+        || template.source_path.to_ascii_lowercase().contains(query)
+        || template
+            .packages
+            .iter()
+            .any(|value| value.to_ascii_lowercase().contains(query))
+        || template
+            .best_for
+            .iter()
+            .any(|value| value.to_ascii_lowercase().contains(query))
+}
+
+fn latex_template_preamble(template: &LatexTemplateEntry) -> String {
+    let mut lines = vec![
+        format!(
+            "% NEditor LaTeX template: {} ({})",
+            template.name, template.id
+        ),
+        if template.class_options.trim().is_empty() {
+            format!("\\documentclass{{{}}}", template.document_class)
+        } else {
+            format!(
+                "\\documentclass[{}]{{{}}}",
+                template.class_options, template.document_class
+            )
+        },
+    ];
+    lines.extend(template.packages.iter().cloned());
+    if !template.geometry.trim().is_empty() {
+        lines.push(format!("\\geometry{{{}}}", template.geometry));
+    }
+    if !template.hypersetup.trim().is_empty() {
+        lines.push(format!("\\hypersetup{{{}}}", template.hypersetup));
+    }
+    if !template.header.trim().is_empty() {
+        lines.push(template.header.clone());
+    }
+    lines.join("\n")
+}
+
+fn latex_templates_text_report(templates: &[LatexTemplateEntry]) -> String {
+    if templates.is_empty() {
+        return "No NEditor LaTeX templates match those filters.".to_string();
+    }
+    let mut lines = vec![format!("NEditor LaTeX templates ({}):", templates.len())];
+    for template in templates {
+        lines.push(format!(
+            "  - {} [{} | {}] {}: {}",
+            template.id, template.source, template.document_class, template.name, template.summary
+        ));
+    }
+    lines.push("Use `ned latex-templates --preamble <id>` to print the reusable preamble, `ned latex-templates --workspace . --save custom-latex-client --document-class article --name \"Client Report\" --package \"\\\\usepackage{booktabs}\"`, or `--import/--export-library` to move company profiles between workspaces.".to_string());
+    lines.join("\n")
+}
+
 fn transform_template_catalog() -> Result<Vec<TransformTemplateEntry>, String> {
     let source = TRANSFORM_TEMPLATE_SOURCE;
     let start = source
@@ -10060,7 +10989,7 @@ fn workspace_init_entries(root: &Path) -> Vec<(PathBuf, &'static str)> {
     vec![
         (
             base.join("README.md"),
-            "# NEditor Workspace\n\nThis folder stores reusable local project material for NEditor.\n\n- `business-profile.json` stores reusable sender, company, client, website, and brand voice values for templates, Docs Live, and handoff packages.\n- `variables.yaml` supplies project variables that documents can reference with `{{variable}}` placeholders.\n- `outlines.json` stores reusable custom document outlines for planners, Docs Live, and scripted document creation.\n- `snippets/` stores reusable document parts for proposals, RFPs, reports, tutorials, and review handoffs.\n- `agent-handoffs/` stores generated local-agent packets for Claude Code, Codex, OpenCode, or private workflows.\n\nDo not store API keys, passwords, or client secrets in this folder.\n",
+            "# NEditor Workspace\n\nThis folder stores reusable local project material for NEditor.\n\n- `business-profile.json` stores reusable sender, company, client, website, and brand voice values for templates, Docs Live, and handoff packages.\n- `variables.yaml` supplies project variables that documents can reference with `{{variable}}` placeholders.\n- `outlines.json` stores reusable custom document outlines for planners, Docs Live, and scripted document creation.\n- `latex-templates.json` stores reusable company, publisher, and client LaTeX export profiles.\n- `snippets/` stores reusable document parts for proposals, RFPs, reports, tutorials, and review handoffs.\n- `agent-handoffs/` stores generated local-agent packets for Claude Code, Codex, OpenCode, or private workflows.\n\nDo not store API keys, passwords, or client secrets in this folder.\n",
         ),
         (
             base.join("variables.yaml"),
@@ -10073,6 +11002,10 @@ fn workspace_init_entries(root: &Path) -> Vec<(PathBuf, &'static str)> {
         (
             base.join("outlines.json"),
             "{\n  \"schema\": \"neditor.workspace-outlines.v1\",\n  \"outlines\": [\n    {\n      \"id\": \"quarterly-business-review\",\n      \"label\": \"Quarterly Business Review\",\n      \"category\": \"Business\",\n      \"summary\": \"Reusable executive review outline for quarterly performance, decisions, and next-step accountability.\",\n      \"bestFor\": [\n        \"board updates\",\n        \"client QBRs\",\n        \"executive operating reviews\"\n      ],\n      \"outline\": [\n        \"Executive Summary\",\n        \"Quarterly Performance Snapshot\",\n        \"Wins and Evidence\",\n        \"Issues and Risks\",\n        \"Financial Review\",\n        \"Customer and Market Signals\",\n        \"Decisions Requested\",\n        \"Next Quarter Priorities\",\n        \"Action Register\"\n      ],\n      \"tags\": [\n        \"business\",\n        \"review\",\n        \"executive\"\n      ]\n    }\n  ]\n}\n",
+        ),
+        (
+            base.join("latex-templates.json"),
+            "{\n  \"schema\": \"neditor.workspace-latex-templates.v1\",\n  \"templates\": [\n    {\n      \"id\": \"custom-latex-client-report\",\n      \"name\": \"Client Report House Style\",\n      \"summary\": \"Reusable report profile for client-facing PDF and TeX handoff.\",\n      \"documentClass\": \"article\",\n      \"classOptions\": \"11pt\",\n      \"packages\": [\n        \"\\\\usepackage[utf8]{inputenc}\",\n        \"\\\\usepackage[T1]{fontenc}\",\n        \"\\\\usepackage{geometry}\",\n        \"\\\\usepackage{hyperref}\",\n        \"\\\\usepackage{longtable}\",\n        \"\\\\usepackage{booktabs}\",\n        \"\\\\usepackage{graphicx}\"\n      ],\n      \"geometry\": \"margin=1in\",\n      \"hypersetup\": \"colorlinks=true,linkcolor=blue,urlcolor=blue\",\n      \"header\": \"\",\n      \"chapterStyle\": false,\n      \"bestFor\": [\n        \"client reports\",\n        \"proposals\"\n      ],\n      \"sourcePath\": \"templates/client-report.tex\"\n    }\n  ]\n}\n",
         ),
         (
             base.join("snippets").join("business.md"),
@@ -10109,6 +11042,7 @@ fn init_text_report(
     lines.push("  - Run `ned profile --workspace . --set fullName=... --set companyName=...` to set reusable business identity values.".to_string());
     lines.push("  - Edit .neditor/variables.yaml with project values that are not part of the reusable business profile.".to_string());
     lines.push("  - Run `ned outlines --workspace . --save custom-outline --section \"Executive Summary\" --section \"Recommendations\"` to add reusable custom outlines.".to_string());
+    lines.push("  - Run `ned latex-templates --workspace . --save custom-latex-client --document-class article --name \"Client Report\"` to add reusable LaTeX export profiles.".to_string());
     lines.push("  - Add reusable proposal, RFP, tutorial, and review handoff parts under .neditor/snippets/.".to_string());
     lines.push(
         "  - Use the Agent Workspace when you want governed local-agent handoff files.".to_string(),
@@ -10295,6 +11229,9 @@ _ned() {{
       outlines)
         COMPREPLY=( $(compgen -W "--json --ids-only --category --query --search --markdown --body --workspace --save --delete --name --label --summary --docs-live-type --document-type --outline-file --section --tag --best-for" -- "$cur") )
         ;;
+      latex-templates|tex-templates)
+        COMPREPLY=( $(compgen -W "--json --ids-only --workspace --query --search --preamble --tex --save --delete --import --export-library --name --label --summary --document-class --class --class-options --package --geometry --hypersetup --header --chapter-style --no-chapter-style --best-for --source-path" -- "$cur") )
+        ;;
       snippets|parts)
         COMPREPLY=( $(compgen -W "--json --ids-only --kind --query --search --markdown --body --workspace --fill-profile --profile" -- "$cur") )
         ;;
@@ -10401,6 +11338,9 @@ _ned() {{
       ;;
     outlines)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching outline ids only]' '--category[filter by category]:category:' '--query[search outlines by text]:query:' '--search[alias for --query]:query:' '--markdown[print one outline as planner Markdown]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--save[save a workspace outline id]:id:' '--delete[delete a workspace outline id]:id:' '--name[set outline display name]:name:' '--label[alias for --name]:name:' '--summary[set outline summary]:summary:' '--docs-live-type[set Docs Live workflow]:type:' '--document-type[alias for --docs-live-type]:type:' '--outline-file[read headings from a Markdown/text file]:file:_files' '--section[add one section heading]:heading:' '--tag[add a search tag]:tag:' '--best-for[add a best-fit use case]:use:'
+      ;;
+    latex-templates|tex-templates)
+      _arguments '--json[print machine-readable JSON]' '--ids-only[print matching LaTeX template ids only]' '--workspace[workspace containing .neditor]:directory:_files -/' '--query[search LaTeX templates by text]:query:' '--search[alias for --query]:query:' '--preamble[print one reusable LaTeX preamble]:id:' '--tex[alias for --preamble]:id:' '--save[save a workspace LaTeX template id]:id:' '--delete[delete a workspace LaTeX template id]:id:' '--import[import a LaTeX template library JSON file]:file:_files' '--export-library[export workspace LaTeX templates to JSON]:file:_files' '--name[set template display name]:name:' '--label[alias for --name]:name:' '--summary[set template summary]:summary:' '--document-class[set LaTeX document class]:class:' '--class[alias for --document-class]:class:' '--class-options[set documentclass options]:options:' '--package[add a preamble package line]:line:' '--geometry[set geometry options]:geometry:' '--hypersetup[set hyperref options]:hypersetup:' '--header[add custom header preamble]:line:' '--chapter-style[use chapter-style sectioning]' '--no-chapter-style[use article-style sectioning]' '--best-for[add a best-fit use case]:use:' '--source-path[record original template path]:path:'
       ;;
     snippets|parts)
       _arguments '--json[print machine-readable JSON]' '--ids-only[print matching snippet ids only]' '--kind[filter by snippet kind]:kind:' '--query[search snippets by text]:query:' '--search[alias for --query]:query:' '--markdown[print one snippet body]:id:' '--body[alias for --markdown]:id:' '--workspace[workspace containing .neditor]:directory:_files -/' '--fill-profile[merge saved business profile values into printed snippet Markdown]' '--profile[alias for --fill-profile]'
@@ -10540,7 +11480,7 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l allow-not-ready".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l option -r".to_string(),
-        "complete -c ned -n '__fish_seen_subcommand_from templates outlines transform-templates xforms targets inspect doctor' -l json"
+        "complete -c ned -n '__fish_seen_subcommand_from templates outlines latex-templates tex-templates transform-templates xforms targets inspect doctor' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
@@ -10570,6 +11510,30 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l section -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l tag -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from outlines' -l best-for -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l ids-only".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l workspace -s w -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l query -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l search -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l preamble -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l tex -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l save -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l delete -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l import -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l export-library -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l name -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l label -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l summary -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l document-class -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l class -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l class-options -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l package -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l geometry -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l hypersetup -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l header -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l chapter-style".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l no-chapter-style".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l best-for -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from latex-templates tex-templates' -l source-path -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l category -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from transform-templates xforms' -l transform -r".to_string(),
@@ -11117,6 +12081,9 @@ fn help_text() -> String {
         "  ned templates [--json] [--category procurement] [--query tender] [--ids-only] [--markdown id] [--title title] [--workspace path --fill-profile]".to_string(),
         "  ned outlines [--workspace .] [--json] [--category Procurement] [--query RFP] [--ids-only] [--markdown id]".to_string(),
         "  ned outlines --workspace . --save custom-id --docs-live-type proposal --section \"Executive Summary\" --section \"Recommendations\" [--json]".to_string(),
+        "  ned latex-templates [--workspace .] [--json] [--query proposal] [--ids-only] [--preamble id]".to_string(),
+        "  ned latex-templates --workspace . --save custom-latex-client --document-class article --name \"Client Report\" --package \"\\\\usepackage{booktabs}\" [--json]".to_string(),
+        "  ned latex-templates --workspace . --import library.json | --export-library library.json [--json]".to_string(),
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id] [--workspace . --fill-profile]".to_string(),
         "  ned transform-templates [--json] [--category Business] [--transform calc] [--query ROI] [--ids-only] [--markdown id]".to_string(),
         "  ned profile [--workspace path] [--init] [--set fullName=...] [--get field|--fields] [--json|--markdown|--placeholders]".to_string(),
@@ -11140,6 +12107,7 @@ fn help_text() -> String {
         "".to_string(),
         format!("Templates: {}", NEW_DOCUMENT_TEMPLATES.join(", ")),
         "Outlines: business-proposal, business-rfp, business-rfq, business-tender, business-report, business-textbook, business-rfp-response, outline-rfp-technical-proposal, outline-rfp-compliance-review, outline-contract-review-brief, and more.".to_string(),
+        "LaTeX templates: article, business-report, proposal, rfp-response, technical-report, academic-paper, textbook, book, plus workspace profiles in .neditor/latex-templates.json.".to_string(),
         format!(
             "Targets: {}, or all. Use comma-separated targets for delivery packs.",
             SUPPORTED_EXPORT_TARGETS.join(", ")
