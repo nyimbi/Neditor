@@ -27,6 +27,30 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Doctor Recommendations In Support Bundles
+
+Support-bundle recommendations now turn `ned doctor` warnings into specific
+operator actions instead of the generic "review doctor warnings" message.
+Bundles can now separately recommend rebuilding or installing the app binary,
+using manual/default-reader setup when automation is unavailable, initializing
+the `.neditor` workspace scaffold, or closing transform handler installer
+coverage gaps.
+
+Against the current checkout, the live support bundle now starts with concrete
+doctor-derived actions:
+
+- Default Markdown reader automation is unavailable on this host; use the
+  documented macOS/duti path.
+- Initialize the workspace scaffold with `ned init . --json` before relying on
+  business profiles, snippets, outlines, or local-agent handoffs.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_creates_redaction_safe_support_bundles --lib` | Pass | Focused support-bundle test proves the generic doctor warning is replaced by the concrete workspace-scaffold recommendation. |
+| `pnpm run check:cli` | Pass | 26 `ned_cli` tests passed and the `ned` binary rebuilt successfully. |
+| `src-tauri/target/debug/ned support-bundle --workspace .` | Pass with release blockers | Live support bundle now emits concrete default-reader and workspace-scaffold recommendations. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting remained clean after the doctor recommendation changes. |
+
 ## 2026-05-29 Transform Evidence Recommendation Precision
 
 Support-bundle recommendations now respect accepted external transform-engine

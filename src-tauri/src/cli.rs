@@ -4185,8 +4185,14 @@ fn support_bundle_recommendations(
 ) -> Vec<String> {
     let mut recommendations = Vec::new();
     if readiness_string_field(doctor, "status").unwrap_or("unknown") != "ready" {
-        recommendations
-            .push("Review ned doctor warnings before sending files to business users.".to_string());
+        let doctor_actions = doctor_action_recommendations(doctor);
+        if doctor_actions.is_empty() {
+            recommendations.push(
+                "Review ned doctor warnings before sending files to business users.".to_string(),
+            );
+        } else {
+            recommendations.extend(doctor_actions);
+        }
     }
     if !readiness_release_ready(readiness) {
         recommendations.push(
@@ -4269,6 +4275,58 @@ fn support_bundle_recommendations(
         recommendations
             .push("Support bundle is ready for installation or release review.".to_string());
     }
+    recommendations
+}
+
+fn doctor_action_recommendations(doctor: &Value) -> Vec<String> {
+    let mut recommendations = Vec::new();
+    if doctor.get("appBinary").and_then(Value::as_str).is_none() {
+        recommendations.push(
+            "Install or rebuild the NEditor desktop app beside ned before handing app-open workflows to business users."
+                .to_string(),
+        );
+    }
+
+    let default_reader = doctor.get("defaultReader").unwrap_or(&Value::Null);
+    let default_reader_supported = default_reader
+        .get("supported")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+    if !default_reader_supported {
+        let message = readiness_string_field(default_reader, "message")
+            .unwrap_or("use the manual operating-system default-app steps");
+        recommendations.push(format!(
+            "Default Markdown reader automation is unavailable on this host; {message}"
+        ));
+    }
+
+    let workspace_scaffold = doctor.get("workspaceScaffold").unwrap_or(&Value::Null);
+    let workspace_status =
+        readiness_string_field(workspace_scaffold, "status").unwrap_or("unknown");
+    if workspace_status != "ready" {
+        let command = readiness_string_field(workspace_scaffold, "recommended_command")
+            .unwrap_or("ned init . --json");
+        recommendations.push(format!(
+            "Initialize the NEditor workspace scaffold with {command} before relying on business profiles, snippets, outlines, or local-agent handoffs."
+        ));
+    }
+
+    let missing_handler_engines = doctor
+        .get("transformHandlers")
+        .and_then(|handlers| handlers.get("missingRegisteredEngines"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|engine| engine.as_str().map(str::to_string))
+        .collect::<Vec<_>>();
+    if !missing_handler_engines.is_empty() {
+        recommendations.push(format!(
+            "Add transform handler installer coverage for registered engine(s): {}.",
+            missing_handler_engines.join(", ")
+        ));
+    }
+
     recommendations
 }
 

@@ -2077,7 +2077,14 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         .iter()
         .any(|recommendation| recommendation
             .as_str()
-            .is_some_and(|value| value.contains("doctor warnings"))));
+            .is_some_and(|value| value.contains("Initialize the NEditor workspace scaffold"))));
+    assert!(!bundle["recommendations"]
+        .as_array()
+        .expect("recommendations")
+        .iter()
+        .any(|recommendation| recommendation
+            .as_str()
+            .is_some_and(|value| value.contains("Review ned doctor warnings"))));
     assert!(bundle["recommendations"]
         .as_array()
         .expect("recommendations")
