@@ -34,7 +34,7 @@ if (!skipBuild) {
 if (!skipEvidence) {
   if (!skipPrerequisiteEvidence) {
     // Release readiness treats stale full-suite browser workflow proof as a local failure.
-    // Refresh it before native/rendered probes that can exhaust browser launch slots on macOS.
+    // Validate it before native/rendered probes that can exhaust browser launch slots on macOS.
     refreshBrowserWorkflowEvidence();
     refreshPrerequisiteEvidence();
     // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.
@@ -201,13 +201,52 @@ function refreshPrerequisiteEvidence() {
 }
 
 function refreshBrowserWorkflowEvidence() {
-  const firstAttempt = run(process.execPath, ["scripts/run-e2e.mjs"], {}, {
-    allowFailure: true,
-    allowedFailureReason: "browser-workflow-retry-after-launch-failure",
-  });
-  if (firstAttempt.status === 0) return;
-  sleepSync(2000);
-  run(process.execPath, ["scripts/run-e2e.mjs"]);
+  const current = currentBrowserWorkflowEvidence();
+  if (current.accepted) {
+    commandResults.push({
+      command: "reuse .tmp/e2e-browser/report.json",
+      env: [],
+      startedAt: new Date().toISOString(),
+      status: 0,
+      stdoutTail: [current.detail],
+      stderrTail: [],
+    });
+    return;
+  }
+  fail(
+    [
+      "Full-suite browser workflow proof must be refreshed before creating a release candidate.",
+      "Run `pnpm run test:e2e` as a top-level shell command, then rerun `pnpm run release:local`.",
+      `Current browser proof is not reusable: ${current.detail}.`,
+    ].join(" "),
+  );
+}
+
+function currentBrowserWorkflowEvidence() {
+  const report = readOptionalJson(".tmp/e2e-browser/report.json");
+  const issues = [];
+  if (!report) {
+    return { accepted: false, detail: "missing .tmp/e2e-browser/report.json" };
+  }
+  const summary = report.summary || {};
+  if (report.schema !== "neditor.e2e-browser-workflow.v1") issues.push("missing-schema");
+  if (report.scope !== "full-suite") issues.push(`scope=${report.scope || "missing"}`);
+  if (report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
+  if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
+  if (Number(summary.tests || 0) < 1) issues.push("missing-test-count");
+  if (Number(summary.passed || 0) < Number(summary.tests || 0)) issues.push("incomplete-pass-count");
+  if (Number(summary.failed || 0) > 0 || Number(summary.timedOut || 0) > 0) issues.push("failed-or-timed-out-tests");
+  if (report.workflowEvidence?.docsLiveDraft !== true) issues.push("missing-docs-live-workflow-proof");
+  if (!freshForSources(report.generatedAt, ["scripts/run-e2e.mjs", "e2e/app-workflows.spec.ts", "playwright.config.ts"])) {
+    issues.push("stale-for-browser-workflow-sources");
+  }
+  return {
+    accepted: issues.length === 0,
+    detail:
+      issues.length === 0
+        ? `Reused current full-suite browser workflow report generated at ${report.generatedAt}; tests=${summary.tests} passed=${summary.passed}.`
+        : issues.join(","),
+  };
 }
 
 function collectFrontendAssets() {
@@ -285,10 +324,6 @@ function run(command, args, env = {}, options = {}) {
     fail(`${report.command} failed with exit code ${report.status}`);
   }
   return result;
-}
-
-function sleepSync(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function runReadinessBootstrap() {
@@ -432,6 +467,19 @@ function readOptionalJson(relativePath) {
   const path = join(root, relativePath);
   if (!existsSync(path)) return null;
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function validIsoDate(value) {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function freshForSources(generatedAt, relativePaths) {
+  if (!validIsoDate(generatedAt)) return false;
+  const generated = Date.parse(generatedAt);
+  return relativePaths.every((relativePath) => {
+    const path = join(root, relativePath);
+    return existsSync(path) && statSync(path).mtimeMs <= generated;
+  });
 }
 
 function tail(value) {
