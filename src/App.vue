@@ -17251,7 +17251,8 @@ function openAgentWorkspaceForBusinessTemplate(template: BusinessDocumentTemplat
     "Use the saved business identity, create an outline first, draft section by section, run QA, humanize the document, and prepare a review handoff.",
     "Support provider handoff to Claude Code, Codex, OpenCode, or Google Antigravity if a local agent is preferred.",
   ].join(" ");
-  selectAgentProviderProfileForInstruction(template.id === "tender" || template.id === "rfp" ? "Claude Code" : "Codex");
+  const procurementTemplateIds = new Set(["tender", "rfp", "rfp-response", "rfq"]);
+  selectAgentProviderProfileForInstruction(procurementTemplateIds.has(template.id) ? "Claude Code" : "Codex");
   openAgentWorkspace(instruction);
   agentContextAnswers.value = businessWizardContext(template, store.businessProfile);
   buildAgentWorkspacePlan();
@@ -17670,7 +17671,7 @@ function insertActiveDocumentSetManifest() {
     store.statusMessage = "Assign the active document to a set before inserting a manifest";
     return;
   }
-  insertBlock(manifest);
+  applyTextToDocument(active.value, insertDocumentSetManifestText(active.value.text, manifest));
   store.statusMessage = `Inserted ${activeDocumentSet.value} manifest`;
 }
 
@@ -17734,6 +17735,20 @@ function documentReleaseStatus(document: OpenDocument) {
   const textStatus = frontMatterAnyScalar(document.text, ["status"]);
   const status = textStatus || (typeof metadata.status === "string" ? metadata.status : "");
   return status.trim() || "draft";
+}
+
+function insertDocumentSetManifestText(text: string, manifest: string) {
+  const cleanManifest = manifest.trimEnd();
+  const lines = text.split(/\r?\n/);
+  if (lines[0]?.trim() === "---") {
+    const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+    if (endIndex > 0) {
+      const head = lines.slice(0, endIndex + 1).join("\n");
+      const tail = lines.slice(endIndex + 1).join("\n").replace(/^\n+/, "");
+      return tail ? `${head}\n\n${cleanManifest}\n\n${tail}` : `${head}\n\n${cleanManifest}\n`;
+    }
+  }
+  return text.trim() ? `${cleanManifest}\n\n${text}` : `${cleanManifest}\n`;
 }
 
 function applyTextToDocument(document: OpenDocument, text: string, compileActiveDocument = true) {
@@ -20619,12 +20634,20 @@ async function exportSelectedTable(format: "csv" | "xlsx") {
       },
     });
     const sourceLabel = exportMarkdown.source === "source-edit" ? " from edited Markdown source" : "";
+    await waitForPreviewCompileIdle();
     store.statusMessage = `Exported ${response.exported_tables} table${response.exported_tables === 1 ? "" : "s"}${sourceLabel} to ${format.toUpperCase()}`;
   } catch (error) {
     store.lastError = error instanceof Error ? error.message : String(error);
     store.statusMessage = `${format.toUpperCase()} table export failed`;
   } finally {
     tableDataBusy.value = false;
+  }
+}
+
+async function waitForPreviewCompileIdle(timeoutMs = 1200) {
+  const startedAt = performance.now();
+  while (store.compileBusy && performance.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => window.setTimeout(resolve, 25));
   }
 }
 

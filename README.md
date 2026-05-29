@@ -824,6 +824,10 @@ properties, and Markdown bundle metadata.
   distribution, governance, provider handoff, and verification agentic.
 - [Specification completion matrix](docs/spec-completion-matrix.md): current
   implementation evidence and remaining release risks against the product spec.
+- [Compiling and releasing NEditor](docs/compiling-and-releasing.md):
+  release-operator guidance for frontend/native compilation, `ned` sidecars,
+  desktop packaging, release candidates, evidence gates, signing, notarization,
+  and Homebrew publishing.
 
 `pnpm run check:spec-completion` turns that matrix into an executable release
 contract. It writes `.tmp/spec-completion/report.json`,
