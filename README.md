@@ -792,13 +792,13 @@ handoffs that should not require hunting through the target picker first.
 | Markdown bundle | Portable source handoff | Source document plus manifest and packaged evidence |
 | Blog package | Blog publishing handoff | Copy-ready Markdown, HTML, text, publish workflow metadata, RSS seed, assets, and manifest |
 | Substack package | Substack publishing handoff | Substack copy HTML, Markdown, text, publish workflow metadata, RSS seed, assets, and manifest |
-| LaTeX | Academic or technical handoff | `.tex` source with metadata, headings, tables, figures, equations, links, and labels |
+| LaTeX | Academic, technical, proposal, RFP, textbook, or book handoff | `.tex` source with metadata, headings, tables, figures, equations, links, labels, and selectable template profiles |
 | Google Docs package | Google Docs import handoff | DOCX, HTML, Markdown, text, import workflow metadata, assets, and manifest |
 | EPUB ebook | Portable long-form reader handoff | `.epub` package with EPUB metadata, navigation, XHTML body, styles, text fallback, packaged media, and embedded NEditor manifest |
 
 Export defaults include manifests, styles, syntax highlighting, HTML language,
 HTML description, canonical URL, cover page, page numbers, layout preset,
-comments appendix, AI provenance appendix, glossary appendix, PPTX agenda,
+LaTeX template profile, comments appendix, AI provenance appendix, glossary appendix, PPTX agenda,
 citation style, brand profile, dirty-Git warnings, transform engine settings,
 and draft watermark behavior.
 

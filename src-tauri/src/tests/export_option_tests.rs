@@ -221,6 +221,35 @@ fn export_layout_preset_controls_html_css_and_metadata() {
 }
 
 #[test]
+fn latex_template_option_controls_document_class_and_headings() {
+    let response = compile(CompileRequest {
+        text: "---\ntitle: RFP Response\nstatus: approved\napprovedBy: QA\n---\n# Compliance Checklist\n\n| Requirement | Status |\n| --- | --- |\n| Signed annex | Met |\n\n## Methodology\n\nBody.".to_string(),
+        file_path: None,
+    });
+    let mut manifest = response.export_manifest.clone();
+    manifest.export_target = "latex".to_string();
+    manifest.export_options = json!({ "latexTemplate": "rfp-response" });
+
+    let latex = String::from_utf8(render_latex_bytes(&response, &manifest).expect("latex bytes"))
+        .expect("latex utf8");
+    assert!(latex.contains("% LaTeX template: RFP Response (rfp-response)"));
+    assert!(latex.contains("\\documentclass[11pt]{article}"));
+    assert!(latex.contains("\\usepackage{booktabs}"));
+    assert!(latex.contains("\\lhead{Compliance Response}"));
+    assert!(latex.contains("\\section{Compliance Checklist}"));
+    assert!(latex.contains("\\begin{longtable}"));
+
+    manifest.export_options = json!({ "latexTemplate": "textbook" });
+    let textbook =
+        String::from_utf8(render_latex_bytes(&response, &manifest).expect("textbook latex bytes"))
+            .expect("textbook latex utf8");
+    assert!(textbook.contains("% LaTeX template: Textbook (textbook)"));
+    assert!(textbook.contains("\\documentclass[11pt,oneside]{book}"));
+    assert!(textbook.contains("\\chapter{Compliance Checklist}"));
+    assert!(textbook.contains("\\section{Methodology}"));
+}
+
+#[test]
 fn export_layout_metadata_controls_page_size_and_margins() {
     let response = compile(CompileRequest {
             text: "---\ntitle: Page Layout\nstatus: approved\napprovedBy: QA\nlayout:\n  pageSize: Letter\n  margins: wide\n  orientation: landscape\n---\n# Page Layout\n\nBody.".to_string(),

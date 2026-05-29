@@ -420,6 +420,7 @@ test("export profile helpers save apply and delete normalized profile state", ()
     coverPage: true,
     pageNumbers: true,
     layoutPreset: "business" as const,
+    latexTemplate: "article" as const,
     includeComments: true,
     includeProvenance: true,
     includeGlossary: true,
@@ -524,6 +525,7 @@ test("document export option helpers normalize compile export and transform sett
       coverPage: true,
       pageNumbers: false,
       layoutPreset: "compact",
+      latexTemplate: "rfp-response",
       includeComments: false,
       includeProvenance: true,
       includeGlossary: false,
@@ -6366,6 +6368,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       htmlDescription: " Board-ready HTML summary ",
       canonicalUrl: " https://example.com/board-ready ",
       layoutPreset: "compact",
+      latexTemplate: "proposal",
     },
     bibliographyDefaults: { citationStyle: "APA" },
     brandProfileDefaults: { color: "  #123456  ", watermark: "Draft" },
@@ -6386,7 +6389,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
         id: "client-pdf",
         name: " Client PDF ",
         exportTarget: "pdf",
-        exportDefaults: { includeManifest: false, layoutPreset: "compact", pageNumbers: false },
+        exportDefaults: { includeManifest: false, layoutPreset: "compact", latexTemplate: "rfp-response", pageNumbers: false },
         bibliographyDefaults: { citationStyle: "ieee" },
         brandProfileDefaults: { name: "Acme", color: " #006699 ", footer: "Confidential" },
       },
@@ -6732,6 +6735,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     coverPage: false,
     pageNumbers: false,
     layoutPreset: "compact",
+    latexTemplate: "proposal",
     includeComments: true,
     includeProvenance: true,
     includeGlossary: true,
@@ -6766,6 +6770,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       coverPage: true,
       pageNumbers: false,
       layoutPreset: "compact",
+      latexTemplate: "rfp-response",
       includeComments: true,
       includeProvenance: true,
       includeGlossary: true,
@@ -8642,6 +8647,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package"'));
   ok(app.includes('id: "publish", label: "Publish", title: "Open blog, Substack, or CMS publishing handoff"'));
   ok(app.includes('aria-label="Public export metadata options"'));
+  ok(app.includes('aria-label="LaTeX template options"'));
+  ok(app.includes("latexTemplateProfiles"));
+  ok(app.includes("store.exportDefaults.latexTemplate"));
   ok(app.includes('aria-label="Distribution metadata checklist"'));
   ok(app.includes('aria-label="AI export readiness assistance"'));
   ok(app.includes('aria-label="Publishing handoff"'));

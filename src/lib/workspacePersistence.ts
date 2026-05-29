@@ -35,6 +35,15 @@ export const SUPPORTED_CITATION_STYLES = [
 
 export type CitationStyle = (typeof SUPPORTED_CITATION_STYLES)[number];
 export type LayoutPreset = "business" | "compact" | "presentation";
+export type LatexTemplatePreset =
+  | "article"
+  | "business-report"
+  | "proposal"
+  | "rfp-response"
+  | "technical-report"
+  | "academic-paper"
+  | "textbook"
+  | "book";
 export type PreviewTheme = "match" | "light" | "dark";
 export type SnapshotStorage = "app-data" | "project-local";
 export type ExportTarget =
@@ -77,6 +86,7 @@ export interface ExportDefaults {
   coverPage: boolean;
   pageNumbers: boolean;
   layoutPreset: LayoutPreset;
+  latexTemplate: LatexTemplatePreset;
   includeComments: boolean;
   includeProvenance: boolean;
   includeGlossary: boolean;
@@ -538,6 +548,19 @@ export function normalizeLayoutPreset(value: unknown): LayoutPreset {
   return value === "compact" || value === "presentation" || value === "business" ? value : "business";
 }
 
+export function normalizeLatexTemplatePreset(value: unknown): LatexTemplatePreset {
+  return value === "business-report" ||
+    value === "proposal" ||
+    value === "rfp-response" ||
+    value === "technical-report" ||
+    value === "academic-paper" ||
+    value === "textbook" ||
+    value === "book" ||
+    value === "article"
+    ? value
+    : "article";
+}
+
 export function normalizeExportDefaults(
   defaults: Partial<ExportDefaults> & {
     includeCoverPage?: boolean;
@@ -565,6 +588,7 @@ export function normalizeExportDefaults(
           ? defaults.includePageNumbers
           : true,
     layoutPreset: normalizeLayoutPreset(defaults.layoutPreset),
+    latexTemplate: normalizeLatexTemplatePreset(defaults.latexTemplate),
     includeComments: typeof defaults.includeComments === "boolean" ? defaults.includeComments : true,
     includeProvenance: typeof defaults.includeProvenance === "boolean" ? defaults.includeProvenance : true,
     includeGlossary: typeof defaults.includeGlossary === "boolean" ? defaults.includeGlossary : true,

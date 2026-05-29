@@ -623,16 +623,25 @@ Supported targets:
 - PPTX for presentation-style summaries and executive decks.
 - Markdown bundle for portable source handoff.
 - Blog and Substack packages for local-first publishing handoff.
-- LaTeX source for academic and technical handoff.
+- LaTeX source for academic, technical, business report, proposal, RFP
+  response, textbook, and long-form manuscript handoff.
 - Google Docs package for local-first import through DOCX, HTML, Markdown, or
   text fallbacks.
 - EPUB ebook for portable long-form reader distribution.
 
 Export options cover manifests, styles, syntax highlighting, HTML language,
 HTML description, canonical URL, cover pages, page numbers, layout presets,
-comments appendix, AI provenance appendix, glossary appendix, PPTX agenda,
-citation style, brand profile, dirty-Git warnings, transform engine settings,
-and draft watermark behavior.
+LaTeX template profiles, comments appendix, AI provenance appendix, glossary
+appendix, PPTX agenda, citation style, brand profile, dirty-Git warnings,
+transform engine settings, and draft watermark behavior.
+
+When the target is LaTeX, choose a template profile in the Export panel before
+writing the `.tex` file. The current built-ins cover article, business report,
+proposal, RFP response, technical report, academic paper, textbook, and book
+layouts. NEditor records the selected profile in saved export profiles and
+emits template-specific document classes, packages, margins, headers, and
+heading levels, making the generated source a practical bridge to larger
+LaTeX house-style or publisher template libraries.
 Front matter `targetPersona` entries are carried into the HTML cover metadata,
 plain text/Markdown bundle text, bundled metadata, and DOCX/PPTX custom
 properties so exported examples keep their intended audience visible.

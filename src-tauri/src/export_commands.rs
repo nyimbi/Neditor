@@ -479,6 +479,30 @@ fn validate_export_settings(
             ));
         }
     }
+    if let Some(latex_template) = options.get("latexTemplate") {
+        let valid = latex_template.as_str().is_some_and(|value| {
+            matches!(
+                value,
+                "article"
+                    | "business-report"
+                    | "proposal"
+                    | "rfp-response"
+                    | "technical-report"
+                    | "academic-paper"
+                    | "textbook"
+                    | "book"
+            )
+        });
+        if !valid {
+            diagnostics.push(diag(
+                "error",
+                "latexTemplate must be article, business-report, proposal, rfp-response, technical-report, academic-paper, textbook, or book.",
+                None,
+                None,
+                Some("Choose one of the built-in LaTeX template profile names."),
+            ));
+        }
+    }
     validate_transform_export_settings(options, diagnostics);
     validate_target_specific_export_options(target, options, diagnostics);
 }

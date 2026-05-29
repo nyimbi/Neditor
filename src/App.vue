@@ -2236,6 +2236,21 @@
               <input v-model="store.exportDefaults.canonicalUrl" type="url" />
             </label>
           </section>
+          <section v-if="store.exportTarget === 'latex'" class="export-target-options" aria-label="LaTeX template options">
+            <h3>LaTeX template</h3>
+            <label>
+              Template profile
+              <select v-model="store.exportDefaults.latexTemplate">
+                <option v-for="profile in latexTemplateProfiles" :key="profile.id" :value="profile.id">
+                  {{ profile.label }}
+                </option>
+              </select>
+            </label>
+            <p class="sidebar-hint">{{ activeLatexTemplateProfile.summary }}</p>
+            <ul class="template-meta-summary" aria-label="LaTeX template best fit">
+              <li v-for="item in activeLatexTemplateProfile.bestFor" :key="item">{{ item }}</li>
+            </ul>
+          </section>
           <section
             v-if="exportDistributionChecklist.length"
             class="export-metadata-checklist"
@@ -6102,6 +6117,7 @@ import {
 import { citationSourceLibraryAuditMarkdown, type CitationSourceAuditItem } from "./lib/citationSourceLibrary";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import { documentLayoutPresetById, documentLayoutPresets, type DocumentLayoutPresetId } from "./lib/documentLayout";
+import { latexTemplateProfiles } from "./lib/latexTemplates";
 import {
   agenticCliIntegrations,
   analyzeRfpSource,
@@ -7610,6 +7626,9 @@ let docsLiveRecognition: SpeechRecognitionLike | null = null;
 
 const active = computed(() => store.activeDocument);
 const activeExportProfile = computed(() => store.exportProfiles.find((profile) => profile.id === store.activeExportProfileId) || null);
+const activeLatexTemplateProfile = computed(() =>
+  latexTemplateProfiles.find((profile) => profile.id === store.exportDefaults.latexTemplate) || latexTemplateProfiles[0],
+);
 const exportProfileSummary = computed(() => {
   const profile = activeExportProfile.value;
   if (!profile) return "";
@@ -7622,7 +7641,11 @@ const exportProfileSummary = computed(() => {
     profile.exportDefaults.includeGlossary && "glossary",
   ].filter(Boolean);
   const brand = profile.brandProfileDefaults.name || profile.brandProfileDefaults.color;
-  return `${profile.exportTarget.toUpperCase()} / ${profile.exportDefaults.layoutPreset}${brand ? ` / ${brand}` : ""}${enabled.length ? ` / ${enabled.join(", ")}` : ""}`;
+  const latexTemplate =
+    profile.exportTarget === "latex"
+      ? ` / ${latexTemplateProfiles.find((template) => template.id === profile.exportDefaults.latexTemplate)?.label || profile.exportDefaults.latexTemplate}`
+      : "";
+  return `${profile.exportTarget.toUpperCase()} / ${profile.exportDefaults.layoutPreset}${latexTemplate}${brand ? ` / ${brand}` : ""}${enabled.length ? ` / ${enabled.join(", ")}` : ""}`;
 });
 const previewDocumentStyle = computed(() => ({
   fontFamily: store.previewFont,
@@ -13566,6 +13589,7 @@ watch(
     store.exportDefaults.coverPage,
     store.exportDefaults.pageNumbers,
     store.exportDefaults.layoutPreset,
+    store.exportDefaults.latexTemplate,
     store.exportDefaults.includeComments,
     store.exportDefaults.includeProvenance,
     store.exportDefaults.includeGlossary,

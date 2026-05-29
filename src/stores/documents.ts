@@ -376,6 +376,7 @@ export const useDocumentsStore = defineStore("documents", {
       coverPage: true,
       pageNumbers: true,
       layoutPreset: "business",
+      latexTemplate: "article",
       includeComments: true,
       includeProvenance: true,
       includeGlossary: true,

@@ -1241,6 +1241,7 @@ fn prepare_for_export_validates_target_and_options() {
             "coverPage": "yes",
             "pageNumbers": "yes",
             "layoutPreset": "dense",
+            "latexTemplate": "letterhead",
             "includeGlossary": "yes",
             "includeComments": "yes",
             "includeProvenance": "yes",
@@ -1249,7 +1250,7 @@ fn prepare_for_export_validates_target_and_options() {
     });
 
     assert!(!report.ready);
-    assert_eq!(report.error_count, 12);
+    assert_eq!(report.error_count, 13);
     assert_eq!(report.manifest.export_target, "rtf");
     assert!(report.manifest.output_path.is_none());
     assert!(report.manifest.output_hash.is_none());
@@ -1281,6 +1282,9 @@ fn prepare_for_export_validates_target_and_options() {
     assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
         .message
         .contains("layoutPreset must be business, compact, or presentation")));
+    assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
+        .message
+        .contains("latexTemplate must be article, business-report")));
     assert!(report.diagnostics.iter().any(|diagnostic| diagnostic
         .message
         .contains("includeGlossary must be true or false")));

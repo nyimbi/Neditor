@@ -54,6 +54,7 @@ export function buildDocumentExportOptions(state: DocumentExportOptionState) {
     coverPage: defaults.coverPage,
     pageNumbers: defaults.pageNumbers,
     layoutPreset: defaults.layoutPreset,
+    latexTemplate: defaults.latexTemplate,
     includeComments: defaults.includeComments,
     includeProvenance: defaults.includeProvenance,
     includeGlossary: defaults.includeGlossary,
