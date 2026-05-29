@@ -59,13 +59,13 @@
             aria-label="Toolbar visibility menu"
             :aria-expanded="toolbarVisibilityMenuOpen"
             aria-haspopup="menu"
-            title="Toolbars are hidden. Open this menu to restore one row or show all toolbars."
+            :title="hiddenToolbarVisibilityMenuHelpText"
             @click="toggleToolbarVisibilityMenu"
           >
             <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
               <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
             </svg>
-            <span>Toolbars hidden</span>
+            <span>Show toolbars</span>
             <small>{{ collapsedToolbarRows.length }}</small>
           </button>
           <section v-if="toolbarVisibilityMenuOpen" class="app-menu-panel toolbar-visibility-panel" role="menu" aria-label="Toolbar visibility menu">
@@ -206,7 +206,7 @@
           aria-live="polite"
         >
           <span class="collapsed-toolbar-tray-label">
-            <span>{{ hiddenToolbarSummary }}</span>
+            <span>{{ hiddenToolbarTrayPrompt }}</span>
             <small>{{ hiddenToolbarTrayHelpText }}</small>
           </span>
           <button
@@ -262,8 +262,8 @@
           <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
             <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
           </svg>
-          <span>Toolbars hidden</span>
-          <small>Click to show all rows</small>
+          <span>{{ hiddenToolbarRecoveryPrompt }}</span>
+          <small>{{ hiddenToolbarFloatingHint }}</small>
         </button>
       </section>
     </header>
@@ -9798,13 +9798,26 @@ const appMenus = computed<AppMenu[]>(() => [
 ]);
 const toolbarCollapseRows = computed(() => toolbarCollapseRowDefinitions);
 const collapsedToolbarRows = computed(() => toolbarCollapseRows.value.filter((row) => store.toolbarCollapsedRows.includes(row.id)));
+const hiddenToolbarNames = computed(() => collapsedToolbarRows.value.map((row) => row.label).join(", "));
 const hiddenToolbarSummary = computed(() => {
   const count = collapsedToolbarRows.value.length;
   const first = collapsedToolbarRows.value[0];
   return count === 1 && first ? `${first.label} toolbar hidden` : `${count} toolbars hidden`;
 });
-const hiddenToolbarTrayHelpText = computed(() => "Use Show all, the Toolbars hidden menu, the floating restore button, or View > Toolbars to restore rows.");
-const hiddenToolbarFloatingHelpText = computed(() => `${hiddenToolbarSummary.value}. Click to show every hidden toolbar row.`);
+const hiddenToolbarTrayPrompt = computed(() => `Hidden: ${hiddenToolbarNames.value || "Toolbars"}`);
+const hiddenToolbarRecoveryPrompt = computed(() => {
+  const first = collapsedToolbarRows.value[0];
+  return collapsedToolbarRows.value.length === 1 && first ? `Show ${first.label} toolbar` : "Show toolbars";
+});
+const hiddenToolbarTrayHelpText = computed(() => "Use Show all or any row button here to unhide toolbars; View > Toolbars has the same controls.");
+const hiddenToolbarFloatingHint = computed(() => {
+  const count = collapsedToolbarRows.value.length;
+  return count === 1 ? "Click to restore the hidden row" : `Click to restore ${count} hidden rows`;
+});
+const hiddenToolbarVisibilityMenuHelpText = computed(
+  () => `${hiddenToolbarSummary.value}. Open this menu to unhide one row or show all toolbars.`,
+);
+const hiddenToolbarFloatingHelpText = computed(() => `${hiddenToolbarSummary.value}. ${hiddenToolbarFloatingHint.value}.`);
 const hiddenToolbarTrayAriaLabel = computed(() => `${hiddenToolbarSummary.value}. ${hiddenToolbarTrayHelpText.value}`);
 const normalizedToolbarCollapsedRows = (ids: string[]) =>
   Array.from(new Set(ids.filter((id) => toolbarCollapseRowIds.includes(id))));

@@ -6020,6 +6020,21 @@ No frontend files changed in this slice. Remaining release completion still
 requires regenerating the release candidate after committed code changes and
 then collecting the external/manual release evidence it names.
 
+## 2026-05-29 Toolbar Restore Discoverability
+
+Hidden toolbar recovery is now action-first instead of state-first. When any
+toolbar row is collapsed, the titlebar menu reads `Show toolbars`, the tray
+lists the hidden rows by name, and the floating restore control says exactly
+what it will restore, such as `Show File toolbar` or `Show toolbars` with the
+hidden-row count. The tray copy now points users to the immediate restore
+buttons and the equivalent `View > Toolbars` menu path.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after the toolbar recovery copy and computed state changes. |
+| `pnpm run test:unit` | Pass | 118 frontend/static tests passed, including guards for the action-first hidden-toolbar labels and help text. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "collapses and restores command toolbars" --project chromium` | Pass | Focused Chromium workflow passed, proving users can collapse one row or all rows, see explicit show controls, restore individual/all rows, and keep the vertical writing-space gain. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
