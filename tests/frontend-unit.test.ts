@@ -9247,6 +9247,7 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("invalid-focused-e2e-report"));
   ok(script.includes("invalid-large-document-e2e-report"));
   ok(script.includes("older-than-app-bundle-report"));
+  ok(script.includes("!classifiedHostLimitation && Date.parse(report.generatedAt || \"\") < Date.parse(appReport.generatedAt)"));
   ok(script.includes("hdiutil sandbox limitation classified with app bundle fallback proof"));
   ok(script.includes("freshForSources"));
   ok(script.includes("windows-linux-tauri-webdriver-execution"));

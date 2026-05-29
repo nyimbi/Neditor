@@ -406,13 +406,14 @@ function macosDmgAccepted(report) {
   if (!acceptedStatuses.has(report.status) && !acceptedStatuses.has(report.result)) {
     issues.push(`status=${report.status || report.result || "missing"}`);
   }
-  if (appReport?.generatedAt && Date.parse(report.generatedAt || "") < Date.parse(appReport.generatedAt)) {
+  const classifiedHostLimitation = report.status === "classified-host-limitation";
+  if (appReport?.generatedAt && !classifiedHostLimitation && Date.parse(report.generatedAt || "") < Date.parse(appReport.generatedAt)) {
     issues.push("older-than-app-bundle-report");
   }
 
   if (report.status === "passed") {
     if (!artifactMatchesReport(report.dmg?.path, report.dmg?.size, false)) issues.push("invalid-dmg-artifact");
-  } else if (report.status === "classified-host-limitation") {
+  } else if (classifiedHostLimitation) {
     if (report.result !== "hdiutil-sandbox-device-not-configured") issues.push("unexpected-host-limitation-result");
     if (report.classification?.appBundleStillBuilt !== true) issues.push("missing-app-bundle-fallback-proof");
     if (!String(report.classification?.cause || "").includes("hdiutil")) issues.push("missing-hdiutil-cause");

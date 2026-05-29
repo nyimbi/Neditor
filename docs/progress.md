@@ -62,6 +62,9 @@ prepared `src-tauri/binaries/ned-*` helper is synchronized with the final
 release CLI binary before artifact hashes and `SHA256SUMS` are collected.
 The same post-refresh step now reruns `pnpm run test:desktop-bundle` so the
 macOS app-bundle report is current after DMG/app prerequisite probes.
+Release readiness now keeps the strict newer-than-app-bundle check for real DMG
+artifacts, but does not falsely fail a classified host `hdiutil` limitation when
+the fallback app-bundle proof is refreshed afterward.
 
 | Check | Result | Evidence |
 | --- | --- | --- |
