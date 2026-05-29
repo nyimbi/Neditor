@@ -32,7 +32,11 @@ if (!skipBuild) {
 }
 
 if (!skipEvidence) {
-  if (!skipPrerequisiteEvidence) refreshPrerequisiteEvidence();
+  if (!skipPrerequisiteEvidence) {
+    refreshPrerequisiteEvidence();
+    // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.
+    run("pnpm", ["run", "prepare:sidecars"]);
+  }
   runReadinessBootstrap();
   run("pnpm", ["run", "collect:evidence-kit"]);
   run("pnpm", ["run", "check:evidence-kit"]);

@@ -9042,6 +9042,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("refreshBrowserEvidence"));
   ok(releaseCandidate.includes("refreshNativeLaunchEvidence"));
   ok(releaseCandidate.includes("refreshPrerequisiteEvidence"));
+  ok(releaseCandidate.includes("Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars."));
+  ok(releaseCandidate.includes("refreshPrerequisiteEvidence();\n    // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.\n    run(\"pnpm\", [\"run\", \"prepare:sidecars\"]);"));
   ok(releaseCandidate.includes("NEDITOR_DESKTOP_SMOKE_LAUNCH"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"prepare:sidecars\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:release-ci\"]"));

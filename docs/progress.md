@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `86a70eb Keep release
-  status aligned with current evidence`
+- Latest inspected committed baseline before this update: `e0d1576 Make toolbar
+  recovery self-evident`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,29 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-29 Release Candidate Sidecar Freshness
+
+The release evidence refresh moved the local readiness gate back to
+`current-host-ready-with-external-gaps` with zero local aggregation failures,
+and regenerated a current release evidence kit whose 19 release work items are
+all ready to send to supported-host owners.
+
+During release-candidate generation, the packaging gate found that Tauri
+prerequisite builds can refresh `src-tauri/target/release/ned` after
+`beforeBuildCommand` prepares the packaged sidecar. `release:local` now
+re-runs `pnpm run prepare:sidecars` after prerequisite evidence refresh so the
+prepared `src-tauri/binaries/ned-*` helper is synchronized with the final
+release CLI binary before artifact hashes and `SHA256SUMS` are collected.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:e2e` | Pass | Full Chromium workflow proof refreshed after toolbar source changes; 72 workflows passed. |
+| `pnpm run test:desktop-bundle` | Pass | Refreshed macOS app-bundle metadata, executable, CLI, and icon report for the current release binaries. |
+| `pnpm run test:desktop-dmg` | Pass with host classification | DMG bundling is classified as the known host `hdiutil` sandbox limitation while preserving app-bundle fallback proof. |
+| `pnpm run test:desktop-smoke` | Pass | Refreshed native command workflow proof for the current desktop binary. |
+| `pnpm run check:release-readiness` | Pass with external gaps | Aggregation now reports `current-host-ready-with-external-gaps` and zero local failures. |
+| `pnpm run collect:evidence-kit` / `pnpm run check:evidence-kit` | Pass | Evidence kit is current and covers 19/19 release-readiness work items. |
 
 ## 2026-05-29 Grouped Support Recommendations UI
 
