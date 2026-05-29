@@ -9050,6 +9050,9 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("refreshPrerequisiteEvidence"));
   ok(releaseCandidate.includes("refreshBrowserWorkflowEvidence"));
   ok(releaseCandidate.includes("Refresh it before native/rendered probes that can exhaust browser launch slots on macOS."));
+  ok(releaseCandidate.includes("browser-workflow-retry-after-launch-failure"));
+  ok(releaseCandidate.includes("sleepSync(2000)"));
+  ok(releaseCandidate.includes("options.allowFailure"));
   ok(releaseCandidate.includes("Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars."));
   ok(releaseCandidate.includes("DMG/app prerequisite probes can also refresh the bundle after its first metadata report."));
   ok(releaseCandidate.includes("// Release readiness treats stale full-suite browser workflow proof as a local failure.\n    // Refresh it before native/rendered probes that can exhaust browser launch slots on macOS.\n    refreshBrowserWorkflowEvidence();\n    refreshPrerequisiteEvidence();\n    // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.\n    run(\"pnpm\", [\"run\", \"prepare:sidecars\"]);\n    // DMG/app prerequisite probes can also refresh the bundle after its first metadata report.\n    run(\"pnpm\", [\"run\", \"test:desktop-bundle\"]);"));

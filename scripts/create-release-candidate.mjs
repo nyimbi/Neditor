@@ -201,6 +201,12 @@ function refreshPrerequisiteEvidence() {
 }
 
 function refreshBrowserWorkflowEvidence() {
+  const firstAttempt = run(process.execPath, ["scripts/run-e2e.mjs"], {}, {
+    allowFailure: true,
+    allowedFailureReason: "browser-workflow-retry-after-launch-failure",
+  });
+  if (firstAttempt.status === 0) return;
+  sleepSync(2000);
   run(process.execPath, ["scripts/run-e2e.mjs"]);
 }
 
@@ -258,7 +264,7 @@ function walk(directory) {
   return output;
 }
 
-function run(command, args, env = {}) {
+function run(command, args, env = {}, options = {}) {
   const startedAt = new Date().toISOString();
   const result = spawnSync(command, args, { cwd: root, encoding: "utf8", env: { ...process.env, ...env }, stdio: "pipe" });
   const report = {
@@ -269,12 +275,20 @@ function run(command, args, env = {}) {
     stdoutTail: tail(result.stdout || ""),
     stderrTail: tail(result.stderr || ""),
   };
+  if (report.status !== 0 && options.allowFailure) {
+    report.allowedFailure = true;
+    report.allowedFailureReason = options.allowedFailureReason || "allowed-failure";
+  }
   commandResults.push(report);
-  if (report.status !== 0 && !allowBootstrapReadinessFailure(report)) {
+  if (report.status !== 0 && !options.allowFailure && !allowBootstrapReadinessFailure(report)) {
     writeCommandFailure(report);
     fail(`${report.command} failed with exit code ${report.status}`);
   }
   return result;
+}
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function runReadinessBootstrap() {
