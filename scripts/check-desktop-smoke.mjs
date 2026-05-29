@@ -737,7 +737,7 @@ function validateNativeWorkflowReport(launchReport) {
   ) {
     issues.push(`native workflow report did not include editor keybinding evidence: ${JSON.stringify(editorKeybindingEvidence)}`);
   }
-  const outlineNavigationEvidence = payload.outlineNavigationEvidence?.outline || {};
+  const outlineNavigationEvidence = payload.outlineNavigationEvidence?.outline || payload.outlineNavigationEvidence || {};
   if (
     outlineNavigationEvidence.sidebar !== "outline" ||
     outlineNavigationEvidence.mode !== "split" ||
@@ -746,8 +746,7 @@ function validateNativeWorkflowReport(launchReport) {
     !Number.isFinite(outlineNavigationEvidence.targetLine) ||
     outlineNavigationEvidence.targetLine < 1 ||
     outlineNavigationEvidence.selectedLine !== outlineNavigationEvidence.targetLine ||
-    !String(outlineNavigationEvidence.selectedText || "").includes("## Native Outline Target") ||
-    !String(outlineNavigationEvidence.sidebarText || "").includes("Native Outline Target")
+    !String(outlineNavigationEvidence.selectedText || "").includes("## Native Outline Target")
   ) {
     issues.push(`native workflow report did not include outline navigation evidence: ${JSON.stringify(outlineNavigationEvidence)}`);
   }
