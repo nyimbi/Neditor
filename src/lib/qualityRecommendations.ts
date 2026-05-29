@@ -52,7 +52,7 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
   const recommendations: QualityRecommendation[] = [];
   const unresolved = (semantic?.comments || []).filter((comment) => comment.state !== "resolved").length;
   const aiPending = [...(semantic?.ai_sources || []), ...(semantic?.ai_assisted_sections || [])].filter((item) => item.status !== "human-reviewed").length;
-  const placeholderCount = (analysisText.match(PLACEHOLDER_RE) || []).length;
+  const placeholderCount = placeholderMarkerCount(analysisText);
   const citationCount = (analysisText.match(CITATION_RE) || []).length;
   const bibliographyPresent = hasBibliographyEvidence(text);
   const deepResearchDocument = DEEP_RESEARCH_MARKER_RE.test(text);
@@ -67,6 +67,7 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
   const diagnosticErrors = diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
   const diagnosticWarnings = diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length;
   const hasDocumentTitle = Boolean((semantic?.title || frontMatterScalarValue(text, "title") || firstHeading(analysisText)).trim());
+  const layoutSignals = documentLayoutSignals(text);
 
   if (diagnosticErrors || diagnosticWarnings) {
     recommendations.push({
@@ -156,6 +157,33 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
       severity: "improve",
       recommendation: `${uniqueLowercase(genericPhrases).slice(0, 5).join(", ")} may read as generic AI wording.`,
       action: "Replace broad adjectives with named facts, proof points, constraints, and concrete reader outcomes.",
+    });
+  }
+  if (layoutSignals.wideTables && !layoutSignals.hasLandscapeSection) {
+    recommendations.push({
+      id: "layout-wide-tables",
+      label: "Wide table layout",
+      severity: "risk",
+      recommendation: `${layoutSignals.wideTables} wide table(s) may overflow or become hard to read in PDF/DOCX exports.`,
+      action: "Move wide tables, timelines, and compliance matrices into a wide landscape section before export.",
+    });
+  }
+  if (layoutSignals.hasMultiColumnLayout && !layoutSignals.hasExplicitColumnGap) {
+    recommendations.push({
+      id: "layout-column-gutter",
+      label: "Column gutter",
+      severity: "improve",
+      recommendation: "A multi-column layout is present without an explicit column gap, which can produce inconsistent visual density across outputs.",
+      action: "Set `columnGap` or use the two-column/three-column layout presets so preview, PDF, and DOCX spacing stays intentional.",
+    });
+  }
+  if (layoutSignals.hasDenseSectionBreak && !layoutSignals.hasSingleColumnResetAfterDenseSection) {
+    recommendations.push({
+      id: "layout-section-reset",
+      label: "Section layout reset",
+      severity: "improve",
+      recommendation: "A dense columned or landscape section changes the flow but no later single-column portrait reset is visible.",
+      action: "Insert a return-to-single-column layout section before normal narrative, appendices, or reviewer handoff content continues.",
     });
   }
   if (!recommendations.length) {
@@ -278,6 +306,114 @@ function longParagraphCount(text: string) {
   return text
     .split(/\n{2,}/)
     .filter((paragraph) => !paragraph.trim().startsWith("#") && paragraph.trim().split(/\s+/).length > 95).length;
+}
+
+function placeholderMarkerCount(text: string) {
+  return (text.match(PLACEHOLDER_RE) || []).filter((marker) => !isDocumentControlDirective(marker)).length;
+}
+
+function isDocumentControlDirective(marker: string) {
+  return /^\{\{\s*(?:section-break|page-break|include|slide)\b/i.test(marker);
+}
+
+function documentLayoutSignals(text: string) {
+  const layoutText = stripFencedBlocksExceptLayout(text);
+  const lines = layoutText.split(/\r?\n/);
+  const sectionBreaks = lines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => /\{\{\s*section-break\b/i.test(line));
+  const denseSectionBreakIndexes = sectionBreaks
+    .filter(({ line }) => {
+      const columns = Number(line.match(/\bcolumns\s*=\s*(\d+)/i)?.[1] || "0");
+      return columns > 1 || /\borientation\s*=\s*landscape\b/i.test(line);
+    })
+    .map(({ index }) => index);
+  const singleColumnResetIndexes = sectionBreaks
+    .filter(({ line }) => {
+      const columns = Number(line.match(/\bcolumns\s*=\s*(\d+)/i)?.[1] || "0");
+      return columns === 1 && (!/\borientation\s*=/i.test(line) || /\borientation\s*=\s*portrait\b/i.test(line));
+    })
+    .map(({ index }) => index);
+
+  return {
+    hasMultiColumnLayout: /\bcolumns\s*[:=]\s*[2-9]\b/i.test(layoutText),
+    hasExplicitColumnGap: /\b(?:columnGap|column-gap|column_gap|gutter|columnGutter|column_gutter)\s*[:=]\s*["']?[^\s}"']+/i.test(layoutText),
+    hasLandscapeSection: /\{\{\s*section-break\b[^}]*\borientation\s*=\s*landscape\b/i.test(layoutText),
+    hasDenseSectionBreak: denseSectionBreakIndexes.length > 0,
+    hasSingleColumnResetAfterDenseSection: denseSectionBreakIndexes.some((index) => singleColumnResetIndexes.some((resetIndex) => resetIndex > index)),
+    wideTables: wideMarkdownTableCount(layoutText),
+  };
+}
+
+function stripFencedBlocksExceptLayout(text: string) {
+  const kept: string[] = [];
+  let fenceMarker = "";
+  let keepingFence = false;
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trimStart();
+    if (fenceMarker) {
+      if (keepingFence) kept.push(line);
+      if (trimmed.startsWith(fenceMarker)) {
+        fenceMarker = "";
+        keepingFence = false;
+      }
+      continue;
+    }
+    const opener = markdownFenceOpener(line);
+    if (opener) {
+      fenceMarker = opener.marker;
+      keepingFence = opener.language === "layout";
+      if (keepingFence) kept.push(line);
+      continue;
+    }
+    kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+function wideMarkdownTableCount(text: string) {
+  const lines = stripFencedBlocksExceptLayout(text).split(/\r?\n/);
+  let count = 0;
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const headerCells = markdownTableCellCount(lines[index]);
+    if (headerCells < 5) continue;
+    const separatorCells = markdownTableSeparatorCellCount(lines[index + 1]);
+    if (separatorCells >= 2) count += 1;
+  }
+  return count;
+}
+
+function markdownTableCellCount(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed.includes("|")) return 0;
+  const withoutOuterPipes = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  return splitMarkdownTableCells(withoutOuterPipes).filter((cell) => cell.trim()).length;
+}
+
+function markdownTableSeparatorCellCount(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed.includes("|")) return 0;
+  const withoutOuterPipes = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  const cells = splitMarkdownTableCells(withoutOuterPipes).map((cell) => cell.trim());
+  return cells.every((cell) => /^:?-{3,}:?$/.test(cell)) ? cells.length : 0;
+}
+
+function splitMarkdownTableCells(row: string) {
+  const cells: string[] = [];
+  let current = "";
+  let escaped = false;
+  for (const char of row) {
+    if (char === "|" && !escaped) {
+      cells.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+    escaped = char === "\\" && !escaped;
+    if (char !== "\\") escaped = false;
+  }
+  cells.push(current);
+  return cells;
 }
 
 function firstHeading(text: string) {

@@ -43,9 +43,17 @@ section-level columns, landscape/wide sections, reset-to-single-column flow,
 supported gutter keys, and export behavior for HTML, PDF, DOCX, and bundle
 manifests.
 
+Quality recommendations now also inspect layout intent before export. They
+warn when wide tables are likely to overflow without a landscape section, when
+multi-column sections omit explicit gutter spacing, and when a dense
+columned/landscape section is not followed by a visible single-column portrait
+reset. The placeholder detector also treats `section-break`, `page-break`,
+`include`, and `slide` as document-control directives instead of unresolved
+business placeholders.
+
 | Check | Result | Evidence |
 | --- | --- | --- |
-| `pnpm run test:unit` | Pass | 119 frontend unit/static tests passed, including the new document layout preset coverage and static guards that the toolbar, Writing Tools menu, and command palette expose layout insertion controls. |
+| `pnpm run test:unit` | Pass | 121 frontend unit/static tests passed, including document layout preset coverage, static guards that the toolbar/menu/command palette expose layout insertion controls, and layout QA checks for wide tables, gutters, resets, and directive-safe placeholder detection. |
 | `pnpm run check` | Pass | Vue typecheck completed cleanly after adding the shared layout preset module and app wiring. |
 | Browser e2e suite | Not rerun | Existing Chromium workflow coverage was updated to assert the Writing Tools layout menu items and command-palette two-column insertion, but the browser batch was deferred to conserve battery until the next larger executable verification batch. |
 

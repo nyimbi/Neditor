@@ -3832,6 +3832,84 @@ test("quality recommendations pass when a reviewed document has baseline structu
   equal(formatQualityRecommendationSummary(recommendations), "0 blockers, 0 risks, 0 improvements");
 });
 
+test("quality recommendations flag layout risks before business export", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "# Proposal",
+      "",
+      "## Evidence",
+      "",
+      "| Requirement | Owner | Deadline | Status | Evidence |",
+      "| --- | --- | --- | --- | --- |",
+      "| Integration | CTO | 2026-06-30 | Open | Architecture appendix |",
+      "",
+      "{{section-break columns=2}}",
+      "",
+      "## Market Analysis",
+      "",
+      "Columned content continues here.",
+    ].join("\n"),
+    semantic: {
+      title: "Proposal",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  const ids = new Set(recommendations.map((item) => item.id));
+  ok(ids.has("layout-wide-tables"));
+  ok(ids.has("layout-column-gutter"));
+  ok(ids.has("layout-section-reset"));
+  equal(recommendations.find((item) => item.id === "layout-wide-tables")?.severity, "risk");
+  equal(formatQualityRecommendationSummary(recommendations), "0 blockers, 1 risks, 2 improvements");
+});
+
+test("quality recommendations accept intentional layout controls", () => {
+  const recommendations = buildQualityRecommendations({
+    text: [
+      "# Board Pack",
+      "",
+      "{{section-break columns=1 pageSize=letter orientation=landscape margins=narrow}}",
+      "",
+      "## Compliance Matrix",
+      "",
+      "| Requirement | Owner | Deadline | Status | Evidence |",
+      "| --- | --- | --- | --- | --- |",
+      "| Integration | CTO | 2026-06-30 | Complete | Architecture appendix |",
+      "",
+      "```layout",
+      "columns: 2",
+      "columnGap: 18pt",
+      "section: analysis",
+      "```",
+      "",
+      "## Analysis",
+      "",
+      "Columned content continues here.",
+      "",
+      "{{section-break columns=1 margins=normal orientation=portrait}}",
+      "",
+      "## Review",
+      "",
+      "Ready for final reader review.",
+    ].join("\n"),
+    semantic: {
+      title: "Board Pack",
+      comments: [],
+      ai_sources: [],
+      ai_assisted_sections: [],
+    },
+    diagnostics: [],
+  });
+
+  ok(!recommendations.some((item) => item.id === "layout-wide-tables"));
+  ok(!recommendations.some((item) => item.id === "layout-column-gutter"));
+  ok(!recommendations.some((item) => item.id === "layout-section-reset"));
+  deepEqual(recommendations.map((item) => item.id), ["qa-ready"]);
+});
+
 test("quality recommendations recognize tilde fenced bibliography sources", () => {
   const recommendations = buildQualityRecommendations({
     text: [
