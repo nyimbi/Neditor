@@ -60,6 +60,8 @@ prerequisite builds can refresh `src-tauri/target/release/ned` after
 re-runs `pnpm run prepare:sidecars` after prerequisite evidence refresh so the
 prepared `src-tauri/binaries/ned-*` helper is synchronized with the final
 release CLI binary before artifact hashes and `SHA256SUMS` are collected.
+The same post-refresh step now reruns `pnpm run test:desktop-bundle` so the
+macOS app-bundle report is current after DMG/app prerequisite probes.
 
 | Check | Result | Evidence |
 | --- | --- | --- |

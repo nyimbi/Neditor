@@ -36,6 +36,8 @@ if (!skipEvidence) {
     refreshPrerequisiteEvidence();
     // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.
     run("pnpm", ["run", "prepare:sidecars"]);
+    // DMG/app prerequisite probes can also refresh the bundle after its first metadata report.
+    run("pnpm", ["run", "test:desktop-bundle"]);
   }
   runReadinessBootstrap();
   run("pnpm", ["run", "collect:evidence-kit"]);

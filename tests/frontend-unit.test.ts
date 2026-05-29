@@ -9043,7 +9043,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("refreshNativeLaunchEvidence"));
   ok(releaseCandidate.includes("refreshPrerequisiteEvidence"));
   ok(releaseCandidate.includes("Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars."));
-  ok(releaseCandidate.includes("refreshPrerequisiteEvidence();\n    // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.\n    run(\"pnpm\", [\"run\", \"prepare:sidecars\"]);"));
+  ok(releaseCandidate.includes("DMG/app prerequisite probes can also refresh the bundle after its first metadata report."));
+  ok(releaseCandidate.includes("refreshPrerequisiteEvidence();\n    // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.\n    run(\"pnpm\", [\"run\", \"prepare:sidecars\"]);\n    // DMG/app prerequisite probes can also refresh the bundle after its first metadata report.\n    run(\"pnpm\", [\"run\", \"test:desktop-bundle\"]);"));
   ok(releaseCandidate.includes("NEDITOR_DESKTOP_SMOKE_LAUNCH"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"prepare:sidecars\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:release-ci\"]"));
