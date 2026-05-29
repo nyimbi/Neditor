@@ -1675,7 +1675,7 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
       Math.min(evaluationCriteria.length, 4) * 3 +
       Math.min(scoringWeights.length, 5) * 2 +
       Math.min(mandatoryAttachments.length, 5) * 2 +
-      Math.min(annexReferences.length, 5) * 2 +
+      Math.min(annexReferences.length, 5) * 2 -
       warnings.length * 5,
   )));
 

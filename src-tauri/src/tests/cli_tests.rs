@@ -566,6 +566,13 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     assert!(response_text.contains("## Compliance Matrix"));
     assert!(response_text.contains("Extract the evaluator model, scoring weights"));
     assert!(response_text.contains("Terms of Reference map"));
+    assert!(response_text.contains("### 1. RFP Metadata"));
+    assert!(response_text.contains("### 2. Scoring Scheme and Page Allocation"));
+    assert!(response_text.contains("| Criterion | Weight | Sub-criterion | Sub-weight |"));
+    assert!(response_text.contains("### 3. Mandatory Pass/Fail Gates"));
+    assert!(response_text.contains("### 4. Terms of Reference Map"));
+    assert!(response_text.contains("#### 12. Required Annexes"));
+    assert!(response_text.contains("### Critical Disqualifiers Checklist"));
     assert!(response_text.contains("### Technical Methodology Draft"));
     assert!(response_text.contains("### Sustainability and Transition Draft"));
     assert!(response_text.contains("### Risk, QA, Validation, and KPI Draft"));

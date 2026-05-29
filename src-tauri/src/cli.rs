@@ -10064,10 +10064,9 @@ fn rfp_cli_response_markdown(
         "".to_string(),
         rfp_cli_proposal_planning_prompt_markdown(analysis, context_notes),
         "".to_string(),
-        "## Proposal Outline".to_string(),
+        rfp_cli_proposal_outline_markdown(analysis),
         "".to_string(),
     ]);
-    lines.extend(rfp_cli_proposal_outline_bullets(analysis));
     lines.extend([
         "".to_string(),
         rfp_cli_evaluator_section_drafts_markdown(analysis, &company, &client, context_notes),
@@ -10440,38 +10439,807 @@ fn rfp_cli_proposal_planning_prompt_markdown(
     lines.join("\n")
 }
 
-fn rfp_cli_proposal_outline_bullets(analysis: &RfpCliAnalysis) -> Vec<String> {
+fn rfp_cli_proposal_outline_markdown(analysis: &RfpCliAnalysis) -> String {
+    let (page_limit, page_limit_source) = rfp_cli_page_limit_source(analysis);
+    let submission_deadline = rfp_cli_submission_deadline_source(analysis);
+    let currency = rfp_cli_currency_source(analysis);
+    let evaluation_model = rfp_cli_evaluation_model(analysis);
+    let pass_fail = rfp_cli_pass_fail_gates(analysis);
+    let page_allocations = rfp_cli_page_allocations(page_limit, &analysis.scoring_weights);
+    let activities = rfp_cli_outline_items(
+        analysis,
+        &["activity", "task", "work package", "workstream", "phase"],
+        "Primary ToR activity - describe approach, tools, outputs, and acceptance evidence",
+        8,
+    );
+    let deliverables = rfp_cli_outline_items(
+        analysis,
+        &[
+            "deliverable",
+            "output",
+            "report",
+            "prototype",
+            "platform",
+            "manual",
+            "training",
+            "handover",
+        ],
+        "Deliverable register - list outputs, acceptance criteria, owners, and proof",
+        10,
+    );
+    let milestones = rfp_cli_outline_items(
+        analysis,
+        &[
+            "month",
+            "week",
+            "days",
+            "deadline",
+            "submission",
+            "milestone",
+            "inception",
+            "prototype",
+            "final",
+        ],
+        "Submission and delivery schedule - add dates, dependencies, approval windows, and owners",
+        10,
+    );
+    let approval_periods = rfp_cli_outline_items(
+        analysis,
+        &["approval", "review", "acceptance", "sign-off", "steering"],
+        "Approval period - confirm buyer review window, decision owner, and fallback",
+        6,
+    );
+    let team_rows = rfp_cli_team_requirement_rows(analysis);
+    let technical_mandates = rfp_cli_outline_items(
+        analysis,
+        &[
+            "open-source",
+            "license",
+            "licence",
+            "interoperab",
+            "standard",
+            "api",
+            "data",
+            "integration",
+            "hosting",
+            "cloud",
+            "source code",
+        ],
+        "[CLARIFICATION NEEDED: confirm open-source, interoperability, data-format, hosting, and API mandates]",
+        10,
+    );
+    let sustainability = rfp_cli_outline_items(
+        analysis,
+        &[
+            "sustainab",
+            "maintenance",
+            "maintain",
+            "roadmap",
+            "handover",
+            "transition",
+            "support",
+            "operations",
+            "knowledge transfer",
+        ],
+        "[CLARIFICATION NEEDED: confirm maintenance, handover, transition, and post-project support obligations]",
+        8,
+    );
+    let risk_qa = rfp_cli_outline_items(
+        analysis,
+        &[
+            "risk",
+            "mitigation",
+            "quality",
+            "qa",
+            "testing",
+            "validation",
+            "pilot",
+            "kpi",
+            "monitoring",
+            "acceptance",
+        ],
+        "[CLARIFICATION NEEDED: confirm risk, QA, validation, monitoring, acceptance, and KPI obligations]",
+        10,
+    );
+    let methodology_pages = rfp_cli_page_allocation_for(
+        &page_allocations,
+        "Proposed Methodology & Technical Approach",
+        "4-5",
+    );
+    let team_pages = rfp_cli_page_allocation_for(
+        &page_allocations,
+        "Team Organization & Key Personnel",
+        "2-3",
+    );
+    let org_pages = rfp_cli_page_allocation_for(
+        &page_allocations,
+        "Organizational Capacity & Past Performance",
+        "2-3",
+    );
     let mut lines = vec![
-        "- Executive Summary".to_string(),
-        "- Assignment Understanding & Delivery Approach".to_string(),
-        "- Proposed Methodology & Technical Approach".to_string(),
+        "## Proposal Outline".to_string(),
+        "".to_string(),
+        "### 1. RFP Metadata".to_string(),
+        "".to_string(),
+        format!("- Submission deadline: {submission_deadline}"),
+        format!("- Page limit: {page_limit_source}"),
+        format!("- Currency: {currency}"),
+        format!("- Evaluation model: {evaluation_model}"),
+        format!(
+            "- Pass/fail criteria: {}",
+            if pass_fail.is_empty() {
+                "No explicit automatic-exclusion wording detected; manual confirmation required"
+                    .to_string()
+            } else {
+                format!("{} detected", pass_fail.len())
+            }
+        ),
+        "".to_string(),
+        "### 2. Scoring Scheme and Page Allocation".to_string(),
+        "".to_string(),
+        "| Criterion | Weight | Sub-criterion | Sub-weight |".to_string(),
+        "| --- | --- | --- | --- |".to_string(),
     ];
-    let technical_rows = analysis
-        .compliance_rows
-        .iter()
-        .filter(|row| row.response_section == "Technical Response")
-        .take(6)
-        .collect::<Vec<_>>();
-    if technical_rows.is_empty() {
-        lines.push("  - Primary ToR activity".to_string());
+    if analysis.scoring_weights.is_empty() {
+        lines.push(
+            "| No explicit weights detected | Assumed equal | Major proposal sections | Equal split |"
+                .to_string(),
+        );
     } else {
-        for row in technical_rows {
-            lines.push(format!("  - {}: {}", row.id, row.requirement));
+        for item in &analysis.scoring_weights {
+            lines.push(format!(
+                "| {} | {} | {} | {} |",
+                table_cell(&item.criterion),
+                rfp_cli_scoring_weight_display(item),
+                table_cell(rfp_cli_subcriterion_for_scoring(&item.criterion)),
+                table_cell(&rfp_cli_subweight_for_scoring(item)),
+            ));
         }
     }
     lines.extend([
-        "- Work Plan & Timeline".to_string(),
-        "- Team Organization & Key Personnel".to_string(),
-        "- Organizational Capacity & Past Performance".to_string(),
-        "- Technical Standards, Data, and Integration Approach".to_string(),
-        "- Risk Management & Mitigation".to_string(),
-        "- Quality Assurance & Monitoring".to_string(),
-        "- Sustainability & Transition Plan".to_string(),
-        "- Compliance Summary Table".to_string(),
-        "- Required Annexes".to_string(),
-        "- Critical Disqualifiers Checklist".to_string(),
+        "".to_string(),
+        "| Proposal section | Suggested pages | Basis |".to_string(),
+        "| --- | --- | --- |".to_string(),
     ]);
-    lines
+    for (section, pages, basis) in &page_allocations {
+        lines.push(format!(
+            "| {} | {} | {} |",
+            table_cell(section),
+            table_cell(pages),
+            table_cell(basis),
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "### 3. Mandatory Pass/Fail Gates".to_string(),
+        "".to_string(),
+        "| Gate | Requirement | Where addressed |".to_string(),
+        "| --- | --- | --- |".to_string(),
+    ]);
+    if pass_fail.is_empty() {
+        lines.push("| PF-01 | No explicit automatic-exclusion wording detected | Reviewer must inspect full RFP and add gates |".to_string());
+    } else {
+        for (index, item) in pass_fail.iter().enumerate() {
+            lines.push(format!(
+                "| PF-{:02} | {} | Compliance checklist, response section, and signed annex or evidence pack |",
+                index + 1,
+                table_cell(item),
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "### 4. Terms of Reference Map".to_string(),
+        "".to_string(),
+        "#### 4.1 Activities".to_string(),
+        "".to_string(),
+    ]);
+    for (index, item) in activities.iter().enumerate() {
+        lines.push(format!(
+            "- {}. {} - *Describe approach, tools, outputs, acceptance checks, and evidence*",
+            index + 1,
+            item
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "#### 4.2 Deliverables".to_string(),
+        "".to_string(),
+    ]);
+    for item in &deliverables {
+        lines.push(format!(
+            "- {item} - *Define output, acceptance criteria, owner, and proof*"
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "#### 4.3 Timeline Milestones and Approval Periods".to_string(),
+        "".to_string(),
+    ]);
+    for item in milestones.iter().chain(approval_periods.iter()) {
+        lines.push(format!(
+            "- {item} - *Map date, dependency, reviewer, and fallback*"
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "#### 4.4 Required Annexes".to_string(),
+        "".to_string(),
+        "| Annex | Purpose | Page-limit treatment | Reference |".to_string(),
+        "| --- | --- | --- | --- |".to_string(),
+    ]);
+    if analysis.annex_references.is_empty() {
+        lines.push("| Annexes | List all required forms and schedules | Confirm page-limit treatment | Manual review |".to_string());
+    } else {
+        for annex in &analysis.annex_references {
+            lines.push(format!(
+                "| {} | {} | Confirm page-limit treatment | Source line {} |",
+                table_cell(&annex.annex),
+                table_cell(if annex.label.is_empty() {
+                    &annex.requirement
+                } else {
+                    &annex.label
+                }),
+                annex.source_line,
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "### 5. Team Composition and Experience Requirements".to_string(),
+        "".to_string(),
+        "| Role | Minimum requirement | Proposed name | Reference |".to_string(),
+        "| --- | --- | --- | --- |".to_string(),
+    ]);
+    for row in team_rows {
+        lines.push(row);
+    }
+    lines.extend([
+        "".to_string(),
+        "### 6. Technical Mandates".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(technical_mandates.iter().map(|item| format!("- {item}")));
+    lines.extend([
+        "".to_string(),
+        "### 7. Sustainability, Risk, QA, and KPI Signals".to_string(),
+        "".to_string(),
+        "#### 7.1 Sustainability and Transition".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(sustainability.iter().map(|item| format!("- {item}")));
+    lines.extend([
+        "".to_string(),
+        "#### 7.2 Risk, QA, Validation, and KPIs".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(risk_qa.iter().map(|item| format!("- {item}")));
+    lines.extend([
+        "".to_string(),
+        "### Technical Proposal Outline".to_string(),
+        "".to_string(),
+        format!(
+            "#### 1. Executive Summary ({})",
+            rfp_cli_page_allocation_for(&page_allocations, "Executive Summary", "0.5")
+        ),
+        "- *High-level value proposition*".to_string(),
+        "- *Mandatory-gate coverage statement*".to_string(),
+        "- *Approach and differentiators*".to_string(),
+        "".to_string(),
+        format!(
+            "#### 2. Assignment Understanding & Delivery Approach ({})",
+            rfp_cli_page_allocation_for(
+                &page_allocations,
+                "Assignment Understanding & Delivery Approach",
+                "1"
+            )
+        ),
+        "- *Context and buyer challenges*".to_string(),
+        "- *Delivery principles and win themes*".to_string(),
+        "- *Stated and implied intent response*".to_string(),
+        "".to_string(),
+        format!("#### 3. Proposed Methodology & Technical Approach ({methodology_pages})"),
+    ]);
+    for (index, item) in activities.iter().enumerate() {
+        lines.push(format!(
+            "##### 3.{} {item}\n- *Describe approach, tools, outputs, acceptance checks, and evidence*",
+            index + 1
+        ));
+    }
+    lines.extend([
+        format!(
+            "##### 3.{} Technology & Standards Summary",
+            activities.len() + 1
+        ),
+        "- *Open-source, interoperability, APIs, data formats, hosting constraints*".to_string(),
+        "".to_string(),
+        format!(
+            "#### 4. Work Plan & Timeline ({})",
+            rfp_cli_page_allocation_for(&page_allocations, "Work Plan & Timeline", "1")
+        ),
+        "- *Milestone table or Gantt summary*".to_string(),
+        "- *Approval periods and dependencies*".to_string(),
+        "- *Annex D reference if required*".to_string(),
+        "".to_string(),
+        format!("#### 5. Team Organization & Key Personnel ({team_pages})"),
+        "- *Team Lead mandatory evidence*".to_string(),
+        "- *Responsibility matrix: Role | Name/TBC | ToR activity | Key qualifications*"
+            .to_string(),
+        "- *Specialist support, consortium, and subcontractor roles if applicable*".to_string(),
+        "".to_string(),
+        format!("#### 6. Organizational Capacity & Past Performance ({org_pages})"),
+        "- *Firm profile*".to_string(),
+        "- *Relevant project summaries*".to_string(),
+        "- *Financial capacity and references*".to_string(),
+        "".to_string(),
+        format!(
+            "#### 7. Open Data, Licensing & Governance Statement ({})",
+            rfp_cli_page_allocation_for(
+                &page_allocations,
+                "Open Data, Licensing & Governance Statement",
+                "0.5-1"
+            )
+        ),
+        "- *License proposals for data, code, documentation*".to_string(),
+        "- *Governance model and contributor workflow*".to_string(),
+        "".to_string(),
+        format!(
+            "#### 8. Risk Management & Mitigation ({})",
+            rfp_cli_page_allocation_for(&page_allocations, "Risk Management & Mitigation", "0.5")
+        ),
+        "- *Top risks and mitigations table*".to_string(),
+        "".to_string(),
+        format!(
+            "#### 9. Quality Assurance & Monitoring ({})",
+            rfp_cli_page_allocation_for(&page_allocations, "Quality Assurance & Monitoring", "0.5")
+        ),
+        "- *KPIs and acceptance checks*".to_string(),
+        "- *Testing, validation, feedback loops*".to_string(),
+        "".to_string(),
+        format!(
+            "#### 10. Sustainability & Transition Plan ({})",
+            rfp_cli_page_allocation_for(
+                &page_allocations,
+                "Sustainability & Transition Plan",
+                "0.5-1"
+            )
+        ),
+        "- *Hosting, maintenance, post-project support*".to_string(),
+        "- *Handover deliverables and runbooks*".to_string(),
+        "".to_string(),
+        format!(
+            "#### 11. Compliance Summary Table ({})",
+            rfp_cli_page_allocation_for(&page_allocations, "Compliance Summary Table", "1")
+        ),
+        "- *Map each mandatory requirement to section or annex*".to_string(),
+        "".to_string(),
+        "#### 12. Required Annexes (not counted unless RFP says otherwise)".to_string(),
+    ]);
+    if analysis.annex_references.is_empty() {
+        lines.push("- *Annex B/C/D/E/F/H and buyer forms after source confirmation*".to_string());
+    } else {
+        lines.extend(analysis.annex_references.iter().map(|item| {
+            format!(
+                "- {} - *{}*",
+                item.annex,
+                if item.label.is_empty() {
+                    "Confirm title and format"
+                } else {
+                    item.label.as_str()
+                }
+            )
+        }));
+    }
+    lines.extend([
+        "".to_string(),
+        "### Critical Disqualifiers Checklist".to_string(),
+        "".to_string(),
+    ]);
+    if pass_fail.is_empty() {
+        lines.push(
+            "- [ ] No explicit automatic-exclusion wording detected - *manual source review required*"
+                .to_string(),
+        );
+    } else {
+        lines.extend(pass_fail.iter().map(|item| {
+            format!(
+                "- [ ] {} - *map to response section, evidence, and reviewer sign-off*",
+                item
+            )
+        }));
+    }
+    lines.join("\n")
+}
+
+fn rfp_cli_analysis_texts(analysis: &RfpCliAnalysis) -> Vec<String> {
+    let mut values = Vec::new();
+    values.extend(analysis.requirements.iter().map(|item| item.text.clone()));
+    values.extend(analysis.timelines.clone());
+    values.extend(analysis.budget_hints.clone());
+    values.extend(analysis.evaluation_criteria.clone());
+    values.extend(analysis.mandatory_attachments.clone());
+    values.extend(analysis.capabilities.clone());
+    values.extend(analysis.stated_intent.clone());
+    values.extend(analysis.implied_intent.clone());
+    values.extend(analysis.risks.clone());
+    values
+}
+
+fn rfp_cli_outline_items(
+    analysis: &RfpCliAnalysis,
+    needles: &[&str],
+    fallback: &str,
+    limit: usize,
+) -> Vec<String> {
+    let mut output = Vec::new();
+    let mut seen = Vec::<String>::new();
+    for value in rfp_cli_analysis_texts(analysis) {
+        let lower = value.to_ascii_lowercase();
+        if !contains_any(&lower, needles) {
+            continue;
+        }
+        let clean = normalize_cli_whitespace(&value);
+        let key = clean.to_ascii_lowercase();
+        if clean.is_empty() || seen.iter().any(|seen_key| seen_key == &key) {
+            continue;
+        }
+        seen.push(key);
+        output.push(clean);
+        if output.len() >= limit {
+            break;
+        }
+    }
+    if output.is_empty() {
+        output.push(fallback.to_string());
+    }
+    output
+}
+
+fn rfp_cli_submission_deadline_source(analysis: &RfpCliAnalysis) -> String {
+    analysis
+        .timelines
+        .iter()
+        .find(|line| {
+            let lower = line.to_ascii_lowercase();
+            contains_any(
+                &lower,
+                &[
+                    "submission deadline",
+                    "deadline for submission",
+                    "due no later than",
+                    "closing date",
+                    "proposals due",
+                    "submit by",
+                ],
+            )
+        })
+        .cloned()
+        .unwrap_or_else(|| "Not specified - confirm deadline, time, and time zone".to_string())
+}
+
+fn rfp_cli_page_limit_source(analysis: &RfpCliAnalysis) -> (usize, String) {
+    for value in rfp_cli_analysis_texts(analysis) {
+        let lower = value.to_ascii_lowercase();
+        if !(lower.contains("page")
+            && contains_any(&lower, &["maximum", "limit", "not exceed", "no more than"]))
+        {
+            continue;
+        }
+        for token in lower.split(|ch: char| !ch.is_ascii_digit()) {
+            let Ok(pages) = token.parse::<usize>() else {
+                continue;
+            };
+            if (1..=300).contains(&pages) {
+                return (pages, format!("{pages} pages ({value})"));
+            }
+        }
+    }
+    (15, "Not specified - assume 15 pages".to_string())
+}
+
+fn rfp_cli_currency_source(analysis: &RfpCliAnalysis) -> String {
+    for value in &analysis.budget_hints {
+        let upper = value.to_ascii_uppercase();
+        for code in [
+            "USD", "EUR", "GBP", "KES", "CAD", "AUD", "ZAR", "CHF", "JPY",
+        ] {
+            if upper.contains(code) {
+                return code.to_string();
+            }
+        }
+        if value.contains('$') {
+            return "USD or local dollar - confirm".to_string();
+        }
+        if value.contains('€') {
+            return "EUR".to_string();
+        }
+        if value.contains('£') {
+            return "GBP".to_string();
+        }
+    }
+    "Not specified".to_string()
+}
+
+fn rfp_cli_evaluation_model(analysis: &RfpCliAnalysis) -> String {
+    if let Some(line) = analysis.evaluation_criteria.iter().find(|line| {
+        let lower = line.to_ascii_lowercase();
+        contains_any(
+            &lower,
+            &[
+                "qcbs",
+                "quality and cost",
+                "least cost",
+                "fixed budget",
+                "best value",
+                "technical and financial",
+                "quality-based",
+            ],
+        )
+    }) {
+        return line.clone();
+    }
+    let technical: u16 = analysis
+        .scoring_weights
+        .iter()
+        .filter(|item| {
+            let lower = item.criterion.to_ascii_lowercase();
+            contains_any(
+                &lower,
+                &[
+                    "technical",
+                    "methodology",
+                    "team",
+                    "experience",
+                    "approach",
+                    "quality",
+                ],
+            )
+        })
+        .map(|item| item.weight)
+        .sum();
+    let cost: u16 = analysis
+        .scoring_weights
+        .iter()
+        .filter(|item| {
+            let lower = item.criterion.to_ascii_lowercase();
+            contains_any(&lower, &["price", "cost", "financial", "commercial"])
+        })
+        .map(|item| item.weight)
+        .sum();
+    if technical > 0 && cost > 0 {
+        format!(
+            "Inferred QCBS / technical-financial scoring ({technical}:{cost} by detected weights)"
+        )
+    } else if technical > 0 {
+        "Inferred quality-based evaluation from technical scoring weights".to_string()
+    } else {
+        "Not explicit - infer after confirming evaluation weights".to_string()
+    }
+}
+
+fn rfp_cli_pass_fail_gates(analysis: &RfpCliAnalysis) -> Vec<String> {
+    if !analysis.critical_disqualifiers.is_empty() {
+        return analysis.critical_disqualifiers.clone();
+    }
+    analysis
+        .compliance_rows
+        .iter()
+        .filter(|row| row.disqualification_risk || row.requirement_type == "MANDATORY")
+        .take(10)
+        .map(|row| format!("{}: {}", row.id, row.requirement))
+        .collect()
+}
+
+fn rfp_cli_page_allocations(
+    total_pages: usize,
+    weights: &[RfpCliScoringWeight],
+) -> Vec<(String, String, String)> {
+    let sections = vec![
+        ("Executive Summary", "0.5", "Front matter and win theme"),
+        (
+            "Assignment Understanding & Delivery Approach",
+            "1",
+            "Buyer context and stated/implied intent",
+        ),
+        (
+            "Proposed Methodology & Technical Approach",
+            "4-5",
+            "Default largest technical scoring section",
+        ),
+        (
+            "Work Plan & Timeline",
+            "1",
+            "Milestones, approvals, and Gantt reference",
+        ),
+        (
+            "Team Organization & Key Personnel",
+            "2-3",
+            "Default team and CV scoring section",
+        ),
+        (
+            "Organizational Capacity & Past Performance",
+            "2-3",
+            "Default experience and firm capability section",
+        ),
+        (
+            "Open Data, Licensing & Governance Statement",
+            "0.5-1",
+            "Technical mandate coverage",
+        ),
+        ("Risk Management & Mitigation", "0.5", "Risk controls"),
+        (
+            "Quality Assurance & Monitoring",
+            "0.5",
+            "QA and KPI coverage",
+        ),
+        (
+            "Sustainability & Transition Plan",
+            "0.5-1",
+            "Handover and operating model",
+        ),
+        (
+            "Compliance Summary Table",
+            "1",
+            "Mandatory requirement traceability",
+        ),
+    ];
+    let total_weight: u16 = weights
+        .iter()
+        .filter(|item| item.unit == "points")
+        .map(|item| item.weight)
+        .sum();
+    sections
+        .into_iter()
+        .map(|(section, fallback_pages, fallback_basis)| {
+            if let Some(weight) = weights
+                .iter()
+                .find(|weight| rfp_cli_section_matches_weight(section, &weight.criterion))
+            {
+                let basis_total = if weight.unit == "%" {
+                    100.0
+                } else {
+                    f64::from(total_weight.max(weight.weight))
+                };
+                let pages = ((total_pages as f64) * (f64::from(weight.weight) / basis_total) * 2.0)
+                    .round()
+                    / 2.0;
+                let pages = pages.max(0.5);
+                (
+                    section.to_string(),
+                    rfp_cli_format_pages(pages),
+                    format!(
+                        "{} detected for {}",
+                        rfp_cli_scoring_weight_display(weight),
+                        weight.criterion
+                    ),
+                )
+            } else if weights.is_empty() {
+                (
+                    section.to_string(),
+                    fallback_pages.to_string(),
+                    format!(
+                        "{fallback_basis}; no explicit weights, {total_pages}-page assumed cap"
+                    ),
+                )
+            } else {
+                (
+                    section.to_string(),
+                    fallback_pages.to_string(),
+                    fallback_basis.to_string(),
+                )
+            }
+        })
+        .collect()
+}
+
+fn rfp_cli_format_pages(pages: f64) -> String {
+    if (pages.fract()).abs() < f64::EPSILON {
+        format!("{}", pages as usize)
+    } else {
+        format!("{pages:.1}")
+    }
+}
+
+fn rfp_cli_section_matches_weight(section: &str, criterion: &str) -> bool {
+    let section = section.to_ascii_lowercase();
+    let criterion = criterion.to_ascii_lowercase();
+    if contains_any(&section, &["methodology", "technical", "approach"])
+        && contains_any(&criterion, &["method", "approach", "technical", "solution"])
+    {
+        return true;
+    }
+    if contains_any(&section, &["team", "personnel", "key"])
+        && contains_any(
+            &criterion,
+            &["team", "personnel", "key", "staff", "experience"],
+        )
+    {
+        return true;
+    }
+    if contains_any(&section, &["capacity", "past performance", "experience"])
+        && contains_any(&criterion, &["experience", "past", "capacity", "reference"])
+    {
+        return true;
+    }
+    contains_any(&section, &["work plan", "timeline"])
+        && contains_any(&criterion, &["work plan", "timeline", "schedule"])
+}
+
+fn rfp_cli_page_allocation_for(
+    allocations: &[(String, String, String)],
+    section: &str,
+    fallback: &str,
+) -> String {
+    allocations
+        .iter()
+        .find(|(candidate, _, _)| candidate == section)
+        .map(|(_, pages, _)| pages.clone())
+        .unwrap_or_else(|| fallback.to_string())
+}
+
+fn rfp_cli_subcriterion_for_scoring(criterion: &str) -> &'static str {
+    let lower = criterion.to_ascii_lowercase();
+    if contains_any(&lower, &["method", "approach", "technical"]) {
+        "*Understanding, methodology, work plan*"
+    } else if contains_any(&lower, &["team", "personnel", "lead"]) {
+        "*Team Lead, role fit, CV evidence*"
+    } else if contains_any(&lower, &["experience", "past", "capacity"]) {
+        "*Relevant projects, references, firm capacity*"
+    } else if contains_any(&lower, &["price", "cost", "financial"]) {
+        "*Financial proposal; separate response if required*"
+    } else {
+        "*Confirm sub-criteria in RFP*"
+    }
+}
+
+fn rfp_cli_subweight_for_scoring(item: &RfpCliScoringWeight) -> String {
+    if item.weight >= 15 {
+        "*Split across detected sub-criteria*".to_string()
+    } else {
+        rfp_cli_scoring_weight_display(item)
+    }
+}
+
+fn rfp_cli_team_requirement_rows(analysis: &RfpCliAnalysis) -> Vec<String> {
+    let mut rows = analysis
+        .compliance_rows
+        .iter()
+        .filter(|row| row.category == "Team and Experience")
+        .take(12)
+        .map(|row| {
+            let role = row
+                .requirement
+                .split([':', '|', ';', '.'])
+                .next()
+                .map(normalize_cli_whitespace)
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| "Required role".to_string());
+            format!(
+                "| {} | {} | *Name or TBC* | Source line {} |",
+                table_cell(&role),
+                table_cell(&row.requirement),
+                row.source_line,
+            )
+        })
+        .collect::<Vec<_>>();
+    if !analysis.bilingual_requirements.is_empty()
+        && !rows
+            .iter()
+            .any(|row| row.to_ascii_lowercase().contains("bilingual"))
+    {
+        rows.push("| Bilingual EN/FR delivery capability | Confirm French/English workshop, training-material, and review coverage | *Name or TBC* | Language scan |".to_string());
+    }
+    if rows.is_empty() {
+        rows.push(
+            "| Team Lead | *Confirm minimum requirements* | *Name or TBC* | RFP team scan |"
+                .to_string(),
+        );
+        rows.push(
+            "| Core Team | *Map roles to ToR activities* | *Names or TBC* | RFP team scan |"
+                .to_string(),
+        );
+    }
+    rows
 }
 
 fn rfp_cli_evaluator_section_drafts_markdown(

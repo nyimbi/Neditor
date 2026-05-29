@@ -3713,6 +3713,12 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(analysis.complianceRows.some((row) => row.verificationChecklist.some((item) => item.includes("Disqualification risk flagged"))));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes("Suggested answer reviewed"))));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes(row.owner))));
+  const shortWarningAnalysis = analyzeRfpSource(
+    { kind: "pdf", title: "Short extracted RFP", text: "Vendor must submit pricing." },
+    profile,
+  );
+  ok(shortWarningAnalysis.warnings.length >= 2);
+  ok(shortWarningAnalysis.completenessScore < 30);
 
   const assistance = buildRfpWizardStepAssistance({
     sourceKind: "markdown",
