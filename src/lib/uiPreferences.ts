@@ -56,6 +56,7 @@ const sidebarPanels = new Set<SidebarPanel>([
   "diagnostics",
   "tables",
   "templates",
+  "layout",
   "references",
   "exports",
   "versioning",

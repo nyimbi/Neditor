@@ -334,6 +334,7 @@ export const useDocumentsStore = defineStore("documents", {
       | "diagnostics"
       | "tables"
       | "templates"
+      | "layout"
       | "references"
       | "exports"
       | "versioning"

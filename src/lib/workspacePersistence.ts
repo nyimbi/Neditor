@@ -55,6 +55,7 @@ export type SidebarPanel =
   | "diagnostics"
   | "tables"
   | "templates"
+  | "layout"
   | "references"
   | "exports"
   | "versioning"
@@ -1262,7 +1263,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (mode) migrated.mode = mode;
   const sidebar = enumValue(
     raw.sidebar,
-    ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "help", "settings"] as const,
+    ["files", "outline", "diagnostics", "tables", "templates", "layout", "references", "exports", "versioning", "review", "help", "settings"] as const,
   );
   if (sidebar) migrated.sidebar = sidebar;
   migrated.transformEnginePaths = stringRecord(raw.transformEnginePaths);

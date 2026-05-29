@@ -1285,6 +1285,7 @@ test("UI preference helpers validate persisted workbench display settings", () =
   equal(updated.previewLineHeight, 2.4);
   equal(updated.mode, "outline");
   equal(updated.sidebar, "settings");
+  equal(applyPersistedUiPreferences(current, { sidebar: "layout" }).sidebar, "layout");
 
   const preserved = applyPersistedUiPreferences(current, {
     theme: "sepia" as never,
@@ -7647,9 +7648,18 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("markdownFenceOpener(text)"));
   ok(app.includes("isAiSourceFenceOpener(text)"));
   ok(app.includes("documentLayoutPresets"));
+  ok(app.includes('store.sidebar === \'layout\''));
+  ok(app.includes('aria-label="Layout advisor summary"'));
+  ok(app.includes('aria-label="Business layout presets"'));
+  ok(app.includes('aria-label="Layout quality findings"'));
+  ok(app.includes("layoutQualityRecommendations"));
+  ok(app.includes("layoutAdvisorHeadline"));
+  ok(app.includes("runLayoutQualityReview"));
+  ok(app.includes("openLayoutAdvisor"));
   ok(app.includes('label: "Document layout"'));
   ok(app.includes('label: "Two-column Section"'));
   ok(app.includes('label: "Wide Landscape Section"'));
+  ok(app.includes('label: "Open Layout Advisor"'));
   ok(app.includes('id: "layout-two-column"'));
   ok(app.includes("insertDocumentLayoutPreset"));
   ok(app.includes("stripMarkdownFencedBlocks"));
@@ -8758,7 +8768,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
     ok(app.includes(`${icon}: [`), `missing ${icon} icon path`);
   }
   ok(app.includes('value="help"'));
+  ok(app.includes('value="layout"'));
   ok(store.includes('| "help"'));
+  ok(store.includes('| "layout"'));
   ok(app.includes('store.sidebar === \'templates\''));
   ok(store.includes("toolbarTextSize: 10"));
   ok(store.includes("toolbarCollapsedRows: []"));

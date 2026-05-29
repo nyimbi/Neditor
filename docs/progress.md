@@ -51,10 +51,18 @@ reset. The placeholder detector also treats `section-break`, `page-break`,
 `include`, and `slide` as document-control directives instead of unresolved
 business placeholders.
 
+The workbench now includes a first-class **Layout Advisor** sidebar panel. It
+summarizes the current paged-document layout, exposes the business layout preset
+library, shows layout-specific QA findings, and provides one-click insertion
+for two-column and wide landscape sections from the same place. The panel is
+available from the sidebar selector, Writing Tools menu, command palette, and
+Insert toolbar, and the persisted workspace preference schema now accepts the
+`layout` sidebar value.
+
 | Check | Result | Evidence |
 | --- | --- | --- |
-| `pnpm run test:unit` | Pass | 121 frontend unit/static tests passed, including document layout preset coverage, static guards that the toolbar/menu/command palette expose layout insertion controls, and layout QA checks for wide tables, gutters, resets, and directive-safe placeholder detection. |
-| `pnpm run check` | Pass | Vue typecheck completed cleanly after adding the shared layout preset module and app wiring. |
+| `pnpm run test:unit` | Pass | 121 frontend unit/static tests passed, including document layout preset coverage, static guards that the toolbar/menu/command palette expose layout insertion controls and Layout Advisor panel, persisted `layout` sidebar acceptance, and layout QA checks for wide tables, gutters, resets, and directive-safe placeholder detection. |
+| `pnpm run check` | Pass | Vue typecheck completed cleanly after adding the shared layout preset module, Layout Advisor sidebar, and app wiring. |
 | Browser e2e suite | Not rerun | Existing Chromium workflow coverage was updated to assert the Writing Tools layout menu items and command-palette two-column insertion, but the browser batch was deferred to conserve battery until the next larger executable verification batch. |
 
 ## 2026-05-29 Grouped CLI Support Actions

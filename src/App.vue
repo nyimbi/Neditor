@@ -352,6 +352,7 @@
             <option value="diagnostics">Diagnostics</option>
             <option value="tables">Tables</option>
             <option value="templates">Templates</option>
+            <option value="layout">Layout</option>
             <option value="references">References</option>
             <option value="exports">Exports</option>
             <option value="versioning">Versioning</option>
@@ -721,6 +722,52 @@
                 <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
               </ul>
               <button v-if="canNavigateDiagnostic(diagnostic)" type="button" @click="goToSourceTarget(diagnostic)">Go to source</button>
+            </article>
+          </section>
+        </template>
+
+        <template v-else-if="store.sidebar === 'layout'">
+          <h2>Layout Advisor</h2>
+          <p class="sidebar-hint">Create polished sections, catch export-risky layout choices, and keep page flow intentional before PDF/DOCX delivery.</p>
+          <section class="layout-advisor-summary" aria-label="Layout advisor summary">
+            <article class="snapshot-row" :data-status="layoutAdvisorStatus">
+              <strong>{{ layoutAdvisorHeadline }}</strong>
+              <p>{{ layoutAdvisorDetail }}</p>
+              <small>{{ readinessLayoutSummary }}</small>
+            </article>
+            <div class="release-readiness-actions">
+              <button type="button" @click="runLayoutQualityReview">Review layout</button>
+              <button type="button" @click="insertDocumentLayoutPreset('two-column-section')">Insert two-column section</button>
+              <button type="button" @click="insertDocumentLayoutPreset('wide-landscape-section')">Insert wide section</button>
+            </div>
+          </section>
+          <section class="layout-preset-grid" aria-label="Business layout presets">
+            <article v-for="preset in documentLayoutPresets" :key="preset.id" class="snapshot-row" data-status="improve">
+              <strong>{{ preset.label }}</strong>
+              <p>{{ preset.summary }}</p>
+              <small>{{ preset.commandName }}</small>
+              <button type="button" @click="insertDocumentLayoutPreset(preset.id)">Insert</button>
+            </article>
+          </section>
+          <section class="layout-advisor-findings" aria-label="Layout quality findings">
+            <header>
+              <h3>Layout quality</h3>
+              <span>{{ layoutQualityRecommendations.length }} finding{{ layoutQualityRecommendations.length === 1 ? "" : "s" }}</span>
+            </header>
+            <article v-if="!layoutQualityRecommendations.length" class="snapshot-row" data-status="pass">
+              <strong>No deterministic layout risks</strong>
+              <p>Wide tables, column gutters, and dense-section resets look intentional from the current Markdown.</p>
+              <small>Run rendered export review for final page geometry.</small>
+            </article>
+            <article
+              v-for="item in layoutQualityRecommendations"
+              :key="item.id"
+              class="snapshot-row"
+              :data-status="item.severity"
+            >
+              <strong>{{ item.label }}</strong>
+              <p>{{ item.recommendation }}</p>
+              <small>{{ item.action }}</small>
             </article>
           </section>
         </template>
@@ -8181,6 +8228,21 @@ const qualityImprovementRecommendations = computed<QualityRecommendation[]>(() =
     diagnostics: active.value.compile?.diagnostics,
   });
 });
+const layoutQualityRecommendations = computed(() => qualityImprovementRecommendations.value.filter((item) => item.id.startsWith("layout-")));
+const layoutAdvisorStatus = computed(() => {
+  if (layoutQualityRecommendations.value.some((item) => item.severity === "risk" || item.severity === "blocker")) return "risk";
+  if (layoutQualityRecommendations.value.length) return "improve";
+  return "pass";
+});
+const layoutAdvisorHeadline = computed(() => {
+  if (layoutAdvisorStatus.value === "risk") return "Layout needs attention before export";
+  if (layoutAdvisorStatus.value === "improve") return "Layout can be polished further";
+  return "Layout baseline looks clean";
+});
+const layoutAdvisorDetail = computed(() => {
+  if (layoutQualityRecommendations.value.length) return layoutQualityRecommendations.value.map((item) => item.label).join(" | ");
+  return "No deterministic wide-table, gutter, or section-reset issues were detected.";
+});
 const qualityRecommendationSummary = computed(() => formatQualityRecommendationSummary(qualityImprovementRecommendations.value));
 const qualityStepAssistance = computed<QualityStepAssistance[]>(() =>
   buildQualityStepAssistance({
@@ -9490,6 +9552,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "figure", label: "Figure", title: "Insert figure", icon: "figure", run: () => insertFigureSnippet() },
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
+      { id: "layout-advisor", label: "Layout", title: "Open the Layout Advisor for columns, wide sections, gutters, and export-safe flow", icon: "layout", run: () => openLayoutAdvisor() },
       { id: "install-handlers", label: "Handlers", title: "Download and install transform handlers", icon: "settings", run: () => openTransformInstaller() },
       { id: "biz-part", label: "Part", title: "Insert a reusable business document part", icon: "templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
       { id: "include", label: "Include", title: "Open the include document builder", icon: "include", run: () => openIncludeBuilder() },
@@ -9701,6 +9764,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "layout-three-column", label: "Three-column Brief", help: "Insert a dense three-column section for short highlights, options, and decisions.", run: () => insertDocumentLayoutPreset("three-column-brief") },
           { id: "layout-wide", label: "Wide Landscape Section", help: "Insert a single-column landscape section for wide tables, timelines, or compliance matrices.", run: () => insertDocumentLayoutPreset("wide-landscape-section") },
           { id: "layout-reset", label: "Return to Single Column", help: "Reset the document back to normal portrait single-column flow.", run: () => insertDocumentLayoutPreset("single-column-reset") },
+          { id: "layout-advisor", label: "Open Layout Advisor", help: "Review column, wide-table, gutter, and section-reset choices before export.", run: () => openLayoutAdvisor() },
           { id: "toc", label: "Table of Contents", help: "Insert a generated TOC marker.", run: () => insertBlock(tocSnippet) },
           { id: "templates", label: "Transform Templates", help: "Open reusable calc, chart, diagram, data, and API templates.", run: () => openTransformTemplates() },
           { id: "sql-transform", label: "SQL Transform", help: "Insert a trusted read-only SQL transform scaffold for database-backed Markdown tables.", run: () => insertSqlTransformTemplate() },
@@ -12775,6 +12839,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Insert list of tables", group: "Snippet", run: () => insertBlock(listOfTablesSnippet) },
   { name: "Insert glossary section", group: "Snippet", run: () => insertBlock(glossarySectionSnippet) },
   { name: "Insert glossary", group: "Snippet", run: () => insertBlock(glossarySnippet) },
+  { name: "Open Layout Advisor", group: "Layout", description: "Review column, wide-table, gutter, and section-reset recommendations before export.", keywords: ["layout", "columns", "wide tables", "gutter", "landscape", "advisor"], run: () => openLayoutAdvisor() },
   ...documentLayoutPresets.map((preset) => ({
     name: preset.commandName,
     group: "Layout",
@@ -17407,6 +17472,16 @@ function openTransformTemplates() {
   });
 }
 
+function openLayoutAdvisor() {
+  store.sidebar = "layout";
+  void nextTick(() => {
+    workspacePane.value?.focus();
+  });
+  store.statusMessage = layoutQualityRecommendations.value.length
+    ? `Opened Layout Advisor with ${layoutQualityRecommendations.value.length} layout finding${layoutQualityRecommendations.value.length === 1 ? "" : "s"}`
+    : "Opened Layout Advisor";
+}
+
 function openDocumentWizardHub(query = "") {
   store.sidebar = "templates";
   businessTemplateQuery.value = query;
@@ -17485,7 +17560,7 @@ function selectConfigurationSection(sectionId: string) {
 }
 
 function selectSidebarPanel(panelId: string) {
-  const panels = ["files", "outline", "diagnostics", "tables", "templates", "references", "exports", "versioning", "review", "help", "settings"] as const;
+  const panels = ["files", "outline", "diagnostics", "tables", "templates", "layout", "references", "exports", "versioning", "review", "help", "settings"] as const;
   if (!panels.includes(panelId as (typeof panels)[number])) return;
   store.$patch({ sidebar: panelId as typeof store.sidebar });
   if (panelId === "settings" && !defaultMarkdownReaderPlan.value) {
@@ -18473,6 +18548,14 @@ function runQualityReview() {
   flushEditorTextToStore();
   store.sidebar = "review";
   store.statusMessage = `QA review found ${qualityRecommendationSummary.value}`;
+}
+
+function runLayoutQualityReview() {
+  flushEditorTextToStore();
+  store.sidebar = "layout";
+  store.statusMessage = layoutQualityRecommendations.value.length
+    ? `Layout advisor found ${layoutQualityRecommendations.value.length} layout finding${layoutQualityRecommendations.value.length === 1 ? "" : "s"}`
+    : "Layout advisor found no deterministic layout risks";
 }
 
 function qualityRecommendationMarkdown() {
@@ -23679,7 +23762,10 @@ select:hover {
 }
 
 .release-readiness-checklist,
-.quality-recommendations {
+.quality-recommendations,
+.layout-advisor-summary,
+.layout-advisor-findings,
+.layout-preset-grid {
   display: grid;
   gap: 8px;
   margin: 10px 0;
@@ -23693,8 +23779,15 @@ select:hover {
   border-left-color: #5d55a5;
 }
 
+.layout-advisor-summary,
+.layout-advisor-findings,
+.layout-preset-grid {
+  border-left-color: #2f855a;
+}
+
 .release-readiness-checklist header,
-.quality-recommendations header {
+.quality-recommendations header,
+.layout-advisor-findings header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -23704,7 +23797,10 @@ select:hover {
 .release-readiness-checklist h3,
 .release-readiness-checklist p,
 .quality-recommendations h3,
-.quality-recommendations p {
+.quality-recommendations p,
+.layout-advisor-findings h3,
+.layout-advisor-findings p,
+.layout-preset-grid p {
   margin: 0;
 }
 
@@ -23713,7 +23809,14 @@ select:hover {
 .release-readiness-checklist small,
 .quality-recommendations header span,
 .quality-recommendations p,
-.quality-recommendations small {
+.quality-recommendations small,
+.layout-advisor-summary p,
+.layout-advisor-summary small,
+.layout-advisor-findings header span,
+.layout-advisor-findings p,
+.layout-advisor-findings small,
+.layout-preset-grid p,
+.layout-preset-grid small {
   color: #526171;
 }
 
