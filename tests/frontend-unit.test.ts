@@ -8240,6 +8240,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("cli_deploy_plan"));
   ok(app.includes("deploy_cli"));
   ok(app.includes("Deploy CLI"));
+  ok(app.includes("Deploy CLI Globally"));
+  ok(app.includes('id: "deploy-cli",'));
+  ok(app.includes('icon: "terminal"'));
+  ok(app.includes("Install the packaged ned command into a user-level command directory so terminal windows can run it."));
   ok(app.includes("neditor-deploy-cli"));
   ok(app.includes("default_markdown_reader_plan"));
   ok(app.includes("configure_default_markdown_reader"));

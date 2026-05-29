@@ -341,7 +341,11 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .item(&menu_item(app, "neditor-open-folder", "Open Folder")?)
         .item(&menu_item(app, "neditor-save-workspace", "Save Workspace")?)
         .separator()
-        .item(&menu_item(app, "neditor-deploy-cli", "Deploy CLI")?)
+        .item(&menu_item(
+            app,
+            "neditor-deploy-cli",
+            "Deploy CLI Globally",
+        )?)
         .separator()
         .close_window()
         .build()?;

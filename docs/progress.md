@@ -137,11 +137,12 @@ release evidence and platform-signing gates remain tracked separately.
 
 ## 2026-05-29 Deploy CLI Menu Action
 
-NEditor now exposes a first-class **Deploy CLI** action in the File menu and in
-the Settings command-line setup panel. The action locates the packaged `ned`
-sidecar, deploys a guarded user-level launcher, reports the exact target path,
-shows PATH setup commands, and refuses to overwrite an unrelated existing `ned`
-without an explicit replacement path.
+NEditor now exposes a first-class **Deploy CLI Globally** action in the native
+File menu, visible in-app File menu, File toolbar, command palette, and Settings
+command-line setup panel. The action locates the packaged `ned` sidecar,
+deploys a guarded user-level launcher, reports the exact target path, shows PATH
+setup commands, and refuses to overwrite an unrelated existing `ned` without an
+explicit replacement path.
 
 This improves business-user setup and Homebrew/package readiness because users
 can make `ned` globally available from the app instead of manually finding
@@ -149,6 +150,7 @@ bundle internals.
 
 | Check | Result | Evidence |
 | --- | --- | --- |
+| `pnpm run test:unit` | Pass | Verifies the visible menu, toolbar, command palette, native menu ID, and CLI deploy IPC strings remain wired. |
 | `cargo test --locked deploy_cli_installs_user_level_ned_launcher_without_overwriting_conflicts --lib` | Pass | Verifies deployment, idempotency, and existing-command conflict protection. |
 | `cargo test --locked spec_25_4_ipc_commands_are_registered_and_documented --lib` | Pass | Verifies `cli_deploy_plan` and `deploy_cli` are registered and covered in the IPC command ledger. |
 

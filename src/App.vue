@@ -6924,6 +6924,7 @@ type ToolbarIconName =
   | "agent"
   | "mic"
   | "speak"
+  | "terminal"
   | "settings"
   | "commands"
   | "bold"
@@ -7014,6 +7015,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   agent: ["M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z", "M9 12h6", "M12 9v6"],
   mic: ["M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z", "M5 11a7 7 0 0 0 14 0", "M12 18v3", "M8 21h8"],
   speak: ["M4 9h4l5-4v14l-5-4H4z", "M16 9a4 4 0 0 1 0 6", "M18.5 6.5a8 8 0 0 1 0 11"],
+  terminal: ["M4 5h16v14H4z", "M7 9l4 3-4 3", "M12 15h5"],
   settings: ["M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z", "M4 12h2", "M18 12h2", "M12 4v2", "M12 18v2", "M6.6 6.6l1.4 1.4", "M16 16l1.4 1.4", "M17.4 6.6 16 8", "M8 16l-1.4 1.4"],
   commands: ["M4 7h16", "M4 12h16", "M4 17h10", "M17 15l3 2-3 2"],
   bold: ["M8 5h5a3 3 0 0 1 0 6H8z", "M8 11h6a3 3 0 0 1 0 6H8z", "M8 5v12"],
@@ -9130,6 +9132,14 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     actions: [
       { id: "open-folder", label: "Open Folder", title: "Open folder", icon: "folder", run: () => openFolder() },
       { id: "save-workspace", label: "Save Workspace", title: "Save workspace", icon: "workspace", run: () => saveWorkspace() },
+      {
+        id: "deploy-cli",
+        label: "Deploy CLI",
+        title: "Install the packaged ned command into a user-level directory so terminal windows can run it",
+        icon: "terminal",
+        disabled: cliDeployBusy.value,
+        run: () => deployCliGlobally(),
+      },
       { id: "revert", label: "Revert", title: "Revert to saved", icon: "revert", run: () => store.revertActive() },
       { id: "rename", label: "Rename", title: "Rename document", icon: "rename", run: () => renameDocument() },
       { id: "duplicate", label: "Duplicate", title: "Duplicate document", icon: "duplicate", run: () => duplicateDocument() },
@@ -9280,7 +9290,7 @@ const appMenus = computed<AppMenu[]>(() => [
         items: [
           { id: "open-folder", label: "Open Folder", help: "Browse a folder as a writing workspace.", run: () => openFolder() },
           { id: "save-workspace", label: "Save Workspace", help: "Persist open tabs, groups, and view state.", run: () => saveWorkspace() },
-          { id: "deploy-cli", label: "Deploy CLI", help: "Install the packaged ned helper into a user-level command directory so terminals can run ned.", disabled: cliDeployBusy.value, run: () => deployCliGlobally() },
+          { id: "deploy-cli", label: "Deploy CLI Globally", help: "Install the packaged ned command into a user-level command directory so terminal windows can run it.", disabled: cliDeployBusy.value, run: () => deployCliGlobally() },
           { id: "rename", label: "Rename", help: "Rename the active document.", run: () => renameDocument() },
           { id: "duplicate", label: "Duplicate", help: "Duplicate the active document.", run: () => duplicateDocument() },
           { id: "reveal", label: "Reveal", help: "Reveal the active file in the file manager.", run: () => store.revealActive() },
@@ -12058,6 +12068,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Open document", group: "File", run: () => void openDocument() },
   { name: "Open folder", group: "Workspace", run: () => void openFolder() },
   { name: "Save workspace", group: "Workspace", run: () => void saveWorkspace() },
+  {
+    name: "Deploy CLI Globally",
+    group: "Settings",
+    description: "Install the packaged ned command into a user-level command directory so terminal windows can run it.",
+    keywords: ["cli", "terminal", "ned", "path", "global", "deploy", "install"],
+    run: () => void deployCliGlobally(),
+  },
   { name: "Insert document set manifest", group: "Workspace", run: () => insertActiveDocumentSetManifest() },
   { name: "Save document", group: "File", run: () => void saveDocument() },
   { name: "Save as", group: "File", run: () => void saveDocumentAs() },
