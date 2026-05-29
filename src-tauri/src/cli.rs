@@ -109,6 +109,7 @@ const CLI_COMMANDS: &[&str] = &[
     "support-bundle",
     "completions",
     "default-reader",
+    "deploy-cli",
     "doctor",
     "help",
     "version",
@@ -443,6 +444,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "support" | "support-bundle" => run_support_bundle_command(&args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
+        "deploy-cli" | "install-cli" => run_deploy_cli_command(&args[2..]),
         "doctor" => run_doctor_command(&args[2..]),
         other => Err(format!("Unknown ned command '{other}'.\n\n{}", help_text())),
     }
@@ -1349,6 +1351,99 @@ fn run_default_reader_command(args: &[String]) -> Result<CliOutcome, String> {
     })
 }
 
+fn run_deploy_cli_command(args: &[String]) -> Result<CliOutcome, String> {
+    run_deploy_cli_command_with_source(args, None)
+}
+
+pub(crate) fn run_deploy_cli_command_with_source(
+    args: &[String],
+    source_override: Option<&Path>,
+) -> Result<CliOutcome, String> {
+    let mut target_dir: Option<String> = None;
+    let mut overwrite = false;
+    let mut status_only = args.is_empty();
+    let mut json_output = false;
+    let mut index = 0;
+    while index < args.len() {
+        let arg = &args[index];
+        match arg.as_str() {
+            "--status" | "--dry-run" => status_only = true,
+            "--json" => json_output = true,
+            "--overwrite" => overwrite = true,
+            "--target-dir" | "--dir" => {
+                index += 1;
+                let Some(value) = args.get(index) else {
+                    return Err(format!("{arg} requires a directory"));
+                };
+                target_dir = Some(value.clone());
+            }
+            _ if arg.starts_with("--target-dir=") => {
+                target_dir = arg
+                    .strip_prefix("--target-dir=")
+                    .map(|value| value.to_string());
+            }
+            _ if arg.starts_with("--dir=") => {
+                target_dir = arg.strip_prefix("--dir=").map(|value| value.to_string());
+            }
+            other => return Err(format!("Unsupported deploy-cli option '{other}'")),
+        }
+        index += 1;
+    }
+
+    let requested_deploy = !status_only;
+    let source = source_override
+        .map(Path::to_path_buf)
+        .or_else(find_ned_cli_binary);
+    let response = if requested_deploy {
+        match source {
+            Some(source) => deploy_cli_from_source(&source, target_dir.as_deref(), overwrite)?,
+            None => {
+                let target_dir = target_dir
+                    .as_deref()
+                    .map(|value| normalize_cli_deploy_dir(Some(value)));
+                cli_deploy_plan_response(
+                    None,
+                    target_dir.as_deref(),
+                    false,
+                    Some(false),
+                    Some(
+                        "The packaged ned helper was not found; deploy-cli could not install the command."
+                            .to_string(),
+                    ),
+                )
+            }
+        }
+    } else {
+        let target_dir = target_dir
+            .as_deref()
+            .map(|value| normalize_cli_deploy_dir(Some(value)));
+        cli_deploy_status_response(source.as_deref(), target_dir.as_deref())
+    };
+    let exit_code = if requested_deploy && !response.applied {
+        1
+    } else {
+        0
+    };
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&deploy_cli_json_report(
+                &response,
+                requested_deploy,
+                status_only,
+                overwrite,
+            ))
+            .map_err(|err| err.to_string())?,
+            exit_code,
+        });
+    }
+
+    Ok(CliOutcome {
+        message: deploy_cli_text_report(&response),
+        exit_code,
+    })
+}
+
 #[tauri::command]
 pub(crate) fn cli_deploy_plan() -> Result<CliDeployResponse, String> {
     let source = find_ned_cli_binary();
@@ -1379,7 +1474,7 @@ pub(crate) fn deploy_cli(request: CliDeployRequest) -> Result<CliDeployResponse,
                     "The packaged ned helper was not found next to the app. Reinstall NEditor or rebuild the sidecar before deploying the CLI."
                         .to_string(),
                 ),
-            ))
+            ));
         }
     };
     deploy_cli_from_source(&source, request.target_dir.as_deref(), request.overwrite)
@@ -1433,21 +1528,54 @@ fn cli_deploy_plan_response(
     }
 }
 
+fn cli_deploy_status_response(
+    source: Option<&Path>,
+    target_dir: Option<&Path>,
+) -> CliDeployResponse {
+    let target_dir = target_dir
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| normalize_cli_deploy_dir(None));
+    let source = source.and_then(|path| path.canonicalize().ok());
+    if let Some(source) = source.as_ref() {
+        let deployed_path = target_dir.join(executable_name("ned"));
+        if deployed_path.exists() && deployed_cli_points_to_source(&deployed_path, source) {
+            return cli_deploy_plan_response(
+                Some(source),
+                Some(&target_dir),
+                true,
+                Some(true),
+                Some(format!(
+                    "ned is already deployed at {}.",
+                    deployed_path.display()
+                )),
+            );
+        }
+    }
+    cli_deploy_plan_response(source.as_deref(), Some(&target_dir), false, None, None)
+}
+
 pub(crate) fn deploy_cli_from_source(
     source: &Path,
     target_dir: Option<&str>,
     overwrite: bool,
 ) -> Result<CliDeployResponse, String> {
-    let source = source
-        .canonicalize()
-        .map_err(|err| format!("Could not resolve ned helper at {}: {err}", source.display()))?;
+    let source = source.canonicalize().map_err(|err| {
+        format!(
+            "Could not resolve ned helper at {}: {err}",
+            source.display()
+        )
+    })?;
     if !source.is_file() {
         return Err(format!("ned helper is not a file: {}", source.display()));
     }
     let target_dir = normalize_cli_deploy_dir(target_dir);
     let deployed_path = target_dir.join(executable_name("ned"));
-    fs::create_dir_all(&target_dir)
-        .map_err(|err| format!("Could not create CLI deploy directory {}: {err}", target_dir.display()))?;
+    fs::create_dir_all(&target_dir).map_err(|err| {
+        format!(
+            "Could not create CLI deploy directory {}: {err}",
+            target_dir.display()
+        )
+    })?;
 
     if deployed_path.exists() || fs::symlink_metadata(&deployed_path).is_ok() {
         if deployed_cli_points_to_source(&deployed_path, &source) {
@@ -1456,7 +1584,10 @@ pub(crate) fn deploy_cli_from_source(
                 Some(&target_dir),
                 true,
                 Some(true),
-                Some(format!("ned is already deployed at {}.", deployed_path.display())),
+                Some(format!(
+                    "ned is already deployed at {}.",
+                    deployed_path.display()
+                )),
             ));
         }
         if !overwrite {
@@ -1471,8 +1602,12 @@ pub(crate) fn deploy_cli_from_source(
                 )),
             ));
         }
-        fs::remove_file(&deployed_path)
-            .map_err(|err| format!("Could not replace existing {}: {err}", deployed_path.display()))?;
+        fs::remove_file(&deployed_path).map_err(|err| {
+            format!(
+                "Could not replace existing {}: {err}",
+                deployed_path.display()
+            )
+        })?;
     }
 
     deploy_cli_link_or_copy(&source, &deployed_path)?;
@@ -1598,6 +1733,23 @@ fn deployed_cli_points_to_source(path: &Path, source: &Path) -> bool {
         .ok()
         .as_deref()
         .is_some_and(|target| target == source)
+        || files_have_same_contents(path, source)
+}
+
+fn files_have_same_contents(left: &Path, right: &Path) -> bool {
+    let (Ok(left_metadata), Ok(right_metadata)) = (fs::metadata(left), fs::metadata(right)) else {
+        return false;
+    };
+    if !left_metadata.is_file()
+        || !right_metadata.is_file()
+        || left_metadata.len() != right_metadata.len()
+    {
+        return false;
+    }
+    match (fs::read(left), fs::read(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
 }
 
 fn deploy_cli_link_or_copy(source: &Path, target: &Path) -> Result<(), String> {
@@ -1612,11 +1764,19 @@ fn deploy_cli_link_or_copy(source: &Path, target: &Path) -> Result<(), String> {
             .unwrap_or(false)
         {
             let mut permissions = fs::metadata(target)
-                .map_err(|err| format!("Could not inspect deployed ned at {}: {err}", target.display()))?
+                .map_err(|err| {
+                    format!(
+                        "Could not inspect deployed ned at {}: {err}",
+                        target.display()
+                    )
+                })?
                 .permissions();
             permissions.set_mode(0o755);
             fs::set_permissions(target, permissions).map_err(|err| {
-                format!("Could not mark deployed ned executable at {}: {err}", target.display())
+                format!(
+                    "Could not mark deployed ned executable at {}: {err}",
+                    target.display()
+                )
             })?;
         }
     }
@@ -1664,7 +1824,10 @@ fn cli_deploy_commands(target_dir: &Path) -> Vec<String> {
 
 fn cli_deploy_manual_steps(target_dir: &Path, path_ready: bool) -> Vec<String> {
     let mut steps = vec![
-        format!("Deploy writes a user-level `ned` launcher to {}.", target_dir.display()),
+        format!(
+            "Deploy writes a user-level `ned` launcher to {}.",
+            target_dir.display()
+        ),
         "Open a new terminal after deployment and run `ned doctor --json`.".to_string(),
     ];
     if !path_ready {
@@ -9099,6 +9262,9 @@ _ned() {{
       default-reader)
         COMPREPLY=( $(compgen -W "--status --enable --json" -- "$cur") )
         ;;
+      deploy-cli|install-cli)
+        COMPREPLY=( $(compgen -W "--status --dry-run --target-dir --dir --overwrite --json" -- "$cur") )
+        ;;
       *)
         COMPREPLY=( $(compgen -W "--help --version" -- "$cur") )
         ;;
@@ -9202,6 +9368,9 @@ _ned() {{
       ;;
     default-reader)
       _arguments '--status[show setup status]' '--enable[request default Markdown reader setup]' '--json[print machine-readable JSON]'
+      ;;
+    deploy-cli|install-cli)
+      _arguments '--status[show CLI deployment status]' '--dry-run[preview CLI deployment status]' '--target-dir[install ned launcher in this directory]:directory:_files -/' '--dir[alias for --target-dir]:directory:_files -/' '--overwrite[replace an existing ned command that does not point to this build]' '--json[print machine-readable JSON]'
       ;;
     doctor)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when warnings exist]' '--workspace[inspect NEditor project scaffold]:directory:_files -/'
@@ -9411,6 +9580,18 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l status".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l enable".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from default-reader' -l json".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deploy-cli install-cli' -l status"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deploy-cli install-cli' -l dry-run"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deploy-cli install-cli' -l target-dir -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deploy-cli install-cli' -l dir -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deploy-cli install-cli' -l overwrite"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deploy-cli install-cli' -l json"
+            .to_string(),
     ]);
     lines.join("\n")
 }
@@ -9526,6 +9707,79 @@ fn default_reader_json_report(
         "manualSteps": &response.manual_steps,
         "nextCommands": default_reader_next_commands(response),
     })
+}
+
+fn deploy_cli_text_report(response: &CliDeployResponse) -> String {
+    let mut lines = vec![
+        format!("Deploy CLI: {}", cli_deploy_status(response)),
+        response.message.clone(),
+        format!("Target: {}", response.deployed_path),
+        format!(
+            "Source: {}",
+            response.source_path.as_deref().unwrap_or("not found")
+        ),
+        format!(
+            "PATH ready: {}",
+            if response.path_ready { "yes" } else { "no" }
+        ),
+    ];
+    if !response.commands.is_empty() {
+        lines.push("Commands:".to_string());
+        lines.extend(
+            response
+                .commands
+                .iter()
+                .map(|command| format!("  {command}")),
+        );
+    }
+    if !response.manual_steps.is_empty() {
+        lines.push("Manual steps:".to_string());
+        lines.extend(
+            response
+                .manual_steps
+                .iter()
+                .map(|step| format!("  - {step}")),
+        );
+    }
+    lines.join("\n")
+}
+
+fn deploy_cli_json_report(
+    response: &CliDeployResponse,
+    requested_deploy: bool,
+    status_only: bool,
+    overwrite: bool,
+) -> Value {
+    json!({
+        "schema": "neditor.ned-deploy-cli.v1",
+        "platform": &response.platform,
+        "status": cli_deploy_status(response),
+        "requestedDeploy": requested_deploy,
+        "statusOnly": status_only,
+        "overwrite": overwrite,
+        "deployment": response,
+        "nextCommands": cli_deploy_next_commands(response),
+    })
+}
+
+fn cli_deploy_status(response: &CliDeployResponse) -> &'static str {
+    if response.applied {
+        "deployed"
+    } else if response.supported {
+        "ready"
+    } else {
+        "manual-setup-required"
+    }
+}
+
+fn cli_deploy_next_commands(response: &CliDeployResponse) -> Vec<String> {
+    if response.applied {
+        vec!["ned doctor --json".to_string()]
+    } else if response.supported {
+        vec!["ned deploy-cli".to_string()]
+    } else {
+        response.commands.clone()
+    }
 }
 
 fn default_reader_status(response: &DefaultMarkdownReaderResponse) -> &'static str {
@@ -9789,6 +10043,8 @@ fn help_text() -> String {
         "  ned doctor [--json] [--strict] [--workspace path]".to_string(),
         "  ned default-reader --status [--json]".to_string(),
         "  ned default-reader --enable [--json]".to_string(),
+        "  ned deploy-cli [--status|--dry-run] [--target-dir path] [--overwrite] [--json]"
+            .to_string(),
         "  ned --version".to_string(),
         "".to_string(),
         format!("Templates: {}", NEW_DOCUMENT_TEMPLATES.join(", ")),

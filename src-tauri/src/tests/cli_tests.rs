@@ -2096,6 +2096,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("publish"));
     assert!(bash.message.contains("--token-env"));
     assert!(bash.message.contains("--matrix-output"));
+    assert!(bash.message.contains("deploy-cli"));
+    assert!(bash.message.contains("--target-dir"));
     assert!(bash.message.contains("markdown-bundle"));
 
     let zsh = crate::cli::run_cli_with_args(&[
@@ -2125,6 +2127,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--endpoint"));
     assert!(zsh.message.contains("--allow-not-ready"));
     assert!(zsh.message.contains("--matrix-output"));
+    assert!(zsh.message.contains("deploy-cli"));
+    assert!(zsh.message.contains("--target-dir"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -2150,6 +2154,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("publish"));
     assert!(fish.message.contains("token-env"));
+    assert!(fish.message.contains("deploy-cli"));
+    assert!(fish.message.contains("target-dir"));
     assert!(fish.message.contains("epub"));
 
     let unsupported = crate::cli::run_cli_with_args(&[
@@ -2506,6 +2512,19 @@ fn deploy_cli_installs_user_level_ned_launcher_without_overwriting_conflicts() {
     assert!(idempotent.applied);
     assert!(idempotent.message.contains("already deployed"));
 
+    let copied_dir = temp_workspace_path("cli-deploy-copied");
+    fs::create_dir_all(&copied_dir).expect("create copied dir");
+    let copied_path = copied_dir.join(format!("ned{}", std::env::consts::EXE_SUFFIX));
+    fs::copy(&source, &copied_path).expect("copy existing ned");
+    let copied = crate::cli::deploy_cli_from_source(
+        &source,
+        Some(copied_dir.to_string_lossy().as_ref()),
+        false,
+    )
+    .expect("copied deploy cli");
+    assert!(copied.applied);
+    assert!(copied.message.contains("already deployed"));
+
     let conflict_dir = temp_workspace_path("cli-deploy-conflict");
     fs::create_dir_all(&conflict_dir).expect("create conflict dir");
     let conflict_path = conflict_dir.join(format!("ned{}", std::env::consts::EXE_SUFFIX));
@@ -2519,6 +2538,117 @@ fn deploy_cli_installs_user_level_ned_launcher_without_overwriting_conflicts() {
     assert!(!conflict.applied);
     assert!(!conflict.supported);
     assert!(conflict.message.contains("was not overwritten"));
+    assert_eq!(
+        fs::read_to_string(conflict_path).expect("conflict file"),
+        "different ned"
+    );
+}
+
+#[test]
+fn ned_cli_deploy_cli_reports_status_and_installs_from_terminal() {
+    let source_dir = temp_workspace_path("cli-deploy-command-source");
+    let target_dir = temp_workspace_path("cli-deploy-command-target");
+    fs::create_dir_all(&source_dir).expect("create source dir");
+    fs::create_dir_all(&target_dir).expect("create target dir");
+    let source = source_dir.join(format!("ned{}", std::env::consts::EXE_SUFFIX));
+    fs::write(&source, "fake ned helper").expect("write fake ned");
+
+    let status = crate::cli::run_deploy_cli_command_with_source(
+        &[
+            "--status".to_string(),
+            "--target-dir".to_string(),
+            target_dir.to_string_lossy().to_string(),
+            "--json".to_string(),
+        ],
+        Some(&source),
+    )
+    .expect("deploy cli status");
+    assert_eq!(status.exit_code, 0);
+    let status_report: serde_json::Value =
+        serde_json::from_str(&status.message).expect("deploy cli status json");
+    assert_eq!(status_report["schema"], "neditor.ned-deploy-cli.v1");
+    assert_eq!(status_report["status"], "ready");
+    assert_eq!(status_report["requestedDeploy"], false);
+    assert_eq!(status_report["statusOnly"], true);
+    assert_eq!(status_report["deployment"]["applied"], false);
+    assert_eq!(status_report["deployment"]["supported"], true);
+    assert_eq!(
+        status_report["deployment"]["deployedPath"],
+        serde_json::json!(target_dir
+            .join(format!("ned{}", std::env::consts::EXE_SUFFIX))
+            .to_string_lossy()
+            .to_string())
+    );
+    assert!(status_report["nextCommands"]
+        .as_array()
+        .expect("next commands")
+        .contains(&serde_json::json!("ned deploy-cli")));
+
+    let deploy = crate::cli::run_deploy_cli_command_with_source(
+        &[
+            "--target-dir".to_string(),
+            target_dir.to_string_lossy().to_string(),
+            "--json".to_string(),
+        ],
+        Some(&source),
+    )
+    .expect("deploy cli install");
+    assert_eq!(deploy.exit_code, 0);
+    let deploy_report: serde_json::Value =
+        serde_json::from_str(&deploy.message).expect("deploy cli install json");
+    assert_eq!(deploy_report["status"], "deployed");
+    assert_eq!(deploy_report["requestedDeploy"], true);
+    assert_eq!(deploy_report["deployment"]["applied"], true);
+    assert!(target_dir
+        .join(format!("ned{}", std::env::consts::EXE_SUFFIX))
+        .exists());
+
+    let text = crate::cli::run_deploy_cli_command_with_source(
+        &[
+            "--status".to_string(),
+            "--target-dir".to_string(),
+            target_dir.to_string_lossy().to_string(),
+        ],
+        Some(&source),
+    )
+    .expect("deploy cli text status");
+    assert_eq!(text.exit_code, 0);
+    assert!(text.message.contains("Deploy CLI: deployed"));
+    assert!(text.message.contains("Target:"));
+    assert!(text.message.contains("ned doctor --json"));
+}
+
+#[test]
+fn ned_cli_deploy_cli_refuses_unknown_target_without_overwrite() {
+    let source_dir = temp_workspace_path("cli-deploy-command-conflict-source");
+    let target_dir = temp_workspace_path("cli-deploy-command-conflict-target");
+    fs::create_dir_all(&source_dir).expect("create source dir");
+    fs::create_dir_all(&target_dir).expect("create target dir");
+    let source = source_dir.join(format!("ned{}", std::env::consts::EXE_SUFFIX));
+    fs::write(&source, "fake ned helper").expect("write fake ned");
+    let conflict_path = target_dir.join(format!("ned{}", std::env::consts::EXE_SUFFIX));
+    fs::write(&conflict_path, "different ned").expect("write existing ned");
+
+    let blocked = crate::cli::run_deploy_cli_command_with_source(
+        &[
+            "--target-dir".to_string(),
+            target_dir.to_string_lossy().to_string(),
+            "--json".to_string(),
+        ],
+        Some(&source),
+    )
+    .expect("deploy cli blocked conflict");
+    assert_eq!(blocked.exit_code, 1);
+    let blocked_report: serde_json::Value =
+        serde_json::from_str(&blocked.message).expect("deploy cli blocked json");
+    assert_eq!(blocked_report["schema"], "neditor.ned-deploy-cli.v1");
+    assert_eq!(blocked_report["status"], "manual-setup-required");
+    assert_eq!(blocked_report["deployment"]["applied"], false);
+    assert_eq!(blocked_report["deployment"]["supported"], false);
+    assert!(blocked_report["deployment"]["message"]
+        .as_str()
+        .expect("message")
+        .contains("was not overwritten"));
     assert_eq!(
         fs::read_to_string(conflict_path).expect("conflict file"),
         "different ned"
@@ -2548,6 +2678,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome
         .message
         .contains("ned default-reader --status [--json]"));
+    assert!(outcome.message.contains("ned deploy-cli"));
     assert!(outcome.message.contains("ned completions"));
     assert!(outcome.message.contains("ned doctor"));
     assert!(outcome.message.contains("--workspace"));

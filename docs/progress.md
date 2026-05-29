@@ -27,6 +27,26 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Scriptable CLI Deployment
+
+The app-level **Deploy CLI** setup is now also available as `ned deploy-cli`.
+Support teams and scripted installers can run `ned deploy-cli --status --json`
+to inspect the packaged helper, target path, PATH readiness, and next commands,
+or `ned deploy-cli --json` to deploy the user-level launcher without opening the
+GUI. The terminal command reuses the same guarded deployment engine as the app:
+it is idempotent when `ned` already points to this build and refuses to replace
+an unrelated existing `ned` command unless `--overwrite` is explicit.
+
+This improves packageability and non-technical setup because the File menu,
+Settings panel, and command line now expose the same setup capability for users,
+help desks, and release scripts.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked deploy_cli --lib` | Pass | Verifies direct deployment, copy/symlink idempotency, `ned deploy-cli --status --json`, terminal install, already-deployed status, and existing-command conflict protection. |
+| `cargo test --locked ned_cli_generates_shell_completions_without_external_dependencies --lib` | Pass | Verifies bash, zsh, and fish completions include `deploy-cli` and its setup flags. |
+| `cargo test --locked ned_cli_help_names_supported_conversion_targets --lib` | Pass | Verifies `ned --help` advertises the Deploy CLI command alongside the broader command surface. |
+
 ## 2026-05-29 CLI Outline Catalog Parity
 
 The CLI outline library now reads the same built-in outline catalog as the app's

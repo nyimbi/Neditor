@@ -118,13 +118,19 @@ ned support-bundle --workspace . --output support.json
 ned completions zsh
 ned doctor --workspace . --json
 ned default-reader --status --json
+ned deploy-cli --status --json
+ned deploy-cli --json
 ```
 
 Use **File -> Deploy CLI** in NEditor when you want the packaged `ned` helper
 made available from normal terminal windows. The same action is available in
 **Settings -> Files -> Command line and default reader**; it installs a
 user-level launcher, reports the exact target path, and shows the PATH command
-to run if your shell cannot see the target directory yet.
+to run if your shell cannot see the target directory yet. For scripted setup,
+IT imaging, or help desk verification, use `ned deploy-cli --status --json` to
+preview the target and `ned deploy-cli --json` to install it without opening the
+app. `ned deploy-cli` refuses to replace an unrelated existing `ned` command
+unless `--overwrite` is passed explicitly.
 
 `ned file.md` and `ned open` launch NEditor with one or more Markdown files;
 use `ned open file.md --dry-run --json` when a setup script needs to verify the
