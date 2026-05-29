@@ -27,6 +27,30 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Grouped Support Recommendations UI
+
+The Settings support-bundle preview now groups recommendations by operational
+lane instead of showing one flat list. Local setup, release readiness,
+specification closure, and evidence collection each get their own visible
+section with item counts, so non-technical support users can separate local
+setup tasks from release blockers and owner handoffs.
+
+The focused browser support-bundle fixture now matches the current support
+schema more closely: release action-plan items, spec work orders, release
+candidate status, grouped recommendations, and the richer preview summary are
+all exercised.
+
+Local setup was also applied for this checkout with `ned init . --json`; the
+generated `.neditor/` scaffold is intentionally ignored by Git and removes the
+workspace-scaffold recommendation from the current live support bundle.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `src-tauri/target/debug/ned init . --json` | Pass | Created `.neditor/README.md`, variables, business profile, outlines, snippets, and agent-handoff placeholders for this local checkout. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding grouped support-bundle recommendation state. |
+| `pnpm run test:unit` | Pass | 118 frontend unit tests passed, including static guards for grouped support-bundle recommendation categories. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "creates support bundle handoff from settings"` | Pass | Focused Chromium workflow proves the Settings support bundle preview shows grouped local setup, release readiness, spec closure, and evidence collection recommendations plus release/spec action-plan details. |
+
 ## 2026-05-29 Doctor Recommendations In Support Bundles
 
 Support-bundle recommendations now turn `ned doctor` warnings into specific

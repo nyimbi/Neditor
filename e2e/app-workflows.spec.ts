@@ -1109,6 +1109,29 @@ async function installTauriMock(page: Page, stateKey: string) {
             summary: { totalRows: 115, completeRows: 9, openRows: 106 },
             openRows: [{ specSection: "Mock", requirementArea: "Mock gap", status: "Partial" }],
           },
+          releaseActionPlan: {
+            status: "ready-to-send",
+            readyToSendCount: 1,
+            workItems: [
+              { id: "release-signing", detail: "Return signing proof.", runbooks: [{ path: "runbooks/release-signing.md" }] },
+              { id: "homebrew-cask", detail: "Return final cask.", runbooks: [{ path: "runbooks/homebrew-release.md" }] },
+            ],
+          },
+          specActionPlan: {
+            status: "ready-to-send",
+            readyToSendCount: 2,
+            workOrders: [
+              { id: "001-manual-review", specSection: "Layout", requirementArea: "Manual QA", classification: "manual-review", runbooks: ["runbooks/manual-review.md"] },
+              { id: "002-platform-proof", specSection: "Packaging", requirementArea: "Windows proof", classification: "cross-platform-evidence", runbooks: ["runbooks/platform-evidence.md"] },
+              { id: "003-accessibility", specSection: "Accessibility", requirementArea: "Assistive tech", classification: "manual-review", runbooks: ["runbooks/manual-review.md"] },
+            ],
+          },
+          releaseCandidate: {
+            status: "stale",
+            releaseable: false,
+            candidateDir: ".tmp/release-candidate",
+            summary: { artifacts: 3, evidenceGaps: 1, checkStatus: "passed" },
+          },
           engineProbe: {
             status: "complete",
             summary: { installed: 10, missingLocal: 0, incompatible: 0, invalidExternalEvidence: 0 },
@@ -1119,7 +1142,12 @@ async function installTauriMock(page: Page, stateKey: string) {
             { id: "google-docs-import", status: "pending-google-drive-authorization", bucket: "attention" },
           ],
           evidenceReportSummary: { total: 2, ready: 1, attention: 1, missing: 0, failed: 0 },
-          recommendations: ["Mock support recommendation"],
+          recommendations: [
+            "Default Markdown reader automation is unavailable on this host; use manual setup.",
+            "Regenerate the stale release candidate with pnpm run release:local after the latest commit and evidence updates.",
+            "Assign 3 spec-completion work order(s) to owners and ingest returned evidence before claiming spec closure.",
+            "Collect or refresh 1 release evidence report(s) before production publishing.",
+          ],
         };
       }
       if (cmd === "write_desktop_ui_smoke_report") return null;
@@ -2801,12 +2829,21 @@ test("creates support bundle handoff from settings", async ({ page }) => {
   await expect(page.getByText("not document content or secrets")).toBeVisible();
 
   await page.getByRole("button", { name: "Preview" }).click();
-  await expect(page.getByText("Support bundle preview ready: current-host-ready-with-external-gaps, 1 evidence gaps, 106 open spec rows, engines complete (0 missing), 1 evidence reports need attention")).toBeVisible();
-  await expect(page.getByText("Mock support recommendation")).toBeVisible();
+  await expect(page.getByText("Support bundle preview ready: current-host-ready-with-external-gaps, 1 evidence gaps, 1/2 release actions ready, 106 open spec rows, 2/3 spec work orders ready, release candidate stale (3 artifacts), engines complete (0 missing), 1 evidence reports need attention")).toBeVisible();
+  const recommendationRegion = page.getByRole("region", { name: "Support bundle recommendations" });
+  await expect(recommendationRegion).toBeVisible();
+  await expect(recommendationRegion.getByText("Local setup", { exact: true })).toBeVisible();
+  await expect(recommendationRegion.getByText("Release readiness", { exact: true })).toBeVisible();
+  await expect(recommendationRegion.getByText("Specification closure", { exact: true })).toBeVisible();
+  await expect(recommendationRegion.getByText("Evidence collection", { exact: true })).toBeVisible();
+  await expect(page.getByText("Default Markdown reader automation is unavailable on this host; use manual setup.")).toBeVisible();
   await expect(page.getByText("preview only")).toBeVisible();
-  await expect(page.locator("dd").getByText("106 open", { exact: true })).toBeVisible();
+  await expect(page.locator("dd").filter({ hasText: "106 open" })).toContainText("2/3 work orders ready");
   await expect(page.locator("dd").getByText("10 installed, 0 missing", { exact: true })).toBeVisible();
   await expect(page.locator("dd").getByText("1 ready, 1 attention, 0 missing", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Release evidence action plan" })).toContainText("release-signing");
+  await expect(page.getByRole("region", { name: "Specification work orders" })).toContainText("001-manual-review");
+  await expect(page.getByRole("region", { name: "Release candidate status" })).toContainText("stale");
 
   await queueDialogSelection(page, "/workspace/neditor-support-bundle.json");
   await page.getByRole("button", { name: "Save JSON" }).click();

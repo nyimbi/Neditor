@@ -3281,9 +3281,17 @@
                 <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
               </div>
             </dl>
-            <ul v-if="supportBundleReport?.recommendations?.length" class="transform-installer-handlers">
-              <li v-for="recommendation in supportBundleReport.recommendations" :key="recommendation">{{ recommendation }}</li>
-            </ul>
+            <section v-if="supportBundleRecommendationGroups.length" class="support-bundle-recommendations" aria-label="Support bundle recommendations">
+              <article v-for="group in supportBundleRecommendationGroups" :key="group.id" :data-priority="group.priority">
+                <header>
+                  <span>{{ group.label }}</span>
+                  <small>{{ group.items.length }} item{{ group.items.length === 1 ? "" : "s" }}</small>
+                </header>
+                <ul>
+                  <li v-for="recommendation in group.items" :key="recommendation">{{ recommendation }}</li>
+                </ul>
+              </article>
+            </section>
             <section v-if="supportBundleReport?.releaseActionPlan?.workItems?.length" class="support-bundle-action-plan" aria-label="Release evidence action plan">
               <h5>Release evidence action plan</h5>
               <article v-for="item in supportBundleReport.releaseActionPlan.workItems.slice(0, 6)" :key="item.id">
@@ -6532,6 +6540,12 @@ type SupportBundleReport = {
   };
   recommendations?: string[];
 };
+type SupportBundleRecommendationGroup = {
+  id: "local-setup" | "release-readiness" | "spec-closure" | "evidence";
+  label: string;
+  priority: "setup" | "blocker" | "handoff";
+  items: string[];
+};
 
 declare global {
   interface Window {
@@ -6746,6 +6760,20 @@ const cliDeployPlan = ref<CliDeployResponse | null>(null);
 const supportBundleBusy = ref(false);
 const supportBundleStatus = ref("");
 const supportBundleReport = ref<SupportBundleReport | null>(null);
+const supportBundleRecommendationGroups = computed<SupportBundleRecommendationGroup[]>(() => {
+  const groups: SupportBundleRecommendationGroup[] = [
+    { id: "local-setup", label: "Local setup", priority: "setup", items: [] },
+    { id: "release-readiness", label: "Release readiness", priority: "blocker", items: [] },
+    { id: "spec-closure", label: "Specification closure", priority: "handoff", items: [] },
+    { id: "evidence", label: "Evidence collection", priority: "handoff", items: [] },
+  ];
+  const byId = new Map(groups.map((group) => [group.id, group]));
+  for (const recommendation of supportBundleReport.value?.recommendations || []) {
+    const bucket = supportBundleRecommendationBucket(recommendation);
+    byId.get(bucket)?.items.push(recommendation);
+  }
+  return groups.filter((group) => group.items.length);
+});
 const guidedDemoStepIndex = ref(0);
 const ttsBusy = ref(false);
 const ttsInspectionBusy = ref(false);
@@ -18793,6 +18821,25 @@ async function createSupportBundleFromSettings(writeToFile: boolean) {
   }
 }
 
+function supportBundleRecommendationBucket(recommendation: string): SupportBundleRecommendationGroup["id"] {
+  const text = recommendation.toLowerCase();
+  if (
+    text.includes("default markdown reader") ||
+    text.includes("workspace scaffold") ||
+    text.includes("app binary") ||
+    text.includes("transform handler installer")
+  ) {
+    return "local-setup";
+  }
+  if (text.includes("spec") || text.includes("work order")) {
+    return "spec-closure";
+  }
+  if (text.includes("evidence report") || text.includes("evidence kit") || text.includes("ingest returned evidence")) {
+    return "evidence";
+  }
+  return "release-readiness";
+}
+
 async function copyTransformInstallerCommands() {
   const commands = transformInstallerCommandText.value;
   if (!commands) {
@@ -26141,6 +26188,91 @@ select:hover {
   gap: 3px;
   margin: 0;
   padding-left: 18px;
+}
+
+.support-bundle-recommendations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.support-bundle-recommendations article {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #d8e0e8;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.support-bundle-recommendations article[data-priority="blocker"] {
+  border-color: #d9a76c;
+  background: #fff8ed;
+}
+
+.support-bundle-recommendations article[data-priority="handoff"] {
+  border-color: #b9c8de;
+  background: #f5f8fc;
+}
+
+.support-bundle-recommendations header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.support-bundle-recommendations header span {
+  color: #182433;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.support-bundle-recommendations header small {
+  color: #526171;
+  font-size: 10px;
+}
+
+.support-bundle-recommendations ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.support-bundle-recommendations li {
+  color: #526171;
+  font-size: 11px;
+}
+
+.app-shell[data-theme="dark"] .support-bundle-recommendations article,
+.app-shell[data-theme="dark"] .support-bundle-action-plan article {
+  border-color: #34465a;
+  background: #1b2736;
+}
+
+.app-shell[data-theme="dark"] .support-bundle-recommendations article[data-priority="blocker"] {
+  border-color: #7c5f38;
+  background: #2a251d;
+}
+
+.app-shell[data-theme="dark"] .support-bundle-recommendations article[data-priority="handoff"] {
+  border-color: #405267;
+  background: #1d2a3a;
+}
+
+.app-shell[data-theme="dark"] .support-bundle-recommendations header span,
+.app-shell[data-theme="dark"] .support-bundle-action-plan h5,
+.app-shell[data-theme="dark"] .support-bundle-action-plan strong {
+  color: #e6edf5;
+}
+
+.app-shell[data-theme="dark"] .support-bundle-recommendations header small,
+.app-shell[data-theme="dark"] .support-bundle-recommendations li,
+.app-shell[data-theme="dark"] .support-bundle-action-plan span,
+.app-shell[data-theme="dark"] .support-bundle-action-plan small {
+  color: #b7c4d3;
 }
 
 .support-bundle-action-plan {

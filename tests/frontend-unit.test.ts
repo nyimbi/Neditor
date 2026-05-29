@@ -8314,6 +8314,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned support-bundle --output support.json"));
   ok(app.includes("Support bundle"));
   ok(app.includes("redaction-safe setup and release-readiness handoff"));
+  ok(app.includes("supportBundleRecommendationGroups"));
+  ok(app.includes("supportBundleRecommendationBucket"));
+  ok(app.includes('aria-label="Support bundle recommendations"'));
+  ok(app.includes("Local setup"));
+  ok(app.includes("Release readiness"));
+  ok(app.includes("Specification closure"));
+  ok(app.includes("Evidence collection"));
   ok(app.includes("specCompletion"));
   ok(app.includes("Spec rows"));
   ok(app.includes("engineProbe"));
