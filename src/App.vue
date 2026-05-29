@@ -150,34 +150,33 @@
       </section>
 
       <section class="window-meta" aria-label="Document status">
-        <section v-if="collapsedToolbarRows.length" class="collapsed-toolbar-tray titlebar-toolbar-tray" aria-label="Collapsed toolbars">
-          <span class="collapsed-toolbar-tray-label">Collapsed</span>
+        <section v-if="collapsedToolbarRows.length" class="collapsed-toolbar-tray titlebar-toolbar-tray" aria-label="Hidden toolbars">
+          <span class="collapsed-toolbar-tray-label">Toolbars hidden</span>
           <button
-            v-for="row in collapsedToolbarRows"
-            :key="`collapsed-${row.id}`"
-            class="collapsed-toolbar-pill"
-            type="button"
-            :aria-label="`Expand ${row.label} toolbar`"
-            :title="`Expand ${row.label} toolbar`"
-            @click="toggleToolbarRow(row.id)"
-          >
-            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-              <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
-            </svg>
-            <span>{{ row.label }}</span>
-          </button>
-          <button
-            v-if="isToolbarCollapsed('view')"
             class="collapsed-toolbar-pill collapsed-toolbar-pill-primary"
             type="button"
-            aria-label="Expand all toolbars"
-            title="Expand all toolbars"
+            aria-label="Show all hidden toolbars"
+            title="Show all hidden toolbar rows"
             @click="setAllCommandToolbarsCollapsed(false)"
           >
             <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
               <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
             </svg>
-            <span>Expand all</span>
+            <span>Show all toolbars</span>
+          </button>
+          <button
+            v-for="row in collapsedToolbarRows"
+            :key="`collapsed-${row.id}`"
+            class="collapsed-toolbar-pill"
+            type="button"
+            :aria-label="`Show ${row.label} toolbar`"
+            :title="`Show ${row.label} toolbar`"
+            @click="toggleToolbarRow(row.id)"
+          >
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
+            </svg>
+            <span>Show {{ row.label }}</span>
           </button>
           <button
             v-if="writingSpaceMaximized"
@@ -21865,7 +21864,7 @@ select:hover {
 
 .titlebar-toolbar-tray {
   flex: 1 1 auto;
-  max-width: min(46vw, 520px);
+  max-width: min(52vw, 660px);
 }
 
 .release-badge {
@@ -21992,14 +21991,18 @@ select:hover {
   gap: 5px;
   min-width: 0;
   min-height: 26px;
-  padding: 1px 0 3px;
+  padding: 2px 4px;
+  border: 1px solid #bdcbd9;
+  border-radius: 7px;
+  background: #f6f9fc;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
   overflow-x: auto;
 }
 
 .collapsed-toolbar-tray-label {
   flex: 0 0 auto;
-  color: #697789;
-  font-size: 9px;
+  color: #2f4258;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1;
@@ -22012,9 +22015,9 @@ select:hover {
   gap: 4px;
   flex: 0 0 auto;
   min-height: 24px;
-  padding: 0 7px;
+  padding: 0 8px;
   border: 1px solid #cbd7e5;
-  border-radius: 999px;
+  border-radius: 6px;
   background: #ffffff;
   color: #445367;
   font-size: 10px;
@@ -22030,8 +22033,10 @@ select:hover {
 }
 
 .collapsed-toolbar-pill-primary {
-  border-color: #9ab6d6;
-  color: #17456f;
+  border-color: #315f8d;
+  background: #e7f1fb;
+  color: #173e63;
+  font-weight: 800;
 }
 
 .collapsed-toolbar-pill svg {

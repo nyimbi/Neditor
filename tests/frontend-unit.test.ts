@@ -7473,6 +7473,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("toolbarCollapsedRows"));
   ok(app.includes("command-toolbar-heading"));
   ok(app.includes("collapsed-toolbar-tray"));
+  ok(app.includes("Toolbars hidden"));
+  ok(app.includes("Show all hidden toolbars"));
+  ok(app.includes("Show all toolbars"));
+  ok(app.includes("Show ${row.label} toolbar"));
   ok(app.includes("collapsedToolbarRows"));
   ok(app.includes("Collapse all toolbars"));
   ok(app.includes("Expand all toolbars"));

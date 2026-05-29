@@ -90,6 +90,22 @@ without the machine-readable record proving how the cask SHA was derived.
 | `pnpm run check:docs` | Pass | README and release docs links still resolve after documenting the materialization report return. |
 | `pnpm run check:homebrew` | Pass with release blockers | Default report restored to the real pending blockers after removing synthetic smoke evidence. |
 
+## 2026-05-29 Hidden Toolbar Restore Affordance
+
+NEditor now makes hidden toolbar rows visibly recoverable from the titlebar.
+Whenever any toolbar row is hidden, the tray is labeled **Toolbars hidden**,
+shows a primary **Show all toolbars** action, and gives each hidden row an
+explicit **Show File/Writing/Review/...** action. The command bar still collapses
+to near-zero height when all rows are hidden, so the recovery path is clearer
+without giving back the vertical writing space users just reclaimed.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after the toolbar restore label and action updates. |
+| `pnpm run test:unit` | Pass | 118 frontend unit tests passed, including static guards for the visible hidden-toolbar tray labels and restore actions. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "collapses and restores command toolbars"` | Pass | Focused Chromium workflow proves hidden toolbars expose **Show all toolbars** plus per-row **Show** actions while the command bar height remains `<= 2px` when all rows are hidden. |
+| `git diff --check` | Pass | Whitespace guard passed before commit. |
+
 ## 2026-05-29 Max Writing Space Preset
 
 NEditor now has a reversible **Maximize Writing Space** command. The command
