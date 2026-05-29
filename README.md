@@ -13,7 +13,7 @@ and inspectable. The app helps turn it into polished HTML, PDF, DOCX, PPTX,
 Markdown bundle, blog, Substack, LaTeX, Google Docs package, or EPUB ebook
 outputs.
 
-![NEditor workbench showing Markdown source, live preview, outline, diagnostics, and status](docs/screenshots/workbench.svg)
+![NEditor workbench showing the capability showcase Markdown source, live preview, outline, diagnostics, and status](docs/screenshots/workbench.png)
 
 ## Start Here If You Just Want To Use NEditor
 
@@ -417,11 +417,11 @@ web app.
 
 | Writing workbench | Export readiness |
 | --- | --- |
-| ![Split editor and preview with outline and diagnostics](docs/screenshots/workbench.svg) | ![Export readiness panel with target options, diagnostics, and manifest preview](docs/screenshots/export-readiness.svg) |
+| ![Split editor and preview with outline and diagnostics](docs/screenshots/workbench.png) | ![Export readiness panel with target options, diagnostics, and manifest preview](docs/screenshots/export-readiness.png) |
 
 | Review and AI governance | Tables and transforms |
 | --- | --- |
-| ![Review panel with release status, unresolved comments, AI provenance, and change notes](docs/screenshots/review-governance.svg) | ![Business table editor and transform-aware document preview](docs/screenshots/tables-transforms.svg) |
+| ![Review panel with release status, unresolved comments, AI provenance, and change notes](docs/screenshots/review-governance.png) | ![Business table editor and transform-aware document preview](docs/screenshots/tables-transforms.png) |
 
 ## Feature Tour
 
