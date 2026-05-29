@@ -2,9 +2,10 @@ use crate::path_to_string;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    io::Read,
+    io::{Cursor, Read, Seek},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use zip::ZipArchive;
 
@@ -97,8 +98,17 @@ fn import_markdown(request: &ImportRfpSourceRequest) -> Result<(String, String, 
 fn import_docx(request: &ImportRfpSourceRequest) -> Result<(String, String, String), String> {
     let path = request_path(request)?;
     let file = fs::File::open(&path).map_err(|err| format!("Could not open DOCX RFP: {err}"))?;
+    let text = extract_docx_text(file)?;
+    Ok((
+        text,
+        title_from_path(&path),
+        "native-docx-package-text".to_string(),
+    ))
+}
+
+fn extract_docx_text<R: Read + Seek>(reader: R) -> Result<String, String> {
     let mut archive =
-        ZipArchive::new(file).map_err(|err| format!("Could not inspect DOCX package: {err}"))?;
+        ZipArchive::new(reader).map_err(|err| format!("Could not inspect DOCX package: {err}"))?;
     let mut parts = Vec::new();
     let names = archive.file_names().map(str::to_string).collect::<Vec<_>>();
     for name in docx_text_part_names(names) {
@@ -115,11 +125,7 @@ fn import_docx(request: &ImportRfpSourceRequest) -> Result<(String, String, Stri
     if parts.is_empty() {
         return Err("DOCX did not contain readable Word document XML.".to_string());
     }
-    Ok((
-        parts.join("\n\n"),
-        title_from_path(&path),
-        "native-docx-package-text".to_string(),
-    ))
+    Ok(parts.join("\n\n"))
 }
 
 fn docx_text_part_names(names: Vec<String>) -> Vec<String> {
@@ -165,9 +171,14 @@ fn import_pdf(
     warnings: &mut Vec<String>,
 ) -> Result<(String, String, String), String> {
     let path = request_path(request)?;
+    let text = extract_pdf_text_from_path(&path, warnings)?;
+    Ok((text, title_from_path(&path), "pdftotext-layout".to_string()))
+}
+
+fn extract_pdf_text_from_path(path: &Path, warnings: &mut Vec<String>) -> Result<String, String> {
     let output = Command::new("pdftotext")
         .arg("-layout")
-        .arg(&path)
+        .arg(path)
         .arg("-")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -177,7 +188,7 @@ fn import_pdf(
             let raw = String::from_utf8_lossy(&output.stdout).to_string();
             let text = preserve_pdf_layout_tables(&raw);
             warnings.push("PDF text extraction depends on the local pdftotext utility; verify scanned pages and addenda manually.".to_string());
-            Ok((text, title_from_path(&path), "pdftotext-layout".to_string()))
+            Ok(text)
         }
         Ok(output) => Err(format!(
             "Could not extract PDF text with pdftotext: {}",
@@ -187,6 +198,23 @@ fn import_pdf(
             "PDF import needs the pdftotext utility on this machine, or paste extracted RFP text manually: {err}"
         )),
     }
+}
+
+fn extract_pdf_text_from_bytes(
+    bytes: &[u8],
+    url: &str,
+    warnings: &mut Vec<String>,
+) -> Result<String, String> {
+    let temp_path = temp_rfp_download_path("pdf");
+    fs::write(&temp_path, bytes).map_err(|err| {
+        format!(
+            "Could not stage downloaded PDF RFP from {url} at {}: {err}",
+            temp_path.display()
+        )
+    })?;
+    let result = extract_pdf_text_from_path(&temp_path, warnings);
+    let _ = fs::remove_file(&temp_path);
+    result
 }
 
 fn preserve_pdf_layout_tables(text: &str) -> String {
@@ -371,12 +399,81 @@ fn import_url(
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
-    let raw = String::from_utf8_lossy(&output.stdout).to_string();
-    warnings.push("URL import captures the public page response; verify linked attachments and addenda manually.".to_string());
-    Ok((
-        html_to_text(&raw),
-        html_title(&raw).unwrap_or_else(|| url.to_string()),
-        "curl-url-text".to_string(),
+    let body = output.stdout;
+    match infer_url_rfp_body_kind(url, &body) {
+        UrlRfpBodyKind::Pdf => {
+            let text = extract_pdf_text_from_bytes(&body, url, warnings)?;
+            warnings.push("URL pointed directly to a PDF RFP; verify scanned pages and separately linked addenda manually.".to_string());
+            Ok((
+                text,
+                url.to_string(),
+                "curl-url-pdf-pdftotext-layout".to_string(),
+            ))
+        }
+        UrlRfpBodyKind::Docx => {
+            let text = extract_docx_text(Cursor::new(body))?;
+            warnings.push(
+                "URL pointed directly to a DOCX RFP; verify separately linked addenda manually."
+                    .to_string(),
+            );
+            Ok((
+                text,
+                url.to_string(),
+                "curl-url-docx-package-text".to_string(),
+            ))
+        }
+        UrlRfpBodyKind::Html => {
+            let raw = String::from_utf8_lossy(&body).to_string();
+            warnings.push("URL import captures the public page response; verify linked attachments and addenda manually.".to_string());
+            Ok((
+                html_to_text(&raw),
+                html_title(&raw).unwrap_or_else(|| url.to_string()),
+                "curl-url-text".to_string(),
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UrlRfpBodyKind {
+    Pdf,
+    Docx,
+    Html,
+}
+
+fn infer_url_rfp_body_kind(url: &str, bytes: &[u8]) -> UrlRfpBodyKind {
+    let clean_url = url
+        .split(['?', '#'])
+        .next()
+        .unwrap_or(url)
+        .trim()
+        .to_ascii_lowercase();
+    if bytes.starts_with(b"%PDF") || clean_url.ends_with(".pdf") {
+        return UrlRfpBodyKind::Pdf;
+    }
+    if clean_url.ends_with(".docx") || bytes_look_like_docx(bytes) {
+        return UrlRfpBodyKind::Docx;
+    }
+    UrlRfpBodyKind::Html
+}
+
+fn bytes_look_like_docx(bytes: &[u8]) -> bool {
+    if !bytes.starts_with(b"PK") {
+        return false;
+    }
+    ZipArchive::new(Cursor::new(bytes))
+        .map(|mut archive| archive.by_name("word/document.xml").is_ok())
+        .unwrap_or(false)
+}
+
+fn temp_rfp_download_path(extension: &str) -> PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    std::env::temp_dir().join(format!(
+        "neditor-rfp-download-{}-{unique}.{extension}",
+        std::process::id()
     ))
 }
 
@@ -676,6 +773,8 @@ fn normalize_text(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
     #[test]
     fn import_rfp_source_accepts_pasted_markdown_aliases() {
@@ -742,6 +841,46 @@ mod tests {
         assert!(normalized
             .contains("Software Architect | 5+ years platform architecture | 20 points |"));
         assert!(normalized.contains("Paragraph text with normal single spaces should stay prose."));
+    }
+
+    #[test]
+    fn url_body_kind_detects_direct_pdf_and_docx_downloads() {
+        let docx_bytes = minimal_docx_bytes(
+            r#"<w:document><w:body><w:p><w:r><w:t>Vendor must respond.</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+
+        assert_eq!(
+            infer_url_rfp_body_kind("https://buyer.example/download?id=7", b"%PDF-1.7\n..."),
+            UrlRfpBodyKind::Pdf
+        );
+        assert_eq!(
+            infer_url_rfp_body_kind("https://buyer.example/rfp.pdf?download=1", b"not pdf magic"),
+            UrlRfpBodyKind::Pdf
+        );
+        assert_eq!(
+            infer_url_rfp_body_kind("https://buyer.example/download?id=8", &docx_bytes),
+            UrlRfpBodyKind::Docx
+        );
+        assert_eq!(
+            infer_url_rfp_body_kind("https://buyer.example/rfp.docx?download=1", b"PK"),
+            UrlRfpBodyKind::Docx
+        );
+        assert_eq!(
+            infer_url_rfp_body_kind("https://buyer.example/rfp", b"<html>RFP</html>"),
+            UrlRfpBodyKind::Html
+        );
+    }
+
+    #[test]
+    fn direct_url_docx_bytes_extract_text_and_tables() {
+        let bytes = minimal_docx_bytes(
+            r#"<w:document><w:body><w:p><w:r><w:t>Proposal instructions</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Role</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Minimum requirement</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>Solution Lead</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>7+ years architecture</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+
+        let text = extract_docx_text(Cursor::new(bytes)).expect("docx text");
+        assert!(text.contains("Proposal instructions"));
+        assert!(text.contains("Role | Minimum requirement |"));
+        assert!(text.contains("Solution Lead | 7+ years architecture |"));
     }
 
     #[test]
@@ -824,5 +963,20 @@ mod tests {
         let text = html_to_text(html);
         assert!(text.contains("Vendor must support café users ✓."));
         assert!(!text.contains("drop()"));
+    }
+
+    fn minimal_docx_bytes(document_xml: &str) -> Vec<u8> {
+        let cursor = Cursor::new(Vec::new());
+        let mut zip = ZipWriter::new(cursor);
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        zip.start_file("[Content_Types].xml", options)
+            .expect("content types");
+        zip.write_all(br#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#)
+            .expect("content types xml");
+        zip.start_file("word/document.xml", options)
+            .expect("document xml");
+        zip.write_all(document_xml.as_bytes())
+            .expect("document xml body");
+        zip.finish().expect("finish docx").into_inner()
     }
 }

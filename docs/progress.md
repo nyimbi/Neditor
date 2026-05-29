@@ -150,6 +150,22 @@ tables from PDF sources.
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting stayed clean after adding PDF layout-table preservation helpers. |
 | `git diff --check` | Pass | Whitespace guard passed before commit. |
 
+## 2026-05-29 Direct URL RFP Attachments
+
+URL-based RFP import now handles direct PDF and DOCX downloads instead of
+treating every URL response as HTML. The importer detects PDF magic bytes,
+`.pdf` URLs with query strings, `.docx` URLs, and DOCX ZIP packages containing
+`word/document.xml`; direct PDF responses route through the same `pdftotext`
+layout extraction and direct DOCX responses route through the same Word package
+text/table extraction used by file imports.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked rfp_import --lib` | Pass | 10 focused RFP importer tests passed, including direct URL body-kind detection for PDF/DOCX/HTML and direct DOCX URL bytes preserving proposal text plus role/minimum-requirement table rows. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting stayed clean after direct URL PDF/DOCX import helpers were formatted. |
+| `pnpm run check:docs` | Pass | Markdown link validation checked 25 documentation files successfully. |
+| `git diff --check` | Pass | Whitespace guard passed before commit. |
+
 ## 2026-05-29 Max Writing Space Preset
 
 NEditor now has a reversible **Maximize Writing Space** command. The command
