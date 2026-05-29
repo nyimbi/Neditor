@@ -164,14 +164,14 @@
           <button
             class="collapsed-toolbar-pill collapsed-toolbar-pill-primary"
             type="button"
-            aria-label="Restore all hidden toolbars"
-            title="Restore all hidden toolbar rows"
+            aria-label="Show all hidden toolbar rows"
+            title="Show all hidden toolbar rows"
             @click="setAllCommandToolbarsCollapsed(false)"
           >
             <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
               <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
             </svg>
-            <span>Restore all</span>
+            <span>Show all</span>
           </button>
           <button
             v-for="row in collapsedToolbarRows"
@@ -185,7 +185,7 @@
             <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
               <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
             </svg>
-            <span>{{ row.label }}</span>
+            <span>Show {{ row.label }}</span>
           </button>
           <button
             v-if="writingSpaceMaximized"
@@ -203,6 +203,20 @@
         </section>
         <span role="status" class="release-badge" :class="releaseStatusClass" :aria-label="`Release status ${releaseStatus}`">{{ releaseStatus }}</span>
         <span v-if="store.gitStatus?.inside_repo">{{ store.gitStatus.branch || "detached" }}{{ store.gitStatus.dirty ? " dirty" : " clean" }}</span>
+        <button
+          v-if="collapsedToolbarRows.length"
+          class="floating-toolbar-restore"
+          type="button"
+          aria-label="Show hidden toolbars"
+          :title="hiddenToolbarFloatingHelpText"
+          @click="setAllCommandToolbarsCollapsed(false)"
+        >
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path v-for="path in toolbarIconPaths('expand')" :key="path" :d="path"></path>
+          </svg>
+          <span>Show toolbars</span>
+          <small>{{ hiddenToolbarSummary }}</small>
+        </button>
       </section>
     </header>
 
@@ -9527,7 +9541,7 @@ const appMenus = computed<AppMenu[]>(() => [
         id: "layout",
         label: "Layout",
         items: [
-          { id: "maximize-writing", label: "Maximize Writing Space", help: "Hide side panels, status, preview, and toolbar rows while keeping a restore path in the titlebar.", run: () => maximizeWritingSpace() },
+          { id: "maximize-writing", label: "Maximize Writing Space", help: "Hide side panels, status, preview, and toolbar rows while keeping visible restore controls.", run: () => maximizeWritingSpace() },
           { id: "restore-writing", label: "Restore Writing Layout", help: "Return to the mode, sidebar, toolbar display, and split panes used before maximizing.", disabled: !writingSpaceMaximized.value, run: () => restoreWritingSpace() },
           { id: "outline-panel", label: "Document Outline", help: "Open the outline sidebar.", run: () => showOutline() },
           { id: "exports-panel", label: "Export Panel", help: "Open distribution and export controls.", run: () => (store.sidebar = "exports") },
@@ -9538,8 +9552,8 @@ const appMenus = computed<AppMenu[]>(() => [
             id: `toggle-toolbar-${row.id}`,
             label: isToolbarCollapsed(row.id) ? `Show ${row.label} Toolbar` : `Hide ${row.label} Toolbar`,
             help: isToolbarCollapsed(row.id)
-              ? `Restore the ${row.label} toolbar row. Hidden rows are also listed in the titlebar tray.`
-              : `Hide the ${row.label} toolbar row and add it to the visible restore tray.`,
+              ? `Restore the ${row.label} toolbar row. Hidden rows are listed in the titlebar tray and the floating Show toolbars button.`
+              : `Hide the ${row.label} toolbar row and add it to the visible restore controls.`,
             run: () => toggleToolbarRow(row.id),
           })),
         ],
@@ -9703,9 +9717,11 @@ const toolbarCollapseRows = computed(() => toolbarCollapseRowDefinitions);
 const collapsedToolbarRows = computed(() => toolbarCollapseRows.value.filter((row) => store.toolbarCollapsedRows.includes(row.id)));
 const hiddenToolbarSummary = computed(() => {
   const count = collapsedToolbarRows.value.length;
-  return `${count} toolbar${count === 1 ? "" : "s"} hidden`;
+  const first = collapsedToolbarRows.value[0];
+  return count === 1 && first ? `${first.label} toolbar hidden` : `${count} toolbars hidden`;
 });
-const hiddenToolbarTrayHelpText = computed(() => "Click Restore all or a toolbar name to show it again.");
+const hiddenToolbarTrayHelpText = computed(() => "Use Show all, Show toolbars, or View menu > Toolbars to restore hidden rows.");
+const hiddenToolbarFloatingHelpText = computed(() => `${hiddenToolbarSummary.value}. Click to show every hidden toolbar row.`);
 const hiddenToolbarTrayAriaLabel = computed(() => `${hiddenToolbarSummary.value}. ${hiddenToolbarTrayHelpText.value}`);
 const normalizedToolbarCollapsedRows = (ids: string[]) =>
   Array.from(new Set(ids.filter((id) => toolbarCollapseRowIds.includes(id))));
@@ -9731,7 +9747,7 @@ function hideToolbarRow(id: string) {
   const current = new Set(store.toolbarCollapsedRows);
   current.add(id);
   store.toolbarCollapsedRows = normalizedToolbarCollapsedRows([...current]);
-  store.statusMessage = `${toolbarRowLabel(id)} toolbar hidden; use the hidden toolbars tray or View menu to show it again`;
+  store.statusMessage = `${toolbarRowLabel(id)} toolbar hidden; use Show toolbars, the hidden toolbars tray, or View menu to show it again`;
 }
 function toggleToolbarRow(id: string) {
   if (isToolbarCollapsed(id)) {
@@ -9743,7 +9759,7 @@ function toggleToolbarRow(id: string) {
 function setAllCommandToolbarsCollapsed(collapsed: boolean) {
   store.toolbarCollapsedRows = collapsed ? [...toolbarCollapseRowIds] : [];
   store.statusMessage = collapsed
-    ? "All toolbars hidden; use the hidden toolbars tray or View menu to show them again"
+    ? "All toolbars hidden; use Show toolbars, the hidden toolbars tray, or View menu to show them again"
     : "All toolbars restored";
 }
 function maximizeWritingSpace() {
@@ -12453,7 +12469,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   {
     name: "Maximize writing space",
     group: "View",
-    description: "Hide side panels, status, preview, and toolbar rows while preserving a one-click restore point.",
+    description: "Hide side panels, status, preview, and toolbar rows while preserving visible restore controls.",
     keywords: ["focus", "writing space", "distraction free", "maximize", "hide sidebar", "hide toolbar"],
     run: () => maximizeWritingSpace(),
   },
@@ -12469,7 +12485,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   ...toolbarCollapseRowDefinitions.map((row) => ({
     name: `Show ${row.label} toolbar`,
     group: "View",
-    description: `Restore the ${row.label} toolbar row. Hidden rows are also listed in the titlebar tray.`,
+    description: `Restore the ${row.label} toolbar row. Hidden rows are listed in the titlebar tray and the floating Show toolbars button.`,
     keywords: ["toolbar", "hidden", "restore", "unhide", row.label.toLowerCase()],
     run: () => showToolbarRow(row.id),
   })),
@@ -21218,6 +21234,17 @@ select:hover {
   background: #203b58;
 }
 
+.app-shell[data-theme="dark"] .floating-toolbar-restore {
+  border-color: #6f98c5;
+  background: #1d344c;
+  color: #e6f2ff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(121, 164, 207, 0.18);
+}
+
+.app-shell[data-theme="dark"] .floating-toolbar-restore small {
+  color: #b7cce2;
+}
+
 .app-shell[data-theme="dark"] .app-menu-trigger,
 .app-shell[data-theme="dark"] .app-menu-group button {
   color: #e6edf5;
@@ -22234,6 +22261,55 @@ select:hover {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2;
+}
+
+.floating-toolbar-restore {
+  position: fixed;
+  top: 44px;
+  right: 12px;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: 16px auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 1px;
+  min-height: 34px;
+  padding: 4px 10px;
+  border: 1px solid #315f8d;
+  border-radius: 7px;
+  background: #f7fbff;
+  color: #173e63;
+  box-shadow: 0 10px 24px rgba(24, 36, 52, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+  text-align: left;
+}
+
+.floating-toolbar-restore:hover,
+.floating-toolbar-restore:focus-visible {
+  border-color: #174a79;
+  background: #e9f4ff;
+  box-shadow: 0 12px 28px rgba(24, 36, 52, 0.24), 0 0 0 3px rgba(99, 134, 180, 0.22);
+}
+
+.floating-toolbar-restore svg {
+  grid-row: 1 / span 2;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.floating-toolbar-restore small {
+  color: #4c647f;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.05;
 }
 
 .command-group {
@@ -27887,6 +27963,13 @@ select:hover {
 
   .titlebar-toolbar-tray {
     max-width: 34vw;
+  }
+
+  .floating-toolbar-restore {
+    top: 42px;
+    right: 8px;
+    min-height: 32px;
+    padding-inline: 8px;
   }
 
   .titlebar-toolbar-tray .collapsed-toolbar-tray-label {

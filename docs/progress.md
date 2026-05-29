@@ -27,6 +27,24 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Floating Toolbar Restore Control
+
+Hidden toolbar recovery is now harder to miss. Any hidden toolbar row keeps the
+compact titlebar tray, but also exposes a floating **Show toolbars** control at
+the top-right edge of the workspace. The floating control restores all hidden
+rows without adding a command-bar row, so users keep the vertical writing space
+they recovered while still having an obvious unhide action.
+
+The titlebar tray wording now uses action language: **Show all** and **Show
+File/Writing/View** instead of passive row names, and the status message points
+to **Show toolbars**, the tray, and the View menu.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the floating restore control and updated computed labels. |
+| `pnpm run test:unit` | Pass | 118 frontend unit tests passed, including static guards for the floating restore control, action labels, and updated recovery help text. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "collapses and restores command toolbars"` | Pass | Focused Chromium workflow proves hidden rows expose the floating **Show toolbars** control, preserve the near-zero command-bar height when all rows are hidden, and restore the hidden rows from the floating control. |
+
 ## 2026-05-29 Homebrew Cask Materialization
 
 NEditor now has `pnpm run release:homebrew`, a release-operator utility that
