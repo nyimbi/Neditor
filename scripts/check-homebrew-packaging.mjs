@@ -26,8 +26,11 @@ const releaseSigningReport = readOptionalJson(".tmp/release-signing/report.json"
 const releaseReadinessReport = readOptionalJson(".tmp/release-readiness/report.json");
 
 requireEqual(packageJson.scripts?.["check:homebrew"], "node scripts/check-homebrew-packaging.mjs", "package.json must expose check:homebrew");
+requireEqual(packageJson.scripts?.["release:homebrew"], "node scripts/create-homebrew-cask.mjs", "package.json must expose release:homebrew");
 requireIncludes(README, "pnpm run check:homebrew", "README must document the Homebrew packaging gate");
+requireIncludes(README, "pnpm run release:homebrew", "README must document the Homebrew cask materialization command");
 requireIncludes(docs, "packaging/homebrew/Casks/neditor.rb.template", "Homebrew docs must point at the cask template");
+requireIncludes(docs, "pnpm run release:homebrew", "Homebrew docs must include the cask materialization command");
 requireIncludes(docs, "signed and notarized", "Homebrew docs must require signed and notarized macOS artifacts");
 requireIncludes(docs, "brew audit --cask --new", "Homebrew docs must include the final cask audit command");
 requireIncludes(docs, "`ned`", "Homebrew docs must describe the ned CLI helper");
@@ -103,9 +106,17 @@ console.log(`Checked Homebrew cask packaging contract; wrote ${relative(reportPa
 
 function validateCaskTemplate(source, { placeholdersRequired, label }) {
   requireIncludes(source, 'cask "neditor" do', `${label} must define the neditor cask token`);
-  requireIncludes(source, 'version "__VERSION__"', `${label} must carry a replaceable version placeholder`);
-  requireIncludes(source, 'sha256 "__SHA256__"', `${label} must carry a replaceable sha256 placeholder`);
+  if (placeholdersRequired) {
+    requireIncludes(source, 'version "__VERSION__"', `${label} must carry a replaceable version placeholder`);
+    requireIncludes(source, 'sha256 "__SHA256__"', `${label} must carry a replaceable sha256 placeholder`);
+  } else {
+    if (!/^\s*version\s+"[^"]+"/m.test(source)) issues.push(`${label} must carry a concrete version stanza`);
+    if (!/^\s*sha256\s+"[a-f0-9]{64}"/im.test(source)) issues.push(`${label} must carry a concrete SHA-256 stanza`);
+  }
   requireIncludes(source, "github.com/nyimbi/Neditor/releases/download/v#{version}", `${label} must use versioned GitHub release artifacts`);
+  if (!/NEditor-#\{version\}-macos\.(zip|dmg)/.test(source)) {
+    issues.push(`${label} must download a versioned NEditor macOS zip or dmg artifact`);
+  }
   requireIncludes(source, 'verified: "github.com/nyimbi/Neditor/"', `${label} must constrain the verified download host`);
   requireIncludes(source, 'name "NEditor"', `${label} must name the application`);
   requireIncludes(source, 'desc "Local-first AI-assisted Markdown workbench for business documents"', `${label} must describe the product`);

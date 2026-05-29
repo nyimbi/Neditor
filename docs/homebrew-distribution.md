@@ -25,11 +25,25 @@ homebrew-neditor/
     neditor.rb
 ```
 
-After producing a signed and notarized macOS zip or DMG, replace
-`__VERSION__` and `__SHA256__` in the template, then run:
+After producing a signed and notarized macOS zip or DMG, materialize the cask
+from the template instead of editing the SHA by hand:
 
 ```sh
-NEDITOR_HOMEBREW_CASK=/path/to/homebrew-neditor/Casks/neditor.rb pnpm run check:homebrew
+pnpm run release:homebrew -- \
+  --artifact /path/to/NEditor-<version>-macos.zip \
+  --output /path/to/homebrew-neditor/Casks/neditor.rb
+```
+
+`release:homebrew` verifies the release version against `package.json`,
+computes the artifact SHA-256, replaces the template placeholders, copies the
+artifact into `.tmp/homebrew/external/` for evidence-kit validation, and writes
+`.tmp/homebrew/materialize-cask-report.json` with the exact follow-up commands.
+Then run:
+
+```sh
+NEDITOR_HOMEBREW_CASK=/path/to/homebrew-neditor/Casks/neditor.rb \
+NEDITOR_HOMEBREW_ARTIFACT=/path/to/NEditor-<version>-macos.zip \
+pnpm run check:homebrew
 ```
 
 The cask installs `NEditor.app` and links `ned` so business users and automation

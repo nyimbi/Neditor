@@ -924,6 +924,11 @@ guardrails, root MIT license linkage, and writes
 notarization, and installer attestation remain credentialed release steps outside
 local verification.
 
+`pnpm run release:homebrew -- --artifact /path/to/NEditor-<version>-macos.zip
+--output /path/to/homebrew-neditor/Casks/neditor.rb` materializes a concrete
+Homebrew cask from the repository template, computes the artifact SHA-256,
+copies the artifact into `.tmp/homebrew/external/`, and writes
+`.tmp/homebrew/materialize-cask-report.json` with follow-up validation commands.
 `pnpm run check:homebrew` verifies the Homebrew cask packaging contract for
 macOS distribution. It checks the cask template under
 `packaging/homebrew/Casks/neditor.rb.template`, the README and

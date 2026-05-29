@@ -368,11 +368,18 @@ After producing a signed and notarized macOS artifact, replace template
 placeholders with the final version and SHA-256:
 
 ```sh
-shasum -a 256 /path/to/NEditor-<version>-macos.zip
+pnpm run release:homebrew -- \
+  --artifact /path/to/NEditor-<version>-macos.zip \
+  --output /path/to/homebrew-neditor/Casks/neditor.rb
 NEDITOR_HOMEBREW_CASK=/path/to/homebrew-neditor/Casks/neditor.rb \
 NEDITOR_HOMEBREW_ARTIFACT=/path/to/NEditor-<version>-macos.zip \
 pnpm run check:homebrew
 ```
+
+`release:homebrew` computes the SHA-256, writes the concrete cask, copies the
+artifact into the Homebrew evidence directory, and records
+`.tmp/homebrew/materialize-cask-report.json`. It does not replace
+signing/notarization or release-readiness gates.
 
 When Homebrew is available on the release host:
 
@@ -417,7 +424,7 @@ checks pass:
 | Browser workflow cannot launch Chromium | Run `pnpm run check:e2e-env`; refresh `.tmp/ms-playwright` with the Playwright install command; use returned CI evidence if the host cannot run browsers. |
 | Playwright port collision | Stop the previous Vite/Playwright run or rerun focused workflows sequentially. |
 | `ned` sidecar missing from a package | Run `pnpm run prepare:sidecars`, confirm `src-tauri/binaries/ned-<target-triple>` exists, then rebuild the Tauri package. |
-| `check:homebrew` reports placeholder SHA | Replace `__SHA256__` with the final artifact hash and rerun with `NEDITOR_HOMEBREW_CASK` and `NEDITOR_HOMEBREW_ARTIFACT`. |
+| `check:homebrew` reports placeholder SHA | Run `pnpm run release:homebrew -- --artifact /path/to/NEditor-<version>-macos.zip --output /path/to/homebrew-neditor/Casks/neditor.rb`, then rerun with `NEDITOR_HOMEBREW_CASK` and `NEDITOR_HOMEBREW_ARTIFACT`. |
 | Signing evidence remains missing | Collect evidence on a credentialed host with `collect:release-signing`, ingest it, then rerun signing and readiness checks. |
 | Full verification is expensive on battery | Run focused checks while developing, then run full verification once per coherent release slice or on a powered/CI host. |
 
@@ -432,4 +439,3 @@ checks pass:
 - Browser, platform, export, accessibility, security, or performance evidence is
   stale for the release commit.
 - Release notes hide known evidence gaps or unsupported host limitations.
-

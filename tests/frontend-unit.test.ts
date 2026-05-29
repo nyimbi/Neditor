@@ -8690,6 +8690,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
   equal(scripts["ingest:evidence"], "node scripts/ingest-release-evidence.mjs");
   equal(scripts["release:local"], "node scripts/create-release-candidate.mjs");
+  equal(scripts["release:homebrew"], "node scripts/create-homebrew-cask.mjs");
   equal(scripts["check:release-candidate"], "node scripts/check-release-candidate.mjs");
   equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
@@ -8720,6 +8721,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
   ok(verification.includes('command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"])'));
   ok(verification.includes('command("Release candidate script syntax", "node", ["--check", "scripts/create-release-candidate.mjs"])'));
+  ok(verification.includes('command("Homebrew cask materializer syntax", "node", ["--check", "scripts/create-homebrew-cask.mjs"])'));
   ok(verification.includes('command("Release candidate checker syntax", "node", ["--check", "scripts/check-release-candidate.mjs"])'));
   ok(verification.includes('command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"])'));
   ok(verification.includes('command("Release signing evidence contract", "pnpm", ["run", "check:release-signing"])'));

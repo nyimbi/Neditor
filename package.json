@@ -43,6 +43,7 @@
     "collect:release-signing": "node scripts/collect-release-signing-evidence.mjs",
     "ingest:evidence": "node scripts/ingest-release-evidence.mjs",
     "release:local": "node scripts/create-release-candidate.mjs",
+    "release:homebrew": "node scripts/create-homebrew-cask.mjs",
     "check:release-candidate": "node scripts/check-release-candidate.mjs",
     "verify:local": "node scripts/run-local-verification.mjs",
     "verify:local:full": "node scripts/run-local-verification.mjs --full",

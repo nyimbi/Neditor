@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `439de25 Prove
-  advanced multi-cursor commands`
+- Latest inspected committed baseline before this update: `86a70eb Keep release
+  status aligned with current evidence`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,28 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-29 Homebrew Cask Materialization
+
+NEditor now has `pnpm run release:homebrew`, a release-operator utility that
+turns a signed macOS zip or DMG into a concrete Homebrew cask from the repository
+template. It verifies the version against `package.json`, computes the artifact
+SHA-256, replaces template placeholders, copies the artifact into
+`.tmp/homebrew/external/`, writes `.tmp/homebrew/materialize-cask-report.json`,
+and prints the exact `check:homebrew` and `brew audit` follow-up commands.
+
+This closes a productization gap in the Homebrew workflow: release operators no
+longer have to hand-edit the cask SHA or manually stage Homebrew evidence files
+before running the packaging validator. The command still preserves the release
+blockers for signing, notarization, platform evidence, and release readiness.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/create-homebrew-cask.mjs` | Pass | Verifies the materializer script is syntactically valid. |
+| `pnpm run release:homebrew -- --artifact .tmp/homebrew-smoke/NEditor-0.1.0-macos.zip --output .tmp/homebrew-smoke/Casks/neditor.rb --evidence-dir .tmp/homebrew-smoke/evidence --json` | Pass | Smoke materializes a concrete cask from a local artifact, computes the SHA-256, copies the artifact into an evidence directory, and writes the materialization report. |
+| `NEDITOR_HOMEBREW_CASK=.tmp/homebrew-smoke/Casks/neditor.rb NEDITOR_HOMEBREW_ARTIFACT=.tmp/homebrew-smoke/evidence/NEditor-0.1.0-macos.zip pnpm run check:homebrew` | Pass with release blockers | Proves the generated cask and artifact checksum satisfy the packaging contract while still reporting signing/notarization blockers. |
+| `pnpm run test:unit` | Pass | Static tests verify the package script and quick verification syntax gate. |
+| `pnpm run check:docs` | Pass | README, Homebrew runbook, and compile/release guide links still resolve. |
 
 ## 2026-05-29 Max Writing Space Preset
 
