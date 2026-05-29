@@ -27,6 +27,24 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Quick Verification Packaging Guards
+
+The routine `pnpm run verify:local` baseline now includes the sidecar
+preparation script syntax check and the platform package configuration audit.
+That brings the strengthened Deploy CLI/sidecar packaging contract into the
+normal completed-slice gate instead of leaving it only in the release-grade full
+verification path.
+
+This improves production readiness because ordinary changes will now catch
+regressions in `prepare:sidecars`, bundle metadata, CLI sidecar guards, file
+associations, icons, CSP, and package metadata before release-candidate
+generation.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run verify:local -- --list` | Pass | Verifies quick local verification now lists the sidecar preparation syntax check and platform package configuration audit. |
+| `pnpm run test:unit` | Pass | Static frontend tests verify package scripts and the local verification command plan include the new sidecar/platform packaging gates. |
+
 ## 2026-05-29 Prepared CLI Sidecar Smoke
 
 The sidecar preparation script now verifies the copied release `ned` helper by

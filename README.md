@@ -858,7 +858,7 @@ release evidence that cannot be collected from every workstation. Run
 checks with the production build, the full browser workflow suite, the focused
 runtime accessibility audit, the manual accessibility review contract, optional
 engine probe, native-watch check, clippy, full Rust tests, rendered export audit,
-platform package configuration audit, Tauri no-bundle release compile, macOS
+Tauri no-bundle release compile, macOS
 `.app` bundle build/smoke and DMG classification on macOS, desktop artifact
 smoke, bounded macOS GUI launch smoke on macOS, and the desktop WebDriver smoke
 or platform skip evidence.
@@ -868,8 +868,10 @@ Use `pnpm run verify:local -- --list` or
 without running it. Quick verification now includes the same browser environment
 preflight exposed by `pnpm run check:e2e-env`,
 which proves the current host can launch Chromium through NEditor's Playwright
-wrapper. The full baseline runs the same browser suite exposed by
-`pnpm run test:e2e`; the runner prefers
+wrapper. It also includes the sidecar-preparation syntax check and platform
+packaging audit, so routine slices catch CLI sidecar and bundle-contract
+regressions before release-candidate generation. The full baseline runs the same
+browser suite exposed by `pnpm run test:e2e`; the runner prefers
 Playwright's workspace-local browser cache at `.tmp/ms-playwright` and falls
 back to an installed Chrome-compatible browser when that cache is missing. To
 refresh that local browser cache, run:
