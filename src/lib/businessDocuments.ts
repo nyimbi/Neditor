@@ -2600,9 +2600,29 @@ function isRequirementLine(line: string) {
 
 function extractRfpRequirementCandidates(lines: Array<{ line: string; index: number }>) {
   const candidates: Array<{ line: string; index: number }> = [];
+  let tableHeaders: string[] = [];
+  let tableContextActive = false;
   for (const item of lines) {
     const normalized = normalizeRfpTableLikeLine(item.line);
-    if (isRfpTableHeaderLine(normalized)) continue;
+    if (isRfpTableSeparatorLine(normalized)) continue;
+    const cells = rfpTableCells(normalized);
+    if (cells.length >= 2) {
+      if (isRfpTableHeaderLine(normalized) || isRfpRequirementTableHeaderCells(cells)) {
+        tableHeaders = cells;
+        tableContextActive = isRfpRequirementTableHeaderCells(cells);
+        continue;
+      }
+      if (tableContextActive) {
+        const tableRequirement = rfpRequirementCandidateFromTableRow(tableHeaders, cells);
+        if (tableRequirement) {
+          candidates.push({ line: tableRequirement, index: item.index });
+          continue;
+        }
+      }
+    } else {
+      tableHeaders = [];
+      tableContextActive = false;
+    }
     if (isRequirementLine(normalized) || isRfpTableRequirementLine(normalized) || isExplicitRfpConstraintLine(normalized)) {
       candidates.push({ line: normalized, index: item.index });
     }
@@ -2611,12 +2631,55 @@ function extractRfpRequirementCandidates(lines: Array<{ line: string; index: num
 }
 
 function normalizeRfpTableLikeLine(line: string) {
-  const cells = line
+  const cells = rfpTableCells(line);
+  if (cells.length < 2) return line;
+  return cells.join(" | ");
+}
+
+function rfpTableCells(line: string) {
+  return line
     .split(/\s*(?:\||\t)\s*/g)
     .map((cell) => normalizeWhitespace(cell))
     .filter(Boolean);
-  if (cells.length < 2) return line;
-  return cells.join(" | ");
+}
+
+function isRfpTableSeparatorLine(line: string) {
+  const cells = rfpTableCells(line);
+  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function isRfpRequirementTableHeaderCells(cells: string[]) {
+  const header = cells.join(" ").toLowerCase();
+  if (!/\b(requirement|minimum|mandatory|required|criteria|criterion|points?|score|weight|role|position|personnel|expert|specialist|qualification|experience|evidence|attachment|deliverable|annex|response|proof)\b/.test(header)) {
+    return false;
+  }
+  return cells.filter(isRfpRequirementTableHeaderCell).length >= Math.max(2, Math.ceil(cells.length / 2));
+}
+
+function isRfpRequirementTableHeaderCell(cell: string) {
+  const clean = normalizeWhitespace(cell);
+  if (!clean || /\d/.test(clean) || clean.length > 48) return false;
+  return /\b(requirement|minimum|required|mandatory|criteria|criterion|role|position|personnel|qualification|experience|evidence|attachment|deliverable|annex|response|proof|points?|score|weight|status|owner|section)\b/i.test(clean);
+}
+
+function rfpRequirementCandidateFromTableRow(headers: string[], cells: string[]) {
+  if (cells.length < 2 || cells.every((cell) => /^yes|no|n\/a$/i.test(cell))) return "";
+  const headerText = headers.join(" ").toLowerCase();
+  const rowText = cells.join(" ").toLowerCase();
+  const tableHasRequirementContext = /\b(requirement|minimum|mandatory|required|criteria|criterion|role|position|personnel|expert|specialist|qualification|experience|evidence|attachment|deliverable|annex|points?|score|weight)\b/.test(headerText);
+  const rowHasRequirementSignal = /\b(\d+\+?\s+years?|degree|certif|must|shall|required|mandatory|yes|pass\/fail|points?|pts?|%|annex|form|certificate|signed|submit|deliver|provide|expert|specialist|architect|manager|lead|analyst|engineer)\b/.test(rowText);
+  if (!tableHasRequirementContext || !rowHasRequirementSignal) return "";
+  const pairs = cells.map((cell, index) => {
+    const header = normalizeRfpTableHeader(headers[index] || `Column ${index + 1}`);
+    return `${header}: ${cell}`;
+  });
+  return pairs.join(" | ");
+}
+
+function normalizeRfpTableHeader(header: string) {
+  const clean = normalizeWhitespace(header.replace(/[*_`]/g, ""));
+  if (!clean) return "Table field";
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
 function isRfpTableRequirementLine(line: string) {

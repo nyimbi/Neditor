@@ -106,6 +106,22 @@ without giving back the vertical writing space users just reclaimed.
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts -g "collapses and restores command toolbars"` | Pass | Focused Chromium workflow proves hidden toolbars expose **Show all toolbars** plus per-row **Show** actions while the command bar height remains `<= 2px` when all rows are hidden. |
 | `git diff --check` | Pass | Whitespace guard passed before commit. |
 
+## 2026-05-29 RFP Table Requirement Extraction
+
+The RFP response wizard now treats requirement tables as first-class source
+evidence. Header-context parsing converts rows from tables such as **Role /
+Minimum requirement / Points** into requirement candidates even when each row
+does not repeat words like "must" or "required". This closes a procurement
+analysis gap for staff-role tables, minimum-experience tables, scored personnel
+tables, and other RFP tables where the mandatory meaning is carried by the
+header rather than each row.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue/TypeScript typecheck passed after adding contextual RFP table parsing helpers. |
+| `pnpm run test:unit` | Pass | 118 frontend unit tests passed; RFP wizard coverage now proves Software Architect and Climate Data Specialist table rows become extracted requirements and team-outline evidence. |
+| `git diff --check` | Pass | Whitespace guard passed before commit. |
+
 ## 2026-05-29 Max Writing Space Preset
 
 NEditor now has a reversible **Maximize Writing Space** command. The command

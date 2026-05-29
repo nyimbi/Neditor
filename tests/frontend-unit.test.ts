@@ -3521,11 +3521,15 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
         "Annex C - Declaration of Undertaking must be signed and submitted.",
         "Training materials must be bilingual EN/FR and workshops delivered in French.",
         "The bidder must name a Legal/IPR expert; TBD or placeholder roles are non-compliant.",
+        "| Role | Minimum requirement | Points |",
+        "| --- | --- | --- |",
+        "| Software Architect | 5+ years of platform architecture and Bachelor's degree | 20 points |",
+        "| Climate Data Specialist | 3+ years with NetCDF and geospatial APIs | 10 points |",
       ].join("\n"),
     },
     profile,
   );
-  ok(analysis.requirements.length >= 11);
+  ok(analysis.requirements.length >= 13);
   ok(analysis.statedIntent.some((item) => item.includes("improve customer support")));
   ok(analysis.impliedIntent.some((item) => item.includes("easily scored response")));
   ok(analysis.impliedIntent.some((item) => item.includes("procurement risk")));
@@ -3533,6 +3537,8 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(analysis.budgetHints.some((item) => item.includes("pricing")));
   ok(analysis.mandatoryAttachments.some((item) => item.includes("insurance certificate")));
   ok(analysis.requirements.some((item) => item.requirementType === "SCORED" && item.text.includes("technical merit")));
+  ok(analysis.requirements.some((item) => item.text.includes("Role: Software Architect") && item.text.includes("Minimum requirement: 5+ years")));
+  ok(analysis.requirements.some((item) => item.text.includes("Role: Climate Data Specialist") && item.text.includes("NetCDF")));
   ok(analysis.requirements.some((item) => item.requirementType === "FORMAT" && item.text.includes("Arial 11pt")));
   ok(analysis.requirements.some((item) => item.disqualificationRisk && item.text.includes("Bid bond certificate")));
   ok(analysis.requirements.every((item) => item.sourceExcerpt.length > 0 && item.confidence));
@@ -3554,6 +3560,8 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(analysis.proposalOutline.deliverables.some((item) => item.label.includes("Inception Report")));
   ok(analysis.proposalOutline.timelineMilestones.some((item) => item.label.includes("90 days")));
   ok(analysis.proposalOutline.teamRequirements.some((item) => item.role.includes("Legal") || item.minimumExperience.includes("Legal")));
+  ok(analysis.proposalOutline.teamRequirements.some((item) => item.role.includes("Software Architect") || item.minimumExperience.includes("platform architecture")));
+  ok(analysis.proposalOutline.teamRequirements.some((item) => item.role.includes("Climate Data Specialist") || item.minimumExperience.includes("NetCDF")));
   ok(analysis.proposalOutline.teamRequirements.some((item) => item.role.includes("Bilingual")));
   ok(analysis.proposalOutline.technicalMandates.some((item) => item.includes("platform")));
   ok(analysis.proposalOutline.pageAllocations.some((item) => item.section === "Proposed Methodology & Technical Approach"));
