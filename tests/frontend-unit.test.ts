@@ -7476,6 +7476,17 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("collapsedToolbarRows"));
   ok(app.includes("Collapse all toolbars"));
   ok(app.includes("Expand all toolbars"));
+  ok(app.includes("writingSpaceMaximized"));
+  ok(app.includes("maximizeWritingSpace"));
+  ok(app.includes("restoreWritingSpace"));
+  ok(app.includes("Maximize Writing Space"));
+  ok(app.includes("Restore Writing Layout"));
+  ok(app.includes("workspace-writing-maximized"));
+  ok(app.includes("neditor-maximize-writing-space"));
+  ok(app.includes("neditor-restore-writing-layout"));
+  ok(tauriLib.includes("neditor-maximize-writing-space"));
+  ok(tauriLib.includes("neditor-restore-writing-layout"));
+  ok(app.includes("Hide side panels, status, preview, and toolbar rows while keeping a restore path in the titlebar."));
   ok(app.includes('id: "deep-research", label: "Deep Research"'));
   ok(app.includes("openDeepResearch"));
   ok(app.includes("expansionPassBudget(settings)"));

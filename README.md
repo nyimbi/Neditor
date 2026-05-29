@@ -410,7 +410,8 @@ web app.
 - Tauri 2 desktop shell with Vue 3, Pinia, Vite, CodeMirror 6, vanilla CSS, and
   a Rust command backend.
 - Split source and preview, source-only, preview-only, focus, review,
-  presentation, and export modes.
+  presentation, and export modes, plus **Maximize Writing Space** to hide
+  side panels, preview, status, and toolbar rows with a one-click restore path.
 - Tabs with accessible move-left/move-right ordering controls, pinned
   documents, recent files, recently closed documents, recent folders, workspace
   folder browsing, restart-style workspace restore, and first-class
@@ -423,7 +424,7 @@ web app.
 - Keyboard-first operation for collapsed-toolbars and deep work: Cmd/Ctrl
   shortcuts cover save/save-as, new/open/open-folder, find, export, direct HTML
   export, bold/italic, command palette, Docs Live, AI Agent Workspace, Review
-  readiness, Export readiness, and shortcut help.
+  readiness, Export readiness, max writing space, and shortcut help.
 - Command palette for app actions, natural-language AI agent instructions, AI
   route suggestions for Docs Live, AI Paste cleanup, Review, Export readiness,
   Outline mode, and provider handoff, plus document-aware navigation across

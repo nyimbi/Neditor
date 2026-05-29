@@ -4,6 +4,7 @@
     :class="{
       'has-trust-prompt': externalTransformTrustPrompts.length,
       'toolbars-collapsed': !hasExpandedToolbarRows,
+      'writing-space-maximized': writingSpaceMaximized,
     }"
     :data-theme="store.theme"
     :data-toolbar-display="store.toolbarDisplay"
@@ -178,6 +179,19 @@
             </svg>
             <span>Expand all</span>
           </button>
+          <button
+            v-if="writingSpaceMaximized"
+            class="collapsed-toolbar-pill collapsed-toolbar-pill-primary"
+            type="button"
+            aria-label="Restore writing space layout"
+            title="Restore the sidebar, status bar, toolbar rows, and view mode you used before maximizing writing space"
+            @click="restoreWritingSpace"
+          >
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <path v-for="path in toolbarIconPaths('collapse')" :key="path" :d="path"></path>
+            </svg>
+            <span>Restore writing</span>
+          </button>
         </section>
         <span role="status" class="release-badge" :class="releaseStatusClass" :aria-label="`Release status ${releaseStatus}`">{{ releaseStatus }}</span>
         <span v-if="store.gitStatus?.inside_repo">{{ store.gitStatus.branch || "detached" }}{{ store.gitStatus.dirty ? " dirty" : " clean" }}</span>
@@ -309,6 +323,14 @@
           </span>
           <span>{{ anyCommandToolbarsCollapsed ? "Expand all" : "Collapse all" }}</span>
         </button>
+        <button v-show="!isToolbarCollapsed('view')" class="compact-toolbar-toggle" type="button" @click="toggleWritingSpaceMaximized">
+          <span class="command-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path v-for="path in toolbarIconPaths(writingSpaceMaximized ? 'collapse' : 'expand')" :key="path" :d="path"></path>
+            </svg>
+          </span>
+          <span>{{ writingSpaceMaximized ? "Restore writing" : "Maximize writing" }}</span>
+        </button>
       </section>
     </nav>
 
@@ -334,7 +356,14 @@
       </ul>
     </section>
 
-    <main id="document-workspace" ref="workspacePane" class="workspace" :class="`mode-${store.mode}`" :style="workspaceStyle" tabindex="-1">
+    <main
+      id="document-workspace"
+      ref="workspacePane"
+      class="workspace"
+      :class="[`mode-${store.mode}`, { 'workspace-writing-maximized': writingSpaceMaximized }]"
+      :style="workspaceStyle"
+      tabindex="-1"
+    >
       <section v-if="store.mode === 'outline'" id="outline-mode" class="outline-mode-pane" aria-label="Document outline mode" tabindex="-1">
         <header class="outline-mode-header">
           <div>
@@ -398,7 +427,7 @@
       </section>
 
       <aside
-        v-show="store.mode !== 'outline'"
+        v-show="store.mode !== 'outline' && !writingSpaceMaximized"
         id="document-sidebar"
         :key="store.sidebar"
         :data-sidebar="store.sidebar"
@@ -3432,7 +3461,7 @@
       </section>
     </main>
 
-    <footer id="document-status" class="status-bar" aria-label="Document status and progress" tabindex="-1">
+    <footer v-show="!writingSpaceMaximized" id="document-status" class="status-bar" aria-label="Document status and progress" tabindex="-1">
       <span
         class="status-message"
         role="status"
@@ -6644,6 +6673,8 @@ const docsLiveRuntimeReport = ref<AiRuntimeReadinessReport | null>(null);
 const desktopWorkflowSmokeActive = ref(false);
 const commandPaletteOpen = ref(false);
 const openAppMenuId = ref<string | null>(null);
+const writingSpaceMaximized = ref(false);
+const writingSpaceRestoreLayout = ref<WritingSpaceLayoutSnapshot | null>(null);
 const conflictOpen = ref(false);
 const mergedConflictText = ref("");
 const conflictMergeParts = ref<ConflictMergePart[]>([]);
@@ -6987,6 +7018,15 @@ interface CommandAgentRouteSuggestion {
 
 interface CommandPaletteCommand extends CommandPaletteSearchable {
   run: () => unknown;
+}
+
+interface WritingSpaceLayoutSnapshot {
+  mode: typeof store.mode;
+  sidebar: typeof store.sidebar;
+  toolbarDisplay: typeof store.toolbarDisplay;
+  toolbarTextSize: number;
+  toolbarCollapsedRows: string[];
+  splitSourcePanes: boolean;
 }
 
 interface OutlineModeHeading {
@@ -8884,7 +8924,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
       "Use Cmd or Ctrl plus S to save, Shift plus Cmd or Ctrl plus S for Save As.",
       "Use Cmd or Ctrl plus O to open a document, Shift plus Cmd or Ctrl plus O to open a folder, and N for a new document.",
       "Use Cmd or Ctrl plus F for find, B for bold, I for italic, E for export, and Shift plus Cmd or Ctrl plus E for HTML export.",
-      "Use Shift plus Cmd or Ctrl plus A for the AI agent workspace, L for Docs Live, R for review, X for export readiness, H for shortcut help, and P or K for the command palette.",
+      "Use Shift plus Cmd or Ctrl plus A for the AI agent workspace, L for Docs Live, R for review, X for export readiness, M for max writing space, H for shortcut help, and P or K for the command palette.",
       "Choose Default, Emacs-style, or Vim-style editor keybindings in Settings when your writing muscle memory depends on a modal or terminal-style editor.",
       "Use the View toolbar to collapse toolbar rows when you need more writing space.",
     ],
@@ -8903,7 +8943,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
       { label: "Collapse toolbars", run: () => setAllCommandToolbarsCollapsed(true) },
       { label: "Toolbar settings", run: () => (store.sidebar = "settings") },
     ],
-    keywords: ["shortcut", "keyboard", "keybinding", "vim", "emacs", "command palette", "collapse", "toolbar", "docs live", "agent", "review", "export"],
+    keywords: ["shortcut", "keyboard", "keybinding", "vim", "emacs", "command palette", "collapse", "toolbar", "writing space", "docs live", "agent", "review", "export"],
   },
   {
     id: "display-accessibility",
@@ -9352,6 +9392,8 @@ const appMenus = computed<AppMenu[]>(() => [
         id: "layout",
         label: "Layout",
         items: [
+          { id: "maximize-writing", label: "Maximize Writing Space", help: "Hide side panels, status, preview, and toolbar rows while keeping a restore path in the titlebar.", run: () => maximizeWritingSpace() },
+          { id: "restore-writing", label: "Restore Writing Layout", help: "Return to the mode, sidebar, toolbar display, and split panes used before maximizing.", disabled: !writingSpaceMaximized.value, run: () => restoreWritingSpace() },
           { id: "outline-panel", label: "Document Outline", help: "Open the outline sidebar.", run: () => showOutline() },
           { id: "exports-panel", label: "Export Panel", help: "Open distribution and export controls.", run: () => (store.sidebar = "exports") },
           { id: "settings", label: "Settings", help: "Tune toolbar, editor, preview, and accessibility settings.", run: () => (store.sidebar = "settings") },
@@ -9534,6 +9576,50 @@ function toggleToolbarRow(id: string) {
 }
 function setAllCommandToolbarsCollapsed(collapsed: boolean) {
   store.toolbarCollapsedRows = collapsed ? [...toolbarCollapseRowIds] : [];
+}
+function maximizeWritingSpace() {
+  if (!writingSpaceMaximized.value) {
+    writingSpaceRestoreLayout.value = {
+      mode: store.mode,
+      sidebar: store.sidebar,
+      toolbarDisplay: store.toolbarDisplay,
+      toolbarTextSize: store.toolbarTextSize,
+      toolbarCollapsedRows: [...store.toolbarCollapsedRows],
+      splitSourcePanes: store.splitSourcePanes,
+    };
+  }
+  writingSpaceMaximized.value = true;
+  store.mode = "focus";
+  store.toolbarDisplay = "icons";
+  store.toolbarTextSize = 9;
+  store.splitSourcePanes = false;
+  setAllCommandToolbarsCollapsed(true);
+  store.statusMessage = "Maximized writing space";
+  void nextTick(() => editorView?.focus());
+}
+function restoreWritingSpace() {
+  const snapshot = writingSpaceRestoreLayout.value;
+  if (snapshot) {
+    store.mode = snapshot.mode;
+    store.sidebar = snapshot.sidebar;
+    store.toolbarDisplay = snapshot.toolbarDisplay;
+    store.toolbarTextSize = snapshot.toolbarTextSize;
+    store.toolbarCollapsedRows = normalizedToolbarCollapsedRows(snapshot.toolbarCollapsedRows);
+    store.splitSourcePanes = snapshot.splitSourcePanes;
+  } else {
+    setAllCommandToolbarsCollapsed(false);
+  }
+  writingSpaceMaximized.value = false;
+  writingSpaceRestoreLayout.value = null;
+  store.statusMessage = "Restored writing layout";
+  void nextTick(() => editorView?.focus());
+}
+function toggleWritingSpaceMaximized() {
+  if (writingSpaceMaximized.value) {
+    restoreWritingSpace();
+  } else {
+    maximizeWritingSpace();
+  }
 }
 function toggleAppMenu(menuId: string) {
   openAppMenuId.value = openAppMenuId.value === menuId ? null : menuId;
@@ -12195,6 +12281,20 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Show toolbar icons only", group: "View", run: () => (store.toolbarDisplay = "icons") },
   { name: "Show toolbar text only", group: "View", run: () => (store.toolbarDisplay = "text") },
   { name: "Toggle split source panes", group: "View", run: () => (store.splitSourcePanes = !store.splitSourcePanes) },
+  {
+    name: "Maximize writing space",
+    group: "View",
+    description: "Hide side panels, status, preview, and toolbar rows while preserving a one-click restore point.",
+    keywords: ["focus", "writing space", "distraction free", "maximize", "hide sidebar", "hide toolbar"],
+    run: () => maximizeWritingSpace(),
+  },
+  {
+    name: "Restore writing layout",
+    group: "View",
+    description: "Restore the mode, sidebar, toolbar display, and split source panes used before maximizing writing space.",
+    keywords: ["restore", "writing space", "sidebar", "toolbar", "status bar"],
+    run: () => restoreWritingSpace(),
+  },
   { name: "Collapse all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(true) },
   { name: "Expand all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(false) },
   { name: "Bold selection", group: "Markdown", run: () => wrapSelection("**") },
@@ -12623,6 +12723,12 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-mode-export":
       store.mode = "export";
       store.sidebar = "exports";
+      break;
+    case "neditor-maximize-writing-space":
+      maximizeWritingSpace();
+      break;
+    case "neditor-restore-writing-layout":
+      restoreWritingSpace();
       break;
     case "neditor-show-outline":
       store.sidebar = "outline";
@@ -20782,6 +20888,9 @@ function handleShortcut(event: KeyboardEvent) {
   } else if (key === "h" && event.shiftKey) {
     event.preventDefault();
     openHelp("keyboard-shortcuts");
+  } else if (key === "m" && event.shiftKey) {
+    event.preventDefault();
+    toggleWritingSpaceMaximized();
   } else if (key === "k" || (key === "p" && event.shiftKey)) {
     event.preventDefault();
     commandPaletteOpen.value = true;
@@ -20867,6 +20976,14 @@ select:hover {
 
 .app-shell.has-trust-prompt.toolbars-collapsed {
   grid-template-rows: 38px 0 auto minmax(0, 1fr) 28px;
+}
+
+.app-shell.writing-space-maximized {
+  grid-template-rows: 38px 0 minmax(0, 1fr) 0;
+}
+
+.app-shell.has-trust-prompt.writing-space-maximized {
+  grid-template-rows: 38px 0 auto minmax(0, 1fr) 0;
 }
 
 .app-shell[data-theme="dark"] {
@@ -22122,6 +22239,10 @@ select:hover {
 }
 
 .workspace.mode-outline {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace.workspace-writing-maximized {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -26182,6 +26303,10 @@ select:hover {
   overflow: hidden;
 }
 
+.workspace-writing-maximized .editor-pane {
+  border-right: 0;
+}
+
 .editor-split-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -27496,6 +27621,14 @@ select:hover {
 
   .app-shell.has-trust-prompt.toolbars-collapsed {
     grid-template-rows: 38px 0 auto minmax(0, 1fr) 34px;
+  }
+
+  .app-shell.writing-space-maximized {
+    grid-template-rows: 38px 0 minmax(0, 1fr) 0;
+  }
+
+  .app-shell.has-trust-prompt.writing-space-maximized {
+    grid-template-rows: 38px 0 auto minmax(0, 1fr) 0;
   }
 
   .titlebar-toolbar-tray {

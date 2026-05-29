@@ -370,6 +370,17 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .item(&menu_item(app, "neditor-mode-outline", "Outline Mode")?)
         .item(&menu_item(app, "neditor-mode-export", "Export Preview")?)
         .separator()
+        .item(&menu_item(
+            app,
+            "neditor-maximize-writing-space",
+            "Maximize Writing Space",
+        )?)
+        .item(&menu_item(
+            app,
+            "neditor-restore-writing-layout",
+            "Restore Writing Layout",
+        )?)
+        .separator()
         .item(&menu_item(app, "neditor-show-outline", "Document Outline")?)
         .item(&menu_item(app, "neditor-show-exports", "Export Panel")?)
         .separator()

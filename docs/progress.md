@@ -27,6 +27,23 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-29 Max Writing Space Preset
+
+NEditor now has a reversible **Maximize Writing Space** command. The command
+captures the current mode, sidebar, toolbar display, toolbar text size, toolbar
+collapse state, and split-source setting; switches into focus writing; hides
+the sidebar, preview, status bar, and toolbar rows; and leaves a restore control
+in the titlebar tray. The same capability is exposed through the visible View
+menu, native View menu, command palette, View toolbar, and Cmd/Ctrl+Shift+M.
+
+This closes the usability gap where users could recover screen real estate only
+by combining several separate controls manually.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | Static and helper tests verify the max-writing-space state, menu labels, command palette entries, native menu IDs, restore path, and layout class wiring. |
+| `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "collapses and restores command toolbars" --project chromium` | Pass | Focused browser workflow proves Maximize Writing Space hides the sidebar, preview, status bar, and command bar, then restores the previous writing layout. |
+
 ## 2026-05-29 Release Candidate Sidecar Evidence
 
 The local release-candidate generator now prepares the version-smoked Tauri

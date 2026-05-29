@@ -2136,6 +2136,27 @@ test("collapses and restores command toolbars to recover writing space", async (
   await expect(commandBar.getByRole("button", { name: "Collapse File toolbar" })).toBeVisible();
   await expect(commandBar.getByRole("button", { name: "New" })).toBeVisible();
   await expect(page.getByLabel("View mode")).toBeVisible();
+
+  await commandBar.getByRole("button", { name: "Maximize writing" }).click();
+  await expect(page.locator("#document-sidebar")).toBeHidden();
+  await expect(page.locator("#live-preview")).toBeHidden();
+  await expect(page.locator("#document-status")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Restore writing space layout" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.locator("#document-workspace").evaluate((element) => ({
+        maximized: element.classList.contains("workspace-writing-maximized"),
+        commandBarCollapsed: (document.querySelector("#main-commands")?.getBoundingClientRect().height || 0) <= 2,
+        workspaceHeight: element.getBoundingClientRect().height,
+      })),
+    )
+    .toMatchObject({ maximized: true, commandBarCollapsed: true });
+
+  await page.getByRole("button", { name: "Restore writing space layout" }).click();
+  await expect(page.locator("#document-sidebar")).toBeVisible();
+  await expect(page.locator("#live-preview")).toBeVisible();
+  await expect(page.locator("#document-status")).toBeVisible();
+  await expect(page.locator("#document-workspace")).not.toHaveClass(/workspace-writing-maximized/);
 });
 
 test("manages modal focus and Escape return paths", async ({ page }) => {
