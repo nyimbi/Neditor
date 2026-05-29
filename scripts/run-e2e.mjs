@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -30,16 +31,15 @@ if (!browserResolution.ok) {
 }
 
 console.error(browserResolution.message);
-const result = spawnSync(binary, args, {
-  cwd: root,
-  env: browserResolution.env,
-  shell: process.platform === "win32",
-  stdio: "pipe",
-  encoding: "utf8",
-});
+let result = runPlaywright(args);
+let fallback = null;
 
-if (result.stdout) process.stdout.write(result.stdout);
-if (result.stderr) process.stderr.write(result.stderr);
+if (scope === "full-suite" && result.status !== 0 && shouldRetryFullSuiteInChunks(result)) {
+  fallback = runFullSuiteFallbackChunks();
+  if (fallback.status === 0) {
+    result = fallback.result;
+  }
+}
 
 writePlaywrightBrowserReport(reportPath, browserResolution, result.status === 0 ? "passed" : "failed", {
   schema: "neditor.e2e-browser-workflow.v1",
@@ -48,8 +48,9 @@ writePlaywrightBrowserReport(reportPath, browserResolution, result.status === 0 
   exitStatus: result.status,
   signal: result.signal,
   error: result.error ? String(result.error) : undefined,
-  summary: summarizePlaywrightOutput(result.stdout || "", result.stderr || ""),
-  workflowEvidence: workflowEvidence([binary, ...args], result.stdout || ""),
+  summary: fallback?.summary || summarizePlaywrightOutput(result.stdout || "", result.stderr || ""),
+  workflowEvidence: fallback?.workflowEvidence || workflowEvidence([binary, ...args], result.stdout || ""),
+  fallbackChunks: fallback?.chunks,
   stdoutTail: tail(result.stdout || ""),
   stderrTail: tail(result.stderr || ""),
 });
@@ -65,6 +66,120 @@ function tail(output) {
 
 function hasWorkerArgument(args) {
   return args.some((arg, index) => arg === "--workers" || arg.startsWith("--workers=") || args[index - 1] === "--workers");
+}
+
+function runPlaywright(args) {
+  const result = spawnSync(binary, args, {
+    cwd: root,
+    env: browserResolution.env,
+    shell: process.platform === "win32",
+    stdio: "pipe",
+    encoding: "utf8",
+  });
+
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  return result;
+}
+
+function shouldRetryFullSuiteInChunks(result) {
+  if (process.env.NEDITOR_E2E_DISABLE_CHUNK_FALLBACK === "1") return false;
+  const output = stripAnsi(`${result.stdout || ""}\n${result.stderr || ""}`);
+  return output.includes("browserType.launch") && output.includes("Target page, context or browser has been closed");
+}
+
+function runFullSuiteFallbackChunks() {
+  const titles = appWorkflowTestTitles();
+  const chunkSize = clampChunkSize(Number(process.env.NEDITOR_E2E_FALLBACK_CHUNK_SIZE || 6));
+  const chunks = chunk(titles, chunkSize);
+  const aggregate = {
+    status: 0,
+    signal: null,
+    error: undefined,
+    stdout: "",
+    stderr: "",
+  };
+  const summary = { tests: 0, passed: 0, failed: 0, flaky: 0, skipped: 0, timedOut: 0 };
+  const evidence = emptyWorkflowEvidence();
+  const chunkReports = [];
+
+  console.error(`Full browser suite launch failed; retrying ${titles.length} workflows in ${chunks.length} smaller chunks.`);
+  chunks.forEach((titlesInChunk, index) => {
+    const grep = titlesInChunk.map(escapeRegExp).join("|");
+    const chunkArgs = ["test", "e2e/app-workflows.spec.ts", "--project", "chromium", "--workers=1", "--grep", grep];
+    console.error(`Running browser workflow fallback chunk ${index + 1}/${chunks.length} (${titlesInChunk.length} tests).`);
+    const chunkResult = runPlaywright(chunkArgs);
+    const chunkSummary = summarizePlaywrightOutput(chunkResult.stdout || "", chunkResult.stderr || "");
+    const chunkEvidence = workflowEvidence([binary, ...chunkArgs], chunkResult.stdout || "");
+    addSummary(summary, chunkSummary);
+    mergeWorkflowEvidence(evidence, chunkEvidence);
+    aggregate.stdout += `\n\n# fallback chunk ${index + 1}/${chunks.length}\n${chunkResult.stdout || ""}`;
+    aggregate.stderr += `\n\n# fallback chunk ${index + 1}/${chunks.length}\n${chunkResult.stderr || ""}`;
+    chunkReports.push({
+      index: index + 1,
+      testsRequested: titlesInChunk.length,
+      status: chunkResult.status ?? 1,
+      summary: chunkSummary,
+      grep,
+    });
+    if (chunkResult.status !== 0) {
+      aggregate.status = chunkResult.status ?? 1;
+      aggregate.signal = chunkResult.signal;
+      aggregate.error = chunkResult.error;
+    }
+  });
+
+  return {
+    status: aggregate.status,
+    result: aggregate,
+    summary,
+    workflowEvidence: evidence,
+    chunks: chunkReports,
+  };
+}
+
+function appWorkflowTestTitles() {
+  const source = readFileSync(join(root, "e2e", "app-workflows.spec.ts"), "utf8");
+  const matches = [...source.matchAll(/^test\("([^"]+)"/gm)].map((match) => match[1]);
+  if (!matches.length) {
+    console.error("No browser workflow titles found for chunked full-suite fallback.");
+    return ["boots the workbench and switches core view modes"];
+  }
+  return matches;
+}
+
+function chunk(items, size) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size));
+  return chunks;
+}
+
+function clampChunkSize(value) {
+  if (!Number.isFinite(value)) return 6;
+  return Math.max(1, Math.min(12, Math.floor(value)));
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function addSummary(target, source) {
+  target.tests += Number(source.tests || 0);
+  target.passed += Number(source.passed || 0);
+  target.failed += Number(source.failed || 0);
+  target.flaky += Number(source.flaky || 0);
+  target.skipped += Number(source.skipped || 0);
+  target.timedOut += Number(source.timedOut || 0);
+}
+
+function emptyWorkflowEvidence() {
+  return Object.fromEntries(Object.keys(workflowEvidence([], "")).map((key) => [key, false]));
+}
+
+function mergeWorkflowEvidence(target, source) {
+  for (const [key, value] of Object.entries(source)) {
+    target[key] = Boolean(target[key] || value);
+  }
 }
 
 function stripAnsi(value) {

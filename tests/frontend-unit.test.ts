@@ -9335,6 +9335,13 @@ test("browser e2e runner emits structured workflow evidence for release readines
   ok(script.includes("NEDITOR_E2E_PARALLEL"));
   ok(script.includes("args.push(\"--workers=1\")"));
   ok(script.includes("hasWorkerArgument"));
+  ok(script.includes("NEDITOR_E2E_DISABLE_CHUNK_FALLBACK"));
+  ok(script.includes("NEDITOR_E2E_FALLBACK_CHUNK_SIZE"));
+  ok(script.includes("runFullSuiteFallbackChunks"));
+  ok(script.includes("Full browser suite launch failed; retrying"));
+  ok(script.includes("appWorkflowTestTitles"));
+  ok(script.includes("fallbackChunks"));
+  ok(script.includes("mergeWorkflowEvidence"));
   ok(script.includes("focused-report.json"));
   ok(script.includes("summarizePlaywrightOutput"));
   ok(script.includes("workflowEvidence"));
