@@ -8316,8 +8316,16 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Engines"));
   ok(app.includes("evidenceReportSummary"));
   ok(app.includes("Evidence reports"));
+  ok(app.includes("ned readiness --action-plan"));
+  ok(app.includes("releaseActionPlan"));
+  ok(app.includes("Action plan"));
+  ok(app.includes("Release evidence action plan"));
+  ok(app.includes("assignable release evidence work items"));
   const cli = readFileSync("src-tauri/src/cli.rs", "utf8");
   ok(cli.includes('"evidence"'));
+  ok(cli.includes("--action-plan"));
+  ok(cli.includes("--evidence-kit"));
+  ok(cli.includes("neditor.ned-release-action-plan.v1"));
   ok(cli.includes("neditor.ned-open.v1"));
   ok(cli.includes("neditor.ned-new.v1"));
   ok(cli.includes("templateDetails"));

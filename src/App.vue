@@ -3173,7 +3173,7 @@
           <section v-show="selectedConfigurationSection === 'files'" class="configuration-center-panel" aria-label="Recent documents configuration">
           <section aria-label="Command line and default reader setup">
             <h3>Command line and default reader</h3>
-            <p class="sidebar-hint">Use <code>ned file.md</code> to open Markdown, <code>ned open file.md --dry-run --json</code> to verify file handoff, <code>ned init . --json</code> to create a reusable <code>.neditor</code> project scaffold, <code>ned profile --workspace . --set companyName=Acme --json</code> to set reusable business identity, <code>ned profile --fields --json</code> to list identity fields and aliases, <code>ned profile --workspace . --get companyName</code> to print one value for scripts, <code>ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json</code> to analyze an RFP and write a response plus compliance matrix, <code>ned analyze-rfp - --matrix</code> to turn piped RFP text into a matrix, <code>ned templates --category Procurement --json</code> to discover filtered starters, <code>ned templates --markdown report --workspace . --fill-profile</code> to preview profile-aware starter Markdown, <code>ned transform-templates --category Business --transform calc --query ROI --json</code> to discover reusable calc/chart/diagram/data blocks, <code>ned outlines --category Procurement --query RFP --json</code> to discover reusable document outlines, <code>ned outlines --markdown business-report</code> to print an outline for the planner or Docs Live, <code>ned outlines --workspace . --save board-pack --docs-live-type board-memo --section "Decision Requested" --section "Recommendation"</code> to add a reusable workspace outline, <code>ned snippets --workspace . --markdown business-contact-block --fill-profile</code> to print profile-aware reusable document parts, <code>ned new tender.md --template tender --workspace . --fill-profile --json</code> or <code>ned new podcast.md --template podcast-script --workspace . --fill-profile --json</code> to start from business and publishing scaffolds, <code>ned inspect file.md --json</code> for no-write document inventory, <code>ned validate file.md --to pdf --json</code> for no-write readiness checks, <code>ned convert file.md --to pdf,docx,html --output-dir exports</code> for headless delivery packs, <code>ned convert - --to html --stdout</code> for pipe automation, <code>ned targets</code> or <code>ned handlers --commands-only</code> for setup discovery, <code>ned readiness --json</code> for release gap summaries, <code>ned evidence --json</code> for release evidence report status, <code>ned default-reader --status --json</code> for default Markdown reader setup, <code>ned support-bundle --output support.json</code> for help desk handoffs, <code>ned completions zsh</code> for shell setup, and <code>ned doctor --workspace . --json</code> for setup checks.</p>
+            <p class="sidebar-hint">Use <code>ned file.md</code> to open Markdown, <code>ned open file.md --dry-run --json</code> to verify file handoff, <code>ned init . --json</code> to create a reusable <code>.neditor</code> project scaffold, <code>ned profile --workspace . --set companyName=Acme --json</code> to set reusable business identity, <code>ned profile --fields --json</code> to list identity fields and aliases, <code>ned profile --workspace . --get companyName</code> to print one value for scripts, <code>ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json</code> to analyze an RFP and write a response plus compliance matrix, <code>ned analyze-rfp - --matrix</code> to turn piped RFP text into a matrix, <code>ned templates --category Procurement --json</code> to discover filtered starters, <code>ned templates --markdown report --workspace . --fill-profile</code> to preview profile-aware starter Markdown, <code>ned transform-templates --category Business --transform calc --query ROI --json</code> to discover reusable calc/chart/diagram/data blocks, <code>ned outlines --category Procurement --query RFP --json</code> to discover reusable document outlines, <code>ned outlines --markdown business-report</code> to print an outline for the planner or Docs Live, <code>ned outlines --workspace . --save board-pack --docs-live-type board-memo --section "Decision Requested" --section "Recommendation"</code> to add a reusable workspace outline, <code>ned snippets --workspace . --markdown business-contact-block --fill-profile</code> to print profile-aware reusable document parts, <code>ned new tender.md --template tender --workspace . --fill-profile --json</code> or <code>ned new podcast.md --template podcast-script --workspace . --fill-profile --json</code> to start from business and publishing scaffolds, <code>ned inspect file.md --json</code> for no-write document inventory, <code>ned validate file.md --to pdf --json</code> for no-write readiness checks, <code>ned convert file.md --to pdf,docx,html --output-dir exports</code> for headless delivery packs, <code>ned convert - --to html --stdout</code> for pipe automation, <code>ned targets</code> or <code>ned handlers --commands-only</code> for setup discovery, <code>ned readiness --json</code> for release gap summaries, <code>ned readiness --action-plan</code> for assignable release evidence work items, <code>ned evidence --json</code> for release evidence report status, <code>ned default-reader --status --json</code> for default Markdown reader setup, <code>ned support-bundle --output support.json</code> for help desk handoffs, <code>ned completions zsh</code> for shell setup, and <code>ned doctor --workspace . --json</code> for setup checks.</p>
             <div class="support-bundle-actions">
               <button type="button" :disabled="cliDeployBusy || cliDeployPlan?.supported === false" title="Install the packaged ned helper into a user-level command directory" @click="deployCliGlobally">
                 {{ cliDeployBusy ? "Deploying..." : "Deploy CLI" }}
@@ -3245,6 +3245,13 @@
                 </dd>
               </div>
               <div>
+                <dt>Action plan</dt>
+                <dd>
+                  {{ supportBundleReport.releaseActionPlan?.status || "unknown" }}
+                  ({{ supportBundleReport.releaseActionPlan?.readyToSendCount || 0 }}/{{ supportBundleReport.releaseActionPlan?.workItems?.length || 0 }} ready)
+                </dd>
+              </div>
+              <div>
                 <dt>Output</dt>
                 <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
               </div>
@@ -3252,6 +3259,20 @@
             <ul v-if="supportBundleReport?.recommendations?.length" class="transform-installer-handlers">
               <li v-for="recommendation in supportBundleReport.recommendations" :key="recommendation">{{ recommendation }}</li>
             </ul>
+            <section v-if="supportBundleReport?.releaseActionPlan?.workItems?.length" class="support-bundle-action-plan" aria-label="Release evidence action plan">
+              <h5>Release evidence action plan</h5>
+              <article v-for="item in supportBundleReport.releaseActionPlan.workItems.slice(0, 6)" :key="item.id">
+                <strong>{{ item.id }}</strong>
+                <span>{{ item.detail }}</span>
+                <small>
+                  Runbook:
+                  {{ item.runbooks?.map((runbook) => runbook.path || runbook.title).filter(Boolean).join(", ") || "not mapped" }}
+                </small>
+              </article>
+              <p v-if="supportBundleReport.releaseActionPlan.workItems.length > 6" class="sidebar-hint">
+                {{ supportBundleReport.releaseActionPlan.workItems.length - 6 }} more action item(s) are included in the saved JSON.
+              </p>
+            </section>
           </section>
           <section aria-label="Recent files">
             <h3>Recent files</h3>
@@ -6371,6 +6392,24 @@ type SupportBundleReport = {
     releaseReady?: boolean;
     evidenceGaps?: unknown[];
     failures?: unknown[];
+  };
+  releaseActionPlan?: {
+    status?: string;
+    manifestPath?: string;
+    readyToSendCount?: number;
+    workItems?: Array<{
+      id?: string;
+      detail?: string;
+      runbooks?: Array<{
+        title?: string;
+        path?: string;
+      }>;
+      returns?: string[];
+      validatorCommands?: string[];
+      ingestCommand?: string;
+      finalReadinessCommand?: string;
+      readyToSend?: boolean;
+    }>;
   };
   specCompletion?: {
     status?: string;
@@ -18643,9 +18682,11 @@ async function createSupportBundleFromSettings(writeToFile: boolean) {
     const engineStatus = report.engineProbe?.status || "unknown";
     const missingEngines = report.engineProbe?.summary?.missingLocal || 0;
     const evidenceAttention = (report.evidenceReportSummary?.attention || 0) + (report.evidenceReportSummary?.missing || 0);
+    const actionItems = report.releaseActionPlan?.workItems?.length || 0;
+    const readyActions = report.releaseActionPlan?.readyToSendCount || 0;
     supportBundleStatus.value = report.writtenTo
       ? `Wrote support bundle to ${report.writtenTo}`
-      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${specOpenRows} open spec rows, engines ${engineStatus} (${missingEngines} missing), ${evidenceAttention} evidence reports need attention`;
+      : `Support bundle preview ready: ${releaseStatus}, ${gaps} evidence gaps, ${readyActions}/${actionItems} action items ready, ${specOpenRows} open spec rows, engines ${engineStatus} (${missingEngines} missing), ${evidenceAttention} evidence reports need attention`;
   } catch (error) {
     supportBundleReport.value = null;
     supportBundleStatus.value = error instanceof Error ? error.message : String(error);
@@ -25942,6 +25983,37 @@ select:hover {
   gap: 3px;
   margin: 0;
   padding-left: 18px;
+}
+
+.support-bundle-action-plan {
+  display: grid;
+  gap: 6px;
+}
+
+.support-bundle-action-plan h5 {
+  margin: 0;
+  color: #182433;
+  font-size: 12px;
+}
+
+.support-bundle-action-plan article {
+  display: grid;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid #d8e0e8;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.support-bundle-action-plan strong {
+  color: #182433;
+  font-size: 11px;
+}
+
+.support-bundle-action-plan span,
+.support-bundle-action-plan small {
+  color: #526171;
+  font-size: 11px;
 }
 
 .transform-installer-commands {

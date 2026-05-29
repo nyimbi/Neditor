@@ -1,5 +1,6 @@
 use std::{
     fs,
+    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -1600,6 +1601,36 @@ fn ned_cli_reads_release_readiness_reports_without_rerunning_checks() {
         serde_json::to_string_pretty(&report).expect("report json"),
     )
     .expect("write readiness report");
+    let kit_dir = root.join("release-evidence-kit");
+    fs::create_dir_all(&kit_dir).expect("create evidence kit");
+    let source_commit = current_test_git_head();
+    fs::write(
+        kit_dir.join("manifest.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schema": "neditor.release-evidence-kit.v1",
+            "generatedAt": "2026-05-26T12:01:00.000Z",
+            "sourceCommit": source_commit,
+            "sourceTreeClean": true,
+            "gapWorkItems": [
+                {
+                    "id": "homebrew-final-cask",
+                    "status": "pending-release-cask",
+                    "detail": "Set the final Homebrew cask SHA.",
+                    "evidence": ".tmp/homebrew/homebrew-packaging-report.json",
+                    "runbooks": [
+                        { "title": "Homebrew release", "path": "runbooks/homebrew-release.md" }
+                    ],
+                    "returns": [".tmp/homebrew/external/homebrew-cask.json"],
+                    "validatorCommands": ["pnpm run check:homebrew"],
+                    "ingestCommand": "pnpm run ingest:evidence -- --source /path/to/return-dir",
+                    "finalReadinessCommand": "pnpm run check:release-readiness",
+                    "readyToSend": true
+                }
+            ]
+        }))
+        .expect("kit manifest json"),
+    )
+    .expect("write evidence kit");
 
     let text = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1616,11 +1647,33 @@ fn ned_cli_reads_release_readiness_reports_without_rerunning_checks() {
     assert!(text.message.contains("homebrew-final-cask"));
     assert!(text.message.contains("pnpm run collect:evidence-kit"));
 
+    let action_text = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "readiness".to_string(),
+        "--report".to_string(),
+        report_path.to_string_lossy().to_string(),
+        "--action-plan".to_string(),
+        "--evidence-kit".to_string(),
+        kit_dir.to_string_lossy().to_string(),
+    ])
+    .expect("readiness action plan text");
+    assert_eq!(action_text.exit_code, 0);
+    assert!(action_text.message.contains("Action plan:"));
+    assert!(action_text
+        .message
+        .contains("Work items ready to send: 1/1"));
+    assert!(action_text.message.contains("runbooks/homebrew-release.md"));
+    assert!(action_text
+        .message
+        .contains(".tmp/homebrew/external/homebrew-cask.json"));
+
     let json = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "release-readiness".to_string(),
         "--report".to_string(),
         report_path.to_string_lossy().to_string(),
+        "--evidence-kit".to_string(),
+        kit_dir.to_string_lossy().to_string(),
         "--json".to_string(),
     ])
     .expect("readiness json");
@@ -1631,6 +1684,12 @@ fn ned_cli_reads_release_readiness_reports_without_rerunning_checks() {
     assert_eq!(normalized["releaseReady"], false);
     assert_eq!(normalized["summary"]["evidenceGaps"], 1);
     assert_eq!(normalized["evidenceGaps"][0]["id"], "homebrew-final-cask");
+    assert_eq!(normalized["actionPlan"]["status"], "ready-to-send");
+    assert_eq!(normalized["actionPlan"]["readyToSendCount"], 1);
+    assert_eq!(
+        normalized["actionPlan"]["workItems"][0]["runbooks"][0]["path"],
+        "runbooks/homebrew-release.md"
+    );
 
     let strict = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -1831,6 +1890,14 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert_eq!(bundle["doctor"]["schema"], "neditor.ned-doctor.v1");
     assert_eq!(bundle["releaseReadiness"]["status"], "release-ready");
     assert_eq!(bundle["releaseReadiness"]["releaseReady"], true);
+    assert_eq!(bundle["releaseActionPlan"]["status"], "no-open-gaps");
+    assert_eq!(
+        bundle["releaseActionPlan"]["workItems"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
     assert_eq!(
         bundle["specCompletion"]["status"],
         "partial-with-release-risks"
@@ -1887,6 +1954,9 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert!(text
         .message
         .contains("Evidence reports: 1 ready, 1 need attention, 8 missing"));
+    assert!(text
+        .message
+        .contains("Release action plan: no-open-gaps (0/0 work items ready)"));
     assert!(text.message.contains("Wrote support bundle"));
     assert!(output_path.is_file());
     let written: serde_json::Value =
@@ -1907,6 +1977,7 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         spec_report: Some(spec_path.to_string_lossy().to_string()),
         engine_report: Some(engine_path.to_string_lossy().to_string()),
         evidence_root: Some(evidence_root.to_string_lossy().to_string()),
+        evidence_kit: None,
         output: Some(ipc_output_path.to_string_lossy().to_string()),
     })
     .expect("ipc support bundle");
@@ -2727,6 +2798,17 @@ fn temp_workspace_path(label: &str) -> std::path::PathBuf {
         .expect("system time")
         .as_nanos();
     std::env::temp_dir().join(format!("neditor-ned-{label}-{unique}"))
+}
+
+fn current_test_git_head() -> String {
+    Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .filter(|commit| !commit.is_empty())
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 fn write_fake_ned_binary(path: &std::path::Path) {

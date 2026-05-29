@@ -5754,6 +5754,36 @@ Preview keyboard source navigation:
 | `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke validator syntax remains valid after requiring focusable preview source targets and keyboard equation source-jump evidence. |
 | `pnpm run check:docs` | Pass | 15 Markdown files were checked after documenting the preview keyboard source-jump path; local links resolve. |
 
+## 2026-05-29 Release Evidence Action Plan
+
+NEditor now turns release-readiness gaps into assignable release-evidence work
+items instead of leaving support and release teams with only gap IDs. The
+readiness CLI can attach an evidence-kit action plan with runbooks, expected
+return files, validator commands, ingest commands, and final readiness commands.
+Support bundles now include the same action plan so help desks and release
+managers can see which external proof items are ready to send, which are still
+missing, and whether the evidence kit was generated from the current commit.
+
+The Settings support-bundle panel also surfaces the action-plan status, ready
+count, and first mapped work items, keeping the GUI and `ned` release handoff
+contract aligned.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli --lib` | Pass | 26 CLI tests passed, including readiness action-plan mapping and support-bundle action-plan summary coverage. |
+| `pnpm run check:cli` | Pass | CLI contract tests and debug `ned` build passed for `--action-plan` / `--evidence-kit` readiness and support-bundle handling. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed for the Settings action-plan summary UI. |
+| `pnpm run test:unit` | Pass | 118 frontend/static tests passed, including CLI/support-bundle action-plan guards. |
+| `src-tauri/target/debug/ned readiness --action-plan --json` | Pass | Direct smoke returned the release action-plan schema and the stale evidence-kit source-commit guard for the current local kit. |
+| `src-tauri/target/debug/ned support-bundle --workspace . --json` | Pass | Direct smoke returned `releaseActionPlan` inside the redaction-safe support bundle. |
+| `pnpm run check:docs` | Pass | Markdown docs and local links pass after documenting the new release handoff workflow. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is stable for the CLI and tests. |
+| `git diff --check` | Pass | The release action-plan slice has no whitespace errors. |
+
+Remaining release blockers are still external/manual evidence gates: refreshed
+Google Drive authorization for live Docs import proof, cross-platform packaged
+build evidence, signing/notarization evidence, and final Homebrew cask evidence.
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

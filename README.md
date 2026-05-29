@@ -258,6 +258,9 @@ readiness` reads `.tmp/release-readiness/report.json` without rerunning the
 verification suite and summarizes accepted checks, failed checks, external
 evidence gaps, and next commands; use `--json` for packaging dashboards and
 `--strict` when any remaining release gap should produce a non-zero exit code.
+Use `ned readiness --action-plan` after `pnpm run collect:evidence-kit` to map
+each release gap to the exact runbook, returned evidence paths, validator
+commands, ingest command, and final readiness command needed to close it.
 `ned evidence` reads the standard release evidence reports under `.tmp` (or a
 directory supplied with `--evidence-root`) and summarizes which platform,
 signing, Google Docs, AI, runtime, security, performance, rendered-export, and
@@ -1085,7 +1088,9 @@ live import/readback, open specification matrix rows, optional missing engines,
 and human reviewer sign-off for accessibility or native-viewer export review.
 `ned readiness --json` reads that generated report for support, release, and
 packaging handoffs; `ned readiness --strict` exits non-zero until the report is
-publication-ready with no failed checks or evidence gaps.
+publication-ready with no failed checks or evidence gaps. Add `--action-plan`
+or `--evidence-kit .tmp/release-evidence-kit` when release managers need an
+assignable work plan for every gap instead of a summary list.
 `ned evidence --json` reads the same standard release evidence reports that feed
 release readiness and produces a support-friendly status summary for platform,
 signing, Google Docs, AI provider, AI runtime, performance, security, rendered
@@ -1094,7 +1099,10 @@ export, and accessibility sign-off evidence.
 release-readiness summary, spec-completion summary, and transform-engine probe
 summary into one supportable JSON file without including document content or
 secrets. Pass `--evidence-root .tmp` explicitly when the standard release
-evidence reports have been copied into a non-default evidence directory.
+evidence reports have been copied into a non-default evidence directory. The
+support bundle also includes the release evidence action plan when
+`.tmp/release-evidence-kit/manifest.json` is present, so help desks can see
+which team owns each external proof item and how to validate the returned files.
 
 `pnpm run test:rendered-exports` runs the representative rendered export audit
 and writes local review artifacts to `.tmp/rendered-export-audit`: HTML, PDF,
