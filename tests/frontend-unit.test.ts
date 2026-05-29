@@ -8657,6 +8657,7 @@ test("local verification scripts expose local baseline checks", () => {
   const externalTransformDocs = readFileSync("scripts/check-external-transform-docs.mjs", "utf8");
   const externalEngineProbe = readFileSync("scripts/check-external-engines.mjs", "utf8");
   const releaseCandidate = readFileSync("scripts/create-release-candidate.mjs", "utf8");
+  const releaseCandidateChecker = readFileSync("scripts/check-release-candidate.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:ai-roadmap"], "node scripts/check-ai-first-roadmap.mjs");
@@ -8689,6 +8690,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
   equal(scripts["ingest:evidence"], "node scripts/ingest-release-evidence.mjs");
   equal(scripts["release:local"], "node scripts/create-release-candidate.mjs");
+  equal(scripts["check:release-candidate"], "node scripts/check-release-candidate.mjs");
   equal(scripts["verify:local"], "node scripts/run-local-verification.mjs");
   equal(scripts["verify:local:full"], "node scripts/run-local-verification.mjs --full");
   equal(scripts.build, "vue-tsc --noEmit && vite build");
@@ -8718,6 +8720,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
   ok(verification.includes('command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"])'));
   ok(verification.includes('command("Release candidate script syntax", "node", ["--check", "scripts/create-release-candidate.mjs"])'));
+  ok(verification.includes('command("Release candidate checker syntax", "node", ["--check", "scripts/check-release-candidate.mjs"])'));
   ok(verification.includes('command("External platform evidence contract", "pnpm", ["run", "check:platform-evidence"])'));
   ok(verification.includes('command("Release signing evidence contract", "pnpm", ["run", "check:release-signing"])'));
   ok(verification.includes('command("Spec completion matrix contract", "pnpm", ["run", "check:spec-completion"])'));
@@ -9008,6 +9011,17 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("returnedEvidencePaths: workItem.returns"));
   ok(releaseCandidate.includes("validatorCommands: workItem.validatorCommands"));
   ok(releaseCandidate.includes("ingestCommand: workItem.ingestCommand"));
+  ok(releaseCandidateChecker.includes("neditor.local-release-candidate-check.v1"));
+  ok(releaseCandidateChecker.includes("neditor.local-release-candidate.v1"));
+  ok(releaseCandidateChecker.includes("manifest.json"));
+  ok(releaseCandidateChecker.includes("SHA256SUMS"));
+  ok(releaseCandidateChecker.includes("check-report.json"));
+  ok(releaseCandidateChecker.includes("native:prepared-ned-sidecar"));
+  ok(releaseCandidateChecker.includes("Prepared ned sidecar hash must match native:ned-cli"));
+  ok(releaseCandidateChecker.includes("manifest artifacts must be a non-empty array"));
+  ok(releaseCandidateChecker.includes("size mismatch"));
+  ok(releaseCandidateChecker.includes("SHA-256 mismatch"));
+  ok(releaseCandidateChecker.includes("README.md must state whether the candidate is releaseable on this host"));
   ok(releaseCandidate.includes("readyToSend: workItem.readyToSend === true"));
   ok(releaseCandidate.includes("releaseGateLine"));
   ok(releaseCandidate.includes("runbooks: ${runbooks}; returns: ${returns}; validators: ${validators}"));

@@ -24,6 +24,7 @@ const quickCommands = [
   command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"]),
   command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"]),
   command("Release candidate script syntax", "node", ["--check", "scripts/create-release-candidate.mjs"]),
+  command("Release candidate checker syntax", "node", ["--check", "scripts/check-release-candidate.mjs"]),
   command("Markdown links", "pnpm", ["run", "check:docs"]),
   command("Spec completion matrix contract", "pnpm", ["run", "check:spec-completion"]),
   command("Table editor manual review contract", "pnpm", ["run", "check:tables:manual"]),

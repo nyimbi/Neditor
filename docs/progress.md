@@ -44,6 +44,27 @@ by combining several separate controls manually.
 | `pnpm run test:unit` | Pass | Static and helper tests verify the max-writing-space state, menu labels, command palette entries, native menu IDs, restore path, and layout class wiring. |
 | `node scripts/run-e2e.mjs e2e/app-workflows.spec.ts --grep "collapses and restores command toolbars" --project chromium` | Pass | Focused browser workflow proves Maximize Writing Space hides the sidebar, preview, status bar, and command bar, then restores the previous writing layout. |
 
+## 2026-05-29 Release Candidate Packet Validator
+
+NEditor now has `pnpm run check:release-candidate`, a standalone validator for
+an already-generated `.tmp/release-candidate` handoff packet. It checks the
+manifest schema, required frontend/native artifact kinds, safe artifact paths,
+actual file sizes, SHA-256 hashes, exact `SHA256SUMS` coverage, README handoff
+sections, and prepared `ned-*` sidecar hash parity with the release CLI. It
+writes `.tmp/release-candidate/check-report.json` so release reviewers can keep
+the validation result with the candidate packet.
+
+This closes the release-handoff gap where NEditor could generate a candidate
+packet but did not yet provide an independent, repeatable command to verify that
+packet before sending it to reviewers.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/check-release-candidate.mjs` | Pass | Verifies the standalone release-candidate validator is syntactically valid. |
+| `pnpm run test:unit` | Pass | Static tests verify the package script, quick local syntax gate, validator schema, required artifacts, checksum checks, README checks, and prepared sidecar parity guard. |
+| `pnpm run check:release-candidate` | Pass | Validated the current `.tmp/release-candidate` packet and wrote `.tmp/release-candidate/check-report.json`. |
+| `pnpm run verify:local -- --list` | Pass | Quick local verification now lists the release-candidate checker syntax gate. |
+
 ## 2026-05-29 Release Candidate Sidecar Evidence
 
 The local release-candidate generator now prepares the version-smoked Tauri

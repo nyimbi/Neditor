@@ -997,6 +997,11 @@ commands, ingest command, and final readiness command without cross-referencing
 multiple JSON files. A candidate is only marked releaseable when that evidence
 kit was collected for the exact source commit in the candidate, the kit validator
 passed, and every final readiness gap has a sendable work item.
+Run `pnpm run check:release-candidate` against the generated directory before
+handoff; it independently validates `manifest.json`, `SHA256SUMS`, the README,
+artifact file sizes, SHA-256 hashes, required native/frontend artifact kinds,
+and the prepared `ned-*` sidecar hash, then writes
+`.tmp/release-candidate/check-report.json`.
 
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`
