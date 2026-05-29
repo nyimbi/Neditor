@@ -8917,6 +8917,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("homebrew-release-artifact"));
   ok(evidenceKitCollector.includes("homebrew-macos-signing"));
   ok(evidenceKitCollector.includes("runbooks/homebrew-release.md"));
+  ok(evidenceKitCollector.includes("pnpm run release:homebrew"));
+  ok(evidenceKitCollector.includes("materialize-cask-report.json"));
   ok(evidenceKitCollector.includes("sourceTreeClean"));
   ok(evidenceKitCollector.includes("staleTemplates"));
   ok(evidenceKitCollector.includes("inspectTemplateFreshness"));

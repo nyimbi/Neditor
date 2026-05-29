@@ -49,6 +49,25 @@ blockers for signing, notarization, platform evidence, and release readiness.
 | `pnpm run test:unit` | Pass | Static tests verify the package script and quick verification syntax gate. |
 | `pnpm run check:docs` | Pass | README, Homebrew runbook, and compile/release guide links still resolve. |
 
+## 2026-05-29 Homebrew Evidence Kit Wiring
+
+The release evidence kit now routes Homebrew proof through `pnpm run
+release:homebrew` instead of asking release owners to copy the template and
+hand-edit `__VERSION__` and `__SHA256__`. The generated Homebrew runbook now
+instructs release hosts to materialize the cask from the signed artifact,
+confirm `.tmp/homebrew/materialize-cask-report.json`, run `check:homebrew` with
+explicit cask/artifact paths, then continue with `brew audit`, install, and
+uninstall proof.
+
+This closes the follow-through gap between the new materializer and the actual
+evidence packet sent to release hosts.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/collect-release-evidence-kit.mjs` | Pass | Verifies the evidence-kit collector remains syntactically valid. |
+| `pnpm run test:unit` | Pass | Static tests verify the collector references `pnpm run release:homebrew` and `materialize-cask-report.json`. |
+| `git diff --check` | Pass | Whitespace guard passed before commit. |
+
 ## 2026-05-29 Max Writing Space Preset
 
 NEditor now has a reversible **Maximize Writing Space** command. The command
