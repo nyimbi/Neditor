@@ -34,6 +34,9 @@ if (!skipBuild) {
 if (!skipEvidence) {
   if (!skipPrerequisiteEvidence) {
     refreshPrerequisiteEvidence();
+    // Release readiness treats stale full-suite browser workflow proof as a local failure.
+    // A normal release candidate refresh must therefore refresh it before bootstrapping readiness.
+    refreshBrowserWorkflowEvidence();
     // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.
     run("pnpm", ["run", "prepare:sidecars"]);
     // DMG/app prerequisite probes can also refresh the bundle after its first metadata report.
@@ -195,6 +198,10 @@ function refreshPrerequisiteEvidence() {
     commands.push(["pnpm", ["run", "test:desktop-smoke"], { NEDITOR_DESKTOP_SMOKE_LAUNCH: "1" }], ["pnpm", ["run", "test:tauri-webdriver"]]);
   }
   for (const [command, commandArgs, env] of commands) run(command, commandArgs, env || {});
+}
+
+function refreshBrowserWorkflowEvidence() {
+  run("pnpm", ["run", "test:e2e"]);
 }
 
 function collectFrontendAssets() {
