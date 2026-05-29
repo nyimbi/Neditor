@@ -33,10 +33,10 @@ if (!skipBuild) {
 
 if (!skipEvidence) {
   if (!skipPrerequisiteEvidence) {
-    refreshPrerequisiteEvidence();
     // Release readiness treats stale full-suite browser workflow proof as a local failure.
-    // A normal release candidate refresh must therefore refresh it before bootstrapping readiness.
+    // Refresh it before native/rendered probes that can exhaust browser launch slots on macOS.
     refreshBrowserWorkflowEvidence();
+    refreshPrerequisiteEvidence();
     // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.
     run("pnpm", ["run", "prepare:sidecars"]);
     // DMG/app prerequisite probes can also refresh the bundle after its first metadata report.
