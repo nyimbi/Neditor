@@ -7863,20 +7863,29 @@ const tocManagerSummary = computed(() => {
   const numbered = frontMatterScalarValue(active.value.text, "tocNumbered") || frontMatterScalarValue(active.value.text, "numberedHeadings") || "false";
   return `Front matter TOC: ${tocEnabled || "not set"} | depth: ${depth} | numbered: ${numbered}`;
 });
-const frontMatterDataSourceRows = computed(() => parseFrontMatterDataSources(active.value.text));
+const activeFrontMatterText = computed(() => frontMatterBlockText(active.value.text));
+const frontMatterDataSourceRows = computed(() => parseFrontMatterDataSources(activeFrontMatterText.value));
 const dataSourceManagerSummary = computed(() => {
   const rows = frontMatterDataSourceRows.value;
   const ready = rows.filter((row) => row.status === "ready").length;
   const blocked = rows.length - ready;
   return `${rows.length} local data sources | ${ready} ready | ${blocked} need attention`;
 });
-const frontMatterVariableRows = computed(() => parseFrontMatterVariables(active.value.text));
+const frontMatterVariableRows = computed(() => parseFrontMatterVariables(activeFrontMatterText.value));
 const mergedMetadataVariableRows = computed(() => parseMergedMetadataVariables(active.value.compile?.metadata || {}, frontMatterVariableRows.value));
 const documentVariableManagerSummary = computed(() => {
   const rows = [...frontMatterVariableRows.value, ...mergedMetadataVariableRows.value];
   const empty = rows.filter((row) => row.status === "empty").length;
   return `${frontMatterVariableRows.value.length} front matter variables | ${mergedMetadataVariableRows.value.length} project/merged variables | ${empty} empty | filters: default, trim, upper, lower, title, number, round, percent, currency`;
 });
+
+function frontMatterBlockText(text: string) {
+  if (!/^---\r?\n/.test(text)) return "";
+  const lines = text.split(/\r?\n/);
+  const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+  return endIndex > 0 ? lines.slice(0, endIndex + 1).join("\n") : "";
+}
+
 const captionedReferenceItems = computed<CaptionedReferenceItem[]>(() =>
   (active.value.compile?.document_ast.blocks || []).flatMap((block: DocumentBlock) => {
     if (block.kind !== "figure" && block.kind !== "table" && block.kind !== "equation") return [];
