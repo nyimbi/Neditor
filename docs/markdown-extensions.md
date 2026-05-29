@@ -51,6 +51,58 @@ Front matter must be a YAML mapping. Invalid YAML and list/scalar front matter
 produce source-ranged diagnostics so malformed metadata is visible before
 preview or export.
 
+## Page Layout And Columns
+
+Use front matter for document-wide layout defaults:
+
+```yaml
+---
+title: Investment Committee Brief
+layout:
+  pageSize: A4
+  orientation: portrait
+  margins: normal
+  columns: 2
+  columnGap: 18pt
+  header: "{{title}}"
+  footer: "Page {{page}} of {{pages}}"
+---
+```
+
+Use a layout block when only part of the document should reflow into columns:
+
+````md
+```layout
+columns: 2
+columnGap: 18pt
+section: market-analysis
+```
+
+## Market Analysis
+
+*Insert concise column-friendly analysis here.*
+````
+
+Use a section break to change layout from that point forward:
+
+```md
+{{section-break columns=2 columnGap=18pt pageSize=letter orientation=landscape margins=narrow}}
+```
+
+Use another section break to return to single-column flow:
+
+```md
+{{section-break columns=1 margins=normal orientation=portrait}}
+```
+
+Supported column-gap keys are `columnGap`, `column-gap`, `column_gap`,
+`gutter`, `columnGutter`, and `column_gutter`. Length values such as `18pt`,
+`0.25in`, `12mm`, and `32px` are normalized for export. HTML preview uses CSS
+columns, PDF reflows content through paged columns, DOCX writes section column
+properties, and bundle manifests retain the paged-layout evidence. Wide tables,
+large figures, and detailed appendices should usually stay in a single-column
+section.
+
 ## Includes
 
 Master documents can include child Markdown files:
