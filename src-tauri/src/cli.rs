@@ -8632,8 +8632,7 @@ fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool
         return false;
     }
     let text = format!(
-        "{} {} {}",
-        item.category.to_ascii_lowercase(),
+        "{} {}",
         item.title.to_ascii_lowercase(),
         item.description.to_ascii_lowercase()
     );

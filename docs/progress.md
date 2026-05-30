@@ -16,17 +16,43 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `cbbe079 Stop treating
-  design as signing evidence`
+- Latest inspected committed baseline before this update: `a470774 Require source
+  confidence before distribution`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: source-confidence approval gate changes
-  pending verification.
+- Worktree before this log update: clean and aligned with `origin/main`.
 
 ## Durable Planning Artifacts
 
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Local Capability Audit Classifier Fix
+
+The 100-improvement audit no longer uses broad category names as the reason to
+force external/manual proof. Category labels such as "Export, Publishing, And
+Distribution" and "Voice, TTS, And Accessibility" were incorrectly keeping
+locally provable capabilities in the external lane even when the specific item
+does not require credentials, live publishing, device TTS, screen-reader human
+sign-off, Homebrew, signing, or cloud/provider proof.
+
+The classifier now gates external/manual proof from each item's title and
+description, while preserving real external lanes for Google Docs live import
+readback, Substack/blog/CMS publishing, provider/cloud setup, voice/TTS,
+screen-reader sign-off, transform downloads, Homebrew, signing/notarization, and
+release evidence. This lets already evidenced local capabilities count from
+their implementation and tests: HTML export polish, EPUB export polish, LaTeX
+and PDF build path, DOCX style mapping, Markdown bundle export, accessible
+command palette, keyboard-first table editing, high-contrast/reduced-motion
+modes, and plain-language help overlays.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 34 CLI tests passed and the debug `ned` binary rebuilt; regression assertions now require items 71, 72, 76, 77, 78, 87, 88, 89, and 90 to be implementation-evidenced while Google Docs, publishing, voice/TTS, and Homebrew lanes remain partial/external. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting the local-capability audit classifier fix. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after the audit classifier update. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 81/100 implementation-evidenced items and 19 partial/external-proof items. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Source-Confidence Approval Gate
 

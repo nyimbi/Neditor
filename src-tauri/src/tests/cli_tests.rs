@@ -3451,6 +3451,40 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         .any(|item| item["number"] == 80
             && item["title"] == "Export profiles"
             && item["status"] == "implemented-evidence-present"));
+    for (number, title) in [
+        (71, "HTML export polish"),
+        (72, "EPUB export polish"),
+        (76, "LaTeX and PDF build path"),
+        (77, "DOCX style mapping"),
+        (78, "Markdown bundle export"),
+        (87, "Accessible command palette"),
+        (88, "Keyboard-first table editing"),
+        (89, "High-contrast and reduced-motion modes"),
+        (90, "Plain-language help overlays"),
+    ] {
+        assert!(report["items"]
+            .as_array()
+            .expect("improvement items")
+            .iter()
+            .any(|item| item["number"] == number
+                && item["title"] == title
+                && item["status"] == "implemented-evidence-present"));
+    }
+    for (number, title) in [
+        (73, "Google Docs import handoff"),
+        (74, "Substack package export"),
+        (75, "Blog and CMS publishing"),
+        (81, "Voice command interface"),
+        (83, "Read selected text aloud"),
+    ] {
+        assert!(report["items"]
+            .as_array()
+            .expect("improvement items")
+            .iter()
+            .any(|item| item["number"] == number
+                && item["title"] == title
+                && item["status"] == "partial-or-external-evidence"));
+    }
     assert!(report["items"]
         .as_array()
         .expect("improvement items")
