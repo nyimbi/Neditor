@@ -20,6 +20,22 @@ export interface DeepResearchSourceFit {
   reasons: string[];
 }
 
+export interface DeepResearchEvidenceConflict {
+  id: string;
+  topic: string;
+  family: string;
+  severity: "review" | "risk";
+  signals: string[];
+  sources: Array<{
+    title: string;
+    url: string;
+    source: string;
+    stance: string;
+    evidence: string;
+  }>;
+  recommendation: string;
+}
+
 export interface DeepResearchSettings {
   topic: string;
   documentType: string;
@@ -247,6 +263,7 @@ export function deepResearchQualityAuditMarkdown(
   const sources = uniqueSources(iterations);
   const openGaps = iterations.flatMap((iteration) => iteration.gaps).filter(Boolean);
   const citationTodos = countCitationTodoMarkers(draftMarkdown);
+  const conflicts = detectDeepResearchEvidenceConflicts(iterations);
   const targetStatus = currentPages >= settings.targetPages
     ? `Reached target: about ${currentPages}/${settings.targetPages} pages.`
     : `Below target: about ${currentPages}/${settings.targetPages} pages; provider expansion should be reviewed before release.`;
@@ -257,12 +274,14 @@ export function deepResearchQualityAuditMarkdown(
     `- Source inventory: ${sources.length} unique source candidate${sources.length === 1 ? "" : "s"} across ${iterations.length} research iteration${iterations.length === 1 ? "" : "s"}.`,
     `- Citation TODO count: ${citationTodos}.`,
     `- Knowledge gaps carried forward: ${openGaps.length}.`,
+    `- Evidence conflict review: ${conflicts.length ? `${conflicts.length} possible conflict${conflicts.length === 1 ? "" : "s"} require human review.` : "No obvious opposing source signals detected in snippets."}`,
     "",
     "### Evidence Checks",
     "",
     "- [ ] Open every saved source document and verify the claims that depend on it.",
     "- [ ] Resolve citation TODOs before external distribution.",
     "- [ ] Confirm dates, figures, named organizations, legal/regulatory claims, and recommendations against source documents.",
+    "- [ ] Resolve possible source conflicts before presenting contested findings as settled.",
     "- [ ] Preserve source-library audit evidence with the final review packet.",
     "",
     "### Humanization Checks",
@@ -275,6 +294,7 @@ export function deepResearchQualityAuditMarkdown(
     "",
     ...(openGaps.length ? openGaps.slice(0, 12).map((gap) => `- ${gap}`) : ["- No explicit knowledge gaps were recorded by the research loop."]),
     "",
+    ...(conflicts.length ? ["### Evidence Conflicts", "", ...conflicts.map((conflict) => `- ${conflict.id}: ${conflict.topic} - ${conflict.signals.join(" versus ")}. ${conflict.recommendation}`), ""] : []),
   ].join("\n");
 }
 
@@ -366,11 +386,15 @@ function appendDeepResearchEvidenceSections(
   const withEvidenceLog = !missingEvidenceLog
     ? withBibliographyMarker
     : `${withBibliographyMarker.trim()}\n\n${evidenceLogHeading}\n\n${missingEvidenceLog}\n`;
+  const conflictReview = deepResearchConflictReviewCompletionMarkdown(withEvidenceLog, iterations);
+  const withConflictReview = conflictReview
+    ? `${withEvidenceLog.trim()}\n\n${conflictReview}\n`
+    : withEvidenceLog;
   const sourceLibraryAudit = normalizeSourceLibraryAudit(options.sourceLibraryAuditMarkdown);
-  const sourceLibraryAuditCompletion = sourceLibraryAuditCompletionMarkdown(withEvidenceLog, sourceLibraryAudit);
+  const sourceLibraryAuditCompletion = sourceLibraryAuditCompletionMarkdown(withConflictReview, sourceLibraryAudit);
   return !sourceLibraryAuditCompletion
-    ? withEvidenceLog
-    : `${withEvidenceLog.trim()}\n\n${sourceLibraryAuditCompletion}\n`;
+    ? withConflictReview
+    : `${withConflictReview.trim()}\n\n${sourceLibraryAuditCompletion}\n`;
 }
 
 export function deepResearchBibliographyMarkdown(
@@ -449,6 +473,42 @@ export function rankDeepResearchSources(sources: DeepResearchSource[], query: st
     .map(({ __index: _index, ...source }) => source);
 }
 
+export function detectDeepResearchEvidenceConflicts(iterations: DeepResearchIteration[]) {
+  const conflicts: DeepResearchEvidenceConflict[] = [];
+  for (const iteration of iterations) {
+    const stancedSources = iteration.results
+      .map((source) => ({ source, stances: conflictStancesForSource(source) }))
+      .filter((item) => item.stances.length);
+    for (const family of CONFLICT_STANCE_FAMILIES) {
+      const positive = stancedSources
+        .filter((item) => item.stances.some((stance) => stance.family === family.id && stance.polarity === "positive"))
+        .map((item) => item.source);
+      const negative = stancedSources
+        .filter((item) => item.stances.some((stance) => stance.family === family.id && stance.polarity === "negative"))
+        .map((item) => item.source);
+      if (!positive.length || !negative.length || !hasDistinctSourceUrls(positive, negative)) continue;
+      const sources = [
+        ...positive.slice(0, 3).map((source) => conflictSourceSummary(source, family.positiveLabel)),
+        ...negative.slice(0, 3).map((source) => conflictSourceSummary(source, family.negativeLabel)),
+      ];
+      conflicts.push({
+        id: `DR-CONFLICT-${String(iteration.index).padStart(2, "0")}-${String(conflicts.length + 1).padStart(2, "0")}`,
+        topic: iteration.query,
+        family: family.label,
+        severity: family.risk ? "risk" : "review",
+        signals: [family.positiveLabel, family.negativeLabel],
+        sources,
+        recommendation: `Open the cited sources for ${iteration.query}, decide which claim is best supported, and mark unresolved disagreement as a limitation or citation TODO.`,
+      });
+    }
+  }
+  return conflicts;
+}
+
+export function deepResearchEvidenceConflictMarkdown(iterations: DeepResearchIteration[]) {
+  return deepResearchEvidenceConflictMarkdownFromConflicts(detectDeepResearchEvidenceConflicts(iterations));
+}
+
 export function assessDeepResearchSource(source: DeepResearchSource, query: string): DeepResearchSourceFit {
   const queryTokens = significantWords(query);
   const titleTokens = new Set(significantWords(source.title));
@@ -497,6 +557,27 @@ export function assessDeepResearchSource(source: DeepResearchSource, query: stri
     label: sourceFitLabel(bounded),
     reasons: reasons.length ? reasons.slice(0, 4) : ["general web source; inspect before citing"],
   };
+}
+
+function deepResearchEvidenceConflictMarkdownFromConflicts(conflicts: DeepResearchEvidenceConflict[]) {
+  if (!conflicts.length) {
+    return [
+      "## Deep Research Evidence Conflict Review",
+      "",
+      "No immediate opposing source signals were detected in search-result snippets. Review source documents before treating this as final proof of consensus.",
+      "",
+    ].join("\n");
+  }
+  return [
+    "## Deep Research Evidence Conflict Review",
+    "",
+    `Possible conflicts detected: ${conflicts.length}`,
+    "",
+    "| Conflict | Severity | Research area | Opposing signals | Source evidence | Review action |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...conflicts.map((conflict) => `| ${tableCell(conflict.id)} | ${conflict.severity} | ${tableCell(conflict.topic)} | ${tableCell(conflict.signals.join(" versus "))} | ${tableCell(conflict.sources.map((source) => `${source.stance}: ${source.title}`).join("; "))} | ${tableCell(conflict.recommendation)} |`),
+    "",
+  ].join("\n");
 }
 
 export function parseReflection(markdown: string) {
@@ -631,6 +712,79 @@ function sourceFitLabel(score: number) {
   return "weak";
 }
 
+interface ConflictStanceFamily {
+  id: string;
+  label: string;
+  positiveLabel: string;
+  negativeLabel: string;
+  positive: RegExp;
+  negative: RegExp;
+  risk?: boolean;
+}
+
+const CONFLICT_STANCE_FAMILIES: ConflictStanceFamily[] = [
+  {
+    id: "direction",
+    label: "Directional finding",
+    positiveLabel: "increase or growth signal",
+    negativeLabel: "decrease or contraction signal",
+    positive: /\b(?:increase[ds]?|increasing|growth|grew|grow(?:s|ing)?|rising|rose|expanded?|expansion|higher|accelerat(?:e|es|ed|ing))\b/i,
+    negative: /\b(?:decrease[ds]?|decreasing|decline[ds]?|declining|fell|falling|fall|reduc(?:e|es|ed|ing|tion)|lower|contract(?:s|ed|ion|ing))\b/i,
+  },
+  {
+    id: "recommendation",
+    label: "Recommendation or effectiveness",
+    positiveLabel: "supportive or effective signal",
+    negativeLabel: "opposing or ineffective signal",
+    positive: /\b(?:support(?:s|ed|ing)?|recommend(?:s|ed|ing)?|effective|benefit(?:s|ed|ing)?|success(?:ful)?|improve(?:s|d|ment|ing)|validated|promising)\b/i,
+    negative: /\b(?:oppose(?:s|d|ing)?|critic(?:ize|ized|ism|al)|ineffective|fail(?:s|ed|ure|ing)?|harm(?:s|ed|ful)?|concern(?:s)?|warning|warn(?:s|ed|ing))\b/i,
+    risk: true,
+  },
+  {
+    id: "obligation",
+    label: "Requirement or obligation",
+    positiveLabel: "mandatory or required signal",
+    negativeLabel: "optional or not-required signal",
+    positive: /\b(?:must|shall|required|mandatory|obligation|compulsory|requirement)\b/i,
+    negative: /\b(?:optional|voluntary|not required|not mandatory|may choose|at discretion|no requirement)\b/i,
+    risk: true,
+  },
+  {
+    id: "certainty",
+    label: "Evidence certainty",
+    positiveLabel: "confirmed or proven signal",
+    negativeLabel: "uncertain or disputed signal",
+    positive: /\b(?:confirmed|proven|demonstrated|evidence shows|validated|verified|conclusive)\b/i,
+    negative: /\b(?:inconclusive|insufficient evidence|mixed evidence|disputed|uncertain|not enough evidence|contested)\b/i,
+    risk: true,
+  },
+];
+
+function conflictStancesForSource(source: DeepResearchSource) {
+  const text = `${source.title} ${source.snippet}`.replace(/\s+/g, " ");
+  return CONFLICT_STANCE_FAMILIES.flatMap((family) => {
+    const stances: Array<{ family: string; polarity: "positive" | "negative" }> = [];
+    if (family.positive.test(text)) stances.push({ family: family.id, polarity: "positive" });
+    if (family.negative.test(text)) stances.push({ family: family.id, polarity: "negative" });
+    return stances;
+  });
+}
+
+function hasDistinctSourceUrls(left: DeepResearchSource[], right: DeepResearchSource[]) {
+  const leftUrls = new Set(left.map((source) => source.url.trim()).filter(Boolean));
+  return right.some((source) => source.url.trim() && !leftUrls.has(source.url.trim()));
+}
+
+function conflictSourceSummary(source: DeepResearchSource, stance: string) {
+  return {
+    title: source.title,
+    url: source.url,
+    source: source.source,
+    stance,
+    evidence: source.snippet || source.url,
+  };
+}
+
 function significantWords(value: string) {
   const stopWords = new Set([
     "about",
@@ -750,6 +904,25 @@ function missingDeepResearchEvidenceIterations(
   if (!iterations.length) return [];
   if (!hasDeepResearchEvidenceLog(markdown)) return iterations;
   return iterations.filter((iteration) => !deepResearchEvidenceLogContainsIteration(markdown, iteration));
+}
+
+function deepResearchConflictReviewCompletionMarkdown(markdown: string, iterations: DeepResearchIteration[]) {
+  const conflicts = detectDeepResearchEvidenceConflicts(iterations);
+  if (!conflicts.length) return "";
+  if (!hasDeepResearchConflictReview(markdown)) {
+    return deepResearchEvidenceConflictMarkdownFromConflicts(conflicts);
+  }
+  const existingSection = sectionText(markdown, "Deep Research Evidence Conflict Review");
+  const missingConflicts = conflicts.filter((conflict) => !existingConflictReviewContainsId(existingSection, conflict.id));
+  if (!missingConflicts.length) return "";
+  return [
+    "## Deep Research Evidence Conflict Review Addendum",
+    "",
+    deepResearchEvidenceConflictMarkdownFromConflicts(missingConflicts)
+      .replace(/^##\s+Deep Research Evidence Conflict Review\s*\n+/i, "")
+      .trim(),
+    "",
+  ].join("\n");
 }
 
 function bibliographyFenceBlocks(markdown: string) {
@@ -934,6 +1107,14 @@ function hasBibliographyMarker(markdown: string) {
 
 function hasSourceLibraryAudit(markdown: string) {
   return /^##\s+Source Library Audit\s*$/im.test(markdown);
+}
+
+function hasDeepResearchConflictReview(markdown: string) {
+  return /^##\s+Deep Research Evidence Conflict Review\s*$/im.test(markdown);
+}
+
+function existingConflictReviewContainsId(section: string, id: string) {
+  return new RegExp(`(?:^|\\|)\\s*${escapeRegExp(id)}\\s*(?:\\||:|$)`, "m").test(section);
 }
 
 function normalizeSourceLibraryAudit(markdown: string | undefined) {

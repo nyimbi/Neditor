@@ -509,7 +509,11 @@ Research and business documents can keep reference metadata near the source.
   fence, complete empty or partial Source Citation Index sections with a
   missing-key addendum, complete empty or partial evidence logs with missing
   research iterations, complete empty or partial Source Library Audit sections
-  with missing saved-source rows, then add the `[BIBLIOGRAPHY]` marker.
+  with missing saved-source rows, add an evidence-conflict review when search
+  snippets appear to disagree, then add the `[BIBLIOGRAPHY]` marker.
+- Use **Insert conflict review** in Source Search & Deep Research to add a
+  source-disagreement table before accepting contested findings or exporting a
+  research report.
 - Choose `title`, `author-year`, `key`, `numeric`, or a common CSL alias such
   as `apa`, `chicago-author-date`, `ieee`, or `vancouver` from front matter,
   preferences, or the references panel.

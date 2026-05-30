@@ -23,11 +23,13 @@ import {
 } from "../src/lib/aiProviderPackages.js";
 import {
   assessDeepResearchSource,
+  detectDeepResearchEvidenceConflicts,
   deepResearchBibliographyMarkdown,
   deepResearchCitationGuidanceMarkdown,
   deepResearchCitationIndexMarkdown,
   deepResearchDocumentMarkdown,
   deepResearchDraftPrompt,
+  deepResearchEvidenceConflictMarkdown,
   deepResearchExpansionPrompt,
   deepResearchReviewPackageMarkdown,
   fallbackResearchDraft,
@@ -5873,6 +5875,39 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ok(qaAudit.includes("1 unique source candidate"));
   ok(qaAudit.includes("Citation TODO count: 1"));
   ok(qaAudit.includes("Budget evidence still missing."));
+  ok(qaAudit.includes("Evidence conflict review: No obvious opposing source signals detected in snippets."));
+
+  const conflictIterations = [
+    {
+      index: 1,
+      query: "AI procurement controls evidence",
+      summary: "Source snippets disagree.",
+      gaps: [],
+      results: [
+        {
+          title: "Agency evaluation confirms controls are effective",
+          url: "https://agency.gov/effective-controls.pdf",
+          snippet: "Evidence shows AI procurement controls improved audit outcomes.",
+          source: "DuckDuckGo",
+        },
+        {
+          title: "Independent review warns controls failed",
+          url: "https://research.example.org/controls-warning.pdf",
+          snippet: "The review warned that controls failed and evidence remains disputed.",
+          source: "SearXNG",
+        },
+      ],
+    },
+  ];
+  const conflicts = detectDeepResearchEvidenceConflicts(conflictIterations);
+  equal(conflicts.length, 2);
+  ok(conflicts.some((conflict) => conflict.family === "Recommendation or effectiveness" && conflict.severity === "risk"));
+  ok(conflicts.some((conflict) => conflict.family === "Evidence certainty" && conflict.signals.includes("confirmed or proven signal")));
+  const conflictAudit = deepResearchEvidenceConflictMarkdown(conflictIterations);
+  ok(conflictAudit.includes("## Deep Research Evidence Conflict Review"));
+  ok(conflictAudit.includes("Possible conflicts detected: 2"));
+  ok(conflictAudit.includes("supportive or effective signal versus opposing or ineffective signal"));
+  ok(conflictAudit.includes("Open the cited sources for AI procurement controls evidence"));
   const standalone = deepResearchDocumentMarkdown(
     settings,
     "# Draft\n\nBody with source review.",
@@ -5934,6 +5969,35 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ok(standalone.includes("[BIBLIOGRAPHY]"));
   ok(standalone.includes("## Deep Research Evidence Log"));
   ok(standalone.includes("## Source Library Audit"));
+
+  const standaloneWithConflicts = deepResearchDocumentMarkdown(
+    settings,
+    "# Draft\n\nBody with source review.",
+    conflictIterations,
+    { generatedAt: "2026-05-28T10:00:00.000Z" },
+  );
+  ok(standaloneWithConflicts.includes("## Deep Research Evidence Conflict Review"));
+  ok(standaloneWithConflicts.includes("DR-CONFLICT-01-01"));
+
+  const standaloneWithPartialConflictReview = deepResearchDocumentMarkdown(
+    settings,
+    [
+      "# Draft",
+      "",
+      "## Deep Research Evidence Conflict Review",
+      "",
+      "| Conflict | Severity | Research area | Opposing signals | Source evidence | Review action |",
+      "| --- | --- | --- | --- | --- | --- |",
+      "| DR-CONFLICT-01-01 | risk | AI procurement controls evidence | supportive or effective signal versus opposing or ineffective signal | Agency evaluation confirms controls are effective | Open source. |",
+      "",
+      "Body with source review.",
+    ].join("\n"),
+    conflictIterations,
+    { generatedAt: "2026-05-28T10:00:00.000Z" },
+  );
+  ok(standaloneWithPartialConflictReview.includes("## Deep Research Evidence Conflict Review Addendum"));
+  equal((standaloneWithPartialConflictReview.match(/DR-CONFLICT-01-01/g) || []).length, 1);
+  ok(standaloneWithPartialConflictReview.includes("DR-CONFLICT-01-02"));
 
   const standaloneWithEmptyBibliography = deepResearchDocumentMarkdown(
     settings,
@@ -9029,6 +9093,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="AI command route suggestions"'));
   ok(app.includes("Docs Live"));
   ok(app.includes("Deep Research"));
+  ok(app.includes('aria-label="Deep research evidence conflict review"'));
+  ok(app.includes("deepResearchEvidenceConflicts"));
+  ok(app.includes("deepResearchConflictSummary"));
+  ok(app.includes("insertDeepResearchConflictReview"));
+  ok(app.includes("Insert conflict review"));
+  ok(app.includes("AI: Insert deep research conflict review"));
   ok(app.includes('case "deep-research"'));
   ok(app.includes("Routed command palette instruction to Deep Research"));
   ok(app.includes("AI Paste cleanup"));

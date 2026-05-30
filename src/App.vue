@@ -2223,10 +2223,17 @@
               <button type="button" :disabled="!deepResearchDraft" @click="insertDeepResearchDraft">Insert draft</button>
               <button type="button" :disabled="!deepResearchDraft" @click="openDeepResearchDraftAsDocument">Open as document</button>
               <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchLog">Insert research log</button>
+              <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchConflictReview">Insert conflict review</button>
             </div>
             <p class="sidebar-hint">
               {{ deepResearchStatus || "Deep research plans queries, searches, reflects on gaps, writes, and iterates expansion passes until it reaches the requested page count or the provider stops adding useful length." }}
             </p>
+            <section v-if="deepResearchIterations.length" class="snapshot-row" aria-label="Deep research evidence conflict review">
+              <p>{{ deepResearchConflictSummary }}</p>
+              <small v-for="conflict in deepResearchEvidenceConflicts.slice(0, 4)" :key="conflict.id">
+                {{ conflict.id }} | {{ conflict.severity }} | {{ conflict.topic }} | {{ conflict.signals.join(" versus ") }}
+              </small>
+            </section>
             <textarea v-if="deepResearchDraft" :value="deepResearchDraft" rows="8" readonly aria-label="Deep research draft preview"></textarea>
           </section>
           <button
@@ -7211,12 +7218,14 @@ import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import {
   deepResearchDraftPrompt,
   deepResearchDocumentMarkdown,
+  deepResearchEvidenceConflictMarkdown,
   deepResearchExpansionPrompt,
   deepResearchQueryPrompt,
   deepResearchQualityAuditMarkdown,
   deepResearchQualityPrompt,
   deepResearchReflectionPrompt,
   deepResearchReviewPackageMarkdown,
+  detectDeepResearchEvidenceConflicts,
   estimateMarkdownPages,
   expansionPassBudget,
   fallbackDeepResearchQuery,
@@ -8005,6 +8014,13 @@ const deepResearchLengthSummary = computed(() => {
   const settings = normalizeDeepResearchSettings({ targetPages: deepResearchTargetPages.value });
   const passCount = expansionPassBudget(settings);
   return `About ${targetWordCount(settings).toLocaleString()} words; up to ${passCount} expansion pass${passCount === 1 ? "" : "es"}.`;
+});
+const deepResearchEvidenceConflicts = computed(() => detectDeepResearchEvidenceConflicts(deepResearchIterations.value));
+const deepResearchConflictSummary = computed(() => {
+  const count = deepResearchEvidenceConflicts.value.length;
+  if (!deepResearchIterations.value.length) return "Conflict review appears after the first research loop.";
+  if (!count) return "No obvious opposing source signals detected in snippets; verify source documents before release.";
+  return `${count} possible evidence conflict${count === 1 ? "" : "s"} detected; resolve before presenting contested findings as settled.`;
 });
 const googleClientId = ref(store.googleIntegration.clientId);
 const googleAccountHint = ref(store.googleIntegration.accountHint);
@@ -11559,6 +11575,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "ai-create", label: "AI Create Document", help: "Open Docs Live as a document creation wizard.", run: () => startAiDocumentCreation() },
           { id: "docs-live", label: "Docs Live", help: "Dictate and structure a draft with context and placeholders.", run: () => openDocsLive() },
           { id: "deep-research", label: "Deep Research", help: "Search sources and generate a sourced report from a 1-page brief to a 200-page report.", run: () => openDeepResearch() },
+          { id: "deep-research-conflicts", label: "Insert Research Conflicts", help: "Insert a conflict-review table for Deep Research sources that appear to disagree.", disabled: !deepResearchIterations.value.length, run: () => insertDeepResearchConflictReview() },
           { id: "agent", label: "AI Agent Workspace", help: "Plan, revise, review, and distribute with governed agent workflows.", run: () => openAgentWorkspace() },
           { id: "document-memory", label: "Document Memory", help: "Capture reusable terminology, style, accepted decisions, rejected directions, review preferences, and distribution preferences.", run: () => openAgentWorkspace() },
           { id: "capture-document-memory", label: "Capture Document Memory", help: "Derive reusable document memory from current context and document signals.", run: () => captureAgentMemoryFromCurrentDocument() },
@@ -13214,6 +13231,11 @@ function insertDeepResearchLog() {
   const log = formatDeepResearchLog(deepResearchIterations.value);
   insertBlock(`\n## Deep Research Log\n\n${log}\n`);
 }
+
+function insertDeepResearchConflictReview() {
+  insertBlock(deepResearchEvidenceConflictMarkdown(deepResearchIterations.value));
+  store.statusMessage = `Inserted Deep Research conflict review with ${deepResearchEvidenceConflicts.value.length} possible conflict${deepResearchEvidenceConflicts.value.length === 1 ? "" : "s"}`;
+}
 function buildAgentWorkspacePlan() {
   flushEditorTextToStore();
   agentPlan.value = buildAgenticWorkflowPlan({
@@ -14695,6 +14717,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     description: "Open source search, report length, and iterative sourced drafting controls.",
     keywords: ["deep research", "research report", "sources", "duckduckgo", "searxng", "tavily", "ollama", "200 pages"],
     run: () => openDeepResearch(commandQuery.value),
+  },
+  {
+    name: "AI: Insert deep research conflict review",
+    group: "AI",
+    description: "Insert a review table for source snippets that appear to disagree.",
+    keywords: ["deep research", "evidence conflict", "source disagreement", "citation review"],
+    run: () => insertDeepResearchConflictReview(),
   },
   { name: "AI: Review and clean pasted text", group: "AI", run: () => openAiPaste() },
   { name: "Open Docs Live", group: "AI", run: () => openDocsLive() },
