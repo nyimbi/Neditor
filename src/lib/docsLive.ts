@@ -730,6 +730,16 @@ export function docsLiveDefaultOutlineMarkdown(documentType: string) {
   return blueprints[type].defaultOutline.map((section) => `- ${section}`).join("\n");
 }
 
+export function shouldReplaceDocsLiveOutlineForTypeChange(input: {
+  currentOutline?: string;
+  previousTypeOutline?: string;
+  autoUpdate?: boolean;
+}) {
+  const currentOutline = (input.currentOutline || "").trim();
+  const previousTypeOutline = (input.previousTypeOutline || "").trim();
+  return Boolean(input.autoUpdate) || !currentOutline || currentOutline === previousTypeOutline;
+}
+
 export function docsLiveWizardProfile(documentType: string): DocsLiveWizardProfile {
   const type = normalizeDocsLiveDocumentType(documentType);
   const blueprint = blueprints[type];

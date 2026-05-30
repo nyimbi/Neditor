@@ -4380,16 +4380,20 @@
             <section class="docs-live-outline-tools">
               <label>
                 Editable outline
-                <textarea v-model="docsLiveOutlineText" rows="12" placeholder="- Executive Summary&#10;- Recommendation&#10;- Next Steps" @input="refreshDocsLiveQuestionnaire"></textarea>
+                <textarea v-model="docsLiveOutlineText" rows="12" placeholder="- Executive Summary&#10;- Recommendation&#10;- Next Steps" @input="handleDocsLiveOutlineInput"></textarea>
               </label>
               <aside class="docs-live-suggested-outline" aria-label="Suggested outline for selected document type">
                 <header>
                   <div>
                     <strong>{{ docsLiveProfile.label }} outline</strong>
-                    <span>Generated from the selected document type.</span>
+                    <span>Generated from the selected document type and refreshed when the type changes.</span>
                   </div>
                   <button type="button" @click="applyDocsLiveSelectedTypeOutline">Use this outline</button>
                 </header>
+                <label class="docs-live-outline-link">
+                  <input v-model="docsLiveAutoUpdateOutline" type="checkbox" />
+                  Keep editable outline linked to document type
+                </label>
                 <textarea :value="docsLiveSelectedTypeOutline" rows="12" readonly aria-label="Selected document type outline"></textarea>
                 <div class="docs-live-outline-actions">
                   <button type="button" @click="loadDocsLiveOutlineFromDocument">Use document outline</button>
@@ -6312,6 +6316,7 @@ import {
   docsLiveWizardProfile,
   normalizeDocsLiveDocumentType,
   removeDocsLivePlaceholder,
+  shouldReplaceDocsLiveOutlineForTypeChange,
   upsertDocsLivePlaceholder,
   type DocsLiveDocumentType,
   type DocsLiveDraft,
@@ -7100,6 +7105,7 @@ const docsLiveWizardSteps: Array<{ id: DocsLiveWizardStepId; label: string; summ
   { id: "draft", label: "Draft", summary: "generate, review, apply" },
 ];
 const docsLiveLastTypeOutlineText = ref(docsLiveDefaultOutlineMarkdown("business-brief"));
+const docsLiveAutoUpdateOutline = ref(true);
 const docsLiveQuestionnaireText = ref(buildDocsLiveQuestionnaire("business-brief"));
 const docsLiveQuestionnaireAnswerText = ref("");
 const docsLiveGeneratedMarkdown = ref("");
@@ -12203,6 +12209,7 @@ function hydrateDocsLiveFromAgentPlan() {
   docsLiveTitle.value = plan.title;
   docsLiveOutlineText.value = plan.suggestedOutline;
   docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  docsLiveAutoUpdateOutline.value = false;
   docsLiveContext.value = [plan.context, plan.sourcePack.markdown ? `\nManaged source pack:\n${plan.sourcePack.markdown}` : ""].filter(Boolean).join("\n");
   docsLivePlaceholderText.value = plan.placeholderText;
   docsLiveQuestionnaireAnswerText.value = plan.contextAnswers
@@ -12223,6 +12230,7 @@ function hydrateDocsLiveFromOutlineVariant(variant: AgenticOutlineVariant) {
   docsLiveTitle.value = `${plan.title} - ${variant.label}`;
   docsLiveOutlineText.value = variant.outline;
   docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  docsLiveAutoUpdateOutline.value = false;
   docsLiveContext.value = [
     plan.context,
     "",
@@ -12274,6 +12282,7 @@ function draftAgentSectionWithDocsLive(section: AgenticSectionWorkItem) {
   docsLiveTitle.value = `${run.plan.title} - ${section.heading}`;
   docsLiveOutlineText.value = `${"  ".repeat(Math.max(0, section.level - 1))}- ${section.heading}`;
   docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  docsLiveAutoUpdateOutline.value = false;
   docsLiveContext.value = [
     run.plan.context,
     "",
@@ -12313,6 +12322,7 @@ function draftAgentSectionHistoryWithDocsLive(item: AgenticSectionDraftHistoryIt
   docsLiveTitle.value = `${run.plan.title} - ${item.sectionHeading}`;
   docsLiveOutlineText.value = `- ${item.sectionHeading}`;
   docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  docsLiveAutoUpdateOutline.value = false;
   docsLiveContext.value = [
     run.plan.context,
     "",
@@ -17504,6 +17514,7 @@ function sendOutlineTemplateToDocsLive(template: DocumentOutlineTemplate) {
   docsLiveTitle.value = template.name;
   docsLiveDocumentType.value = docsLiveTypeForOutlineTemplate(template);
   docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  docsLiveAutoUpdateOutline.value = false;
   docsLiveContext.value = [
     `Selected outline template: ${template.name}`,
     `Category: ${template.category}`,
@@ -17594,6 +17605,7 @@ function openDocsLiveFromOutline() {
   docsLiveOutlineText.value = outlineDraftText.value;
   docsLiveTitle.value = outlineDraftTitle.value || active.value.title.replace(/\.[^.]+$/, "");
   docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  docsLiveAutoUpdateOutline.value = false;
   openDocsLive();
 }
 
@@ -17602,6 +17614,7 @@ function openDocsLiveFromDocumentOutline() {
   docsLiveOutlineText.value = outlinePlanFromMarkdown(active.value.text) || outlineDraftText.value;
   docsLiveTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
   docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  docsLiveAutoUpdateOutline.value = false;
   openDocsLive();
 }
 
@@ -17872,6 +17885,7 @@ function startBusinessDocumentWizard(template: BusinessDocumentTemplate) {
   docsLiveTitle.value = `${template.label} for ${store.businessProfile.defaultClientName || "Client"}`;
   docsLiveOutlineText.value = template.outline.map((item) => `- ${item}`).join("\n");
   docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  docsLiveAutoUpdateOutline.value = false;
   docsLiveContext.value = businessWizardContext(template, store.businessProfile);
   docsLivePlaceholderText.value = businessProfilePlaceholderText(store.businessProfile);
   docsLiveDraftingDepth.value = template.id === "tender" || template.id === "rfp" ? "detailed" : "standard";
@@ -18046,6 +18060,7 @@ function sendRfpResponseToDocsLive() {
   docsLiveTitle.value = `RFP response for ${store.businessProfile.defaultClientName || analysis.source.title || "Client"}`;
   docsLiveOutlineText.value = rfpProposalOutlineBullets(analysis);
   docsLiveLastTypeOutlineText.value = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
+  docsLiveAutoUpdateOutline.value = false;
   docsLiveContext.value = [
     businessWizardContext(businessDocumentTemplates.find((template) => template.id === "rfp-response") || businessDocumentTemplates[0], store.businessProfile),
     "",
@@ -19911,8 +19926,13 @@ function openDocsLive() {
   flushEditorTextToStore();
   if (!docsLiveTitle.value.trim()) docsLiveTitle.value = active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "");
   if (!docsLiveOutlineText.value.trim()) {
-    docsLiveOutlineText.value = outlinePlanFromMarkdown(active.value.text) || outlineDraftText.value;
-    if (!docsLiveOutlineText.value.trim()) applyDocsLiveSelectedTypeOutline();
+    const documentOutline = outlinePlanFromMarkdown(active.value.text);
+    if (documentOutline) {
+      docsLiveOutlineText.value = documentOutline;
+      docsLiveAutoUpdateOutline.value = false;
+    } else {
+      applyDocsLiveSelectedTypeOutline();
+    }
   }
   refreshDocsLiveQuestionnaire();
   docsLiveOpen.value = true;
@@ -19956,15 +19976,24 @@ function refreshDocsLiveQuestionnaire() {
   });
 }
 
+function handleDocsLiveOutlineInput() {
+  docsLiveAutoUpdateOutline.value = false;
+  refreshDocsLiveQuestionnaire();
+}
+
 function handleDocsLiveDocumentTypeChange() {
   const selectedTypeOutline = docsLiveDefaultOutlineMarkdown(docsLiveDocumentType.value);
   const currentOutline = docsLiveOutlineText.value.trim();
   const previousTypeOutline = docsLiveLastTypeOutlineText.value.trim();
-  if (!currentOutline || currentOutline === previousTypeOutline) {
+  if (shouldReplaceDocsLiveOutlineForTypeChange({
+    currentOutline,
+    previousTypeOutline,
+    autoUpdate: docsLiveAutoUpdateOutline.value,
+  })) {
     docsLiveOutlineText.value = selectedTypeOutline;
     store.statusMessage = `Loaded ${docsLiveProfile.value.label.toLowerCase()} outline into Docs Live`;
   } else {
-    store.statusMessage = `${docsLiveProfile.value.label} selected; suggested outline is ready to apply`;
+    store.statusMessage = `${docsLiveProfile.value.label} selected; custom outline preserved and suggested outline is ready to apply`;
   }
   docsLiveLastTypeOutlineText.value = selectedTypeOutline;
   refreshDocsLiveQuestionnaire();
@@ -19973,6 +20002,7 @@ function handleDocsLiveDocumentTypeChange() {
 function applyDocsLiveSelectedTypeOutline() {
   docsLiveOutlineText.value = docsLiveSelectedTypeOutline.value;
   docsLiveLastTypeOutlineText.value = docsLiveSelectedTypeOutline.value;
+  docsLiveAutoUpdateOutline.value = true;
   refreshDocsLiveQuestionnaire();
   store.statusMessage = `Applied ${docsLiveProfile.value.label.toLowerCase()} outline`;
 }
@@ -28189,6 +28219,18 @@ select:hover {
 .docs-live-suggested-outline header span {
   color: #526171;
   font-size: 12px;
+}
+
+.docs-live-outline-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #344054;
+}
+
+.docs-live-outline-link input {
+  margin: 0;
 }
 
 .docs-live-profile-lists,

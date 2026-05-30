@@ -119,6 +119,7 @@ import {
   extractDocsLivePlaceholders,
   normalizeDocsLiveDocumentType,
   removeDocsLivePlaceholder,
+  shouldReplaceDocsLiveOutlineForTypeChange,
   upsertDocsLivePlaceholder,
 } from "../src/lib/docsLive.js";
 import { outlinePlanFromMarkdown, outlinePlanToMarkdown, parseOutlinePlan } from "../src/lib/documentOutline.js";
@@ -3315,6 +3316,14 @@ test("Docs Live textbook and novel wizards plan structure before sequential chap
   ok(novelProfile.decisionPrompts.some((prompt) => prompt.label === "Creative promise"));
   ok(novelProfile.decisionPrompts.some((prompt) => prompt.label === "Genre and shelf"));
   ok(novelProfile.decisionPrompts.some((prompt) => prompt.label === "Point of view and tense"));
+  ok(novelProfile.decisionPrompts.some((prompt) => prompt.label === "Protagonist arc"));
+  const businessBriefOutline = docsLiveDefaultOutlineMarkdown("business-brief");
+  const novelOutline = docsLiveDefaultOutlineMarkdown("novel");
+  ok(!businessBriefOutline.includes("- Plot Outline"));
+  ok(novelOutline.includes("- Plot Outline"));
+  ok(shouldReplaceDocsLiveOutlineForTypeChange({ currentOutline: businessBriefOutline, previousTypeOutline: businessBriefOutline }));
+  ok(shouldReplaceDocsLiveOutlineForTypeChange({ currentOutline: "- Custom Act One", previousTypeOutline: businessBriefOutline, autoUpdate: true }));
+  equal(shouldReplaceDocsLiveOutlineForTypeChange({ currentOutline: "- Custom Act One", previousTypeOutline: businessBriefOutline, autoUpdate: false }), false);
   ok(docsLiveDefaultOutlineMarkdown("movie-script").includes("- Beat Sheet"));
 
   const textbookDraft = buildDocsLiveDraft({
@@ -8812,6 +8821,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("AI-created questionnaire"));
   ok(app.includes('aria-label="AI suggested optimal answers"'));
   ok(app.includes("buildDocsLiveSuggestedAnswers"));
+  ok(app.includes("shouldReplaceDocsLiveOutlineForTypeChange"));
+  ok(app.includes("docsLiveAutoUpdateOutline"));
+  ok(app.includes("Keep editable outline linked to document type"));
+  ok(app.includes("handleDocsLiveOutlineInput"));
   ok(app.includes("suggestion.rationale"));
   ok(app.includes("suggestion.contextSignals"));
   ok(app.includes("Context signals:"));
