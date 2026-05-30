@@ -6646,7 +6646,10 @@
             <p>{{ currentDemoStep?.summary }}</p>
             <small>{{ guidedDemoCompletionSummary }}</small>
           </div>
-          <button type="button" aria-label="Close guided demo" @click="closeGuidedDemo">x</button>
+          <div class="guided-demo-header-actions">
+            <button type="button" @click="openShowcaseDocument">Open showcase document</button>
+            <button type="button" aria-label="Close guided demo" @click="closeGuidedDemo">x</button>
+          </div>
         </header>
         <section class="guided-demo-progress" aria-label="Guided demo progress">
           <div>
@@ -6676,6 +6679,17 @@
             <ul>
               <li v-for="point in currentDemoStep.points" :key="point">{{ point }}</li>
             </ul>
+            <section
+              v-if="currentDemoStep.showcaseFocus || currentDemoStep.evidence?.length"
+              class="guided-demo-showcase-evidence"
+              aria-label="Showcase evidence to inspect"
+            >
+              <h4>Showcase evidence</h4>
+              <p v-if="currentDemoStep.showcaseFocus">{{ currentDemoStep.showcaseFocus }}</p>
+              <ul v-if="currentDemoStep.evidence?.length">
+                <li v-for="item in currentDemoStep.evidence" :key="item">{{ item }}</li>
+              </ul>
+            </section>
             <div class="guided-demo-actions">
               <button type="button" :disabled="guidedDemoStepIndex === 0" @click="previousGuidedDemoStep">Previous</button>
               <button type="button" @click="runGuidedDemoStep(currentDemoStep)">Try this step</button>
@@ -8198,6 +8212,8 @@ interface GuidedDemoStep {
   summary: string;
   detail: string;
   points: string[];
+  showcaseFocus?: string;
+  evidence?: string[];
   run: () => unknown;
 }
 
@@ -10798,6 +10814,21 @@ const startWorkspaceSummary = computed(() =>
 );
 const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
   {
+    id: "showcase",
+    title: "Open the showcase",
+    mode: "Shipped exemplar",
+    summary: "Load the packaged NEditor Capability Showcase before walking through the product.",
+    detail: "The showcase is a real Markdown document included with the app. It contains front matter, tables, equations, images, citations, source vault metadata, includes, comments, AI provenance, layout controls, and export metadata.",
+    points: [
+      "Open examples/showcase/neditor-capability-showcase.md from the packaged distribution.",
+      "Use the preview and outline to inspect a beautiful rendered business document.",
+      "Use this file as the canonical demo, screenshot, QA, and release evidence source.",
+    ],
+    showcaseFocus: "Start here so the demo proves real document creation quality instead of showing an empty editor or placeholder UI.",
+    evidence: ["Rendered heading hierarchy", "Business table and KPI data", "Equation and Mermaid/PlantUML examples", "Citations, source vault metadata, comments, includes, and release evidence"],
+    run: () => void openShowcaseDocument(),
+  },
+  {
     id: "ai-create",
     title: "Create with AI",
     mode: "Agentic creation",
@@ -10808,6 +10839,8 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Describe the business goal in speech or text.",
       "Add placeholders such as client, audience, owner, deadline, and required evidence.",
     ],
+    showcaseFocus: "Use the showcase front matter, placeholders, and AI provenance sections as the model for a governed first draft.",
+    evidence: ["Document purpose and audience metadata", "AI-assisted marker block", "Review handoff and release metadata"],
     run: () => startAiDocumentCreation(),
   },
   {
@@ -10821,6 +10854,8 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Inspect missing inputs, reviewer agents, and section work queue before applying output.",
       "Build a provider package when an approved model should continue the workflow.",
     ],
+    showcaseFocus: "Point playbooks at the showcase to see how a complex document can be routed through creation, review, citation, and export workflows.",
+    evidence: ["Capability map table", "Governance and review sections", "Distribution-ready metadata"],
     run: () => openAgentWorkspace(agenticWorkflowPlaybooks[0]?.instruction || ""),
   },
   {
@@ -10834,6 +10869,8 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Use Run task to jump to Docs Live, Outline, Review, AI Paste, or Export readiness.",
       "Use Insert brief or Copy brief when a task should become a documented handoff.",
     ],
+    showcaseFocus: "Use the showcase change notes, comments, and release log to explain why lifecycle tasks need owners and evidence.",
+    evidence: ["Open comment marker", "Change note marker", "Release evidence table"],
     run: () => {
       openAgentWorkspace(agenticWorkflowPlaybooks[0]?.instruction || "");
       generateAgentWorkspaceRun();
@@ -10850,6 +10887,8 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Inspect the request package before any direct provider execution.",
       "Apply provider output only after previewing the response and preserving needs-review provenance.",
     ],
+    showcaseFocus: "Use the showcase AI source and citation sections to demonstrate why provider responses remain review material until accepted.",
+    evidence: ["AI source fence", "Citation TODO workflow", "Human review markers"],
     run: () => {
       openAgentWorkspace(agenticWorkflowPlaybooks.find((playbook) => playbook.id === "publish-to-blog-and-substack")?.instruction || "");
       generateAgentWorkspaceRun();
@@ -10867,6 +10906,8 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Create or append the planned document skeleton.",
       "Switch to Outline mode to CRUD headings without body text in the way.",
     ],
+    showcaseFocus: "Open the showcase outline to show the document map, section hierarchy, includes, figures, tables, equations, and TODOs in context.",
+    evidence: ["Chapters and sections", "Included child documents", "Figure/table/equation inventory"],
     run: () => planDocumentOutline(),
   },
   {
@@ -10880,6 +10921,8 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Generate the draft after context and questionnaire answers are ready.",
       "Review section QA notes before applying the draft.",
     ],
+    showcaseFocus: "Use the showcase section structure to demonstrate section-by-section drafting and review gates.",
+    evidence: ["Section placeholders", "QA and humanization notes", "Reviewer handoff area"],
     run: () => openDocsLiveFromDocumentOutline(),
   },
   {
@@ -10893,6 +10936,8 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Duplicate useful examples into custom templates.",
       "Run transforms after inserting calculations or diagrams.",
     ],
+    showcaseFocus: "Use the showcase KPI table, calculation sections, and diagram fences as concrete templates users can adapt.",
+    evidence: ["Markdown table", "Calculation/code fences", "Diagram examples"],
     run: () => openTransformTemplates(),
   },
   {
@@ -10906,6 +10951,8 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Add comments and change notes.",
       "Mark AI sources and sections as human reviewed after inspection.",
     ],
+    showcaseFocus: "Use the showcase review comments, change notes, citations, and AI provenance to teach governance before export.",
+    evidence: ["Open reviewer comment", "AI-assisted marker", "Citation source library"],
     run: () => {
       store.sidebar = "review";
       openAiPaste();
@@ -10922,6 +10969,8 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       "Run Prepare for export before generating files.",
       "Save export profiles for repeated client or publishing workflows.",
     ],
+    showcaseFocus: "Use the showcase as the release-demo source for HTML/PDF/DOCX/PPTX/LaTeX/Google Docs/EPUB visual QA and release evidence.",
+    evidence: ["Export metadata front matter", "Cover/page/layout controls", "Release evidence and bibliography"],
     run: () => {
       store.sidebar = "exports";
       void prepareForExport();
@@ -10934,7 +10983,7 @@ const guidedDemoCompletionPercent = computed(() =>
   guidedDemoSteps.value.length ? Math.round((guidedDemoCompletedCount.value / guidedDemoSteps.value.length) * 100) : 0,
 );
 const guidedDemoCompletionSummary = computed(() =>
-  `${guidedDemoCompletedCount.value}/${guidedDemoSteps.value.length} demo capabilities completed: AI creation, playbooks, lifecycle tasks, provider governance, outline, composition, templates, review, and export.`,
+  `${guidedDemoCompletedCount.value}/${guidedDemoSteps.value.length} demo capabilities completed: showcase document, AI creation, playbooks, lifecycle tasks, provider governance, outline, composition, templates, review, and export.`,
 );
 function businessTemplateById(id: BusinessDocumentTemplate["id"]) {
   return businessDocumentTemplates.find((template) => template.id === id) || businessDocumentTemplates[0];
@@ -11430,6 +11479,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "start-workspace", label: "Start Workspace", help: "Open the onboarding cockpit for setup, identity, wizards, Docs Live, templates, export, and CLI deployment.", run: () => openStartWorkspace() },
           { id: "help-center", label: "NEditor Help Center", help: "Open searchable guidance.", run: () => openHelp() },
           { id: "demo", label: "Guided Demo", help: "Walk through NEditor capabilities.", run: () => openGuidedDemo() },
+          { id: "showcase", label: "Open Capability Showcase", help: "Open the packaged showcase document with tables, equations, images, citations, includes, provenance, and export metadata.", run: () => void openShowcaseDocument() },
           { id: "getting-started", label: "Getting Started", help: "Learn the workbench basics.", run: () => openHelp("getting-started") },
           { id: "docs-live", label: "Docs Live", help: "Learn AI-first drafting.", run: () => openHelp("docs-live") },
           { id: "export-help", label: "Export and Publishing", help: "Learn export targets and handoffs.", run: () => openHelp("export-publishing") },
@@ -14110,7 +14160,7 @@ function runAgenticStep(step: AgenticWorkflowStep) {
       break;
   }
 }
-function openGuidedDemo(stepId = "ai-create") {
+function openGuidedDemo(stepId = "showcase") {
   const stepIndex = guidedDemoSteps.value.findIndex((step) => step.id === stepId);
   guidedDemoStepIndex.value = stepIndex >= 0 ? stepIndex : 0;
   guidedDemoOpen.value = true;
@@ -14118,6 +14168,22 @@ function openGuidedDemo(stepId = "ai-create") {
 }
 function closeGuidedDemo() {
   guidedDemoOpen.value = false;
+}
+async function openShowcaseDocument() {
+  try {
+    const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_showcase_document");
+    await store.openPath(response.path);
+    store.mode = "split";
+    store.sidebar = "outline";
+    closeGuidedDemo();
+    store.statusMessage = "Opened the packaged NEditor capability showcase";
+  } catch (error) {
+    store.newDocumentFromText(showcaseFallbackMarkdown(error), "NEditor capability showcase");
+    store.mode = "split";
+    store.sidebar = "outline";
+    closeGuidedDemo();
+    store.statusMessage = "Created fallback showcase copy; packaged showcase file was not reachable";
+  }
 }
 function selectGuidedDemoStep(index: number) {
   guidedDemoStepIndex.value = Math.min(Math.max(index, 0), Math.max(0, guidedDemoSteps.value.length - 1));
@@ -14142,6 +14208,43 @@ function resetGuidedDemoProgress() {
 function guidedDemoTableCell(value: string) {
   return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
 }
+function showcaseFallbackMarkdown(error: unknown) {
+  return [
+    "---",
+    "title: NEditor Capability Showcase",
+    "status: demo",
+    "documentType: product-demo",
+    "audience: New NEditor users",
+    "toc: true",
+    "---",
+    "",
+    "# NEditor Capability Showcase",
+    "",
+    "> The packaged showcase document could not be opened automatically. This fallback still gives the guided demo a concrete document; reinstall NEditor or open `examples/showcase/neditor-capability-showcase.md` to inspect the complete shipped exemplar.",
+    "",
+    `Diagnostic: ${String(error || "showcase file unavailable").replace(/\s+/g, " ").slice(0, 240)}`,
+    "",
+    "## What To Inspect",
+    "",
+    "| Capability | Evidence to check |",
+    "| --- | --- |",
+    "| AI-first drafting | Docs Live wizard, placeholders, section queue, and review packet |",
+    "| Beautiful business documents | Tables, equations, figures, callouts, covers, and layout controls |",
+    "| Evidence governance | Citations, downloaded sources, comments, change notes, and AI provenance |",
+    "| Distribution | Export readiness, visual QA, release evidence, and target-specific handoffs |",
+    "",
+    "## Equation",
+    "",
+    "$$ROI = \\frac{Net\\ Benefit - Cost}{Cost}$$",
+    "",
+    "## Review Checklist",
+    "",
+    "- [ ] Open the complete packaged showcase document.",
+    "- [ ] Walk through the guided demo steps against real rendered content.",
+    "- [ ] Run export readiness before distributing screenshots or artifacts.",
+    "",
+  ].join("\n");
+}
 async function runGuidedDemoStep(step: GuidedDemoStep) {
   markGuidedDemoStepComplete(step.id);
   closeGuidedDemo();
@@ -14156,15 +14259,17 @@ function guidedDemoChecklistMarkdown() {
     `Generated: ${generatedAt}`,
     `Progress: ${guidedDemoCompletedCount.value}/${guidedDemoSteps.value.length} (${guidedDemoCompletionPercent.value}%)`,
     "",
-    "| Done | Capability | Surface | Evidence to inspect |",
+    "| Done | Capability | Surface | Showcase evidence to inspect |",
     "| --- | --- | --- | --- |",
     ...guidedDemoSteps.value.map((step) => {
       const done = guidedDemoStepIsComplete(step.id) ? "x" : " ";
-      return `| [${done}] | ${guidedDemoTableCell(step.title)} | ${guidedDemoTableCell(step.mode)} | ${guidedDemoTableCell(step.points.join("; "))} |`;
+      const evidence = step.evidence?.length ? step.evidence.join("; ") : step.points.join("; ");
+      return `| [${done}] | ${guidedDemoTableCell(step.title)} | ${guidedDemoTableCell(step.mode)} | ${guidedDemoTableCell(evidence)} |`;
     }),
     "",
     "### Trainer Notes",
     "",
+    "- Open the packaged NEditor Capability Showcase before starting the tour.",
     "- Complete every step before onboarding a team to AI-first document creation.",
     "- Confirm provider outputs remain needs-review until a human accepts them.",
     "- Confirm export readiness is run before distributing external deliverables.",
@@ -14325,6 +14430,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Insert Start Workspace checklist", group: "Help", description: "Insert the current onboarding and readiness checklist into the document.", keywords: ["start", "checklist", "readiness", "handoff"], run: () => insertStartWorkspaceChecklist() },
   { name: "Open Help Center", group: "Help", run: () => openHelp() },
   { name: "Start guided demo", group: "Help", run: () => openGuidedDemo() },
+  {
+    name: "Open capability showcase",
+    group: "Help",
+    description: "Open the packaged showcase document with real tables, equations, images, citations, includes, provenance, and export metadata.",
+    keywords: ["showcase", "demo document", "example document", "capability showcase", "screenshots"],
+    run: () => void openShowcaseDocument(),
+  },
   { name: "Help: AI-first composition", group: "Help", run: () => openHelp("ai-first-composition") },
   { name: "Help: Getting started", group: "Help", run: () => openHelp("getting-started") },
   { name: "Help: Docs Live", group: "Help", run: () => openHelp("docs-live") },
@@ -15095,6 +15207,9 @@ async function runNativeMenuCommand(command: string) {
       break;
     case "neditor-guided-demo":
       openGuidedDemo();
+      break;
+    case "neditor-open-showcase":
+      void openShowcaseDocument();
       break;
     case "neditor-help-getting-started":
       openHelp("getting-started");
@@ -28219,6 +28334,13 @@ select:hover {
   align-items: start;
 }
 
+.guided-demo-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .guided-demo-modal header p {
   margin: 4px 0 0;
   color: #526171;
@@ -28328,6 +28450,26 @@ select:hover {
   display: grid;
   gap: 6px;
   padding-left: 18px;
+}
+
+.guided-demo-showcase-evidence {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #c7d5e5;
+  border-left: 3px solid #1f6f8b;
+  background: #f6fbff;
+}
+
+.guided-demo-showcase-evidence h4,
+.guided-demo-showcase-evidence p,
+.guided-demo-showcase-evidence ul {
+  margin: 0;
+}
+
+.guided-demo-showcase-evidence h4 {
+  font-size: 12px;
+  text-transform: uppercase;
 }
 
 .guided-demo-actions {

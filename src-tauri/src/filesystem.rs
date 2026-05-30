@@ -2,6 +2,9 @@ use crate::{path_to_string, sha256_hex};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, process::Command};
+use tauri::{path::BaseDirectory, AppHandle, Manager};
+
+const SHOWCASE_DOCUMENT_RELATIVE_PATH: &str = "examples/showcase/neditor-capability-showcase.md";
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SaveFileRequest {
@@ -76,6 +79,16 @@ pub(crate) fn read_file(path: String) -> Result<FileResponse, String> {
 #[tauri::command]
 pub(crate) fn open_file(path: String) -> Result<FileResponse, String> {
     read_file(path)
+}
+
+#[tauri::command]
+pub(crate) fn read_showcase_document(app: AppHandle) -> Result<FileResponse, String> {
+    for candidate in showcase_document_candidate_paths(&app) {
+        if candidate.is_file() {
+            return read_file(path_to_string(&candidate));
+        }
+    }
+    Err("The packaged showcase document could not be found. Reinstall NEditor or open examples/showcase/neditor-capability-showcase.md from the source distribution.".to_string())
 }
 
 #[tauri::command]
@@ -284,6 +297,26 @@ fn data_source_relative_path(base: &std::path::Path, output: &std::path::Path) -
         .ok()
         .map(path_to_string)
         .unwrap_or_else(|| path_to_string(output))
+}
+
+fn showcase_document_candidate_paths(app: &AppHandle) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(resource) = app
+        .path()
+        .resolve(SHOWCASE_DOCUMENT_RELATIVE_PATH, BaseDirectory::Resource)
+    {
+        candidates.push(resource);
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join(SHOWCASE_DOCUMENT_RELATIVE_PATH));
+        candidates.push(cwd.join("..").join(SHOWCASE_DOCUMENT_RELATIVE_PATH));
+    }
+    candidates.push(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(SHOWCASE_DOCUMENT_RELATIVE_PATH),
+    );
+    candidates
 }
 
 pub(crate) fn reveal_command_for_path(path: &str) -> Result<RevealCommand, String> {

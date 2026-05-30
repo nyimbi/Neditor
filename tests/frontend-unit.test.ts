@@ -8258,6 +8258,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const frontMatterManagers = readFileSync("src/lib/frontMatterManagers.ts", "utf8");
   const workspacePersistenceState = readFileSync("src/lib/workspacePersistenceState.ts", "utf8");
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
+  const tauriFilesystem = readFileSync("src-tauri/src/filesystem.rs", "utf8");
   const tauriConf = readFileSync("src-tauri/tauri.conf.json", "utf8");
   const vimKeybindings = readFileSync("src/lib/vimKeybindings.ts", "utf8");
   const emacsKeybindings = readFileSync("src/lib/emacsKeybindings.ts", "utf8");
@@ -8581,6 +8582,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(store.includes(`this.gitHistory = [];
           this.gitDiffText = "";`));
   ok(app.includes("NEditor Guided Demo"));
+  ok(app.includes("Open showcase document"));
+  ok(app.includes("Showcase evidence"));
+  ok(app.includes("read_showcase_document"));
+  ok(app.includes("examples/showcase/neditor-capability-showcase.md"));
+  ok(app.includes("packaged NEditor Capability Showcase"));
+  ok(app.includes('function openGuidedDemo(stepId = "showcase")'));
   ok(app.includes("guidedDemoSteps"));
   ok(app.includes("guidedDemoCompletionSummary"));
   ok(app.includes("guidedDemoCompletedCount"));
@@ -8592,6 +8599,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Copy checklist"));
   ok(app.includes("guidedDemoChecklistMarkdown"));
   ok(app.includes("## NEditor Guided Demo Checklist"));
+  ok(app.includes("showcase document, AI creation, playbooks"));
+  ok(app.includes("Use this file as the canonical demo, screenshot, QA, and release evidence source."));
+  ok(app.includes("Open capability showcase"));
   ok(app.includes("AI Agent Workspace"));
   ok(app.includes('aria-label="Docs Live creation wizard"'));
   ok(app.includes("docsLiveWizardSteps"));
@@ -9548,7 +9558,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes("download_tts_model"));
   ok(tauriLib.includes("list_ollama_models"));
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
-  ok(tauriLib.includes('"neditor-start-workspace", "Start Workspace"'));
+  ok(tauriLib.includes('"neditor-start-workspace"'));
+  ok(tauriLib.includes('"Start Workspace"'));
   ok(tauriLib.includes('"neditor-open-deep-research",'));
   ok(tauriLib.includes('"neditor-open-agent-workspace",'));
   ok(tauriLib.includes('"neditor-ai-create-document",'));
@@ -9557,6 +9568,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes('"neditor-wizard-lesson-plan",'));
   ok(tauriLib.includes('"neditor-wizard-movie-script",'));
   ok(tauriLib.includes('"neditor-guided-demo", "Guided Demo"'));
+  ok(tauriLib.includes('"neditor-open-showcase",'));
+  ok(tauriLib.includes("read_showcase_document"));
+  ok(tauriFilesystem.includes("neditor-capability-showcase.md"));
   ok(tauriLib.includes('"neditor-help-exports",'));
   ok(tauriConf.includes("connect-src 'self' ipc: https:"));
   ok(tauriLib.includes('"neditor-mode-outline", "Outline Mode"'));
@@ -9576,6 +9590,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('case "neditor-wizard-technical-textbook"'));
   ok(app.includes('case "neditor-ai-create-document"'));
   ok(app.includes('case "neditor-guided-demo"'));
+  ok(app.includes('case "neditor-open-showcase"'));
   ok(tauriLib.includes('app.emit("neditor-menu-command", id)'));
   ok(app.includes("commandToolbarRows"));
   ok(app.includes("command-toolbar-row"));

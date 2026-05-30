@@ -87,8 +87,8 @@ use export_commands::{export_document, prepare_for_export, prepare_google_docs_l
 #[cfg(test)]
 use export_commands::{ExportRequest, GoogleDocsLiveImportRequest, PrepareExportRequest};
 use filesystem::{
-    copy_data_source_file, duplicate_file, file_metadata, open_file, read_file, rename_file,
-    reveal_path, save_file, save_file_as, FileResponse,
+    copy_data_source_file, duplicate_file, file_metadata, open_file, read_file,
+    read_showcase_document, rename_file, reveal_path, save_file, save_file_as, FileResponse,
 };
 #[cfg(test)]
 use filesystem::{
@@ -163,6 +163,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             open_file,
             read_file,
+            read_showcase_document,
             save_file_as,
             save_file,
             watch_file,
@@ -547,9 +548,18 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .build()?;
 
     let help_menu = SubmenuBuilder::new(app, "Help")
-        .item(&menu_item(app, "neditor-start-workspace", "Start Workspace")?)
+        .item(&menu_item(
+            app,
+            "neditor-start-workspace",
+            "Start Workspace",
+        )?)
         .item(&menu_item(app, "neditor-open-help", "NEditor Help Center")?)
         .item(&menu_item(app, "neditor-guided-demo", "Guided Demo")?)
+        .item(&menu_item(
+            app,
+            "neditor-open-showcase",
+            "Open Capability Showcase",
+        )?)
         .separator()
         .item(&menu_item(
             app,

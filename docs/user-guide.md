@@ -234,12 +234,14 @@ so a provider response cannot enter the document as approved final copy. The
 saved run history stores that wrapped review draft, so later append/copy actions
 reproduce the same governed material that was applied.
 
-Open **Help > Guided Demo** or the **AI Governance** help topic when onboarding
-new users to this flow. The guided demo now includes dedicated steps for the
-Lifecycle Task Board and provider handoff governance, so business users can
-practice routing tasks, inserting briefs, copying handoffs, building provider
-packages, and applying provider output as review material before using those
-controls on a live document. Trainers can mark steps complete, reset locally
+Open **Help > Open Capability Showcase** before onboarding new users. NEditor
+loads the packaged showcase document with real headings, tables, equations,
+images, citations, includes, AI provenance, review comments, release metadata,
+and export settings. Then open **Help > Guided Demo**. Each demo step now points
+to evidence in the showcase so business users can practice routing tasks,
+inserting briefs, copying handoffs, building provider packages, governing AI
+output, reviewing citations, and preparing exports against a real document
+instead of a blank page. Trainers can mark steps complete, reset locally
 persisted progress, or insert/copy the generated Markdown checklist as
 onboarding evidence.
 

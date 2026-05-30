@@ -124,6 +124,11 @@ capabilities:
 - [Research report](examples/research-report.md)
 - [Proposal budget](examples/proposal-budget.md)
 
+Inside the app, choose **Help -> Open Capability Showcase** and then
+**Help -> Guided Demo** to walk through the shipped showcase with real tables,
+equations, images, citations, AI provenance, review evidence, and export
+metadata.
+
 ## Release Status
 
 NEditor has substantial local implementation and verification coverage, but
