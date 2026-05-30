@@ -131,7 +131,11 @@ import {
   resolveCitationTodo,
 } from "../src/lib/citationTodoWorkflow.js";
 import { countCitationTodoMarkers } from "../src/lib/citationTodoPatterns.js";
-import { citationSourceLibraryAuditMarkdown } from "../src/lib/citationSourceLibrary.js";
+import {
+  citationSourceLibraryAuditMarkdown,
+  claimEvidenceMatrixMarkdown,
+  matchClaimsToCitationSources,
+} from "../src/lib/citationSourceLibrary.js";
 import { commandSearchText, compactCommandKeywords, joinCommandDescription } from "../src/lib/commandPalette.js";
 import { saveAiProviderDefaultsState, saveBusinessProfileState, saveTtsPreferencesState } from "../src/lib/configurationProfiles.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
@@ -6670,6 +6674,56 @@ test("citation source library audit captures evidence metadata", () => {
   ok(audit.includes("government source domain; downloadable PDF source"));
 });
 
+test("claim evidence matrix matches extracted claims to saved sources", () => {
+  const claims = [
+    {
+      kind: "number",
+      sourceLine: 8,
+      text: "AI procurement controls reduced audit risk by 24% in 2026.",
+      reason: "Number, currency, percentage, or multiplier needs source verification.",
+    },
+    {
+      kind: "claim",
+      sourceLine: 12,
+      text: "Customer workshops improved adoption because teams received bilingual support.",
+      reason: "Causal, performance, or risk claim needs evidence review.",
+    },
+  ];
+  const sources = [
+    {
+      citation_key: "controls2026",
+      title: "AI procurement controls audit evidence",
+      url: "https://agency.gov/controls.pdf",
+      snippet: "Audit evidence shows controls reduced risk and improved procurement compliance.",
+      relative_path: "proposal.neditor-sources/controls.pdf",
+      sha256: "abcdef",
+      bytes: 2048,
+      fit_score: 91,
+      fit_label: "strong",
+      file_exists: true,
+      hash_matches: true,
+    },
+    {
+      citation_key: "workshops2026",
+      title: "Bilingual customer adoption workshops",
+      url: "https://agency.gov/workshops.pdf",
+      snippet: "Customer workshops improved adoption through French and English support.",
+      relative_path: "proposal.neditor-sources/workshops.pdf",
+      sha256: "123456",
+      bytes: 1024,
+    },
+  ];
+  const matches = matchClaimsToCitationSources(claims, sources);
+  ok(matches.length >= 2);
+  equal(matches[0].source.citation_key, "controls2026");
+  ok(matches[0].reasons.some((reason) => reason.includes("title")));
+  const matrix = claimEvidenceMatrixMarkdown(claims, sources);
+  ok(matrix.includes("## Claim Evidence Matrix"));
+  ok(matrix.includes("[@controls2026]"));
+  ok(matrix.includes("proposal.neditor-sources/controls.pdf"));
+  ok(matrix.includes("Review the source and add [@controls2026] if it supports the claim."));
+});
+
 test("AI provider defaults normalize non-secret setup preferences", () => {
   deepEqual(
     normalizeAiProviderDefaults({
@@ -8850,6 +8904,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("reviewEvidenceRun"));
   ok(app.includes("refreshReviewEvidenceSnapshot"));
   ok(app.includes("insertReviewEvidenceAudit"));
+  ok(app.includes("insertClaimEvidenceMatrix"));
+  ok(app.includes("Insert claim-source matrix"));
+  ok(app.includes("activeClaimSourceMatches"));
   ok(app.includes("claim inventory, approval metadata gate"));
   ok(app.includes("coverBuilderDraft"));
   ok(app.includes("coverBuilderEffective"));

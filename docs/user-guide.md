@@ -516,6 +516,10 @@ Research and business documents can keep reference metadata near the source.
   current document. It ranks saved sources by title, snippet, path, provider
   metadata, and readable local file content without sending a search request to
   the web.
+- In **Review**, refresh **Evidence and approval review** to extract candidate
+  claims, then use **Insert claim-source matrix** to map those claims to saved
+  source-library citations. The matrix shows match scores, reasons, local file
+  paths, and review actions before you accept a citation.
 - Use **Insert conflict review** in Source Search & Deep Research to add a
   source-disagreement table before accepting contested findings or exporting a
   research report.

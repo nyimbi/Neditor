@@ -3263,11 +3263,13 @@
             <p>Surface claims, missing citations, unresolved reviewer comments, approval metadata, and specialist reviewer actions before export.</p>
             <div class="release-readiness-actions">
               <button type="button" :disabled="!activeReviewEvidenceRun" @click="insertReviewEvidenceAudit">Insert evidence audit</button>
+              <button type="button" :disabled="!activeReviewEvidenceRun" @click="insertClaimEvidenceMatrix">Insert claim-source matrix</button>
               <button type="button" @click="openAgentWorkspace('Review this document for claim inventory, citations, approval metadata, reviewer objections, and export release blockers.')">Open agent workspace</button>
             </div>
             <template v-if="activeReviewEvidenceRun">
               <section class="review-evidence-metrics" aria-label="Evidence review metrics">
                 <span><strong>{{ activeReviewEvidenceRun.documentEvidence.claimInventory.length }}</strong> claims</span>
+                <span><strong>{{ activeClaimSourceMatches.length }}</strong> source matches</span>
                 <span><strong>{{ activeReviewEvidenceRun.documentEvidence.citationTodos.length }}</strong> citation TODOs</span>
                 <span><strong>{{ activeReviewEvidenceRun.documentEvidence.reviewCommentResolutions.length }}</strong> comments</span>
                 <span><strong>{{ activeReviewEvidenceRun.approvalGate.blockers.length }}</strong> approval blockers</span>
@@ -3283,6 +3285,10 @@
                   <strong>Line {{ claim.sourceLine }} | {{ claim.kind }}</strong>
                   <p>{{ claim.text }}</p>
                   <small>{{ claim.reason }}</small>
+                  <small v-if="activeClaimSourceMatchByLine.get(claim.sourceLine)">
+                    Suggested source: @{{ activeClaimSourceMatchByLine.get(claim.sourceLine)?.source.citation_key }}
+                    | {{ activeClaimSourceMatchByLine.get(claim.sourceLine)?.reasons.join("; ") }}
+                  </small>
                 </article>
                 <p v-if="!activeReviewEvidenceRun.documentEvidence.claimInventory.length" class="sidebar-hint">No candidate claims detected in the current snapshot.</p>
               </details>
@@ -7281,7 +7287,12 @@ import {
   resolveCitationTodo,
   type CitationTodoItem,
 } from "./lib/citationTodoWorkflow";
-import { citationSourceLibraryAuditMarkdown, type CitationSourceAuditItem } from "./lib/citationSourceLibrary";
+import {
+  citationSourceLibraryAuditMarkdown,
+  claimEvidenceMatrixMarkdown,
+  matchClaimsToCitationSources,
+  type CitationSourceAuditItem,
+} from "./lib/citationSourceLibrary";
 import { createDebouncedTextCommit } from "./lib/debounce";
 import {
   blankDatabaseProfile,
@@ -9108,12 +9119,23 @@ const latestAgentRunHistory = computed(() => store.agentRunHistory[0] || null);
 const latestDocsLiveDraftHistory = computed(() => store.docsLiveDraftHistory[0] || null);
 const activeAgentControlCenter = computed(() => agentRun.value?.controlCenter || latestAgentRunHistory.value?.controlCenter || null);
 const activeReviewEvidenceRun = computed(() => reviewEvidenceRun.value || agentRun.value || null);
+const activeClaimSourceMatches = computed(() =>
+  matchClaimsToCitationSources(activeReviewEvidenceRun.value?.documentEvidence.claimInventory || [], citationSourceLibrary.value),
+);
+const activeClaimSourceMatchByLine = computed(() => {
+  const byLine = new Map<number, ReturnType<typeof matchClaimsToCitationSources>[number]>();
+  for (const match of activeClaimSourceMatches.value) {
+    if (!byLine.has(match.claim.sourceLine)) byLine.set(match.claim.sourceLine, match);
+  }
+  return byLine;
+});
 const reviewEvidenceSnapshotSummary = computed(() => {
   const run = activeReviewEvidenceRun.value;
   if (!run) return "No evidence review snapshot yet.";
   const evidence = run.documentEvidence;
   return [
     `${evidence.claimInventory.length} claims`,
+    `${activeClaimSourceMatches.value.length} source matches`,
     `${evidence.citationTodos.length} citation TODOs`,
     `${evidence.reviewCommentResolutions.length} unresolved comments`,
     `${run.approvalGate.blockers.length} approval blockers`,
@@ -11753,6 +11775,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "comment", label: "Insert Review Comment", help: "Add an unresolved review comment marker.", run: () => insertBlock(commentSnippet) },
           { id: "ai-source", label: "Insert AI Source", help: "Add AI provenance metadata.", run: () => insertBlock(aiSnippet) },
           { id: "citation-audit", label: "Insert Citation TODO Audit", help: "Insert open citation TODOs.", run: () => insertBlock(citationTodoAuditMarkdown(citationTodoItems.value)) },
+          { id: "claim-source-matrix", label: "Insert Claim-Source Matrix", help: "Match detected claims to saved source-library evidence for citation review.", disabled: !activeReviewEvidenceRun.value, run: () => insertClaimEvidenceMatrix() },
           { id: "source-library-audit", label: "Insert Source Library Audit", help: "Insert saved source evidence, fit scores, hashes, and local paths.", disabled: !citationSourceLibrary.value.length, run: () => insertCitationSourceLibraryAudit() },
           { id: "automation-audit", label: "Insert Agent Automation Audit", help: "Append agent automation evidence if a run exists.", disabled: !agentRun.value, run: () => insertAgentAutomationAudit() },
         ],
@@ -14927,6 +14950,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Insert accessibility QA report", group: "Quality", description: "Insert accessibility QA status and manual screen-reader review actions.", keywords: ["accessibility", "screen reader", "a11y", "voiceover", "qa report"], run: () => insertAccessibilityQaReport() },
   { name: "Refresh evidence and approval review", group: "Quality", description: "Build a claim inventory, approval metadata gate, unresolved comment queue, and reviewer-agent action list.", keywords: ["claim inventory", "evidence", "approval gate", "citation", "reviewer"], run: () => refreshReviewEvidenceSnapshot() },
   { name: "Insert evidence and approval audit", group: "Quality", description: "Insert the current claim inventory and approval gate review as Markdown.", keywords: ["evidence audit", "approval audit", "claim inventory"], run: () => insertReviewEvidenceAudit() },
+  { name: "Insert claim-source evidence matrix", group: "Quality", description: "Match extracted claims to saved source-library citations and insert a review matrix.", keywords: ["claim source matrix", "claim evidence", "source library", "citation"], run: () => insertClaimEvidenceMatrix() },
   { name: "Improve document with agent", group: "Quality", description: "Open an AI agent workflow seeded with current QA findings.", keywords: ["improve", "humanize", "quality", "agent"], run: () => openQualityAgent() },
   { name: "Prepare release metadata", group: "Review", run: () => applyReleaseMetadataScaffold() },
   { name: "Insert release readiness audit", group: "Review", run: () => insertReleaseReadinessAudit() },
@@ -21241,6 +21265,7 @@ function reviewEvidenceAuditMarkdown() {
   const run = activeReviewEvidenceRun.value;
   if (!run) return "";
   const evidence = run.documentEvidence;
+  const claimSourceMatrix = claimEvidenceMatrixMarkdown(evidence.claimInventory, citationSourceLibrary.value);
   const claimRows = evidence.claimInventory.length
     ? evidence.claimInventory.map(
         (claim) =>
@@ -21268,6 +21293,8 @@ function reviewEvidenceAuditMarkdown() {
     "| --- | --- | --- | --- |",
     ...claimRows,
     "",
+    claimSourceMatrix.trim(),
+    "",
     "### Approval Metadata Gate",
     "",
     "| Field | Status | Value | Guidance |",
@@ -21294,6 +21321,19 @@ function insertReviewEvidenceAudit() {
   store.updateText(editorView?.state.doc.toString() || active.value.text);
   store.sidebar = "review";
   store.statusMessage = "Inserted evidence and approval review audit";
+}
+
+function insertClaimEvidenceMatrix() {
+  const run = activeReviewEvidenceRun.value;
+  if (!run) {
+    refreshReviewEvidenceSnapshot();
+    return;
+  }
+  flushEditorTextToStore();
+  insertBlock(claimEvidenceMatrixMarkdown(run.documentEvidence.claimInventory, citationSourceLibrary.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = `Inserted claim-source evidence matrix with ${activeClaimSourceMatches.value.length} suggested match${activeClaimSourceMatches.value.length === 1 ? "" : "es"}`;
 }
 
 function qualityStepAssistanceBlock(item: QualityStepAssistance) {
