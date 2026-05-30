@@ -8640,7 +8640,8 @@ fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool
     [
         "google docs",
         "homebrew",
-        "sign",
+        "signed",
+        "signing",
         "notar",
         "windows",
         "linux",

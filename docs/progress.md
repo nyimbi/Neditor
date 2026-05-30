@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `ddf4b71 Make export
-  profiles repeatable from ned`
+- Latest inspected committed baseline before this update: `8be5602 Make business
+  profiles carry reusable credentials`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,23 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Improvement Audit Design Classifier Fix
+
+The 100-improvement audit no longer treats the substring `sign` inside
+`design` or `designer` as evidence that a feature requires external signing or
+notarization proof. That bug was keeping already evidenced local UI
+capabilities, including page design presets and the chart designer, in the
+external/manual lane. The audit now keeps real signed/notarized release work in
+the external lane while allowing local page-design and chart-design features to
+be counted from implementation evidence.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 34 CLI tests passed and the debug `ned` binary rebuilt; regression assertions now require page design presets and chart designer to be implementation-evidenced while Homebrew release signing remains partial/external. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after tightening the audit classifier. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 70/100 implementation-evidenced items and 30 partial/external-proof items. Items 63 Page design presets and 67 Chart designer are implementation-evidenced; item 98 Homebrew release path remains external-proof gated. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Rich Reusable Business Profile
 

@@ -3420,6 +3420,20 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         .as_array()
         .expect("improvement items")
         .iter()
+        .any(|item| item["number"] == 63
+            && item["title"] == "Page design presets"
+            && item["status"] == "implemented-evidence-present"));
+    assert!(report["items"]
+        .as_array()
+        .expect("improvement items")
+        .iter()
+        .any(|item| item["number"] == 67
+            && item["title"] == "Chart designer"
+            && item["status"] == "implemented-evidence-present"));
+    assert!(report["items"]
+        .as_array()
+        .expect("improvement items")
+        .iter()
         .any(|item| item["number"] == 80
             && item["title"] == "Export profiles"
             && item["status"] == "implemented-evidence-present"));
@@ -3428,6 +3442,13 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         .expect("improvement items")
         .iter()
         .any(|item| item["number"] == 99 && item["title"] == "Release evidence dashboard"));
+    assert!(report["items"]
+        .as_array()
+        .expect("improvement items")
+        .iter()
+        .any(|item| item["number"] == 98
+            && item["title"] == "Homebrew release path"
+            && item["status"] == "partial-or-external-evidence"));
 
     let markdown = fs::read_to_string(&output).expect("improvements markdown");
     assert!(markdown.contains("# NEditor 100 Improvements Coverage Audit"));
