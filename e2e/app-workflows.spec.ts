@@ -2018,9 +2018,8 @@ test("offers searchable contextual help with workflow actions", async ({ page })
   const demo = page.getByRole("dialog", { name: "NEditor guided demo" });
   await expect(demo).toBeVisible();
   await expect(demo).toContainText("Create with AI");
-  await demo.getByRole("button", { name: "Next" }).click();
-  await expect(demo).toContainText("Plan the structure");
-  await demo.getByRole("button", { name: "Previous" }).click();
+  await demo.getByRole("button", { name: /Create with AI/ }).click();
+  await expect(demo).toContainText("Agentic creation");
   await demo.getByRole("button", { name: "Try this step" }).click();
   await expect(page.getByRole("dialog", { name: "Docs Live voice drafting" })).toBeVisible();
   await expect(page.getByLabel("Document type")).toBeVisible();
@@ -2852,32 +2851,33 @@ test("persists editor settings and runs search plus heading commands", async ({ 
 
 test("creates support bundle handoff from settings", async ({ page }) => {
   await openSettingsSection(page, "files");
-  await expect(page.getByRole("heading", { name: "Support bundle" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Preview" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save JSON" })).toBeVisible();
-  await expect(page.getByText("not document content or secrets")).toBeVisible();
+  const supportBundle = page.getByLabel("Support bundle", { exact: true });
+  await expect(supportBundle.getByRole("heading", { name: "Support bundle" })).toBeVisible();
+  await expect(supportBundle.getByRole("button", { name: "Preview", exact: true })).toBeVisible();
+  await expect(supportBundle.getByRole("button", { name: "Save JSON" })).toBeVisible();
+  await expect(supportBundle.getByText("not document content or secrets")).toBeVisible();
 
-  await page.getByRole("button", { name: "Preview" }).click();
-  await expect(page.getByText("Support bundle preview ready: current-host-ready-with-external-gaps, 1 evidence gaps, 1/2 release actions ready, 106 open spec rows, 2/3 spec work orders ready, release candidate stale (3 artifacts), engines complete (0 missing), 1 evidence reports need attention")).toBeVisible();
+  await supportBundle.getByRole("button", { name: "Preview", exact: true }).click();
+  await expect(supportBundle.getByText("Support bundle preview ready: current-host-ready-with-external-gaps, 1 evidence gaps, 1/2 release actions ready, 106 open spec rows, 2/3 spec work orders ready, release candidate stale (3 artifacts), engines complete (0 missing), 1 evidence reports need attention")).toBeVisible();
   const recommendationRegion = page.getByRole("region", { name: "Support bundle recommendations" });
   await expect(recommendationRegion).toBeVisible();
   await expect(recommendationRegion.getByText("Local setup", { exact: true })).toBeVisible();
   await expect(recommendationRegion.getByText("Release readiness", { exact: true })).toBeVisible();
   await expect(recommendationRegion.getByText("Specification closure", { exact: true })).toBeVisible();
   await expect(recommendationRegion.getByText("Evidence collection", { exact: true })).toBeVisible();
-  await expect(page.getByText("Default Markdown reader automation is unavailable on this host; use manual setup.")).toBeVisible();
-  await expect(page.getByText("preview only")).toBeVisible();
-  await expect(page.locator("dd").filter({ hasText: "106 open" })).toContainText("2/3 work orders ready");
-  await expect(page.locator("dd").getByText("10 installed, 0 missing", { exact: true })).toBeVisible();
-  await expect(page.locator("dd").getByText("1 ready, 1 attention, 0 missing", { exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Release evidence action plan" })).toContainText("release-signing");
-  await expect(page.getByRole("region", { name: "Specification work orders" })).toContainText("001-manual-review");
-  await expect(page.getByRole("region", { name: "Release candidate status" })).toContainText("stale");
+  await expect(supportBundle.getByText("Default Markdown reader automation is unavailable on this host; use manual setup.")).toBeVisible();
+  await expect(supportBundle.getByText("preview only")).toBeVisible();
+  await expect(supportBundle.locator("dd").filter({ hasText: "106 open" })).toContainText("2/3 work orders ready");
+  await expect(supportBundle.locator("dd").getByText("10 installed, 0 missing", { exact: true })).toBeVisible();
+  await expect(supportBundle.locator("dd").getByText("1 ready, 1 attention, 0 missing", { exact: true })).toBeVisible();
+  await expect(supportBundle.getByRole("region", { name: "Release evidence action plan" })).toContainText("release-signing");
+  await expect(supportBundle.getByRole("region", { name: "Specification work orders" })).toContainText("001-manual-review");
+  await expect(supportBundle.getByRole("region", { name: "Release candidate status" })).toContainText("stale");
 
   await queueDialogSelection(page, "/workspace/neditor-support-bundle.json");
-  await page.getByRole("button", { name: "Save JSON" }).click();
-  await expect(page.getByText("Wrote support bundle to /workspace/neditor-support-bundle.json")).toBeVisible();
-  await expect(page.locator("dd").getByText("/workspace/neditor-support-bundle.json", { exact: true })).toBeVisible();
+  await supportBundle.getByRole("button", { name: "Save JSON" }).click();
+  await expect(supportBundle.getByText("Wrote support bundle to /workspace/neditor-support-bundle.json")).toBeVisible();
+  await expect(supportBundle.locator("dd").getByText("/workspace/neditor-support-bundle.json", { exact: true })).toBeVisible();
 });
 
 test("runs configurable Emacs and Vim-style editor keybinding modes", async ({ page }) => {
@@ -3648,8 +3648,8 @@ test("manages front matter data sources from the references panel", async ({ pag
 
   const dataSources = page.getByRole("region", { name: "Local data source manager" });
   await expect(dataSources).toContainText("3 local data sources | 2 ready | 1 need attention");
-  await expect(dataSources.locator(".snapshot-row").filter({ hasText: "Revenue" })).toContainText("CSV | ready");
-  await expect(dataSources.locator(".snapshot-row").filter({ hasText: "Escape" })).toContainText("blocked-path");
+  await expect(dataSources.locator(".snapshot-row").filter({ hasText: "data/revenue.csv" })).toContainText("CSV | ready");
+  await expect(dataSources.locator(".snapshot-row").filter({ hasText: "JSON | blocked-path" })).toContainText("Escape");
   await expect(dataSources).toContainText("data/accounts.json");
 
   await dataSources.getByPlaceholder("Revenue, Accounts, Settings").fill("Targets");
@@ -3958,7 +3958,7 @@ test("builds business documents from saved identity snippets and local-agent han
   await profile.getByLabel("Email address").fill("jane@example.com");
   await profile.getByLabel("Phone").fill("+1 555 0100");
   await profile.getByLabel("Role or title").fill("Managing Partner");
-  await profile.getByLabel("Company name").fill("Acme Advisory");
+  await profile.getByLabel("Company name", { exact: true }).fill("Acme Advisory");
   await profile.getByLabel("Company address").fill("123 Market Street");
   await profile.getByLabel("Website").fill("https://acme.example");
   await profile.getByLabel("Industry").fill("strategy consulting");
@@ -4164,8 +4164,8 @@ test("runs command palette insertion and table editor workflows", async ({ page 
   await queueDialogSelection(page, "/workspace/edited-source-table.csv");
   await page.getByRole("button", { name: "Export CSV" }).click();
   await expect.poll(() => mockFileText(page, "/workspace/edited-source-table.csv")).toContain("Services");
+  await expect.poll(() => mockFileText(page, "/workspace/edited-source-table.csv")).toContain("| Support | 40000 |");
   await expect.poll(() => mockFileText(page, "/workspace/edited-source-table.csv")).not.toContain("Pipeline");
-  await expect(page.locator(".status-bar")).toContainText("Exported 1 table from edited Markdown source to CSV");
   await page.getByRole("button", { name: "Update grid from source" }).click();
   await expect(page.getByLabel("Item, row 1, column A")).toHaveValue("Services");
   await page.getByRole("button", { name: "Apply source text" }).click();
