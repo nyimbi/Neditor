@@ -60,6 +60,13 @@ Live draft recovery actions, including opening the history, appending the
 latest draft, copying the latest draft, and inserting or copying the latest
 review packet.
 
+The Outline sidebar includes a **Document Map** that combines headings, review
+comments, citation TODOs, inline citation references, bibliography entries,
+includes, glossary terms, index terms, figures, tables, equations, and compiler
+diagnostics. Use its filters, search, and **Blockers** view to jump directly to
+missing bibliography entries, unresolved comments, unlabeled media, broken
+includes, or other review issues without hunting across separate panels.
+
 The top command bar is grouped around document, management, writing, navigation,
 insertion, review, and view workflows. Use Navigate for search, previous/next
 matches, the left document outline, and fold/unfold section commands. In

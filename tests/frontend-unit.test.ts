@@ -10194,6 +10194,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("focusDocumentMapBlockers"));
   ok(app.includes("goToDocumentMapItem"));
   ok(app.includes("documentMapKindLabel"));
+  ok(app.includes("References and includes"));
+  ok(app.includes("bibliographyItems"));
+  ok(app.includes("glossaryItems"));
+  ok(app.includes("indexItems"));
+  ok(app.includes("includeItems"));
+  ok(app.includes("missing bibliography"));
+  ok(app.includes("Included by"));
   ok(app.includes('store.sidebar === \'templates\''));
   ok(store.includes("toolbarTextSize: 10"));
   ok(store.includes("toolbarCollapsedRows: []"));

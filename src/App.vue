@@ -8451,8 +8451,8 @@ interface CompilerOutputInventoryItem {
   detail: string;
 }
 
-type DocumentMapFilter = "all" | "structure" | "review" | "evidence" | "media" | "diagnostics";
-type DocumentMapKind = "heading" | "comment" | "citation" | "figure" | "table" | "equation" | "diagnostic";
+type DocumentMapFilter = "all" | "structure" | "review" | "evidence" | "references" | "media" | "diagnostics";
+type DocumentMapKind = "heading" | "comment" | "citation" | "bibliography" | "glossary" | "index" | "include" | "figure" | "table" | "equation" | "diagnostic";
 
 interface DocumentMapItem {
   id: string;
@@ -9829,10 +9829,12 @@ const documentMapFilterOptions: { id: DocumentMapFilter; label: string; shortLab
   { id: "structure", label: "Structure", shortLabel: "Heads" },
   { id: "review", label: "Review", shortLabel: "Review" },
   { id: "evidence", label: "Evidence", shortLabel: "Cites" },
+  { id: "references", label: "References and includes", shortLabel: "Refs" },
   { id: "media", label: "Media, tables, equations", shortLabel: "Media" },
   { id: "diagnostics", label: "Diagnostics", shortLabel: "Issues" },
 ];
 const documentMapItems = computed<DocumentMapItem[]>(() => {
+  const bibliographyKeys = new Set((active.value.compile?.bibliography || []).map((entry) => entry.key));
   const headingItems = outlineHeadings.value.map((heading): DocumentMapItem => ({
     id: `heading-${heading.source_file || "document"}-${heading.line}-${heading.anchor || heading.text}`,
     kind: "heading",
@@ -9863,6 +9865,53 @@ const documentMapItems = computed<DocumentMapItem[]>(() => {
     line: todo.line,
     column: todo.column,
   }));
+  const citedItems = (active.value.compile?.semantic.citation_references || []).map((citation): DocumentMapItem => ({
+    id: `citation-reference-${citation.line}-${citation.column}-${citation.key}`,
+    kind: "citation",
+    group: "evidence",
+    label: `[@${citation.key}]`,
+    detail: citation.locator ? `Line ${citation.line} | ${citation.locator}` : `Line ${citation.line}`,
+    status: bibliographyKeys.has(citation.key) ? "cited" : "missing bibliography",
+    line: citation.line,
+    column: citation.column,
+  }));
+  const bibliographyItems = (active.value.compile?.bibliography || []).map((entry): DocumentMapItem => ({
+    id: `bibliography-${entry.source_file || "document"}-${entry.line || 0}-${entry.key}`,
+    kind: "bibliography",
+    group: "evidence",
+    label: `[@${entry.key}] ${entry.title || "Untitled source"}`,
+    detail: entry.line ? `Bibliography entry | line ${entry.line}` : "Bibliography entry",
+    status: /TODO|Untitled source/i.test(entry.title || "") ? "needs metadata" : "ready",
+    line: entry.line || null,
+    column: entry.column || null,
+    source_file: entry.source_file || null,
+  }));
+  const glossaryItems = Object.entries(active.value.compile?.semantic.glossary || {}).map(([term, definition]): DocumentMapItem => ({
+    id: `glossary-${term}`,
+    kind: "glossary",
+    group: "references",
+    label: term,
+    detail: definition || "No definition detected",
+    status: definition ? "defined" : "missing definition",
+  }));
+  const indexItems = indexTerms.value.map((term): DocumentMapItem => ({
+    id: `index-${term}`,
+    kind: "index",
+    group: "references",
+    label: term,
+    detail: "Index term",
+    status: "indexed",
+  }));
+  const includeItems = (active.value.compile?.include_graph || []).map((edge, index): DocumentMapItem => ({
+    id: `include-${index}-${edge.parent}-${edge.child}`,
+    kind: "include",
+    group: "references",
+    label: displayDocumentPath(edge.child),
+    detail: `Included by ${displayDocumentPath(edge.parent)} | depth ${edge.depth}`,
+    status: "included",
+    line: 1,
+    source_file: edge.child,
+  }));
   const mediaItems = captionedReferenceItems.value.map((item): DocumentMapItem => ({
     id: `${item.kind}-${item.source_file || "document"}-${item.line}-${item.id || item.label}`,
     kind: item.kind,
@@ -9886,7 +9935,18 @@ const documentMapItems = computed<DocumentMapItem[]>(() => {
     end_line: diagnostic.end_line || diagnostic.line || null,
     source_file: diagnostic.source_file || null,
   }));
-  return [...headingItems, ...commentItems, ...citationItems, ...mediaItems, ...diagnosticItems].sort((left, right) => {
+  return [
+    ...headingItems,
+    ...commentItems,
+    ...citationItems,
+    ...citedItems,
+    ...bibliographyItems,
+    ...glossaryItems,
+    ...indexItems,
+    ...includeItems,
+    ...mediaItems,
+    ...diagnosticItems,
+  ].sort((left, right) => {
     const leftLine = left.line || Number.MAX_SAFE_INTEGER;
     const rightLine = right.line || Number.MAX_SAFE_INTEGER;
     return leftLine - rightLine || left.group.localeCompare(right.group) || left.label.localeCompare(right.label);
@@ -19859,12 +19919,16 @@ function documentMapKindLabel(kind: DocumentMapKind) {
   if (kind === "heading") return "Heading";
   if (kind === "comment") return "Comment";
   if (kind === "citation") return "Citation";
+  if (kind === "bibliography") return "Source";
+  if (kind === "glossary") return "Glossary";
+  if (kind === "index") return "Index";
+  if (kind === "include") return "Include";
   if (kind === "diagnostic") return "Issue";
   return captionKindLabel(kind);
 }
 
 function documentMapItemNeedsAttention(item: DocumentMapItem) {
-  return !["ready", "resolved", "outline", "deep heading"].includes(item.status);
+  return !["ready", "resolved", "outline", "deep heading", "cited", "defined", "indexed", "included"].includes(item.status);
 }
 
 function documentMapCountByFilter(filter: DocumentMapFilter) {
@@ -19882,12 +19946,16 @@ function focusDocumentMapBlockers() {
 }
 
 function goToDocumentMapItem(item: DocumentMapItem) {
-  void goToSourceTarget({
-    line: item.line,
-    end_line: item.end_line || item.line,
-    column: item.column,
-    source_file: item.source_file,
-  });
+  if (item.line || item.source_file) {
+    void goToSourceTarget({
+      line: item.line,
+      end_line: item.end_line || item.line,
+      column: item.column,
+      source_file: item.source_file,
+    });
+    return;
+  }
+  goToSearchTerm(item.label.replace(/^\[@(.+?)\]\s*/, "$1"));
 }
 
 function outlineHeadingMarker(level: number) {
