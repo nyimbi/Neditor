@@ -5394,6 +5394,24 @@
               <p v-if="docsLiveInterimTranscript" class="sidebar-hint">{{ docsLiveInterimTranscript }}</p>
             </section>
 
+            <section class="docs-live-voice-command-plan" aria-label="Docs Live voice command plan">
+              <header>
+                <div>
+                  <strong>Voice command plan</strong>
+                  <span>Natural commands become scoped drafting actions before generation.</span>
+                </div>
+                <button type="button" :disabled="!docsLiveVoiceCommandPlan.length" @click="appendDocsLiveVoiceCommandPlan">Use commands</button>
+              </header>
+              <ul v-if="docsLiveVoiceCommandPlan.length">
+                <li v-for="item in docsLiveVoiceCommandPlan" :key="item.id">
+                  <strong>{{ docsLiveVoiceCommandActionLabel(item.action) }} -> {{ item.target }}</strong>
+                  <span>{{ item.prompt }}</span>
+                  <small>{{ item.confidence }} | {{ item.rationale }}</small>
+                </li>
+              </ul>
+              <p v-else class="sidebar-hint">Dictate commands such as "expand the executive summary", "make section 3 more formal", or "turn the pricing notes into a table".</p>
+            </section>
+
             <div class="docs-live-context-grid">
               <label>
                 Context and constraints
@@ -7376,9 +7394,11 @@ import {
 import {
   buildDocsLiveDraft,
   buildDocsLiveQuestionnaire,
+  buildDocsLiveVoiceCommandPlan,
   docsLiveAuditInline,
   buildDocsLiveReviewPacketMarkdown,
   buildDocsLiveSuggestedAnswers,
+  docsLiveVoiceCommandPlanMarkdown,
   docsLiveDefaultOutlineMarkdown,
   docsLiveDocumentTypeForOutlineSignal,
   docsLivePlaceholderEntries,
@@ -7395,6 +7415,7 @@ import {
   type DocsLivePlaceholderKind,
   type DocsLivePlaceholderReviewStatus,
   type DocsLiveSuggestedAnswer,
+  type DocsLiveVoiceCommandPlanItem,
   type DocsLiveWizardProfile,
 } from "./lib/docsLive";
 import {
@@ -9049,6 +9070,15 @@ const docsLiveIntentCompletion = computed(() => {
 });
 const docsLiveSuggestedAnswers = computed(() =>
   buildDocsLiveSuggestedAnswers(docsLiveDocumentType.value, {
+    title: docsLiveTitle.value,
+    outline: docsLiveOutlineText.value,
+    context: docsLiveContext.value,
+    transcript: docsLiveTranscript.value,
+    placeholders: docsLivePlaceholderText.value,
+  }),
+);
+const docsLiveVoiceCommandPlan = computed<DocsLiveVoiceCommandPlanItem[]>(() =>
+  buildDocsLiveVoiceCommandPlan({
     title: docsLiveTitle.value,
     outline: docsLiveOutlineText.value,
     context: docsLiveContext.value,
@@ -22851,6 +22881,23 @@ function appendAllDocsLiveSuggestedAnswers() {
   store.statusMessage = "Added all suggested Docs Live answers";
 }
 
+function appendDocsLiveVoiceCommandPlan() {
+  const plan = docsLiveVoiceCommandPlan.value;
+  if (!plan.length) {
+    store.statusMessage = "No actionable Docs Live voice commands detected";
+    return;
+  }
+  docsLiveQuestionnaireAnswerText.value = appendTextBlock(docsLiveQuestionnaireAnswerText.value, docsLiveVoiceCommandPlanMarkdown(plan));
+  store.statusMessage = `Added ${plan.length} Docs Live voice command${plan.length === 1 ? "" : "s"} to drafting notes`;
+}
+
+function docsLiveVoiceCommandActionLabel(action: DocsLiveVoiceCommandPlanItem["action"]) {
+  return action
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function docsLiveSuggestedAnswerBlock(suggestion: DocsLiveSuggestedAnswer) {
   return [
     `${suggestion.stepLabel}: ${suggestion.question}`,
@@ -32227,12 +32274,48 @@ select:hover {
   background: #eef3f8;
 }
 
+.docs-live-voice-command-plan {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d7dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.docs-live-voice-command-plan header,
 .docs-live-voice-actions,
 .docs-live-preview header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.docs-live-voice-command-plan header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.docs-live-voice-command-plan ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-live-voice-command-plan li {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.docs-live-voice-command-plan small {
+  color: #526171;
 }
 
 .docs-live-draft-actions {

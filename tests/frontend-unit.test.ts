@@ -160,8 +160,10 @@ import {
   buildDocsLiveQuestionnaire,
   buildDocsLiveReviewPacketMarkdown,
   buildDocsLiveSuggestedAnswers,
+  buildDocsLiveVoiceCommandPlan,
   docsLiveDefaultOutlineMarkdown,
   docsLiveDocumentTypeForOutlineSignal,
+  docsLiveVoiceCommandPlanMarkdown,
   docsLivePlaceholderEntries,
   docsLiveDocumentTypes,
   docsLiveWizardProfile,
@@ -3396,6 +3398,21 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(suggestions.every((suggestion) => suggestion.rationale.length > 40));
   ok(suggestions.every((suggestion) => suggestion.contextSignals.some((signal) => signal.startsWith("document type:"))));
   ok(suggestions.some((suggestion) => suggestion.contextSignals.includes("known fields: client, owner, distribution target")));
+
+  const voiceCommands = buildDocsLiveVoiceCommandPlan({
+    title: "Acme Renewal Proposal",
+    outline: "- Executive Summary\n- Proposed Approach\n- Investment",
+    transcript: "Expand the Executive Summary with delivery risk evidence. Make section 3 more formal. Turn pricing notes into a table.",
+  });
+  equal(voiceCommands.length, 3);
+  ok(voiceCommands.some((item) => item.action === "expand" && item.target === "Executive Summary"));
+  ok(voiceCommands.some((item) => item.action === "formalize" && item.target === "section 3"));
+  ok(voiceCommands.some((item) => item.action === "add-table" && item.prompt.includes("Markdown table")));
+  ok(voiceCommands.every((item) => item.prompt.includes(item.command)));
+  const voiceCommandMarkdown = docsLiveVoiceCommandPlanMarkdown(voiceCommands);
+  ok(voiceCommandMarkdown.includes("Voice command plan:"));
+  ok(voiceCommandMarkdown.includes("Drafting instruction:"));
+  ok(voiceCommandMarkdown.includes("Confidence:"));
 
   const draft = buildDocsLiveDraft({
     documentType: "proposal",
@@ -9188,6 +9205,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("docsLivePlaceholderValue"));
   ok(app.includes("distribution target"));
   ok(app.includes("docsLivePlaceholderRows"));
+  ok(app.includes('aria-label="Docs Live voice command plan"'));
+  ok(app.includes("docsLiveVoiceCommandPlan"));
+  ok(app.includes("appendDocsLiveVoiceCommandPlan"));
+  ok(app.includes("docsLiveVoiceCommandActionLabel"));
+  ok(app.includes("Use commands"));
   ok(app.includes("docsLiveMissingPlaceholderKeys"));
   ok(app.includes("addDocsLivePlaceholder"));
   ok(app.includes("updateDocsLivePlaceholder"));

@@ -60,6 +60,26 @@ export interface DocsLiveQuestionnaireRequest {
   placeholders?: string;
 }
 
+export type DocsLiveVoiceCommandAction =
+  | "expand"
+  | "shorten"
+  | "formalize"
+  | "humanize"
+  | "revise"
+  | "add-evidence"
+  | "add-table"
+  | "outline";
+
+export interface DocsLiveVoiceCommandPlanItem {
+  id: string;
+  command: string;
+  action: DocsLiveVoiceCommandAction;
+  target: string;
+  prompt: string;
+  rationale: string;
+  confidence: "high" | "medium" | "review";
+}
+
 export type DocsLiveDraftDepth = "summary" | "standard" | "detailed" | "technical" | "legal" | "executive";
 export type DocsLivePlaceholderKind =
   | "text"
@@ -780,6 +800,45 @@ export function buildDocsLiveSuggestedAnswers(documentType: string, request: Doc
       contextSignals,
     };
   });
+}
+
+export function buildDocsLiveVoiceCommandPlan(input: DocsLiveQuestionnaireRequest = {}): DocsLiveVoiceCommandPlanItem[] {
+  const transcript = [input.transcript, input.context].filter(Boolean).join("\n");
+  const outlineItems = parseOutlinePlan(input.outline || "");
+  const lines = transcript
+    .split(/\r?\n|[.!?](?:\s+|$)/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const commands: DocsLiveVoiceCommandPlanItem[] = [];
+  for (const line of lines) {
+    const action = voiceCommandActionFor(line);
+    if (!action) continue;
+    const target = voiceCommandTargetFor(line, outlineItems);
+    commands.push({
+      id: `voice-${commands.length + 1}`,
+      command: line,
+      action,
+      target,
+      prompt: voiceCommandPrompt(action, target, line),
+      rationale: voiceCommandRationale(action, target),
+      confidence: voiceCommandConfidence(line, target, outlineItems),
+    });
+  }
+  return commands.slice(0, 12);
+}
+
+export function docsLiveVoiceCommandPlanMarkdown(commands: DocsLiveVoiceCommandPlanItem[]) {
+  if (!commands.length) return "Voice command plan: no actionable voice revision commands detected.";
+  return [
+    "Voice command plan:",
+    ...commands.map((item, index) => [
+      `${index + 1}. ${titleCase(item.action.replace(/-/g, " "))} -> ${item.target}`,
+      `   Command: ${item.command}`,
+      `   Drafting instruction: ${item.prompt}`,
+      `   Rationale: ${item.rationale}`,
+      `   Confidence: ${item.confidence}`,
+    ].join("\n")),
+  ].join("\n");
 }
 
 function docsLiveQuestionnaireQuestions(documentType: string, request: DocsLiveQuestionnaireRequest = {}) {
@@ -1682,6 +1741,59 @@ function suggestedAnswerRationale(stepLabel: string, question: string, contextSi
     return "Uses supplied context and placeholders to create a reviewable starting answer while leaving uncertain facts editable.";
   }
   return `Uses the ${blueprint.label.toLowerCase()} blueprint as a conservative starting point for the ${stepLabel.toLowerCase()} step and marks replaceable assumptions for review.`;
+}
+
+function voiceCommandActionFor(command: string): DocsLiveVoiceCommandAction | null {
+  const lower = command.toLowerCase();
+  if (/\b(expand|elaborate|add detail|more detail|develop)\b/.test(lower)) return "expand";
+  if (/\b(shorten|condense|tighten|summari[sz]e|make it shorter|more concise)\b/.test(lower)) return "shorten";
+  if (/\b(formal|more professional|executive tone|board tone)\b/.test(lower)) return "formalize";
+  if (/\b(humanize|less ai|natural|plain language|warmer|more conversational)\b/.test(lower)) return "humanize";
+  if (/\b(evidence|citation|source|proof|support this|verify)\b/.test(lower)) return "add-evidence";
+  if (/\b(table|matrix|grid|columns|comparison)\b/.test(lower)) return "add-table";
+  if (/\b(outline|section|chapter|subsection|move|reorder|add heading)\b/.test(lower)) return "outline";
+  if (/\b(rewrite|revise|change|edit|update|replace)\b/.test(lower)) return "revise";
+  return null;
+}
+
+function voiceCommandTargetFor(command: string, outlineItems: OutlinePlanItem[]) {
+  const lower = command.toLowerCase();
+  const explicit = command.match(/\b(?:section|chapter|part)\s+([0-9]+(?:\.[0-9]+)*)\b/i);
+  if (explicit?.[1]) return `section ${explicit[1]}`;
+  for (const item of outlineItems) {
+    if (item.title && lower.includes(item.title.toLowerCase())) return item.title;
+  }
+  const quoted = command.match(/["“](.+?)["”]/);
+  if (quoted?.[1]) return quoted[1].trim();
+  const commonSection = command.match(/\b(executive summary|introduction|conclusion|recommendation|methodology|risk|pricing|timeline|team)\b/i);
+  if (commonSection?.[1]) return commonSection[1];
+  return "current selection or active section";
+}
+
+function voiceCommandPrompt(action: DocsLiveVoiceCommandAction, target: string, command: string) {
+  const base = `Apply voice command to ${target}: ${command}`;
+  if (action === "expand") return `${base}. Add useful specifics, examples, caveats, owners, and evidence needs without padding.`;
+  if (action === "shorten") return `${base}. Preserve decisions, numbers, source obligations, and review notes while making the text concise.`;
+  if (action === "formalize") return `${base}. Make the tone professional, precise, and appropriate for executive or client review.`;
+  if (action === "humanize") return `${base}. Remove prompt-shaped phrasing and generic AI wording; keep concrete facts and natural transitions.`;
+  if (action === "add-evidence") return `${base}. Add citation TODOs, source requirements, or evidence owner notes where support is missing.`;
+  if (action === "add-table") return `${base}. Convert comparable items into a Markdown table with clear headers and reviewable assumptions.`;
+  if (action === "outline") return `${base}. Update the outline first, preserve hierarchy, and mark any new section as needing review before drafting.`;
+  return `${base}. Revise the target while preserving verified facts, citations, placeholders, and approval metadata.`;
+}
+
+function voiceCommandRationale(action: DocsLiveVoiceCommandAction, target: string) {
+  if (action === "outline") return `Treating "${target}" as an outline operation keeps structure editable before prose changes.`;
+  if (action === "add-evidence") return "Evidence commands become explicit source and citation tasks instead of unsupported polished claims.";
+  if (action === "add-table") return "Table commands make comparisons scan-friendly and preserve assumptions for review.";
+  if (action === "humanize") return "Humanization commands remove AI cruft while keeping factual and review constraints visible.";
+  return "The voice command is converted into a scoped drafting instruction so Docs Live can apply it without losing review context.";
+}
+
+function voiceCommandConfidence(command: string, target: string, outlineItems: OutlinePlanItem[]): DocsLiveVoiceCommandPlanItem["confidence"] {
+  if (target !== "current selection or active section") return "high";
+  if (outlineItems.length && /\b(section|chapter|heading|outline)\b/i.test(command)) return "medium";
+  return "review";
 }
 
 function suggestedQuestionnaireAnswer(

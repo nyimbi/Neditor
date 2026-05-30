@@ -265,6 +265,9 @@ owners, dates, evidence, reviewers, numbers, sources, and repeated variables;
 each row can carry a type, source or evidence note, and review status while the
 underlying plain-text placeholder block stays synchronized for Docs Live, agent
 packets, and provider handoffs.
+When dictating revision requests, review the **Voice command plan** and use
+**Use commands** to convert phrases such as "expand the executive summary" or
+"turn pricing into a table" into scoped drafting actions before generation.
 
 Docs Live includes blueprints for business briefs, board memos, proposals,
 strategy plans, project plans, research briefs, policies, meeting briefs,
