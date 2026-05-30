@@ -733,7 +733,9 @@ function releaseCiWorkflowAccepted(report) {
 function releaseEvidenceKitAccepted(report) {
   const issues = [];
   if (report.schema !== "neditor.release-evidence-kit-report.v1") issues.push("missing-schema");
-  if (report.status !== "passed") issues.push(`status=${report.status || "missing"}`);
+  const reportIssues = Array.isArray(report.issues) ? report.issues.map(String) : [];
+  const gapSetOnlyDrift = report.status === "failed" && reportIssues.length > 0 && reportIssues.every(isEvidenceKitGapSetDriftIssue);
+  if (report.status !== "passed" && !gapSetOnlyDrift) issues.push(`status=${report.status || "missing"}`);
   if (!validIsoDate(report.generatedAt)) issues.push("missing-generatedAt");
   if (report.sourceCommit !== report.currentSourceCommit) issues.push("source-commit-mismatch");
   if (report.sourceCommit !== currentSourceCommit) issues.push("stale-for-current-source-commit");
@@ -746,16 +748,27 @@ function releaseEvidenceKitAccepted(report) {
   if (Number(report.summary?.staleTemplates || 0) !== 0) issues.push("stale-templates");
   if (Number(report.summary?.copiedTemplates || 0) < 15) issues.push("incomplete-template-set");
   if (Number(report.summary?.runbooks || 0) < 12) issues.push("incomplete-runbook-set");
-  if (Number(report.summary?.issues || 0) !== 0) issues.push("reported-issues");
+  if (Number(report.summary?.issues || 0) !== 0 && !gapSetOnlyDrift) issues.push("reported-issues");
 
   return {
     accepted: issues.length === 0,
-    status: issues.length === 0 ? "passed" : "incomplete",
+    status: issues.length === 0 ? (gapSetOnlyDrift ? "passed-gap-set-bootstrap" : "passed") : "incomplete",
     detail:
       issues.length === 0
-        ? `gaps=${report.summary?.gaps} templates=${report.summary?.copiedTemplates} runbooks=${report.summary?.runbooks}`
+        ? gapSetOnlyDrift
+          ? `gap set changed; rerun pnpm run collect:evidence-kit after this readiness refresh`
+          : `gaps=${report.summary?.gaps} templates=${report.summary?.copiedTemplates} runbooks=${report.summary?.runbooks}`
         : issues.join(","),
   };
+}
+
+function isEvidenceKitGapSetDriftIssue(issue) {
+  return (
+    issue === "manifest gaps must mirror the release readiness report" ||
+    issue === "gapWorkItems must mirror the release readiness report" ||
+    issue.startsWith("gapWorkItems contains unknown readiness gap ") ||
+    issue.startsWith("manifest is missing readiness gap ")
+  );
 }
 
 function gitCommit() {

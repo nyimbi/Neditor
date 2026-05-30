@@ -11286,6 +11286,10 @@ test("release readiness aggregation records external evidence gaps", () => {
   ok(script.includes("neditor.release-evidence-kit-report.v1"));
   ok(script.includes("stale-for-current-source-commit"));
   ok(script.includes("current-worktree-not-clean"));
+  ok(script.includes("isEvidenceKitGapSetDriftIssue"));
+  ok(script.includes("passed-gap-set-bootstrap"));
+  ok(script.includes("gap set changed; rerun pnpm run collect:evidence-kit after this readiness refresh"));
+  ok(script.includes("gapWorkItems contains unknown readiness gap "));
   ok(script.includes("custom?.status ?? report.status"));
   ok(script.includes("custom?.detail ? `: ${custom.detail}`"));
   ok(script.includes('spawnSync("git", ["rev-parse", "HEAD"]'));
