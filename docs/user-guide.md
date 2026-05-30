@@ -878,6 +878,20 @@ The packaged CLI exposes the same handoff for automation:
 ned publish document.md --target blog --destination wordpress-rest --endpoint https://cms.example.com/wp-json/wp/v2/posts --token-env CMS_TOKEN --output publish-payload.json --json
 ```
 
+Reusable business identity values live in `.neditor/business-profile.json`.
+Use the **Business Identity** dialog or this CLI form:
+
+```sh
+ned profile --workspace . --set companyName=Acme --set companyLegalName="Acme LLC" --set taxIdentifier=VAT-999 --set credentialsSummary="Approved supplier" --json
+```
+
+This saves repeated sender, company, legal-name, registration, tax, DUNS, country,
+website, LinkedIn, credential, certification, disclaimer, client, and brand
+voice facts. Templates and snippets can then use placeholders such as
+`{{companyLegalName}}`, `{{taxIdentifier}}`, `{{credentialsSummary}}`,
+`{{certifications}}`, and `{{legalDisclaimer}}`; run
+`ned profile --workspace . --placeholders` to inspect the available values.
+
 Repeated delivery settings can be saved as project-local export profiles under
 `.neditor/export-profiles.json`. Use
 `ned export-profiles --workspace . --save client-html --target html --layout-preset business --brand name=Client --citation-style apa --json`

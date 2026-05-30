@@ -4,10 +4,19 @@ export interface BusinessProfile {
   phone: string;
   roleTitle: string;
   companyName: string;
+  companyLegalName: string;
+  companyRegistrationNumber: string;
+  taxIdentifier: string;
+  dunsNumber: string;
   companyAddress: string;
+  companyCountry: string;
   website: string;
+  linkedIn: string;
   industry: string;
   defaultClientName: string;
+  credentialsSummary: string;
+  certifications: string;
+  legalDisclaimer: string;
   brandVoice: string;
 }
 
@@ -306,10 +315,19 @@ export const businessProfileFields: BusinessProfileField[] = [
   { key: "phone", label: "Phone", placeholder: "+1 555 0100" },
   { key: "roleTitle", label: "Role or title", placeholder: "Managing Partner" },
   { key: "companyName", label: "Company name", placeholder: "Acme Advisory LLC" },
+  { key: "companyLegalName", label: "Legal company name", placeholder: "Acme Advisory LLC" },
+  { key: "companyRegistrationNumber", label: "Registration number", placeholder: "Delaware file number, Companies House number, or equivalent" },
+  { key: "taxIdentifier", label: "Tax identifier", placeholder: "VAT, EIN, GST, or tax registration number" },
+  { key: "dunsNumber", label: "DUNS number", placeholder: "Optional supplier or procurement identifier" },
   { key: "companyAddress", label: "Company address", placeholder: "123 Market Street, Suite 400, San Francisco, CA" },
+  { key: "companyCountry", label: "Country", placeholder: "United States" },
   { key: "website", label: "Website", placeholder: "https://example.com" },
+  { key: "linkedIn", label: "LinkedIn", placeholder: "https://www.linkedin.com/company/acme-advisory" },
   { key: "industry", label: "Industry", placeholder: "Management consulting" },
   { key: "defaultClientName", label: "Default client", placeholder: "Client organization" },
+  { key: "credentialsSummary", label: "Credentials summary", placeholder: "Approved qualifications, licenses, registrations, and proof points reused in proposals" },
+  { key: "certifications", label: "Certifications", placeholder: "ISO 9001; SOC 2; Small business certification; Professional licenses" },
+  { key: "legalDisclaimer", label: "Legal disclaimer", placeholder: "Approved legal, confidentiality, and liability language for external documents" },
   { key: "brandVoice", label: "Brand voice", placeholder: "Clear, commercially practical, evidence-led" },
 ];
 
@@ -319,10 +337,19 @@ export const defaultBusinessProfile: BusinessProfile = {
   phone: "",
   roleTitle: "",
   companyName: "",
+  companyLegalName: "",
+  companyRegistrationNumber: "",
+  taxIdentifier: "",
+  dunsNumber: "",
   companyAddress: "",
+  companyCountry: "",
   website: "",
+  linkedIn: "",
   industry: "",
   defaultClientName: "",
+  credentialsSummary: "",
+  certifications: "",
+  legalDisclaimer: "",
   brandVoice: "",
 };
 
@@ -898,12 +925,17 @@ export const businessDocumentSnippets: BusinessDocumentSnippet[] = [
       "**Prepared by:** {{fullName}}, {{roleTitle}}",
       "",
       "**Company:** {{companyName}}",
+      "**Legal name:** {{companyLegalName}}",
+      "**Registration:** {{companyRegistrationNumber}}",
+      "**Tax ID:** {{taxIdentifier}}",
       "",
       "**Address:** {{companyAddress}}",
+      "**Country:** {{companyCountry}}",
       "",
       "**Email:** {{email}}  ",
       "**Phone:** {{phone}}  ",
       "**Website:** {{website}}",
+      "**LinkedIn:** {{linkedIn}}",
     ].join("\n"),
   },
   {
@@ -911,7 +943,7 @@ export const businessDocumentSnippets: BusinessDocumentSnippet[] = [
     label: "Company overview",
     kind: "identity",
     summary: "Short boilerplate overview for proposals, tenders, and capability statements.",
-    body: "{{companyName}} is a {{industry}} organization. We help {{defaultClientName}} make practical decisions with clear evidence, disciplined delivery, and {{brandVoice}} communication.",
+    body: "{{companyName}} is a {{industry}} organization. We help {{defaultClientName}} make practical decisions with clear evidence, disciplined delivery, and {{brandVoice}} communication.\n\n**Credentials:** {{credentialsSummary}}\n\n**Certifications:** {{certifications}}",
   },
   {
     id: "executive-summary",
@@ -1411,9 +1443,18 @@ export function businessProfilePlaceholderMap(profile: Partial<BusinessProfile> 
     "profile.roleTitle": canonical.roleTitle,
     "profile.phone": canonical.phone,
     "company.name": canonical.companyName,
+    "company.legalName": canonical.companyLegalName,
+    "company.registrationNumber": canonical.companyRegistrationNumber,
+    "company.taxIdentifier": canonical.taxIdentifier,
+    "company.dunsNumber": canonical.dunsNumber,
     "company.address": canonical.companyAddress,
+    "company.country": canonical.companyCountry,
     "company.website": canonical.website,
+    "company.linkedin": canonical.linkedIn,
     "company.industry": canonical.industry,
+    "company.credentials": canonical.credentialsSummary,
+    "company.certifications": canonical.certifications,
+    "company.legalDisclaimer": canonical.legalDisclaimer,
     "client.name": canonical.defaultClientName,
   };
   return placeholders;

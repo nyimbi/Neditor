@@ -5213,7 +5213,7 @@
           <label v-for="field in businessProfileFields" :key="field.key">
             {{ field.label }}
             <textarea
-              v-if="field.key === 'companyAddress' || field.key === 'brandVoice'"
+              v-if="['companyAddress', 'credentialsSummary', 'certifications', 'legalDisclaimer', 'brandVoice'].includes(field.key)"
               v-model="businessProfileDraft[field.key]"
               :placeholder="field.placeholder"
               rows="3"

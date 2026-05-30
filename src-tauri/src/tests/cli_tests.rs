@@ -120,6 +120,9 @@ fn ned_cli_initializes_project_workspace_scaffold() {
     assert!(export_profiles.contains("neditor.workspace-export-profiles.v1"));
     assert!(export_profiles.contains("Client PDF Delivery"));
     assert!(profile.contains("\"brandVoice\""));
+    assert!(profile.contains("\"companyLegalName\""));
+    assert!(profile.contains("\"taxIdentifier\""));
+    assert!(profile.contains("\"credentialsSummary\""));
     let snippet = fs::read_to_string(root.join(".neditor").join("snippets").join("business.md"))
         .expect("snippet");
     assert!(snippet.contains("Compliance Matrix Starter"));
@@ -191,9 +194,28 @@ fn ned_cli_manages_reusable_business_profile() {
         "--set".to_string(),
         "companyName=Acme Advisory".to_string(),
         "--set".to_string(),
+        "companyLegalName=Acme Advisory LLC".to_string(),
+        "--set".to_string(),
+        "registration=DE-123456".to_string(),
+        "--set".to_string(),
+        "taxId=VAT-999".to_string(),
+        "--set".to_string(),
+        "duns=12-345-6789".to_string(),
+        "--set".to_string(),
+        "companyCountry=United States".to_string(),
+        "--set".to_string(),
         "phone=+1 555 0100".to_string(),
         "--set".to_string(),
         "website=https://acme.example".to_string(),
+        "--set".to_string(),
+        "linkedin=https://linkedin.example/acme".to_string(),
+        "--set".to_string(),
+        "credentials=Approved supplier with climate analytics and procurement response credentials"
+            .to_string(),
+        "--set".to_string(),
+        "certifications=ISO 9001; SOC 2".to_string(),
+        "--set".to_string(),
+        "legalDisclaimer=Confidential draft for review".to_string(),
         "--set".to_string(),
         "brandVoice=clear and practical".to_string(),
         "--json".to_string(),
@@ -205,6 +227,18 @@ fn ned_cli_manages_reusable_business_profile() {
     assert_eq!(report["written"], true);
     assert_eq!(report["profile"]["fullName"], "Jane Doe");
     assert_eq!(report["profile"]["companyName"], "Acme Advisory");
+    assert_eq!(report["profile"]["companyLegalName"], "Acme Advisory LLC");
+    assert_eq!(report["profile"]["companyRegistrationNumber"], "DE-123456");
+    assert_eq!(report["profile"]["taxIdentifier"], "VAT-999");
+    assert_eq!(report["profile"]["dunsNumber"], "12-345-6789");
+    assert_eq!(
+        report["profile"]["credentialsSummary"],
+        "Approved supplier with climate analytics and procurement response credentials"
+    );
+    assert_eq!(
+        report["profile"]["legalDisclaimer"],
+        "Confidential draft for review"
+    );
     assert!(report["placeholderText"]
         .as_str()
         .expect("placeholder text")
@@ -225,6 +259,9 @@ fn ned_cli_manages_reusable_business_profile() {
     assert!(markdown.message.contains("## Business Identity"));
     assert!(markdown.message.contains("Jane Doe"));
     assert!(markdown.message.contains("Acme Advisory"));
+    assert!(markdown.message.contains("Acme Advisory LLC"));
+    assert!(markdown.message.contains("VAT-999"));
+    assert!(markdown.message.contains("ISO 9001; SOC 2"));
 
     let placeholders = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -236,6 +273,9 @@ fn ned_cli_manages_reusable_business_profile() {
     .expect("profile placeholders");
     assert!(placeholders.message.contains("fullName: Jane Doe"));
     assert!(placeholders.message.contains("companyName: Acme Advisory"));
+    assert!(placeholders
+        .message
+        .contains("credentialsSummary: Approved supplier"));
 
     let filled_snippet = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -253,6 +293,9 @@ fn ned_cli_manages_reusable_business_profile() {
     assert!(filled_snippet.message.contains("Acme Advisory"));
     assert!(filled_snippet.message.contains("jane@example.com"));
     assert!(filled_snippet.message.contains("https://acme.example"));
+    assert!(filled_snippet.message.contains("DE-123456"));
+    assert!(filled_snippet.message.contains("VAT-999"));
+    assert!(filled_snippet.message.contains("United States"));
     assert!(!filled_snippet.message.contains("{{fullName}}"));
 
     let filled_snippet_json = crate::cli::run_cli_with_args(&[
@@ -298,6 +341,15 @@ fn ned_cli_manages_reusable_business_profile() {
                 .as_array()
                 .expect("aliases")
                 .contains(&serde_json::json!("client"))));
+    assert!(fields_report["fields"]
+        .as_array()
+        .expect("profile fields")
+        .iter()
+        .any(|field| field["field"] == "credentialsSummary"
+            && field["aliases"]
+                .as_array()
+                .expect("aliases")
+                .contains(&serde_json::json!("credentials"))));
 
     let single = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -314,6 +366,17 @@ fn ned_cli_manages_reusable_business_profile() {
     assert_eq!(single_report["schema"], "neditor.ned-profile-value.v1");
     assert_eq!(single_report["field"], "companyName");
     assert_eq!(single_report["value"], "Acme Advisory");
+
+    let legal_single = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "profile".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--get".to_string(),
+        "legalName".to_string(),
+    ])
+    .expect("legal profile value");
+    assert_eq!(legal_single.message, "Acme Advisory LLC");
 
     let unset_single = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -3341,6 +3404,13 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
             > 0
     );
     assert!(report["summary"]["open"].as_u64().expect("open count") > 0);
+    assert!(report["items"]
+        .as_array()
+        .expect("improvement items")
+        .iter()
+        .any(|item| item["number"] == 11
+            && item["title"] == "Reusable business profile"
+            && item["status"] == "implemented-evidence-present"));
     assert!(report["items"]
         .as_array()
         .expect("improvement items")

@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `fcc7ca5 Make CLI
-  read-aloud consent gated`
+- Latest inspected committed baseline before this update: `ddf4b71 Make export
+  profiles repeatable from ned`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,30 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Rich Reusable Business Profile
+
+The reusable business profile is now a fuller business identity and credential
+record instead of a thin contact card. The shared desktop model, Business
+Identity dialog, CLI profile command, workspace scaffold, placeholder map,
+reusable snippets, and user guide now support legal company name, registration
+number, tax identifier, DUNS number, country, LinkedIn URL, credential summary,
+certifications, legal disclaimer, and brand voice alongside the existing
+sender, contact, company, website, industry, and client defaults.
+
+This makes repeated business-development documents less brittle: proposals,
+RFP responses, tenders, supplier forms, snippets, and AI drafting context can
+reuse approved identity and qualification facts without copy/paste.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 34 CLI tests passed and the debug `ned` binary rebuilt, including rich business-profile field aliases, scaffold keys, Markdown identity output, placeholder output, snippet fill, single-field retrieval, and audit status for item 11. |
+| `pnpm run check` | Pass | Vue typecheck passed after expanding the shared `BusinessProfile` type and Business Identity dialog field handling. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting rich profile fields. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after expanding the profile schema and CLI field catalog. |
+| `src-tauri/target/debug/ned profile --workspace "$tmpdir" --init --set companyName=Acme --set companyLegalName='Acme LLC' --set taxIdentifier=VAT-999 --set credentialsSummary='Approved supplier' --json` | Pass | Smoke output used schema `neditor.ned-profile.v1`, wrote `.neditor/business-profile.json`, and exposed the new fields in `profile`, `markdown`, and `placeholderText`. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 67/100 implementation-evidenced items, marks item 11 Reusable business profile and item 80 Export profiles as implementation-evidenced, and still reports 33 partial/external-proof items. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Scriptable Export Profiles
 

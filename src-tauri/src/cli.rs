@@ -425,16 +425,26 @@ struct TransformTemplateEntry {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 struct BusinessProfile {
     full_name: String,
     email: String,
     phone: String,
     role_title: String,
     company_name: String,
+    company_legal_name: String,
+    company_registration_number: String,
+    tax_identifier: String,
+    duns_number: String,
     company_address: String,
+    company_country: String,
     website: String,
+    linked_in: String,
     industry: String,
     default_client_name: String,
+    credentials_summary: String,
+    certifications: String,
+    legal_disclaimer: String,
     brand_voice: String,
 }
 
@@ -8618,7 +8628,7 @@ fn improvement_evidence_signals(item: &ImprovementItem) -> Vec<String> {
 }
 
 fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool {
-    if item.number == 80 {
+    if matches!(item.number, 11 | 80) {
         return false;
     }
     let text = format!(
@@ -11854,14 +11864,14 @@ fn document_snippet_catalog() -> Vec<DocumentSnippetInfo> {
             label: "Company contact block",
             kind: "identity",
             summary: "Reusable sender and organization block for cover pages, letters, and submissions.",
-            body: "**Prepared by:** {{fullName}}, {{roleTitle}}\n\n**Company:** {{companyName}}\n\n**Address:** {{companyAddress}}\n\n**Email:** {{email}}  \n**Phone:** {{phone}}  \n**Website:** {{website}}\n",
+            body: "**Prepared by:** {{fullName}}, {{roleTitle}}\n\n**Company:** {{companyName}}\n**Legal name:** {{companyLegalName}}\n**Registration:** {{companyRegistrationNumber}}\n**Tax ID:** {{taxIdentifier}}\n\n**Address:** {{companyAddress}}\n**Country:** {{companyCountry}}\n\n**Email:** {{email}}  \n**Phone:** {{phone}}  \n**Website:** {{website}}\n**LinkedIn:** {{linkedIn}}\n",
         },
         DocumentSnippetInfo {
             id: "company-overview",
             label: "Company overview",
             kind: "identity",
             summary: "Short boilerplate overview for proposals, tenders, and capability statements.",
-            body: "{{companyName}} is a {{industry}} organization. We help {{defaultClientName}} make practical decisions with clear evidence, disciplined delivery, and {{brandVoice}} communication.\n",
+            body: "{{companyName}} is a {{industry}} organization. We help {{defaultClientName}} make practical decisions with clear evidence, disciplined delivery, and {{brandVoice}} communication.\n\n**Credentials:** {{credentialsSummary}}\n\n**Certifications:** {{certifications}}\n",
         },
         DocumentSnippetInfo {
             id: "executive-summary",
@@ -12187,10 +12197,19 @@ fn set_business_profile_field(
         "phone" => profile.phone = value.to_string(),
         "roleTitle" => profile.role_title = value.to_string(),
         "companyName" => profile.company_name = value.to_string(),
+        "companyLegalName" => profile.company_legal_name = value.to_string(),
+        "companyRegistrationNumber" => profile.company_registration_number = value.to_string(),
+        "taxIdentifier" => profile.tax_identifier = value.to_string(),
+        "dunsNumber" => profile.duns_number = value.to_string(),
         "companyAddress" => profile.company_address = value.to_string(),
+        "companyCountry" => profile.company_country = value.to_string(),
         "website" => profile.website = value.to_string(),
+        "linkedIn" => profile.linked_in = value.to_string(),
         "industry" => profile.industry = value.to_string(),
         "defaultClientName" => profile.default_client_name = value.to_string(),
+        "credentialsSummary" => profile.credentials_summary = value.to_string(),
+        "certifications" => profile.certifications = value.to_string(),
+        "legalDisclaimer" => profile.legal_disclaimer = value.to_string(),
         "brandVoice" => profile.brand_voice = value.to_string(),
         _ => unreachable!("canonical profile field list is exhaustive"),
     }
@@ -12204,10 +12223,19 @@ fn business_profile_fields() -> Vec<&'static str> {
         "phone",
         "roleTitle",
         "companyName",
+        "companyLegalName",
+        "companyRegistrationNumber",
+        "taxIdentifier",
+        "dunsNumber",
         "companyAddress",
+        "companyCountry",
         "website",
+        "linkedIn",
         "industry",
         "defaultClientName",
+        "credentialsSummary",
+        "certifications",
+        "legalDisclaimer",
         "brandVoice",
     ]
 }
@@ -12220,12 +12248,25 @@ fn canonical_profile_field(key: &str) -> Result<&'static str, String> {
         "phone" | "phone number" | "telephone" => Ok("phone"),
         "role title" | "role" | "title" | "job title" => Ok("roleTitle"),
         "company name" | "company" | "organization" | "organisation" => Ok("companyName"),
+        "company legal name" | "legal company name" | "legal name" => Ok("companyLegalName"),
+        "company registration number" | "registration number" | "registration" | "company id" => {
+            Ok("companyRegistrationNumber")
+        }
+        "tax identifier" | "tax id" | "vat" | "ein" | "gst" => Ok("taxIdentifier"),
+        "duns number" | "duns" | "supplier id" | "supplier identifier" => Ok("dunsNumber"),
         "company address" | "address" | "mailing address" => Ok("companyAddress"),
+        "company country" | "country" => Ok("companyCountry"),
         "website" | "web site" | "url" => Ok("website"),
+        "linked in" | "linkedin" | "linked in url" | "linkedin url" => Ok("linkedIn"),
         "industry" | "sector" => Ok("industry"),
         "default client name" | "default client" | "client" | "client name" => {
             Ok("defaultClientName")
         }
+        "credentials summary" | "credentials" | "qualifications" | "capabilities" => {
+            Ok("credentialsSummary")
+        }
+        "certifications" | "certification" | "licenses" | "licences" => Ok("certifications"),
+        "legal disclaimer" | "disclaimer" | "legal text" | "legal" => Ok("legalDisclaimer"),
         "brand voice" | "voice" | "tone" => Ok("brandVoice"),
         other => Err(format!(
             "Unknown profile field '{other}'. Supported fields: {}",
@@ -12245,10 +12286,19 @@ fn business_profile_field_value(
         "phone" => &profile.phone,
         "roleTitle" => &profile.role_title,
         "companyName" => &profile.company_name,
+        "companyLegalName" => &profile.company_legal_name,
+        "companyRegistrationNumber" => &profile.company_registration_number,
+        "taxIdentifier" => &profile.tax_identifier,
+        "dunsNumber" => &profile.duns_number,
         "companyAddress" => &profile.company_address,
+        "companyCountry" => &profile.company_country,
         "website" => &profile.website,
+        "linkedIn" => &profile.linked_in,
         "industry" => &profile.industry,
         "defaultClientName" => &profile.default_client_name,
+        "credentialsSummary" => &profile.credentials_summary,
+        "certifications" => &profile.certifications,
+        "legalDisclaimer" => &profile.legal_disclaimer,
         "brandVoice" => &profile.brand_voice,
         _ => unreachable!("canonical profile field list is exhaustive"),
     };
@@ -12262,10 +12312,19 @@ fn business_profile_field_catalog() -> Vec<Value> {
         json!({"field": "phone", "label": "Phone", "aliases": ["phoneNumber", "telephone"], "usedFor": "contact blocks and submission forms"}),
         json!({"field": "roleTitle", "label": "Role title", "aliases": ["role", "title", "jobTitle"], "usedFor": "prepared-by lines and reviewer handoffs"}),
         json!({"field": "companyName", "label": "Company name", "aliases": ["company", "organization", "organisation"], "usedFor": "company boilerplate, proposals, and procurement responses"}),
+        json!({"field": "companyLegalName", "label": "Legal company name", "aliases": ["legalName", "legalCompanyName"], "usedFor": "contracts, tenders, supplier forms, and official submissions"}),
+        json!({"field": "companyRegistrationNumber", "label": "Company registration number", "aliases": ["registration", "companyId"], "usedFor": "supplier forms, compliance matrices, and procurement attachments"}),
+        json!({"field": "taxIdentifier", "label": "Tax identifier", "aliases": ["taxId", "vat", "ein", "gst"], "usedFor": "supplier forms, invoices, and tender declarations"}),
+        json!({"field": "dunsNumber", "label": "DUNS number", "aliases": ["duns", "supplierId"], "usedFor": "enterprise procurement portals and vendor registration"}),
         json!({"field": "companyAddress", "label": "Company address", "aliases": ["address", "mailingAddress"], "usedFor": "cover pages, letters, tenders, and official submissions"}),
+        json!({"field": "companyCountry", "label": "Company country", "aliases": ["country"], "usedFor": "supplier forms, compliance declarations, and export metadata"}),
         json!({"field": "website", "label": "Website", "aliases": ["webSite", "url"], "usedFor": "contact blocks, publishing metadata, and capability statements"}),
+        json!({"field": "linkedIn", "label": "LinkedIn", "aliases": ["linkedin", "linkedinUrl"], "usedFor": "company profiles, bios, and business development documents"}),
         json!({"field": "industry", "label": "Industry", "aliases": ["sector"], "usedFor": "company overview snippets and proposal positioning"}),
         json!({"field": "defaultClientName", "label": "Default client name", "aliases": ["defaultClient", "client", "clientName"], "usedFor": "starter documents, Docs Live placeholders, and reusable snippets"}),
+        json!({"field": "credentialsSummary", "label": "Credentials summary", "aliases": ["credentials", "qualifications", "capabilities"], "usedFor": "capability statements, proposals, RFP responses, and AI drafting context"}),
+        json!({"field": "certifications", "label": "Certifications", "aliases": ["licenses", "licences"], "usedFor": "qualification tables, procurement forms, and proposal appendices"}),
+        json!({"field": "legalDisclaimer", "label": "Legal disclaimer", "aliases": ["disclaimer", "legalText"], "usedFor": "external exports, formal handoffs, confidentiality notices, and review gates"}),
         json!({"field": "brandVoice", "label": "Brand voice", "aliases": ["voice", "tone"], "usedFor": "Docs Live drafting, snippets, humanization, and agent handoffs"}),
     ]
 }
@@ -12371,12 +12430,25 @@ fn business_profile_placeholder_value(
         "phone" | "phone number" | "telephone" => &profile.phone,
         "role title" | "role" | "title" | "job title" => &profile.role_title,
         "company name" | "company" | "organization" | "organisation" => &profile.company_name,
+        "company legal name" | "legal company name" | "legal name" => &profile.company_legal_name,
+        "company registration number" | "registration number" | "registration" | "company id" => {
+            &profile.company_registration_number
+        }
+        "tax identifier" | "tax id" | "vat" | "ein" | "gst" => &profile.tax_identifier,
+        "duns number" | "duns" | "supplier id" | "supplier identifier" => &profile.duns_number,
         "company address" | "address" | "mailing address" => &profile.company_address,
+        "company country" | "country" => &profile.company_country,
         "website" | "web site" | "url" => &profile.website,
+        "linked in" | "linkedin" | "linked in url" | "linkedin url" => &profile.linked_in,
         "industry" | "sector" => &profile.industry,
         "default client name" | "default client" | "client" | "client name" => {
             &profile.default_client_name
         }
+        "credentials summary" | "credentials" | "qualifications" | "capabilities" => {
+            &profile.credentials_summary
+        }
+        "certifications" | "certification" | "licenses" | "licences" => &profile.certifications,
+        "legal disclaimer" | "disclaimer" | "legal text" | "legal" => &profile.legal_disclaimer,
         "brand voice" | "voice" | "tone" => &profile.brand_voice,
         _ => return None,
     };
@@ -12396,9 +12468,20 @@ fn normalize_business_profile_placeholder_key(placeholder: &str) -> String {
     if let Some(rest) = trimmed.strip_prefix("company.") {
         return match normalize_profile_key(rest).as_str() {
             "name" => "company name".to_string(),
+            "legal name" | "legal company name" => "company legal name".to_string(),
+            "registration" | "registration number" | "company id" => {
+                "company registration number".to_string()
+            }
+            "tax id" | "tax identifier" | "vat" | "ein" | "gst" => "tax identifier".to_string(),
+            "duns" | "duns number" | "supplier id" => "duns number".to_string(),
             "address" | "mailing address" => "company address".to_string(),
+            "country" => "company country".to_string(),
             "website" | "web site" | "url" => "website".to_string(),
+            "linkedin" | "linked in" | "linkedin url" => "linked in".to_string(),
             "industry" | "sector" => "industry".to_string(),
+            "credentials" | "qualifications" | "capabilities" => "credentials summary".to_string(),
+            "certifications" | "licenses" | "licences" => "certifications".to_string(),
+            "legal disclaimer" | "disclaimer" | "legal text" => "legal disclaimer".to_string(),
             other => other.to_string(),
         };
     }
@@ -12418,10 +12501,22 @@ fn business_profile_placeholder_text(profile: &BusinessProfile) -> String {
         ("phone", &profile.phone),
         ("roleTitle", &profile.role_title),
         ("companyName", &profile.company_name),
+        ("companyLegalName", &profile.company_legal_name),
+        (
+            "companyRegistrationNumber",
+            &profile.company_registration_number,
+        ),
+        ("taxIdentifier", &profile.tax_identifier),
+        ("dunsNumber", &profile.duns_number),
         ("companyAddress", &profile.company_address),
+        ("companyCountry", &profile.company_country),
         ("website", &profile.website),
+        ("linkedIn", &profile.linked_in),
         ("industry", &profile.industry),
         ("defaultClientName", &profile.default_client_name),
+        ("credentialsSummary", &profile.credentials_summary),
+        ("certifications", &profile.certifications),
+        ("legalDisclaimer", &profile.legal_disclaimer),
         ("brandVoice", &profile.brand_voice),
     ]
     .iter()
@@ -12445,8 +12540,31 @@ fn business_profile_markdown(profile: &BusinessProfile) -> String {
             profile_value(&profile.company_name, "companyName")
         ),
         format!(
+            "**Legal name:** {}",
+            profile_value(&profile.company_legal_name, "companyLegalName")
+        ),
+        format!(
+            "**Registration:** {}",
+            profile_value(
+                &profile.company_registration_number,
+                "companyRegistrationNumber"
+            )
+        ),
+        format!(
+            "**Tax ID:** {}",
+            profile_value(&profile.tax_identifier, "taxIdentifier")
+        ),
+        format!(
+            "**DUNS:** {}",
+            profile_value(&profile.duns_number, "dunsNumber")
+        ),
+        format!(
             "**Address:** {}",
             profile_value(&profile.company_address, "companyAddress")
+        ),
+        format!(
+            "**Country:** {}",
+            profile_value(&profile.company_country, "companyCountry")
         ),
         "".to_string(),
         format!("**Email:** {}", profile_value(&profile.email, "email")),
@@ -12454,6 +12572,10 @@ fn business_profile_markdown(profile: &BusinessProfile) -> String {
         format!(
             "**Website:** {}",
             profile_value(&profile.website, "website")
+        ),
+        format!(
+            "**LinkedIn:** {}",
+            profile_value(&profile.linked_in, "linkedIn")
         ),
         "".to_string(),
         format!(
@@ -12463,6 +12585,18 @@ fn business_profile_markdown(profile: &BusinessProfile) -> String {
         format!(
             "**Default client:** {}",
             profile_value(&profile.default_client_name, "defaultClientName")
+        ),
+        format!(
+            "**Credentials:** {}",
+            profile_value(&profile.credentials_summary, "credentialsSummary")
+        ),
+        format!(
+            "**Certifications:** {}",
+            profile_value(&profile.certifications, "certifications")
+        ),
+        format!(
+            "**Legal disclaimer:** {}",
+            profile_value(&profile.legal_disclaimer, "legalDisclaimer")
         ),
         format!(
             "**Brand voice:** {}",
@@ -16080,7 +16214,7 @@ fn workspace_init_entries(root: &Path) -> Vec<(PathBuf, &'static str)> {
         ),
         (
             base.join("business-profile.json"),
-            "{\n  \"fullName\": \"Your Name\",\n  \"email\": \"you@example.com\",\n  \"phone\": \"\",\n  \"roleTitle\": \"Your Role\",\n  \"companyName\": \"Your Company\",\n  \"companyAddress\": \"\",\n  \"website\": \"https://example.com\",\n  \"industry\": \"\",\n  \"defaultClientName\": \"Client Name\",\n  \"brandVoice\": \"clear and practical\"\n}\n",
+            "{\n  \"fullName\": \"Your Name\",\n  \"email\": \"you@example.com\",\n  \"phone\": \"\",\n  \"roleTitle\": \"Your Role\",\n  \"companyName\": \"Your Company\",\n  \"companyLegalName\": \"Your Company LLC\",\n  \"companyRegistrationNumber\": \"\",\n  \"taxIdentifier\": \"\",\n  \"dunsNumber\": \"\",\n  \"companyAddress\": \"\",\n  \"companyCountry\": \"\",\n  \"website\": \"https://example.com\",\n  \"linkedIn\": \"\",\n  \"industry\": \"\",\n  \"defaultClientName\": \"Client Name\",\n  \"credentialsSummary\": \"\",\n  \"certifications\": \"\",\n  \"legalDisclaimer\": \"\",\n  \"brandVoice\": \"clear and practical\"\n}\n",
         ),
         (
             base.join("outlines.json"),

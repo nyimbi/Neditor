@@ -104,6 +104,7 @@ Common examples:
 ```sh
 ned open proposal.md
 ned new response.md --template rfp-response --title "RFP Response"
+ned profile --workspace . --set companyName=Acme --set companyLegalName="Acme LLC" --set taxIdentifier=VAT-999 --set credentialsSummary="Approved supplier"
 ned rfp-response buyer-rfp.pdf --output response.md --matrix-output compliance.md --outline-output proposal-outline.md --coverage-output coverage.md
 ned sources --document research-report.md --query "market evidence" --provider duckduckgo
 ned sources --document research-report.md --audit --output source-audit.md
