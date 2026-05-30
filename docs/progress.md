@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-29
+Updated: 2026-05-30
 
 ## Active Goal
 
@@ -26,6 +26,32 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 CLI Read-Aloud And TTS Consent Gate
+
+The packaged `ned` CLI now exposes read-aloud workflows instead of leaving TTS
+only inside the desktop UI. `ned read-aloud`, `ned tts`, and `ned speak` accept
+Markdown files, stdin, or literal `--text`, convert Markdown to spoken plain
+text, and can run macOS Say or Supertonic CLI through the same native command
+builders used by the app. Dry-run JSON reports show character and word counts,
+redacted command arguments, whether stdin is used, and next steps without
+leaking the document body.
+
+Supertonic remains consent-gated from the terminal: the command reports the
+model name, approximate size, and storage location, and refuses to prepare
+playback until `--acknowledge-model-download` is present. Users can also write
+an auditable local script with `--script-output` after explicitly choosing that
+handoff. Bash, zsh, and fish completions plus the README and user guide now
+document the read-aloud surface.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 33 CLI tests passed and the debug `ned` binary rebuilt, including consent-gated Supertonic dry-run JSON, redacted command plans, generated script output, macOS Say stdin handling, help text, and shell completions. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting CLI read-aloud. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after adding the CLI command. |
+| `src-tauri/target/debug/ned read-aloud - --engine supertonic-cli --acknowledge-model-download --model-storage ~/.cache/supertonic/models --dry-run --json` | Pass | Smoke output used schema `neditor.ned-read-aloud.v1`, redacted the spoken text, showed Supertonic model size/storage, and did not start playback. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit still reports 65/100 implementation-evidenced items and 35 partial/external-proof items, so the overall 100-improvement goal remains active. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-29 First-Class Multi-Column Layout Authoring
 

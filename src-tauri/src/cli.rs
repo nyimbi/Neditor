@@ -14,6 +14,7 @@ use crate::{
         installable_external_transform_engines, transform_handler_installer_plans_for_platform,
         TransformHandlerInstallerPlan,
     },
+    tts::{native_tts_command_for_request, NativeTtsCommand, NativeTtsRequest},
     CompileRequest, CompileResponse, DocumentDiagnostic,
 };
 use serde::{Deserialize, Serialize};
@@ -21,7 +22,7 @@ use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     env, fs,
-    io::{self, Read},
+    io::{self, Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
@@ -140,6 +141,9 @@ const CLI_COMMANDS: &[&str] = &[
     "improvements",
     "improvement-audit",
     "roadmap",
+    "read-aloud",
+    "tts",
+    "speak",
     "support",
     "support-bundle",
     "completions",
@@ -605,6 +609,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         }
         "release-candidate" | "candidate" => run_release_candidate_command(&args[2..]),
         "improvements" | "improvement-audit" | "roadmap" => run_improvements_command(&args[2..]),
+        "read-aloud" | "tts" | "speak" => run_read_aloud_command(&args[2..], stdin_text),
         "support" | "support-bundle" => run_support_bundle_command(&args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
@@ -5362,6 +5367,462 @@ fn run_improvements_command(args: &[String]) -> Result<CliOutcome, String> {
         },
         exit_code,
     })
+}
+
+fn run_read_aloud_command(args: &[String], stdin_text: Option<&str>) -> Result<CliOutcome, String> {
+    let mut source: Option<String> = None;
+    let mut inline_text: Option<String> = None;
+    let mut engine = "system".to_string();
+    let mut voice: Option<String> = None;
+    let mut language: Option<String> = None;
+    let mut rate: Option<u16> = None;
+    let mut speed: Option<f32> = None;
+    let mut supertonic_command: Option<String> = None;
+    let mut model = "supertonic-3".to_string();
+    let mut model_size = "~305 MB".to_string();
+    let mut model_storage: Option<String> = None;
+    let mut acknowledge_model_download = false;
+    let mut dry_run = false;
+    let mut json_output = false;
+    let mut script_output: Option<PathBuf> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--text" => {
+                index += 1;
+                inline_text = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--text requires text to read aloud".to_string())?
+                        .to_string(),
+                );
+            }
+            "--engine" => {
+                index += 1;
+                engine = args
+                    .get(index)
+                    .ok_or_else(|| {
+                        "--engine requires system, macos-say, or supertonic-cli".to_string()
+                    })?
+                    .to_string();
+            }
+            "--voice" => {
+                index += 1;
+                voice = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--voice requires a voice name".to_string())?
+                        .to_string(),
+                );
+            }
+            "--language" | "--lang" => {
+                index += 1;
+                language = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--language requires a language code".to_string())?
+                        .to_string(),
+                );
+            }
+            "--rate" => {
+                index += 1;
+                rate = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--rate requires a number from 80 to 420".to_string())?
+                        .parse::<u16>()
+                        .map_err(|_| "--rate must be a number from 80 to 420".to_string())?,
+                );
+            }
+            "--speed" => {
+                index += 1;
+                speed = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--speed requires a number from 0.7 to 2.0".to_string())?
+                        .parse::<f32>()
+                        .map_err(|_| "--speed must be a number from 0.7 to 2.0".to_string())?,
+                );
+            }
+            "--supertonic-command" | "--command" => {
+                index += 1;
+                supertonic_command = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--supertonic-command requires a command path".to_string())?
+                        .to_string(),
+                );
+            }
+            "--model" => {
+                index += 1;
+                model = args
+                    .get(index)
+                    .ok_or_else(|| "--model requires a model name".to_string())?
+                    .to_string();
+            }
+            "--model-size" | "--size" => {
+                index += 1;
+                model_size = args
+                    .get(index)
+                    .ok_or_else(|| "--model-size requires a size label".to_string())?
+                    .to_string();
+            }
+            "--model-storage" | "--storage" | "--model-storage-path" => {
+                index += 1;
+                model_storage = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--model-storage requires a storage path".to_string())?
+                        .to_string(),
+                );
+            }
+            "--acknowledge-model-download" | "--acknowledge-download" => {
+                acknowledge_model_download = true
+            }
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            "--script-output" | "--write-script" => {
+                index += 1;
+                script_output =
+                    Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--script-output requires a path".to_string()
+                    })?));
+            }
+            value if value != "-" && value.starts_with('-') => {
+                return Err(format!("Unsupported read-aloud option '{value}'"))
+            }
+            value => {
+                if source.is_some() {
+                    return Err("Usage: ned read-aloud <file.md|-> [--engine system|macos-say|supertonic-cli] [--dry-run] [--json]".to_string());
+                }
+                source = Some(value.to_string());
+            }
+        }
+        index += 1;
+    }
+
+    if inline_text.is_some() && source.is_some() {
+        return Err("Choose either --text or a Markdown file, not both.".to_string());
+    }
+    if model.trim() != "supertonic-3" {
+        return Err(
+            "NEditor currently exposes the Supertonic supertonic-3 model through the CLI."
+                .to_string(),
+        );
+    }
+
+    let (input_text, source_label, input_kind) = if let Some(text) = inline_text {
+        (text, "inline text".to_string(), "text".to_string())
+    } else {
+        let source = source.ok_or_else(|| {
+            "Usage: ned read-aloud <file.md|-> [--engine system|macos-say|supertonic-cli] [--dry-run] [--json]".to_string()
+        })?;
+        let (markdown, _file_path, input_path) = read_cli_input_document(&source, stdin_text)?;
+        (
+            markdown_to_plain_text(&markdown),
+            input_path,
+            "markdown".to_string(),
+        )
+    };
+    let text = input_text.trim();
+    if text.is_empty() {
+        return Err("No text is available to read aloud.".to_string());
+    }
+
+    let resolved_engine = resolve_cli_tts_engine(&engine)?;
+    let browser_plan = resolved_engine == "browser-speech";
+    let command = if browser_plan {
+        None
+    } else {
+        Some(native_tts_command_for_request(&NativeTtsRequest {
+            engine: resolved_engine.clone(),
+            text: text.to_string(),
+            voice: voice.clone(),
+            language: language.clone(),
+            rate,
+            command_path: supertonic_command.clone(),
+            speed,
+            model_download_acknowledged: Some(acknowledge_model_download),
+            model_storage_path: model_storage.clone(),
+        })?)
+    };
+
+    if let (Some(path), Some(command)) = (script_output.as_deref(), command.as_ref()) {
+        write_cli_script_output(path, &tts_shell_script(command))?;
+    }
+
+    let words = text.split_whitespace().count();
+    let characters = text.chars().count();
+    let model_storage_label = model_storage
+        .as_deref()
+        .unwrap_or("Supertonic default model cache");
+    let report = json!({
+        "schema": "neditor.ned-read-aloud.v1",
+        "source": source_label,
+        "inputKind": input_kind,
+        "engine": resolved_engine,
+        "dryRun": dry_run,
+        "executed": !dry_run && command.is_some(),
+        "text": {
+            "characters": characters,
+            "words": words
+        },
+        "modelDownload": {
+            "requiredForEngine": resolved_engine == "supertonic-cli",
+            "acknowledged": acknowledge_model_download,
+            "model": model,
+            "approximateSize": model_size,
+            "storagePath": model_storage_label,
+            "willDownloadImplicitlyOnFirstUse": resolved_engine == "supertonic-cli" && acknowledge_model_download,
+        },
+        "command": command.as_ref().map(tts_command_report),
+        "scriptOutput": script_output.as_deref().map(path_to_display),
+        "nextSteps": read_aloud_next_steps(&resolved_engine, dry_run, command.is_some(), acknowledge_model_download),
+    });
+
+    if browser_plan && !dry_run {
+        return Err(
+            "Browser speech can only be run inside the NEditor app. Use --dry-run for a handoff plan or choose --engine macos-say or --engine supertonic-cli."
+                .to_string(),
+        );
+    }
+    if !dry_run {
+        if let Some(command) = command.as_ref() {
+            execute_tts_command(command)?;
+        }
+    }
+
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+
+    Ok(CliOutcome {
+        message: read_aloud_text_report(&report),
+        exit_code: 0,
+    })
+}
+
+fn resolve_cli_tts_engine(engine: &str) -> Result<String, String> {
+    let normalized = engine.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "system" | "native" => {
+            #[cfg(target_os = "macos")]
+            {
+                Ok("macos-say".to_string())
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                Err("No OS-native CLI TTS engine is configured for this platform. Use --engine supertonic-cli, or use --engine browser --dry-run for an in-app handoff.".to_string())
+            }
+        }
+        "macos" | "macos-say" | "say" => Ok("macos-say".to_string()),
+        "supertonic" | "supertonic-cli" => Ok("supertonic-cli".to_string()),
+        "browser" | "browser-speech" => Ok("browser-speech".to_string()),
+        _ => Err(
+            "Unsupported read-aloud engine. Use system, macos-say, browser, or supertonic-cli."
+                .to_string(),
+        ),
+    }
+}
+
+fn execute_tts_command(command: &NativeTtsCommand) -> Result<(), String> {
+    let mut child = Command::new(&command.program)
+        .args(&command.args)
+        .stdin(if command.stdin_text.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|err| format!("Could not start text-to-speech engine: {err}"))?;
+    if let Some(text) = command.stdin_text.as_deref() {
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(text.as_bytes())
+                .map_err(|err| format!("Could not send text to speech engine: {err}"))?;
+        }
+    }
+    let _ = child.try_wait();
+    Ok(())
+}
+
+fn tts_command_report(command: &NativeTtsCommand) -> Value {
+    json!({
+        "program": command.program,
+        "args": command
+            .args
+            .iter()
+            .enumerate()
+            .map(|(index, arg)| if command.stdin_text.as_deref() == Some(arg.as_str()) {
+                format!("<text:{} chars>", arg.chars().count())
+            } else if is_supertonic_text_arg(command, index) {
+                format!("<text:{} chars>", arg.chars().count())
+            } else {
+                arg.clone()
+            })
+            .collect::<Vec<_>>(),
+        "usesStdin": command.stdin_text.is_some(),
+        "stdin": command.stdin_text.as_ref().map(|text| format!("<text:{} chars>", text.chars().count())),
+        "display": tts_command_display(command),
+    })
+}
+
+fn tts_command_display(command: &NativeTtsCommand) -> String {
+    if command.stdin_text.is_some() {
+        let mut parts = vec![shell_word(&command.program)];
+        parts.extend(command.args.iter().map(|arg| shell_word(arg)));
+        format!("printf '%s' '<document text>' | {}", parts.join(" "))
+    } else {
+        std::iter::once(shell_word(&command.program))
+            .chain(command.args.iter().enumerate().map(|(index, arg)| {
+                if command.stdin_text.as_deref() == Some(arg.as_str())
+                    || is_supertonic_text_arg(command, index)
+                {
+                    shell_word("<document text>")
+                } else {
+                    shell_word(arg)
+                }
+            }))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+}
+
+fn is_supertonic_text_arg(command: &NativeTtsCommand, index: usize) -> bool {
+    command.stdin_text.is_none()
+        && command.args.first().is_some_and(|arg| arg == "say")
+        && index == 1
+}
+
+fn tts_shell_script(command: &NativeTtsCommand) -> String {
+    let mut lines = vec!["#!/bin/sh".to_string(), "set -eu".to_string()];
+    if let Some(text) = command.stdin_text.as_deref() {
+        let mut parts = vec![shell_word(&command.program)];
+        parts.extend(command.args.iter().map(|arg| shell_word(arg)));
+        lines.push(format!(
+            "printf '%s' {} | {}",
+            shell_word(text),
+            parts.join(" ")
+        ));
+    } else {
+        lines.push(
+            std::iter::once(shell_word(&command.program))
+                .chain(command.args.iter().map(|arg| shell_word(arg)))
+                .collect::<Vec<_>>()
+                .join(" "),
+        );
+    }
+    lines.join("\n")
+}
+
+fn shell_word(value: &str) -> String {
+    format!("'{}'", shell_single_quote(value))
+}
+
+fn write_cli_script_output(path: &Path, script: &str) -> Result<(), String> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("Could not create directory {}: {err}", parent.display()))?;
+    }
+    fs::write(path, format!("{}\n", script.trim_end()))
+        .map_err(|err| format!("Could not write {}: {err}", path.display()))
+}
+
+fn read_aloud_next_steps(
+    engine: &str,
+    dry_run: bool,
+    has_command: bool,
+    acknowledged: bool,
+) -> Vec<String> {
+    if engine == "browser-speech" {
+        return vec![
+            "Open the document in NEditor and use Writing Tools -> Read document aloud."
+                .to_string(),
+            "Use Settings -> AI, agents, and voice to choose the browser voice and rate."
+                .to_string(),
+        ];
+    }
+    if engine == "supertonic-cli" && !acknowledged {
+        return vec![
+            "Review the Supertonic model name, approximate size, storage location, and command.".to_string(),
+            "Re-run with --acknowledge-model-download only after accepting that the model may be downloaded on first use.".to_string(),
+        ];
+    }
+    if dry_run && has_command {
+        return vec![
+            "Remove --dry-run to start read-aloud from the CLI.".to_string(),
+            "Use --script-output read-aloud.sh to create an auditable local handoff script."
+                .to_string(),
+        ];
+    }
+    vec!["Read-aloud command started.".to_string()]
+}
+
+fn read_aloud_text_report(report: &Value) -> String {
+    let text = report.get("text").unwrap_or(&Value::Null);
+    let model = report.get("modelDownload").unwrap_or(&Value::Null);
+    let command = report.get("command").unwrap_or(&Value::Null);
+    let mut lines = vec![
+        "NEditor read-aloud plan".to_string(),
+        format!(
+            "Source: {}",
+            readiness_string_field(report, "source").unwrap_or("unknown")
+        ),
+        format!(
+            "Engine: {}",
+            readiness_string_field(report, "engine").unwrap_or("unknown")
+        ),
+        format!(
+            "Text: {} characters, {} words",
+            number_field_u64(text, "characters"),
+            number_field_u64(text, "words")
+        ),
+    ];
+    if report
+        .get("dryRun")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        lines.push("Mode: dry run; no speech process was started.".to_string());
+    }
+    if model
+        .get("requiredForEngine")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        lines.push(format!(
+            "Supertonic model: {} ({}) stored at {}; acknowledgement: {}",
+            readiness_string_field(model, "model").unwrap_or("supertonic-3"),
+            readiness_string_field(model, "approximateSize").unwrap_or("~305 MB"),
+            readiness_string_field(model, "storagePath")
+                .unwrap_or("Supertonic default model cache"),
+            if model
+                .get("acknowledged")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                "yes"
+            } else {
+                "no"
+            }
+        ));
+    }
+    if let Some(display) = readiness_string_field(command, "display") {
+        lines.push(format!("Command: {display}"));
+    }
+    if let Some(script) = readiness_string_field(report, "scriptOutput") {
+        lines.push(format!("Script: {script}"));
+    }
+    lines.push("Next steps:".to_string());
+    if let Some(next_steps) = report.get("nextSteps").and_then(Value::as_array) {
+        for step in next_steps {
+            if let Some(step) = step.as_str() {
+                lines.push(format!("- {step}"));
+            }
+        }
+    }
+    lines.join("\n")
 }
 
 fn run_evidence_packet_command(args: &[String]) -> Result<CliOutcome, String> {
@@ -15074,6 +15535,9 @@ _ned() {{
       publish)
         COMPREPLY=( $(compgen -W "--target --to --destination --kind --endpoint --format --auth-header --token-env --output --json --allow-not-ready --option" -- "$cur") )
         ;;
+      read-aloud|tts|speak)
+        COMPREPLY=( $(compgen -W "--text --engine --voice --language --lang --rate --speed --supertonic-command --command --model --model-size --model-storage --acknowledge-model-download --dry-run --json --script-output" -- "$cur") )
+        ;;
       inspect)
         COMPREPLY=( $(compgen -W "--json --option" -- "$cur") )
         ;;
@@ -15201,6 +15665,9 @@ _ned() {{
       ;;
     publish)
       _arguments '*:markdown file:_files -g "*.md"' '--target[publishing target]:target:($publish_targets)' '--to[publishing target alias]:target:($publish_targets)' '--destination[publishing destination]:destination:($publish_destinations)' '--kind[publishing destination alias]:destination:($publish_destinations)' '--endpoint[HTTPS publishing endpoint]:url:' '--format[payload content format]:format:($publish_formats)' '--auth-header[header name for token at handoff time]:header:' '--token-env[environment variable containing token at handoff time]:name:' '--output[write JSON payload]:file:_files' '--json[print machine-readable JSON]' '--allow-not-ready[prepare payload despite readiness errors]' '--option[set export option key=value]:option:'
+      ;;
+    read-aloud|tts|speak)
+      _arguments '*:markdown file:_files -g "*.md"' '--text[read this literal text instead of a file]:text:' '--engine[text-to-speech engine]:engine:(system macos-say browser supertonic-cli)' '--voice[voice name]:voice:' '--language[language code]:language:' '--lang[language code alias]:language:' '--rate[macOS Say words per minute]:rate:' '--speed[Supertonic speech speed]:speed:' '--supertonic-command[Supertonic CLI command path]:command:_files' '--command[alias for --supertonic-command]:command:_files' '--model[Supertonic model name]:model:' '--model-size[shown model download size]:size:' '--model-storage[shown model storage path]:directory:_files -/' '--acknowledge-model-download[confirm Supertonic model download/storage notice]' '--dry-run[print plan without starting speech]' '--json[print machine-readable JSON]' '--script-output[write auditable shell script]:file:_files'
       ;;
     inspect)
       _arguments '*:markdown file:_files -g "*.md"' '--json[print machine-readable JSON]' '--option[set compile option key=value]:option:'
@@ -15370,6 +15837,38 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l json".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l allow-not-ready".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from publish' -l option -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l text -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l engine -a 'system macos-say browser supertonic-cli'"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l voice -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l language -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l lang -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l rate -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l speed -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l supertonic-command -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l command -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l model -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l model-size -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l model-storage -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l acknowledge-model-download"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l dry-run"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l script-output -r"
+            .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates outlines latex-templates tex-templates transform-templates xforms targets inspect doctor' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
@@ -16388,6 +16887,8 @@ fn help_text() -> String {
         "  ned convert <file.md|-> --to pdf,docx --output-dir exports [--no-manifest]".to_string(),
         "  ned convert <file.md|-> --to html --stdout".to_string(),
         "  ned publish <file.md|-> --target blog --endpoint https://cms.example/hook --output payload.json [--json]".to_string(),
+        "  ned read-aloud <file.md|-> [--engine system|macos-say|supertonic-cli] [--dry-run] [--json]".to_string(),
+        "  ned read-aloud <file.md|-> --engine supertonic-cli --acknowledge-model-download --model-storage ~/.cache/supertonic/models".to_string(),
         "  ned inspect <file.md|-> [--json]".to_string(),
         "  ned validate <file.md|-> --to pdf [--json] [--strict]".to_string(),
         "  ned quality <file.md|-> [--json|--markdown] [--output quality-review.md] [--strict]".to_string(),

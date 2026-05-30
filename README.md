@@ -109,6 +109,8 @@ ned sources --document research-report.md --query "market evidence" --provider d
 ned sources --document research-report.md --audit --output source-audit.md
 ned deep-research --topic "market evidence" --provider duckduckgo --pages 10 --output research-dossier.md
 ned quality board-paper.md --markdown --output quality-review.md
+ned read-aloud board-paper.md --engine macos-say --dry-run --json
+ned read-aloud board-paper.md --engine supertonic-cli --acknowledge-model-download --model-storage ~/.cache/supertonic/models
 ned convert board-paper.md --to pdf,docx,html --output-dir exports
 ned readiness --json
 ned support-bundle --workspace . --output support.json

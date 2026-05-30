@@ -306,6 +306,15 @@ storage path, download source, and command before any model-backed speech can
 start. The **Download model** and **Read document** actions stay disabled until
 you acknowledge the download notice.
 
+The packaged CLI exposes the same consent gate for scripted review sessions.
+Use `ned read-aloud report.md --engine macos-say --dry-run --json` to inspect
+the OS-native command without starting playback. For Supertonic, use
+`ned read-aloud report.md --engine supertonic-cli --model-storage ~/.cache/supertonic/models --dry-run --json`
+first; playback is blocked until you rerun with
+`--acknowledge-model-download`, after reviewing the model name, approximate
+size, and storage location. Add `--script-output read-aloud.sh` when a reviewer
+needs an auditable local handoff script.
+
 Use **AI Paste** when text came from a chat tool and needs cleanup before it
 enters the source document. Keep provenance enabled when the document needs an
 audit trail.

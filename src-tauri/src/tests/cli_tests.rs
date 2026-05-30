@@ -3411,6 +3411,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("evidence"));
     assert!(bash.message.contains("evidence-packet"));
     assert!(bash.message.contains("improvements"));
+    assert!(bash.message.contains("read-aloud"));
+    assert!(bash.message.contains("--acknowledge-model-download"));
     assert!(bash.message.contains("sources"));
     assert!(bash.message.contains("--download-url"));
     assert!(bash.message.contains("deep-research"));
@@ -3460,6 +3462,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--evidence-root"));
     assert!(zsh.message.contains("evidence-return-packet"));
     assert!(zsh.message.contains("roadmap\\:roadmap"));
+    assert!(zsh.message.contains("read-aloud\\:read-aloud"));
+    assert!(zsh
+        .message
+        .contains("--script-output[write auditable shell script]"));
     assert!(zsh
         .message
         .contains("'--output[write Markdown packet]:file:_files'"));
@@ -3515,6 +3521,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("evidence-packet"));
     assert!(fish.message.contains("release-evidence-packet"));
     assert!(fish.message.contains("improvement-audit"));
+    assert!(fish.message.contains("read-aloud"));
+    assert!(fish.message.contains("acknowledge-model-download"));
     assert!(fish.message.contains("citation-sources"));
     assert!(fish.message.contains("download-url"));
     assert!(fish.message.contains("deep-research"));
@@ -3554,6 +3562,92 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     ])
     .expect_err("unsupported shell");
     assert!(unsupported.contains("Supported shells: bash, zsh, fish"));
+}
+
+#[test]
+fn ned_cli_read_aloud_builds_consent_gated_tts_plans() {
+    let blocked = crate::cli::run_cli_with_args_and_stdin(
+        &[
+            "ned".to_string(),
+            "read-aloud".to_string(),
+            "-".to_string(),
+            "--engine".to_string(),
+            "supertonic-cli".to_string(),
+            "--model-storage".to_string(),
+            "~/.cache/supertonic/models".to_string(),
+            "--dry-run".to_string(),
+            "--json".to_string(),
+        ],
+        Some("# Board Memo\n\nRead the confidential quarterly plan."),
+    )
+    .expect_err("supertonic should require explicit model acknowledgement");
+    assert!(blocked.contains("~305 MB"));
+    assert!(blocked.contains("~/.cache/supertonic/models"));
+
+    let script_path = temp_markdown_path("read-aloud").with_extension("sh");
+    let outcome = crate::cli::run_cli_with_args_and_stdin(
+        &[
+            "ned".to_string(),
+            "tts".to_string(),
+            "-".to_string(),
+            "--engine".to_string(),
+            "supertonic-cli".to_string(),
+            "--acknowledge-model-download".to_string(),
+            "--model-storage".to_string(),
+            "~/.cache/supertonic/models".to_string(),
+            "--voice".to_string(),
+            "F1".to_string(),
+            "--dry-run".to_string(),
+            "--json".to_string(),
+            "--script-output".to_string(),
+            script_path.to_string_lossy().to_string(),
+        ],
+        Some("# Board Memo\n\nRead the confidential quarterly plan."),
+    )
+    .expect("acknowledged supertonic dry-run");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value =
+        serde_json::from_str(&outcome.message).expect("read-aloud json");
+    assert_eq!(report["schema"], "neditor.ned-read-aloud.v1");
+    assert_eq!(report["engine"], "supertonic-cli");
+    assert_eq!(report["dryRun"], true);
+    assert_eq!(report["modelDownload"]["acknowledged"], true);
+    assert_eq!(report["modelDownload"]["approximateSize"], "~305 MB");
+    assert_eq!(report["command"]["args"][1], "<text:48 chars>");
+    assert!(!outcome.message.contains("confidential quarterly plan"));
+    assert!(script_path.is_file());
+    let script = fs::read_to_string(&script_path).expect("read generated TTS script");
+    assert!(script.contains("supertonic"));
+    assert!(script.contains("confidential quarterly plan"));
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn ned_cli_read_aloud_uses_macos_say_without_shell_interpolation() {
+    let outcome = crate::cli::run_cli_with_args_and_stdin(
+        &[
+            "ned".to_string(),
+            "speak".to_string(),
+            "-".to_string(),
+            "--engine".to_string(),
+            "macos-say".to_string(),
+            "--voice".to_string(),
+            "Samantha".to_string(),
+            "--rate".to_string(),
+            "180".to_string(),
+            "--dry-run".to_string(),
+            "--json".to_string(),
+        ],
+        Some("# Memo\n\nRead this safely."),
+    )
+    .expect("macOS Say dry-run");
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("macos say json");
+    assert_eq!(report["schema"], "neditor.ned-read-aloud.v1");
+    assert_eq!(report["engine"], "macos-say");
+    assert_eq!(report["command"]["program"], "say");
+    assert_eq!(report["command"]["usesStdin"], true);
+    assert_eq!(report["command"]["stdin"], "<text:22 chars>");
+    assert!(!outcome.message.contains("Read this safely"));
 }
 
 #[test]
