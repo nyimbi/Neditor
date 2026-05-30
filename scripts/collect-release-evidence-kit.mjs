@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -274,8 +274,8 @@ const runbooks = [
     commands: [
       "pnpm run check:spec-completion",
       "pnpm run check:manual-review",
-      "Open .tmp/spec-completion/work-orders.md and locate the assigned manual-review work order.",
-      "Fill .tmp/manual-review/templates/<work-order-id>.template.json with named reviewer, current app version, current source commit, clean-source provenance, artifact paths, checklist outcomes, and zero unresolved blockers.",
+      "Open manual-review/dashboard.html or manual-review/dashboard.md in this evidence kit and locate the assigned manual-review work order.",
+      "Fill templates/spec-manual-review/<work-order-id>.template.json with named reviewer, current app version, current source commit, clean-source provenance, artifact paths, checklist outcomes, and zero unresolved blockers.",
       "Put screenshots or native-viewer/export evidence under .tmp/manual-review/<work-order-id>/artifacts/.",
       "pnpm run ingest:evidence -- --source .tmp/manual-review/<work-order-id>",
       "pnpm run check:manual-review",
@@ -325,6 +325,7 @@ mkdirSync(outputDir, { recursive: true });
 const copiedTemplates = copyTemplates();
 const copiedSpecWorkOrders = copySpecWorkOrders();
 const copiedSpecWorkOrderRunbooks = copySpecWorkOrderRunbooks();
+const copiedManualReviewAssets = copyManualReviewAssets();
 const staleTemplates = copiedTemplates.filter((template) => template.copied && template.freshness.status === "stale");
 const manifest = {
   schema: "neditor.release-evidence-kit.v1",
@@ -340,6 +341,7 @@ const manifest = {
     evidence: gap.evidence || null,
   })),
   copiedTemplates,
+  manualReviewAssets: copiedManualReviewAssets,
   specCompletionWorkOrders: copiedSpecWorkOrders,
   specCompletionRunbooks: copiedSpecWorkOrderRunbooks,
   missingTemplates: copiedTemplates.filter((template) => !template.copied),
@@ -387,6 +389,20 @@ function writeEvidenceKitReport(manifest) {
   if (copiedSpecWorkOrders.total !== copiedSpecWorkOrders.readyToSend) {
     reportIssues.push(`spec-work-orders-not-ready=${copiedSpecWorkOrders.total - copiedSpecWorkOrders.readyToSend}`);
   }
+  if (
+    copiedManualReviewAssets.expectedManualWorkOrders > 0 &&
+    copiedManualReviewAssets.templates.total < copiedManualReviewAssets.expectedManualWorkOrders
+  ) {
+    reportIssues.push(
+      `manual-review-templates-missing=${copiedManualReviewAssets.expectedManualWorkOrders - copiedManualReviewAssets.templates.total}`,
+    );
+  }
+  if (
+    copiedManualReviewAssets.expectedManualWorkOrders > 0 &&
+    (!copiedManualReviewAssets.dashboardMarkdown.copied || !copiedManualReviewAssets.assignmentsCsv.copied)
+  ) {
+    reportIssues.push("manual-review-dashboard-missing");
+  }
   writeFileSync(
     join(outputDir, "report.json"),
     `${JSON.stringify(
@@ -412,6 +428,8 @@ function writeEvidenceKitReport(manifest) {
           staleTemplates: manifest.staleTemplates.length,
           runbooks: manifest.runbooks.length,
           specCompletionRunbooks: manifest.specCompletionRunbooks.length,
+          manualReviewTemplates: copiedManualReviewAssets.templates.total,
+          manualReviewDashboardCopied: copiedManualReviewAssets.dashboardMarkdown.copied || copiedManualReviewAssets.dashboardHtml.copied,
           specWorkOrders: copiedSpecWorkOrders.total,
           specWorkOrdersReady: copiedSpecWorkOrders.readyToSend,
           issues: reportIssues.length,
@@ -423,6 +441,57 @@ function writeEvidenceKitReport(manifest) {
       2,
     )}\n`,
   );
+}
+
+function copyManualReviewAssets() {
+  const sourceTemplateDir = join(root, ".tmp", "manual-review", "templates");
+  const destinationTemplateDir = join(outputDir, "templates", "spec-manual-review");
+  const dashboardMarkdownSource = join(root, ".tmp", "manual-review", "dashboard.md");
+  const dashboardHtmlSource = join(root, ".tmp", "manual-review", "dashboard.html");
+  const assignmentsCsvSource = join(root, ".tmp", "manual-review", "assignments.csv");
+  const copiedTemplateFiles = [];
+  const expectedManualWorkOrders = Array.isArray(specWorkOrders?.workOrders)
+    ? specWorkOrders.workOrders.filter((order) => order.classification === "manual-review").length
+    : 0;
+
+  if (existsSync(sourceTemplateDir)) {
+    mkdirSync(destinationTemplateDir, { recursive: true });
+    for (const file of readdirSync(sourceTemplateDir).filter((name) => name.endsWith(".template.json")).sort()) {
+      const source = join(sourceTemplateDir, file);
+      const destination = join(destinationTemplateDir, file);
+      if (!statSync(source).isFile()) continue;
+      cpSync(source, destination);
+      copiedTemplateFiles.push(`templates/spec-manual-review/${file}`);
+    }
+  }
+
+  return {
+    expectedManualWorkOrders,
+    templates: {
+      sourceDir: ".tmp/manual-review/templates",
+      path: "templates/spec-manual-review",
+      copied: copiedTemplateFiles.length > 0,
+      total: copiedTemplateFiles.length,
+      files: copiedTemplateFiles,
+    },
+    dashboardMarkdown: copyOptionalManualAsset(dashboardMarkdownSource, "manual-review/dashboard.md"),
+    dashboardHtml: copyOptionalManualAsset(dashboardHtmlSource, "manual-review/dashboard.html"),
+    assignmentsCsv: copyOptionalManualAsset(assignmentsCsvSource, "manual-review/assignments.csv"),
+  };
+}
+
+function copyOptionalManualAsset(source, destinationPath) {
+  const copied = existsSync(source) && statSync(source).isFile();
+  if (copied) {
+    const destination = join(outputDir, destinationPath);
+    mkdirSync(dirname(destination), { recursive: true });
+    cpSync(source, destination);
+  }
+  return {
+    source: relative(source),
+    path: destinationPath,
+    copied,
+  };
 }
 
 function copyTemplates() {
@@ -600,6 +669,7 @@ function readme(manifest) {
     ? manifest.staleTemplates.map((template) => `- \`${template.source}\`: ${template.freshness.issues.join("; ")}`).join("\n")
     : "- None.";
   const workOrders = manifest.specCompletionWorkOrders || {};
+  const manualReviewAssets = manifest.manualReviewAssets || {};
   const specRunbookLines = manifest.specCompletionRunbooks.length
     ? manifest.specCompletionRunbooks
         .map((runbook) => `- [${runbook.path}](${runbook.path})${runbook.generatedByKit ? " (generated for this kit)" : ""}`)
@@ -612,6 +682,14 @@ function readme(manifest) {
         `- Ready work orders: ${workOrders.readyToSend}/${workOrders.total}`,
       ].join("\n")
     : "- Spec-completion work orders are missing. Run `pnpm run check:spec-completion`, then regenerate this kit.";
+  const manualTemplateLines = manualReviewAssets.templates?.copied
+    ? [
+        `- Templates: [${manualReviewAssets.templates.path}](${manualReviewAssets.templates.path}) (${manualReviewAssets.templates.total} files)`,
+        `- Dashboard: ${manualReviewAssets.dashboardHtml?.copied ? `[${manualReviewAssets.dashboardHtml.path}](${manualReviewAssets.dashboardHtml.path})` : "missing"}`,
+        `- Markdown dashboard: ${manualReviewAssets.dashboardMarkdown?.copied ? `[${manualReviewAssets.dashboardMarkdown.path}](${manualReviewAssets.dashboardMarkdown.path})` : "missing"}`,
+        `- Assignment CSV: ${manualReviewAssets.assignmentsCsv?.copied ? `[${manualReviewAssets.assignmentsCsv.path}](${manualReviewAssets.assignmentsCsv.path})` : "missing"}`,
+      ].join("\n")
+    : "- Spec manual-review templates are missing. Run `pnpm run check:manual-review`, then regenerate this kit.";
   return `${[
     "# NEditor Release Evidence Kit",
     "",
@@ -636,6 +714,10 @@ function readme(manifest) {
     "## Spec Completion Work Orders",
     "",
     workOrderLines,
+    "",
+    "## Spec Manual Review Templates",
+    "",
+    manualTemplateLines,
     "",
     "## Spec Completion Runbooks",
     "",

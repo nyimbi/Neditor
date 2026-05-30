@@ -700,7 +700,14 @@ NEditor is built for drafts that need evidence before publication.
   review kit** to add reviewer-ready sign-off templates, expected artifact
   paths, validator commands, and closure commands to the active document. Add
   the suggestion to editable setup notes when a non-technical user needs a
-  clear setup record before changing configuration.
+  clear setup record before changing configuration. Release managers can also
+  run `pnpm run check:manual-review` to generate
+  `.tmp/manual-review/dashboard.html`, `.tmp/manual-review/dashboard.md`,
+  `.tmp/manual-review/assignments.csv`, and one strict sign-off template per
+  open manual-review spec work order. `pnpm run collect:evidence-kit` copies
+  those generated templates into `templates/spec-manual-review/` and the
+  dashboard into `manual-review/`, so the sendable release evidence kit contains
+  everything reviewers need without rebuilding local `.tmp` state.
 - Dictated instructions can be audited from the terminal with
   `ned voice "create a board memo; client: Acme; make section 3 more formal; read selected text aloud" --json`.
   The voice packet routes natural-language instructions to Docs Live, the

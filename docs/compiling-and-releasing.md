@@ -225,7 +225,11 @@ pnpm run check:release-readiness
 `.tmp/release-evidence-kit/` with runbooks, templates, return paths, validator
 commands, ingest commands, and final readiness commands. Send that directory to
 supported-host owners or human reviewers when the local machine cannot produce
-the needed evidence.
+the needed evidence. After `pnpm run check:manual-review`, the kit also includes
+the spec manual-review dashboard at `manual-review/dashboard.html` and
+`manual-review/dashboard.md`, an assignment CSV at
+`manual-review/assignments.csv`, and all generated work-order sign-off
+templates under `templates/spec-manual-review/`.
 
 To produce a single Markdown handoff for tickets, reviewers, or credentialed
 operators, run:

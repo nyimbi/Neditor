@@ -11,6 +11,9 @@ const currentSourceTreeClean = gitTreeClean();
 const outputDir = join(root, ".tmp", "manual-review");
 const templateDir = join(outputDir, "templates");
 const reportPath = join(outputDir, "report.json");
+const dashboardMarkdownPath = join(outputDir, "dashboard.md");
+const dashboardHtmlPath = join(outputDir, "dashboard.html");
+const assignmentsCsvPath = join(outputDir, "assignments.csv");
 const specWorkOrdersPath = join(root, ".tmp", "spec-completion", "work-orders.json");
 const signoffDir = resolve(process.env.NEDITOR_MANUAL_REVIEW_DIR || join(outputDir, "external"));
 const issues = [];
@@ -77,12 +80,16 @@ const report = {
   specWorkOrdersPath: relativePath(specWorkOrdersPath),
   signoffDir: relativePath(signoffDir),
   templateDir: relativePath(templateDir),
+  dashboardMarkdown: relativePath(dashboardMarkdownPath),
+  dashboardHtml: relativePath(dashboardHtmlPath),
+  assignmentsCsv: relativePath(assignmentsCsvPath),
   summary: {
     manualWorkOrders: manualOrders.length,
     accepted: accepted.length,
     pending: pending.length,
     invalid: invalid.length,
     issues: issues.length,
+    bySpecSection: summarizeBySpecSection(manualOrders, accepted, pending, invalid),
   },
   accepted,
   pending,
@@ -92,6 +99,9 @@ const report = {
 
 mkdirSync(dirname(reportPath), { recursive: true });
 writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+writeFileSync(dashboardMarkdownPath, renderDashboardMarkdown(report));
+writeFileSync(dashboardHtmlPath, renderDashboardHtml(report));
+writeFileSync(assignmentsCsvPath, renderAssignmentsCsv(report));
 
 if (issues.length > 0) {
   console.error("Manual review evidence validation failed:");
@@ -101,7 +111,7 @@ if (issues.length > 0) {
 }
 
 console.log(
-  `Manual review evidence is ${status}; ${accepted.length}/${manualOrders.length} work-order signoff(s) accepted, ${pending.length} pending. Wrote ${relativePath(reportPath)}.`,
+  `Manual review evidence is ${status}; ${accepted.length}/${manualOrders.length} work-order signoff(s) accepted, ${pending.length} pending. Wrote ${relativePath(reportPath)}, ${relativePath(dashboardMarkdownPath)}, ${relativePath(dashboardHtmlPath)}, and ${relativePath(assignmentsCsvPath)}.`,
 );
 
 function writeTemplate(order) {
@@ -109,6 +119,16 @@ function writeTemplate(order) {
     schema: "neditor.manual-review.signoff.v1",
     workOrderId: order.id,
     requirement: order.requirement,
+    specSection: order.specSection,
+    requirementArea: order.requirementArea,
+    objective: order.objective,
+    remainingGap: order.remainingGap,
+    acceptanceCriteria: Array.isArray(order.acceptanceCriteria) ? order.acceptanceCriteria : [],
+    runbooks: Array.isArray(order.runbooks) ? order.runbooks : [],
+    validatorCommands: Array.isArray(order.validatorCommands) ? order.validatorCommands : [],
+    ingestCommand: order.ingestCommand || "pnpm run ingest:evidence -- --source <returned-evidence-dir>",
+    finalReadinessCommand: order.finalReadinessCommand || "pnpm run check:release-readiness",
+    matrixClosureCommand: order.matrixClosureCommand || "pnpm run check:spec-completion",
     appVersion: packageJson.version,
     sourceCommit: currentSourceCommit || "replace-with-current-git-commit",
     sourceTreeClean: currentSourceTreeClean,
@@ -129,7 +149,7 @@ function writeTemplate(order) {
       path: "",
       hash: "",
     },
-    artifacts: ["artifacts/screenshot-or-export-proof.png"],
+    artifacts: ["artifacts/screenshot-or-export-proof.png", "artifacts/validator-output.txt"],
     checklist: checklistForOrder(order),
     unresolvedBlockers: [],
     notes: "",
@@ -139,6 +159,13 @@ function writeTemplate(order) {
 
 function checklistForOrder(order) {
   const base = [
+    {
+      id: "current-source-identity",
+      label: `Confirm app version ${packageJson.version}, Git commit ${currentSourceCommit || "<unknown>"}, and clean-source provenance before review.`,
+      status: "pending",
+      evidence: "artifacts/validator-output.txt",
+      notes: "",
+    },
     {
       id: "workflow-observed",
       label: `Exercise and observe: ${order.requirement}`,
@@ -161,7 +188,15 @@ function checklistForOrder(order) {
       notes: "",
     },
   ];
+  const acceptanceCriteria = (Array.isArray(order.acceptanceCriteria) ? order.acceptanceCriteria : []).map((criterion, index) => ({
+    id: `acceptance-${String(index + 1).padStart(2, "0")}`,
+    label: String(criterion),
+    status: "pending",
+    evidence: "artifacts/screenshot-or-export-proof.png",
+    notes: "",
+  }));
   return base.concat(
+    acceptanceCriteria,
     (Array.isArray(order.validatorCommands) ? order.validatorCommands : []).map((command, index) => ({
       id: `validator-${String(index + 1).padStart(2, "0")}`,
       label: `Validator command passed: ${command}`,
@@ -170,6 +205,175 @@ function checklistForOrder(order) {
       notes: "",
     })),
   );
+}
+
+function summarizeBySpecSection(manualOrders, accepted, pending, invalid) {
+  const acceptedById = new Set(accepted.map((item) => item.workOrderId));
+  const pendingById = new Set(pending.map((item) => item.workOrderId));
+  const invalidById = new Set(invalid.map((item) => item.workOrderId));
+  const bySection = new Map();
+  for (const order of manualOrders) {
+    const section = order.specSection || "Unspecified";
+    const entry = bySection.get(section) || {
+      total: 0,
+      accepted: 0,
+      pending: 0,
+      invalid: 0,
+    };
+    entry.total += 1;
+    if (acceptedById.has(order.id)) entry.accepted += 1;
+    if (pendingById.has(order.id)) entry.pending += 1;
+    if (invalidById.has(order.id)) entry.invalid += 1;
+    bySection.set(section, entry);
+  }
+  return Object.fromEntries([...bySection.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function renderDashboardMarkdown(report) {
+  const summary = report.summary || {};
+  const sectionRows = Object.entries(summary.bySpecSection || {}).map(
+    ([section, counts]) =>
+      `| ${cell(section)} | ${counts.total || 0} | ${counts.accepted || 0} | ${counts.pending || 0} | ${counts.invalid || 0} |`,
+  );
+  const pendingRows = report.pending.map(
+    (item) =>
+      `| ${cell(item.workOrderId)} | ${cell(item.requirement)} | \`${item.template}\` | \`${item.expectedSignoff}\` |`,
+  );
+  const acceptedRows = report.accepted.map(
+    (item) =>
+      `| ${cell(item.workOrderId)} | ${cell(item.requirement)} | ${cell(item.reviewer)} | ${cell(item.reviewedAt)} | \`${item.path}\` |`,
+  );
+  const invalidRows = report.invalid.map(
+    (item) => `| ${cell(item.workOrderId)} | \`${item.path}\` | ${cell(item.issues.join("; "))} |`,
+  );
+  return `${[
+    "# NEditor Manual Review Dashboard",
+    "",
+    `Generated: ${report.generatedAt}`,
+    `Status: **${report.status}**`,
+    `App version: \`${report.appVersion}\``,
+    `Source commit: \`${report.sourceCommit || "<unknown>"}\``,
+    `Source tree clean: ${report.sourceTreeClean ? "yes" : "no"}`,
+    "",
+    "## Summary",
+    "",
+    `- Manual work orders: ${summary.manualWorkOrders || 0}`,
+    `- Accepted: ${summary.accepted || 0}`,
+    `- Pending: ${summary.pending || 0}`,
+    `- Invalid: ${summary.invalid || 0}`,
+    `- Template directory: \`${report.templateDir}\``,
+    `- Sign-off directory: \`${report.signoffDir}\``,
+    `- Assignment CSV: \`${report.assignmentsCsv}\``,
+    "",
+    "## Workflow",
+    "",
+    "1. Send each pending template plus its runbook and artifact folder to the named reviewer.",
+    "2. Keep screenshots, native-viewer exports, screen recordings, and validator output beside the completed sign-off JSON.",
+    "3. Ingest returned evidence with `pnpm run ingest:evidence -- --source <returned-evidence-dir>`.",
+    "4. Rerun `pnpm run check:manual-review`, `pnpm run check:release-readiness`, and `pnpm run check:spec-completion`.",
+    "",
+    "## By Spec Section",
+    "",
+    "| Spec section | Total | Accepted | Pending | Invalid |",
+    "| --- | ---: | ---: | ---: | ---: |",
+    ...(sectionRows.length ? sectionRows : ["| - | 0 | 0 | 0 | 0 |"]),
+    "",
+    "## Pending Work Orders",
+    "",
+    "| Work order | Requirement | Template | Expected sign-off |",
+    "| --- | --- | --- | --- |",
+    ...(pendingRows.length ? pendingRows : ["| - | No pending manual-review work orders | - | - |"]),
+    "",
+    "## Accepted Sign-Offs",
+    "",
+    "| Work order | Requirement | Reviewer | Reviewed at | Path |",
+    "| --- | --- | --- | --- | --- |",
+    ...(acceptedRows.length ? acceptedRows : ["| - | No accepted manual-review sign-offs yet | - | - | - |"]),
+    "",
+    "## Invalid Sign-Offs",
+    "",
+    "| Work order | Path | Issues |",
+    "| --- | --- | --- |",
+    ...(invalidRows.length ? invalidRows : ["| - | No invalid manual-review sign-offs | - |"]),
+    "",
+  ].join("\n")}\n`;
+}
+
+function renderDashboardHtml(report) {
+  const markdown = renderDashboardMarkdown(report);
+  const body = markdown
+    .split(/\r?\n/)
+    .map((line) => {
+      if (line.startsWith("# ")) return `<h1>${escapeHtml(line.slice(2))}</h1>`;
+      if (line.startsWith("## ")) return `<h2>${escapeHtml(line.slice(3))}</h2>`;
+      if (line.startsWith("- ")) return `<p class="bullet">${escapeHtml(line)}</p>`;
+      if (/^\d+\.\s+/.test(line)) return `<p class="step">${escapeHtml(line)}</p>`;
+      if (line.startsWith("|")) return `<pre>${escapeHtml(line)}</pre>`;
+      if (!line.trim()) return "";
+      return `<p>${escapeHtml(line).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>")}</p>`;
+    })
+    .join("\n");
+  return `${[
+    "<!doctype html>",
+    '<html lang="en">',
+    "<head>",
+    '<meta charset="utf-8" />',
+    "<title>NEditor Manual Review Dashboard</title>",
+    "<style>",
+    "body{font-family:Inter,Arial,sans-serif;margin:32px;line-height:1.45;color:#17202a;background:#fbfcfd}",
+    "h1,h2{color:#111827}code{background:#eef2f7;padding:2px 4px;border-radius:4px}pre{white-space:pre-wrap;background:#fff;border:1px solid #d7dde6;border-radius:6px;padding:8px 10px;margin:6px 0}.bullet,.step{margin:4px 0}",
+    "</style>",
+    "</head>",
+    "<body>",
+    body,
+    "</body>",
+    "</html>",
+  ].join("\n")}\n`;
+}
+
+function renderAssignmentsCsv(report) {
+  const header = ["workOrderId", "status", "requirement", "template", "expectedSignoff", "reviewer", "reviewedAt", "issues"];
+  const rows = [
+    ...report.pending.map((item) => [
+      item.workOrderId,
+      "pending",
+      item.requirement,
+      item.template,
+      item.expectedSignoff,
+      "",
+      "",
+      "",
+    ]),
+    ...report.accepted.map((item) => [
+      item.workOrderId,
+      "accepted",
+      item.requirement,
+      "",
+      item.path,
+      item.reviewer,
+      item.reviewedAt,
+      "",
+    ]),
+    ...report.invalid.map((item) => [item.workOrderId, "invalid", "", "", item.path, "", "", item.issues.join("; ")]),
+  ];
+  return `${[header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n")}\n`;
+}
+
+function cell(value) {
+  return String(value ?? "").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function collectSignoffs(dir) {

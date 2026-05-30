@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `6fa7596 Make release
-  and accessibility evidence scriptable`
+- Latest inspected committed baseline before this update: `ce525b7 Expose final
+  roadmap release handoffs`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,33 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Manual Review Evidence Handoff
+
+The release evidence kit now packages the dynamic spec manual-review materials
+instead of requiring reviewers to reconstruct local `.tmp` state. `pnpm run
+check:manual-review` writes a Markdown dashboard, an HTML dashboard, an
+assignment CSV, and one strict sign-off template per open manual-review spec
+work order. `pnpm run collect:evidence-kit` copies those materials into
+`.tmp/release-evidence-kit/manual-review/` and
+`.tmp/release-evidence-kit/templates/spec-manual-review/`, and its manifest
+records the expected manual work-order count, copied template count, dashboard
+status, and assignment CSV status.
+
+This does not close the human-review gate by itself. It makes the gate
+reviewer-ready and sendable: external reviewers now receive exact templates,
+artifact expectations, commands, return paths, dashboards, and assignment rows
+from the release evidence kit.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/check-manual-review-evidence.mjs` | Pass | Manual review evidence script syntax is valid after adding dashboards, grouped section counts, assignment CSV output, and richer sign-off templates. |
+| `node --check scripts/collect-release-evidence-kit.mjs` | Pass | Evidence kit collector syntax is valid after copying dynamic spec manual-review templates and dashboards. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including coverage for manual-review dashboards, assignment CSVs, richer sign-off templates, and evidence-kit copying into `templates/spec-manual-review/`. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting the sendable manual-review kit. |
+| `pnpm run check:manual-review` | Pass with human review pending | Wrote `.tmp/manual-review/report.json`, `.tmp/manual-review/dashboard.md`, `.tmp/manual-review/dashboard.html`, `.tmp/manual-review/assignments.csv`, and 33 pending work-order templates. |
+| `pnpm run check:spec-completion` | Pass with release risks | Refreshed `.tmp/spec-completion/report.json` and work orders; the matrix remains `partial-with-release-risks` because external/manual proof is still required. |
+| `pnpm run collect:evidence-kit` | Pass with dirty-tree caveat during development | Wrote `.tmp/release-evidence-kit/`; manifest records 33 expected manual work orders, 33 copied `templates/spec-manual-review/*.template.json` files, copied manual-review dashboards, and copied assignment CSV. The report correctly flags `source-tree-not-clean` until regenerated after commit. |
 
 ## 2026-05-30 Final Roadmap Handoff Surfaces
 

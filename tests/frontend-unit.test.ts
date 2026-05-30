@@ -10580,6 +10580,7 @@ test("local verification scripts expose local baseline checks", () => {
   const aiRuntimeEvidence = readFileSync("scripts/check-ai-runtime-evidence.mjs", "utf8");
   const securityReview = readFileSync("scripts/check-security-review-evidence.mjs", "utf8");
   const specCompletion = readFileSync("scripts/check-spec-completion-matrix.mjs", "utf8");
+  const manualReviewEvidence = readFileSync("scripts/check-manual-review-evidence.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
   const googleDocsCollector = readFileSync("scripts/collect-google-docs-import-evidence.mjs", "utf8");
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
@@ -10770,6 +10771,14 @@ test("local verification scripts expose local baseline checks", () => {
   ok(specCompletion.includes("Unverified"));
   ok(specCompletion.includes("Missing"));
   ok(specCompletion.includes("remaining gap is empty or placeholder"));
+  ok(manualReviewEvidence.includes("neditor.manual-review.report.v1"));
+  ok(manualReviewEvidence.includes("dashboard.md"));
+  ok(manualReviewEvidence.includes("dashboard.html"));
+  ok(manualReviewEvidence.includes("assignments.csv"));
+  ok(manualReviewEvidence.includes("bySpecSection"));
+  ok(manualReviewEvidence.includes("acceptanceCriteria"));
+  ok(manualReviewEvidence.includes("validatorCommands"));
+  ok(manualReviewEvidence.includes("current-source-identity"));
   ok(performanceProfile.includes("neditor.performance-profile-evidence.v1"));
   ok(performanceProfile.includes("NEDITOR_PERFORMANCE_PROFILE_EVIDENCE_DIR"));
   ok(performanceProfile.includes("NEDITOR_PERFORMANCE_PROFILE_EVIDENCE"));
@@ -10880,6 +10889,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("native-profile.template.json"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
+  ok(evidenceKitCollector.includes("copyManualReviewAssets"));
+  ok(evidenceKitCollector.includes("templates/spec-manual-review"));
+  ok(evidenceKitCollector.includes("manual-review/dashboard.html"));
+  ok(evidenceKitCollector.includes("manual-review/assignments.csv"));
+  ok(evidenceKitCollector.includes("manual-review-templates-missing"));
   ok(evidenceKitCollector.includes("pikchr.template.json"));
   ok(evidenceKitCollector.includes("sqlite.template.json"));
   ok(evidenceKitCollector.includes("NEDITOR_TEST_SQLITE3"));
