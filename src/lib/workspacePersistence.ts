@@ -469,6 +469,7 @@ export interface PersistedWorkspace {
   customLatexTemplates?: Partial<CustomLatexTemplateProfile>[];
   customDocumentOutlineTemplates?: CustomDocumentOutlineTemplate[];
   customVersionedClauses?: CustomVersionedBusinessClause[];
+  documentMemoryText?: string;
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
   agentRunHistory?: Partial<AgentRunHistoryItem>[];
   docsLiveDraftHistory?: Partial<DocsLiveDraftHistoryItem>[];
@@ -1391,6 +1392,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   migrated.customLatexTemplates = normalizeCustomLatexTemplateProfiles(raw.customLatexTemplates);
   migrated.customDocumentOutlineTemplates = normalizeCustomDocumentOutlineTemplates(raw.customDocumentOutlineTemplates);
   migrated.customVersionedClauses = normalizeCustomVersionedClauses(raw.customVersionedClauses);
+  migrated.documentMemoryText = normalizedString(raw.documentMemoryText, 20_000) || "";
   return migrated;
 }
 

@@ -5659,7 +5659,11 @@
                 <strong>Document memory</strong>
                 <span>{{ agentDocumentMemoryPreview.summary }}</span>
               </div>
-              <button type="button" :disabled="!agentDocumentMemoryPreview.entries.length" @click="insertAgentDocumentMemoryPack">Insert pack</button>
+              <div class="agent-memory-header-actions">
+                <button type="button" :disabled="!agentDocumentMemoryPreview.entries.length" @click="insertAgentDocumentMemoryPack">Insert pack</button>
+                <button type="button" :disabled="agentMemoryText.trim() === store.documentMemoryText.trim()" @click="saveAgentDocumentMemoryLibrary">Save memory</button>
+                <button type="button" :disabled="!store.documentMemoryText.trim()" @click="reloadAgentDocumentMemoryLibrary">Reload saved</button>
+              </div>
             </header>
             <div class="agent-memory-add">
               <label>
@@ -5693,6 +5697,7 @@
             </label>
             <div class="agent-memory-actions">
               <button type="button" @click="captureAgentMemoryFromCurrentDocument">Capture from document</button>
+              <button type="button" :disabled="!store.documentMemoryText.trim()" @click="agentMemoryText = appendTextBlock(agentMemoryText, store.documentMemoryText)">Append saved memory</button>
               <button type="button" :disabled="!agentDocumentMemoryPreview.entries.length" @click="copyAgentDocumentMemoryPack">Copy pack</button>
             </div>
             <ul v-if="agentDocumentMemoryPreview.entries.length" class="agent-source-pack-list">
@@ -7911,7 +7916,7 @@ const agentWorkspaceOpen = ref(false);
 const agentInstruction = ref("");
 const agentContextAnswers = ref("");
 const agentSourcePackText = ref("");
-const agentMemoryText = ref("");
+const agentMemoryText = ref(store.documentMemoryText);
 const agentMemoryKind = ref<AgentMemoryInputKind>("terminology");
 const agentMemoryLabel = ref("");
 const agentMemoryDetail = ref("");
@@ -13417,7 +13422,15 @@ function addAgentMemoryItem() {
   agentMemoryLabel.value = "";
   agentMemoryDetail.value = "";
   buildAgentWorkspacePlan();
-  store.statusMessage = "Added reusable document memory";
+  store.statusMessage = "Added reusable document memory; save memory to keep it across sessions";
+}
+async function saveAgentDocumentMemoryLibrary() {
+  await store.saveDocumentMemoryText(agentMemoryText.value);
+}
+function reloadAgentDocumentMemoryLibrary() {
+  agentMemoryText.value = store.documentMemoryText;
+  buildAgentWorkspacePlan();
+  store.statusMessage = store.documentMemoryText.trim() ? "Reloaded saved document memory library" : "No saved document memory library is available";
 }
 function captureAgentMemoryFromCurrentDocument() {
   flushEditorTextToStore();
@@ -13440,7 +13453,7 @@ function captureAgentMemoryFromCurrentDocument() {
   }
   agentMemoryText.value = appendTextBlock(agentMemoryText.value, additions.join("\n"));
   buildAgentWorkspacePlan();
-  store.statusMessage = `Captured ${additions.length} reusable document memory item${additions.length === 1 ? "" : "s"}`;
+  store.statusMessage = `Captured ${additions.length} reusable document memory item${additions.length === 1 ? "" : "s"}; save memory to keep it across sessions`;
 }
 function insertAgentDocumentMemoryPack() {
   const memory = agentDocumentMemoryPreview.value;
@@ -15551,6 +15564,15 @@ watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteD
 watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
 watch(() => store.aiProviderDefaults, applyStoredAiProviderDefaults, { deep: true });
 watch(() => store.googleIntegration, syncGoogleIntegrationFields, { deep: true });
+watch(
+  () => store.documentMemoryText,
+  (value, oldValue) => {
+    if (!agentMemoryText.value.trim() || agentMemoryText.value.trim() === (oldValue || "").trim()) {
+      agentMemoryText.value = value;
+      buildAgentWorkspacePlan();
+    }
+  },
+);
 watch([agentProviderId, agentProviderEndpoint], () => {
   if (!ollamaModelOptions.value.length && !ollamaModelEndpoint.value) return;
   ollamaModelOptions.value = [];
@@ -28871,6 +28893,13 @@ select:hover {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: start;
+}
+
+.agent-memory-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .agent-source-pack-builder > header span,

@@ -7411,6 +7411,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       },
       { id: "missing-body", label: "Ignored" },
     ],
+    documentMemoryText: " [terminology] ARR: Annual recurring revenue\n[style] Executive: concise language ",
   });
 
   equal(migrated.schemaVersion, WORKSPACE_SCHEMA_VERSION);
@@ -7804,6 +7805,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
       body: "<!-- clause:mutual-confidentiality version=2026.06 status=current -->\n## Mutual Confidentiality\nApproved body.",
     },
   ]);
+  equal(migrated.documentMemoryText, "[terminology] ARR: Annual recurring revenue\n[style] Executive: concise language");
 });
 
 test("workspace persistence state helper builds normalized store snapshots", () => {
@@ -7918,6 +7920,7 @@ test("workspace persistence state helper builds normalized store snapshots", () 
         body: "<!-- clause:mutual-confidentiality version=2026.06 status=current -->\n## Mutual Confidentiality\nApproved body.",
       },
     ],
+    documentMemoryText: "[terminology] ARR: Annual recurring revenue",
   });
 
   equal(workspace.schemaVersion, WORKSPACE_SCHEMA_VERSION);
@@ -7941,6 +7944,7 @@ test("workspace persistence state helper builds normalized store snapshots", () 
   equal(workspace.databaseProfiles?.[0]?.name, "Warehouse");
   equal(workspace.activeDatabaseProfileId, "warehouse");
   equal(workspace.customVersionedClauses?.[0]?.id, "mutual-confidentiality");
+  equal(workspace.documentMemoryText, "[terminology] ARR: Annual recurring revenue");
   deepEqual(workspace.googleIntegration?.scopes, ["https://www.googleapis.com/auth/drive.file"]);
   deepEqual(workspace.guidedDemoCompletedStepIds, ["intro", "ai-create"]);
 });
@@ -8005,6 +8009,7 @@ test("workspace persistence state helper applies persisted preferences and resto
     customLatexTemplates: [],
     customDocumentOutlineTemplates: [],
     customVersionedClauses: [],
+    documentMemoryText: "",
   } satisfies Parameters<typeof applyPersistedWorkspacePreferenceState>[0];
 
   const result = applyPersistedWorkspacePreferenceState(
@@ -8052,6 +8057,7 @@ test("workspace persistence state helper applies persisted preferences and resto
           body: "<!-- clause:mutual-confidentiality version=2026.06 status=current -->\n## Mutual Confidentiality\nApproved body.",
         },
       ],
+      documentMemoryText: "[terminology] ARR: Annual recurring revenue",
       guidedDemoCompletedStepIds: ["ai-create"],
     }),
   );
@@ -8081,6 +8087,7 @@ test("workspace persistence state helper applies persisted preferences and resto
   deepEqual(result.state.guidedDemoCompletedStepIds, ["ai-create"]);
   equal(result.state.customDocumentOutlineTemplates[0]?.name, "QBR");
   equal(result.state.customVersionedClauses[0]?.label, "Mutual confidentiality");
+  equal(result.state.documentMemoryText, "[terminology] ARR: Annual recurring revenue");
   deepEqual(result.restoreRequest, {
     openFiles: ["/a.md", "/b.md"],
     activePath: "/b.md",
@@ -8929,6 +8936,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Document memory"));
   ok(app.includes('aria-label="Document memory manager"'));
   ok(app.includes("agentDocumentMemoryPreview"));
+  ok(app.includes("Save memory"));
+  ok(app.includes("Reload saved"));
+  ok(app.includes("store.documentMemoryText"));
+  ok(app.includes("saveAgentDocumentMemoryLibrary"));
   ok(app.includes("addAgentMemoryItem"));
   ok(app.includes("captureAgentMemoryFromCurrentDocument"));
   ok(app.includes("insertAgentDocumentMemoryPack"));

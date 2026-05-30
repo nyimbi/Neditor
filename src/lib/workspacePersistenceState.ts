@@ -87,6 +87,7 @@ export interface WorkspacePersistenceStateInput {
   customLatexTemplates: RequiredPersistedValue<"customLatexTemplates">;
   customDocumentOutlineTemplates: RequiredPersistedValue<"customDocumentOutlineTemplates">;
   customVersionedClauses: RequiredPersistedValue<"customVersionedClauses">;
+  documentMemoryText: string;
 }
 
 export type WorkspacePreferenceStateInput = Omit<WorkspacePersistenceStateInput, "documents" | "activeId">;
@@ -154,6 +155,7 @@ export function applyPersistedWorkspacePreferenceState(
     customLatexTemplates: normalizeCustomLatexTemplateProfiles(persisted.customLatexTemplates),
     customDocumentOutlineTemplates: normalizeCustomDocumentOutlineTemplates(persisted.customDocumentOutlineTemplates),
     customVersionedClauses: normalizeCustomVersionedClauses(persisted.customVersionedClauses),
+    documentMemoryText: persisted.documentMemoryText || "",
   };
   const restoreRequest = persisted.openFiles?.length
     ? {
@@ -241,5 +243,6 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     customLatexTemplates: state.customLatexTemplates,
     customDocumentOutlineTemplates: state.customDocumentOutlineTemplates,
     customVersionedClauses: state.customVersionedClauses,
+    documentMemoryText: state.documentMemoryText,
   });
 }

@@ -438,6 +438,7 @@ export const useDocumentsStore = defineStore("documents", {
     customLatexTemplates: [] as CustomLatexTemplateProfile[],
     customDocumentOutlineTemplates: [] as CustomDocumentOutlineTemplate[],
     customVersionedClauses: [] as CustomVersionedBusinessClause[],
+    documentMemoryText: "",
     transformProbeResults: {} as Record<string, TransformProbeResult>,
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
@@ -1555,6 +1556,13 @@ export const useDocumentsStore = defineStore("documents", {
       if (!next.changed) return;
       this.customVersionedClauses = next.clauses;
       this.statusMessage = "Deleted custom versioned clause";
+      await this.persistWorkspace();
+    },
+    async saveDocumentMemoryText(text: string) {
+      const next = text.trim();
+      if (this.documentMemoryText === next) return;
+      this.documentMemoryText = next;
+      this.statusMessage = next ? "Saved reusable document memory library" : "Cleared reusable document memory library";
       await this.persistWorkspace();
     },
     async loadWorkspaceDocumentOutlineTemplates() {

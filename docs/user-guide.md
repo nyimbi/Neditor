@@ -113,7 +113,10 @@ reviewer tasks, provider source evidence pack, and saved run history. Use
 **Document memory** in the same workspace to add or capture terminology, house
 style, accepted decisions, rejected directions, reviewer preferences, and
 distribution preferences; memory packs can be inserted into the Markdown source
-for human review and reused by future agent plans. The run
+for human review and reused by future agent plans. Choose **Save memory** to
+persist the managed memory library with the workspace, **Reload saved** to
+restore it after experimentation, or **Append saved memory** to merge the saved
+library into a new agent planning context. The run
 history can be searched and filtered by status, workflow lane, or output target
 so generated packets, applied revisions, provider-applied drafts, evidence
 blockers, and distribution handoffs remain recoverable after the workspace
