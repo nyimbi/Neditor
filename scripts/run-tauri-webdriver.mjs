@@ -294,6 +294,7 @@ async function assertModeSwitchAndCommandPalette(session) {
 }
 
 async function assertTransformTemplateWorkflow(session) {
+  await setViewMode(session, "split", "desktop split mode before transform template insertion");
   await showSidebar(session, "templates", ["Category", "Transform", "Search"]);
   await setTransformTemplateFilters(session, { category: "Science", transform: "calc", search: "dose" });
   const inserted = await waitForValue(
@@ -340,6 +341,22 @@ async function assertTransformTemplateWorkflow(session) {
       String(value?.dosePreview || "").includes("total_dose_mg"),
     "packaged calc template insertion",
   );
+  const calcRendered = await waitForValue(
+    session,
+    `
+      ${editorDocumentTextFunction}
+      return {
+        editor: editorDocumentText(),
+        preview: document.querySelector('#live-preview')?.textContent || '',
+        status: document.querySelector('.status-bar')?.textContent || '',
+      };
+    `,
+    (value) =>
+      String(value?.editor || "").includes("weight_kg = 72") &&
+      String(value?.editor || "").includes("Total dose: {{=total_dose_mg}} mg") &&
+      String(value?.preview || "").includes("Total dose"),
+    "packaged calc template source and preview evidence",
+  );
 
   await setTransformTemplateFilters(session, { category: "Charts", transform: "chart", search: "kpi" });
   const chartInserted = await waitForValue(
@@ -373,6 +390,22 @@ async function assertTransformTemplateWorkflow(session) {
       String(value?.chartMeta || "").includes("chart"),
     "packaged chart template insertion",
   );
+  const chartRendered = await waitForValue(
+    session,
+    `
+      ${editorDocumentTextFunction}
+      return {
+        editor: editorDocumentText(),
+        preview: document.querySelector('#live-preview')?.textContent || '',
+        status: document.querySelector('.status-bar')?.textContent || '',
+      };
+    `,
+    (value) =>
+      String(value?.editor || "").includes("```chart") &&
+      String(value?.editor || "").includes("title: Quarterly KPI plan") &&
+      String(value?.preview || "").includes("Quarterly KPI plan"),
+    "packaged chart template source and preview evidence",
+  );
   const rendered = await waitForValue(
     session,
     `
@@ -395,10 +428,10 @@ async function assertTransformTemplateWorkflow(session) {
     doseFillFields: inserted.doseFillFields,
     dosePreviewHasTotalDose: String(inserted.dosePreview || "").includes("total_dose_mg"),
     chartMeta: chartInserted.chartMeta,
-    sourceHasCalcTemplate: String(rendered.editor || "").includes("weight_kg = 72"),
-    sourceHasChartTemplate: String(rendered.editor || "").includes("title: Quarterly KPI plan"),
-    previewHasDoseResult: String(rendered.preview || "").includes("Total dose"),
-    status: rendered.status,
+    sourceHasCalcTemplate: String(rendered.editor || calcRendered.editor || "").includes("weight_kg = 72"),
+    sourceHasChartTemplate: String(rendered.editor || chartRendered.editor || "").includes("title: Quarterly KPI plan"),
+    previewHasDoseResult: String(rendered.preview || calcRendered.preview || "").includes("Total dose"),
+    status: rendered.status || chartRendered.status || calcRendered.status,
   };
   recordAssertion("desktop WebDriver inserts calc and chart templates from packaged templates panel");
 }
