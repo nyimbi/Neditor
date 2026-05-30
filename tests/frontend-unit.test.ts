@@ -3414,6 +3414,17 @@ test("Docs Live turns outline, voice context, and placeholders into a reviewable
   ok(voiceCommandMarkdown.includes("Drafting instruction:"));
   ok(voiceCommandMarkdown.includes("Confidence:"));
 
+  const workflowCommands = buildDocsLiveVoiceCommandPlan({
+    transcript: "Open Deep Research for climate resilience sources. Run QA. Prepare export as PDF. Read selected text aloud.",
+  });
+  equal(workflowCommands.length, 4);
+  ok(workflowCommands.every((item) => item.action === "workflow"));
+  ok(workflowCommands.some((item) => item.workflowRoute === "deep-research" && item.target === "Deep Research"));
+  ok(workflowCommands.some((item) => item.workflowRoute === "quality" && item.target === "Quality review"));
+  ok(workflowCommands.some((item) => item.workflowRoute === "export" && item.prompt.includes("Export readiness")));
+  ok(workflowCommands.some((item) => item.workflowRoute === "tts" && item.workflowLabel === "Read aloud"));
+  ok(docsLiveVoiceCommandPlanMarkdown(workflowCommands).includes("Workflow route:"));
+
   const draft = buildDocsLiveDraft({
     documentType: "proposal",
     title: "Acme Renewal Proposal",
@@ -9208,7 +9219,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Docs Live voice command plan"'));
   ok(app.includes("docsLiveVoiceCommandPlan"));
   ok(app.includes("appendDocsLiveVoiceCommandPlan"));
+  ok(app.includes("docsLiveWorkflowCommandCount"));
+  ok(app.includes("runDocsLiveVoiceWorkflowCommands"));
+  ok(app.includes("routeDocsLiveVoiceWorkflowCommand"));
   ok(app.includes("docsLiveVoiceCommandActionLabel"));
+  ok(app.includes("Run workflows"));
+  ok(app.includes("Run {{ item.workflowLabel }}"));
   ok(app.includes("Use commands"));
   ok(app.includes("docsLiveMissingPlaceholderKeys"));
   ok(app.includes("addDocsLivePlaceholder"));

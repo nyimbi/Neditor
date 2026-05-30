@@ -5401,15 +5401,17 @@
                   <span>Natural commands become scoped drafting actions before generation.</span>
                 </div>
                 <button type="button" :disabled="!docsLiveVoiceCommandPlan.length" @click="appendDocsLiveVoiceCommandPlan">Use commands</button>
+                <button type="button" :disabled="!docsLiveWorkflowCommandCount" @click="runDocsLiveVoiceWorkflowCommands">Run workflows</button>
               </header>
               <ul v-if="docsLiveVoiceCommandPlan.length">
                 <li v-for="item in docsLiveVoiceCommandPlan" :key="item.id">
                   <strong>{{ docsLiveVoiceCommandActionLabel(item.action) }} -> {{ item.target }}</strong>
                   <span>{{ item.prompt }}</span>
                   <small>{{ item.confidence }} | {{ item.rationale }}</small>
+                  <button v-if="item.workflowRoute" type="button" @click="runDocsLiveVoiceWorkflowCommand(item)">Run {{ item.workflowLabel }}</button>
                 </li>
               </ul>
-              <p v-else class="sidebar-hint">Dictate commands such as "expand the executive summary", "make section 3 more formal", or "turn the pricing notes into a table".</p>
+              <p v-else class="sidebar-hint">Dictate commands such as "expand the executive summary", "open Deep Research", "run QA", "prepare export", or "read selected text aloud".</p>
             </section>
 
             <div class="docs-live-context-grid">
@@ -7416,6 +7418,7 @@ import {
   type DocsLivePlaceholderReviewStatus,
   type DocsLiveSuggestedAnswer,
   type DocsLiveVoiceCommandPlanItem,
+  type DocsLiveVoiceCommandWorkflowRoute,
   type DocsLiveWizardProfile,
 } from "./lib/docsLive";
 import {
@@ -9086,6 +9089,7 @@ const docsLiveVoiceCommandPlan = computed<DocsLiveVoiceCommandPlanItem[]>(() =>
     placeholders: docsLivePlaceholderText.value,
   }),
 );
+const docsLiveWorkflowCommandCount = computed(() => docsLiveVoiceCommandPlan.value.filter((item) => item.workflowRoute).length);
 const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
@@ -22891,6 +22895,89 @@ function appendDocsLiveVoiceCommandPlan() {
   store.statusMessage = `Added ${plan.length} Docs Live voice command${plan.length === 1 ? "" : "s"} to drafting notes`;
 }
 
+async function runDocsLiveVoiceWorkflowCommands() {
+  const workflowCommands = docsLiveVoiceCommandPlan.value.filter((item) => item.workflowRoute);
+  if (!workflowCommands.length) {
+    store.statusMessage = "No runnable Docs Live voice workflow commands detected";
+    return;
+  }
+  for (const item of workflowCommands) {
+    await runDocsLiveVoiceWorkflowCommand(item, { batch: true });
+  }
+  store.statusMessage = `Ran ${workflowCommands.length} Docs Live voice workflow command${workflowCommands.length === 1 ? "" : "s"}`;
+}
+
+async function runDocsLiveVoiceWorkflowCommand(item: DocsLiveVoiceCommandPlanItem, options: { batch?: boolean } = {}) {
+  const route = item.workflowRoute;
+  if (!route) {
+    appendDocsLiveVoiceCommandPlan();
+    return;
+  }
+  await routeDocsLiveVoiceWorkflowCommand(route, item.command);
+  if (!options.batch) store.statusMessage = `Ran Docs Live voice workflow: ${item.workflowLabel || docsLiveVoiceWorkflowRouteLabel(route)}`;
+}
+
+async function routeDocsLiveVoiceWorkflowCommand(route: DocsLiveVoiceCommandWorkflowRoute, instruction: string) {
+  const command = instruction.trim();
+  if (route !== "docs-live") closeDocsLive();
+  switch (route) {
+    case "docs-live":
+      if (command) docsLiveContext.value = appendTextBlock(docsLiveContext.value, command);
+      openDocsLive();
+      break;
+    case "deep-research":
+      openDeepResearch(command);
+      break;
+    case "ai-paste":
+      await openAiPaste();
+      break;
+    case "review":
+      store.mode = "review";
+      store.sidebar = "review";
+      break;
+    case "export":
+      store.mode = "export";
+      store.sidebar = "exports";
+      break;
+    case "outline":
+      store.mode = "outline";
+      store.sidebar = "outline";
+      break;
+    case "provider":
+      selectAgentProviderProfileForInstruction(command);
+      openAgentWorkspace(command || "Prepare this document for governed AI provider handoff.");
+      generateAgentWorkspaceRun();
+      buildAgentProviderPackage();
+      break;
+    case "quality":
+      runQualityReview();
+      break;
+    case "tts":
+      await readSelectionAloud();
+      break;
+    case "tables":
+      openTableEditor();
+      break;
+    case "help":
+      openGuidedDemo();
+      break;
+  }
+}
+
+function docsLiveVoiceWorkflowRouteLabel(route: DocsLiveVoiceCommandWorkflowRoute) {
+  if (route === "docs-live") return "Docs Live";
+  if (route === "deep-research") return "Deep Research";
+  if (route === "ai-paste") return "AI Paste cleanup";
+  if (route === "review") return "Review governance";
+  if (route === "export") return "Export readiness";
+  if (route === "outline") return "Outline mode";
+  if (route === "provider") return "AI provider handoff";
+  if (route === "quality") return "Quality review";
+  if (route === "tts") return "Read aloud";
+  if (route === "tables") return "Table editor";
+  return "Help and demo";
+}
+
 function docsLiveVoiceCommandActionLabel(action: DocsLiveVoiceCommandPlanItem["action"]) {
   return action
     .split("-")
@@ -32312,6 +32399,13 @@ select:hover {
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   background: #f8fafc;
+}
+
+.docs-live-voice-command-plan li button {
+  justify-self: start;
+  min-height: 26px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .docs-live-voice-command-plan small {

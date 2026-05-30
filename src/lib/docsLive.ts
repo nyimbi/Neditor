@@ -68,7 +68,21 @@ export type DocsLiveVoiceCommandAction =
   | "revise"
   | "add-evidence"
   | "add-table"
-  | "outline";
+  | "outline"
+  | "workflow";
+
+export type DocsLiveVoiceCommandWorkflowRoute =
+  | "docs-live"
+  | "deep-research"
+  | "ai-paste"
+  | "review"
+  | "export"
+  | "outline"
+  | "provider"
+  | "quality"
+  | "tts"
+  | "tables"
+  | "help";
 
 export interface DocsLiveVoiceCommandPlanItem {
   id: string;
@@ -78,6 +92,8 @@ export interface DocsLiveVoiceCommandPlanItem {
   prompt: string;
   rationale: string;
   confidence: "high" | "medium" | "review";
+  workflowRoute?: DocsLiveVoiceCommandWorkflowRoute;
+  workflowLabel?: string;
 }
 
 export type DocsLiveDraftDepth = "summary" | "standard" | "detailed" | "technical" | "legal" | "executive";
@@ -811,17 +827,19 @@ export function buildDocsLiveVoiceCommandPlan(input: DocsLiveQuestionnaireReques
     .filter(Boolean);
   const commands: DocsLiveVoiceCommandPlanItem[] = [];
   for (const line of lines) {
-    const action = voiceCommandActionFor(line);
+    const workflowRoute = voiceCommandWorkflowRouteFor(line);
+    const action: DocsLiveVoiceCommandAction | null = workflowRoute ? "workflow" : voiceCommandActionFor(line);
     if (!action) continue;
-    const target = voiceCommandTargetFor(line, outlineItems);
+    const target = workflowRoute ? voiceWorkflowRouteLabel(workflowRoute) : voiceCommandTargetFor(line, outlineItems);
     commands.push({
       id: `voice-${commands.length + 1}`,
       command: line,
       action,
       target,
-      prompt: voiceCommandPrompt(action, target, line),
-      rationale: voiceCommandRationale(action, target),
-      confidence: voiceCommandConfidence(line, target, outlineItems),
+      prompt: voiceCommandPrompt(action, target, line, workflowRoute),
+      rationale: voiceCommandRationale(action, target, workflowRoute),
+      confidence: workflowRoute ? "high" : voiceCommandConfidence(line, target, outlineItems),
+      ...(workflowRoute ? { workflowRoute, workflowLabel: voiceWorkflowRouteLabel(workflowRoute) } : {}),
     });
   }
   return commands.slice(0, 12);
@@ -835,6 +853,7 @@ export function docsLiveVoiceCommandPlanMarkdown(commands: DocsLiveVoiceCommandP
       `${index + 1}. ${titleCase(item.action.replace(/-/g, " "))} -> ${item.target}`,
       `   Command: ${item.command}`,
       `   Drafting instruction: ${item.prompt}`,
+      ...(item.workflowRoute ? [`   Workflow route: ${item.workflowLabel || voiceWorkflowRouteLabel(item.workflowRoute)}`] : []),
       `   Rationale: ${item.rationale}`,
       `   Confidence: ${item.confidence}`,
     ].join("\n")),
@@ -1743,6 +1762,36 @@ function suggestedAnswerRationale(stepLabel: string, question: string, contextSi
   return `Uses the ${blueprint.label.toLowerCase()} blueprint as a conservative starting point for the ${stepLabel.toLowerCase()} step and marks replaceable assumptions for review.`;
 }
 
+function voiceCommandWorkflowRouteFor(command: string): DocsLiveVoiceCommandWorkflowRoute | null {
+  const lower = command.toLowerCase();
+  if (/\b(deep research|research report|source search|find sources|collect sources|research workspace)\b/.test(lower)) return "deep-research";
+  if (/\b(open|start|launch|use|go to|create|draft|generate)\b.*\b(docs live|document wizard|draft wizard|ai create|first draft)\b/.test(lower)) return "docs-live";
+  if (/\b(ai paste|clean pasted|cleanup pasted|clean up pasted|paste cleanup|chat cleanup)\b/.test(lower)) return "ai-paste";
+  if (/\b(run|open|start|show|prepare)\b.*\b(qa|quality review|quality recommendations|quality improvement|quality check)\b/.test(lower)) return "quality";
+  if (/\b(export|prepare pdf|prepare docx|prepare epub|prepare html|publishing|publish|substack|blog|distribution)\b/.test(lower)) return "export";
+  if (/\b(open|show|switch to|start|use|edit)\b.*\b(outline mode|outline planner|document outline|outline library)\b/.test(lower)) return "outline";
+  if (/\b(claude code|codex|opencode|open code|google antigravity|ollama|provider handoff|ai provider|local agent)\b/.test(lower)) return "provider";
+  if (/\b(review governance|approval gate|release readiness|review panel|citation todo|claim inventory)\b/.test(lower)) return "review";
+  if (/\b(read aloud|read selected|read document|text to speech|tts|speak this|speech)\b/.test(lower)) return "tts";
+  if (/\b(open|show|edit|use)\b.*\b(table editor|table at cursor|tables panel|spreadsheet table)\b/.test(lower)) return "tables";
+  if (/\b(help center|guided demo|tutorial|show demo|walk me through|onboarding)\b/.test(lower)) return "help";
+  return null;
+}
+
+function voiceWorkflowRouteLabel(route: DocsLiveVoiceCommandWorkflowRoute) {
+  if (route === "docs-live") return "Docs Live";
+  if (route === "deep-research") return "Deep Research";
+  if (route === "ai-paste") return "AI Paste cleanup";
+  if (route === "review") return "Review governance";
+  if (route === "export") return "Export readiness";
+  if (route === "outline") return "Outline mode";
+  if (route === "provider") return "AI provider handoff";
+  if (route === "quality") return "Quality review";
+  if (route === "tts") return "Read aloud";
+  if (route === "tables") return "Table editor";
+  return "Help and demo";
+}
+
 function voiceCommandActionFor(command: string): DocsLiveVoiceCommandAction | null {
   const lower = command.toLowerCase();
   if (/\b(expand|elaborate|add detail|more detail|develop)\b/.test(lower)) return "expand";
@@ -1770,8 +1819,16 @@ function voiceCommandTargetFor(command: string, outlineItems: OutlinePlanItem[])
   return "current selection or active section";
 }
 
-function voiceCommandPrompt(action: DocsLiveVoiceCommandAction, target: string, command: string) {
+function voiceCommandPrompt(
+  action: DocsLiveVoiceCommandAction,
+  target: string,
+  command: string,
+  workflowRoute?: DocsLiveVoiceCommandWorkflowRoute | null,
+) {
   const base = `Apply voice command to ${target}: ${command}`;
+  if (action === "workflow" && workflowRoute) {
+    return `${base}. Route the user to ${voiceWorkflowRouteLabel(workflowRoute)} and preserve the spoken instruction as workflow context.`;
+  }
   if (action === "expand") return `${base}. Add useful specifics, examples, caveats, owners, and evidence needs without padding.`;
   if (action === "shorten") return `${base}. Preserve decisions, numbers, source obligations, and review notes while making the text concise.`;
   if (action === "formalize") return `${base}. Make the tone professional, precise, and appropriate for executive or client review.`;
@@ -1782,7 +1839,8 @@ function voiceCommandPrompt(action: DocsLiveVoiceCommandAction, target: string, 
   return `${base}. Revise the target while preserving verified facts, citations, placeholders, and approval metadata.`;
 }
 
-function voiceCommandRationale(action: DocsLiveVoiceCommandAction, target: string) {
+function voiceCommandRationale(action: DocsLiveVoiceCommandAction, target: string, workflowRoute?: DocsLiveVoiceCommandWorkflowRoute | null) {
+  if (action === "workflow" && workflowRoute) return `Routes the spoken command to ${voiceWorkflowRouteLabel(workflowRoute)} instead of leaving it as passive transcript text.`;
   if (action === "outline") return `Treating "${target}" as an outline operation keeps structure editable before prose changes.`;
   if (action === "add-evidence") return "Evidence commands become explicit source and citation tasks instead of unsupported polished claims.";
   if (action === "add-table") return "Table commands make comparisons scan-friendly and preserve assumptions for review.";

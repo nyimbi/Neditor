@@ -268,6 +268,11 @@ packets, and provider handoffs.
 When dictating revision requests, review the **Voice command plan** and use
 **Use commands** to convert phrases such as "expand the executive summary" or
 "turn pricing into a table" into scoped drafting actions before generation.
+Workflow phrases such as "open Deep Research", "run QA", "prepare export", or
+"read selected text aloud" appear in the same plan with **Run workflows** and
+per-command run buttons, so voice input can navigate creation, review,
+research, export, table, provider, help, and read-aloud workflows without
+forcing users back to the command palette.
 
 Docs Live includes blueprints for business briefs, board memos, proposals,
 strategy plans, project plans, research briefs, policies, meeting briefs,
