@@ -54,7 +54,7 @@ if (!cargoPackage.description || !cargoPackage.description.includes("local-first
 if (!String(bundle.copyright || "").includes("2026")) {
   issues.push("Tauri bundle copyright must include the release year");
 }
-for (const requiredKind of ["png", "icns", "ico", "windowsTilePng"]) {
+for (const requiredKind of ["png", "icns", "ico", "sourceSvg", "generatedDesktopPng", "windowsTilePng", "iosIcon", "androidIcon"]) {
   if (!iconEvidence.kinds.includes(requiredKind)) {
     issues.push(`Tauri icon set is missing required ${requiredKind} evidence`);
   }
@@ -117,6 +117,27 @@ function collectIconEvidence(iconEntries) {
       kind: iconKind(entry),
     };
   });
+  const sourceEntries = ["neditor-icon.svg"].map((entry) => {
+    const path = join(root, "src-tauri", "icons", entry);
+    const exists = existsSync(path);
+    return {
+      path: `src-tauri/icons/${entry}`,
+      exists,
+      size: exists ? statSync(path).size : 0,
+      kind: "sourceSvg",
+      minSize: 1000,
+    };
+  });
+  const generatedDesktopEntries = ["64x64.png"].map((entry) => {
+    const path = join(root, "src-tauri", "icons", entry);
+    const exists = existsSync(path);
+    return {
+      path: `src-tauri/icons/${entry}`,
+      exists,
+      size: exists ? statSync(path).size : 0,
+      kind: "generatedDesktopPng",
+    };
+  });
   const windowsTileEntries = [
     "Square30x30Logo.png",
     "Square44x44Logo.png",
@@ -138,11 +159,30 @@ function collectIconEvidence(iconEntries) {
       kind: "windowsTilePng",
     };
   });
-  for (const entry of [...entries, ...windowsTileEntries]) {
+  const mobileEntries = [
+    "ios/AppIcon-512@2x.png",
+    "ios/AppIcon-60x60@3x.png",
+    "android/mipmap-anydpi-v26/ic_launcher.xml",
+    "android/mipmap-xxxhdpi/ic_launcher.png",
+    "android/mipmap-xxxhdpi/ic_launcher_foreground.png",
+    "android/mipmap-xxxhdpi/ic_launcher_round.png",
+    "android/values/ic_launcher_background.xml",
+  ].map((entry) => {
+    const path = join(root, "src-tauri", "icons", entry);
+    const exists = existsSync(path);
+    return {
+      path: `src-tauri/icons/${entry}`,
+      exists,
+      size: exists ? statSync(path).size : 0,
+      kind: entry.startsWith("ios/") ? "iosIcon" : "androidIcon",
+      minSize: entry.endsWith(".xml") ? 80 : 500,
+    };
+  });
+  for (const entry of [...entries, ...sourceEntries, ...generatedDesktopEntries, ...windowsTileEntries, ...mobileEntries]) {
     if (!entry.exists) issues.push(`packaging icon is missing: ${entry.path}`);
-    if (entry.exists && entry.size < 500) issues.push(`packaging icon is unexpectedly small: ${entry.path}`);
+    if (entry.exists && entry.size < (entry.minSize || 500)) issues.push(`packaging icon is unexpectedly small: ${entry.path}`);
   }
-  const allEntries = [...entries, ...windowsTileEntries];
+  const allEntries = [...entries, ...sourceEntries, ...generatedDesktopEntries, ...windowsTileEntries, ...mobileEntries];
   return {
     entries: allEntries,
     kinds: [...new Set(allEntries.filter((entry) => entry.exists).map((entry) => entry.kind))].sort(),

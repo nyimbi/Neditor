@@ -9108,6 +9108,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(verification.includes('command("Release device performance profile contract", "pnpm", ["run", "check:performance-profile"])'));
   ok(verification.includes('command("Sidecar preparation script syntax", "node", ["--check", "scripts/prepare-ned-sidecar.mjs"])'));
   ok(verification.includes('command("Platform package configuration", "pnpm", ["run", "check:platform-packaging"])'));
+  ok(platformPackaging.includes("neditor-icon.svg"));
+  ok(platformPackaging.includes("generatedDesktopPng"));
+  ok(platformPackaging.includes("iosIcon"));
+  ok(platformPackaging.includes("androidIcon"));
   ok(verification.includes('command("Release evidence workflow guard", "pnpm", ["run", "check:release-ci"])'));
   ok(verification.includes('command("Release candidate script syntax", "node", ["--check", "scripts/create-release-candidate.mjs"])'));
   ok(verification.includes('command("Homebrew cask materializer syntax", "node", ["--check", "scripts/create-homebrew-cask.mjs"])'));
