@@ -683,6 +683,14 @@ NEditor is built for drafts that need evidence before publication.
   same packet outside the app with
   `ned evidence-packet --output release-evidence-return-packet.md`, which is
   useful for support tickets, QA handoffs, and credentialed-host assignments.
+  The same setup surface is scriptable from the terminal with
+  `ned setup --json` or `ned setup --markdown`; use `--platform` to prepare
+  macOS, Windows, Linux, or manual setup instructions and `--ollama-endpoint`
+  to point the Ollama model picker at a local or cloud endpoint before
+  refreshing `/api/tags`. The setup packet includes configuration-center areas,
+  guided provider profiles, Ollama model-selection workflows, transform handler
+  installer plans, setup checklist evidence, and next commands without printing
+  secrets.
   If the bundle includes manual-review spec work orders, use **Insert manual
   review kit** to add reviewer-ready sign-off templates, expected artifact
   paths, validator commands, and closure commands to the active document. Add

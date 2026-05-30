@@ -2421,6 +2421,84 @@ fn ned_cli_lists_transform_handler_setup_plans() {
 }
 
 #[test]
+fn ned_cli_reports_unified_setup_packet() {
+    let outcome = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "setup".to_string(),
+        "--platform".to_string(),
+        "macos".to_string(),
+        "--ollama-endpoint".to_string(),
+        "https://ollama.example.com/team/api/chat".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("setup json");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("setup json");
+    assert_eq!(report["schema"], "neditor.ned-setup.v1");
+    assert_eq!(report["platform"], "macos");
+    assert!(report["configurationCenter"]
+        .as_array()
+        .expect("configuration center")
+        .iter()
+        .any(|section| section["id"] == "transforms"
+            && section["purpose"]
+                .as_str()
+                .expect("transform purpose")
+                .contains("installer plans")));
+    assert!(report["guidedProviderSetup"]
+        .as_array()
+        .expect("provider setup")
+        .iter()
+        .any(|provider| provider["id"] == "ollama-local"
+            && provider["setupSteps"]
+                .as_array()
+                .expect("setup steps")
+                .iter()
+                .any(|step| step
+                    .as_str()
+                    .is_some_and(|value| value.contains("Confirm endpoint and model")))));
+    assert!(report["guidedProviderSetup"]
+        .as_array()
+        .expect("provider setup")
+        .iter()
+        .any(|provider| provider["id"] == "codex-cli"));
+    assert_eq!(
+        report["ollamaModelPicker"]["tagsEndpoint"],
+        "https://ollama.example.com/team/api/tags"
+    );
+    assert!(report["ollamaModelPicker"]["modelSelectionWorkflows"]
+        .as_array()
+        .expect("model workflows")
+        .contains(&serde_json::json!("Deep Research")));
+    assert!(report["transformHandlerInstaller"]["coverageComplete"]
+        .as_bool()
+        .expect("handler coverage"));
+    assert!(report["setupChecklist"]
+        .as_array()
+        .expect("setup checklist")
+        .iter()
+        .any(|item| item["id"] == "ollama-models"
+            && item["evidence"]
+                .as_str()
+                .expect("ollama evidence")
+                .contains("/api/tags")));
+
+    let markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "configurator".to_string(),
+        "--platform".to_string(),
+        "linux".to_string(),
+        "--markdown".to_string(),
+    ])
+    .expect("setup markdown");
+    assert!(markdown.message.contains("# NEditor Setup Packet"));
+    assert!(markdown.message.contains("## Configuration Center"));
+    assert!(markdown.message.contains("## Guided Provider Setup"));
+    assert!(markdown.message.contains("## Ollama Model Picker"));
+    assert!(markdown.message.contains("## Transform Handler Installer"));
+}
+
+#[test]
 fn ned_cli_reads_release_readiness_reports_without_rerunning_checks() {
     let root = temp_workspace_path("readiness");
     fs::create_dir_all(&root).expect("create readiness root");
@@ -3502,6 +3580,10 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         (76, "LaTeX and PDF build path"),
         (77, "DOCX style mapping"),
         (78, "Markdown bundle export"),
+        (91, "Unified configurator"),
+        (92, "Guided provider setup"),
+        (93, "Ollama model picker"),
+        (94, "Transform handler installer"),
         (87, "Accessible command palette"),
         (88, "Keyboard-first table editing"),
         (89, "High-contrast and reduced-motion modes"),

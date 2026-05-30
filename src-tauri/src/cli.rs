@@ -131,6 +131,10 @@ const CLI_COMMANDS: &[&str] = &[
     "targets",
     "handlers",
     "transform-handlers",
+    "setup",
+    "config",
+    "configure",
+    "configurator",
     "readiness",
     "release-readiness",
     "evidence",
@@ -636,6 +640,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "rfp" | "rfp-response" | "analyze-rfp" => run_rfp_response_command(&args[2..], stdin_text),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
+        "setup" | "config" | "configure" | "configurator" => run_setup_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
         "evidence" | "evidence-status" => run_evidence_command(&args[2..]),
         "evidence-packet" | "evidence-return-packet" | "release-evidence-packet" => {
@@ -5673,6 +5678,406 @@ fn run_handlers_command(args: &[String]) -> Result<CliOutcome, String> {
     })
 }
 
+fn run_setup_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut platform = env::consts::OS.to_string();
+    let mut ollama_endpoint = "http://127.0.0.1:11434/api/chat".to_string();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--markdown" | "--report" => {}
+            "--platform" => {
+                index += 1;
+                platform = args
+                    .get(index)
+                    .ok_or_else(|| {
+                        "--platform requires macos, windows, linux, or manual".to_string()
+                    })?
+                    .to_ascii_lowercase();
+            }
+            "--ollama-endpoint" | "--ollama-url" => {
+                index += 1;
+                ollama_endpoint = args
+                    .get(index)
+                    .ok_or_else(|| {
+                        "--ollama-endpoint requires an http:// or https:// URL".to_string()
+                    })?
+                    .trim()
+                    .to_string();
+            }
+            value => return Err(format!("Unsupported setup option '{value}'")),
+        }
+        index += 1;
+    }
+    let report = build_setup_report(&platform, &ollama_endpoint)?;
+    let markdown = setup_report_markdown(&report);
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: markdown,
+        exit_code: 0,
+    })
+}
+
+fn build_setup_report(platform: &str, ollama_endpoint: &str) -> Result<Value, String> {
+    let normalized_platform = setup_platform(platform);
+    let plans = transform_handler_installer_plans_for_platform(&normalized_platform);
+    let registered_engines = installable_external_transform_engines();
+    let missing = missing_transform_handler_engines(&plans, &registered_engines);
+    let coverage_complete = missing.is_empty();
+    let ollama_tags_endpoint = setup_ollama_tags_endpoint(ollama_endpoint)?;
+    Ok(json!({
+        "schema": "neditor.ned-setup.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "platform": normalized_platform,
+        "configurationCenter": setup_configuration_center_sections(),
+        "guidedProviderSetup": setup_provider_profiles(),
+        "ollamaModelPicker": {
+            "endpoint": ollama_endpoint,
+            "tagsEndpoint": ollama_tags_endpoint,
+            "modelSelectionWorkflows": [
+                "Docs Live drafting",
+                "Agent Workspace",
+                "Deep Research",
+                "AI Paste cleanup",
+                "Quality assistance"
+            ],
+            "nonSecretDefaults": [
+                "provider profile id",
+                "endpoint",
+                "model",
+                "API key environment variable name"
+            ],
+            "discoveryCommand": format!("curl --location --silent --show-error --max-time 15 {}", shell_word(&ollama_tags_endpoint)),
+            "selectionGuidance": "Refresh models from the configured local or cloud Ollama endpoint, choose one returned model, and save only the model name plus endpoint defaults."
+        },
+        "transformHandlerInstaller": {
+            "registeredEngines": registered_engines,
+            "missingRegisteredEngines": missing,
+            "plans": plans,
+            "coverageComplete": coverage_complete
+        },
+        "setupChecklist": setup_checklist_items(),
+        "nextCommands": [
+            "ned setup --json",
+            "ned profile --workspace . --init --fields",
+            "ned handlers --json --platform macos",
+            "ned read-aloud --engine supertonic-cli --dry-run --json",
+            "ned deploy-cli --status --json",
+            "ned support-bundle --json"
+        ]
+    }))
+}
+
+fn setup_platform(platform: &str) -> String {
+    match platform.trim().to_ascii_lowercase().as_str() {
+        "mac" | "darwin" | "macos" => "macos".to_string(),
+        "win" | "windows" => "windows".to_string(),
+        "linux" => "linux".to_string(),
+        "manual" => "manual".to_string(),
+        value if value.is_empty() => env::consts::OS.to_string(),
+        value => value.to_string(),
+    }
+}
+
+fn setup_ollama_tags_endpoint(endpoint: &str) -> Result<String, String> {
+    let trimmed = endpoint.trim();
+    if trimmed.is_empty() {
+        return Err("--ollama-endpoint cannot be empty".to_string());
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if !(lower.starts_with("http://") || lower.starts_with("https://")) {
+        return Err("Ollama setup requires an http:// or https:// endpoint.".to_string());
+    }
+    let without_query = trimmed
+        .split('?')
+        .next()
+        .unwrap_or(trimmed)
+        .trim_end_matches('/');
+    for suffix in [
+        "/api/chat",
+        "/api/generate",
+        "/api/embed",
+        "/api/embeddings",
+    ] {
+        if without_query
+            .to_ascii_lowercase()
+            .ends_with(&suffix.to_ascii_lowercase())
+        {
+            let prefix = &without_query[..without_query.len() - suffix.len()];
+            return Ok(format!("{prefix}/api/tags"));
+        }
+    }
+    if without_query.to_ascii_lowercase().ends_with("/api/tags") {
+        return Ok(without_query.to_string());
+    }
+    if without_query.to_ascii_lowercase().ends_with("/api") {
+        return Ok(format!("{without_query}/tags"));
+    }
+    Ok(format!("{without_query}/api/tags"))
+}
+
+fn setup_configuration_center_sections() -> Vec<Value> {
+    vec![
+        json!({"id": "identity", "label": "Business identity", "purpose": "Reusable personal, company, legal, credentials, and brand facts"}),
+        json!({"id": "llm-access", "label": "LLM access", "purpose": "Provider profile, endpoint, model, and key environment variable defaults"}),
+        json!({"id": "local-agents", "label": "Local agent tools", "purpose": "Claude Code, Codex, OpenCode, Google Antigravity, and other governed handoffs"}),
+        json!({"id": "voice-runtime", "label": "Docs Live voice", "purpose": "Microphone, speech-recognition, clipboard, and voice-command readiness"}),
+        json!({"id": "tts", "label": "Read aloud", "purpose": "Browser speech, macOS Say, and consent-gated Supertonic setup"}),
+        json!({"id": "exports", "label": "Export defaults", "purpose": "Brand, citation, HTML, PDF, Office, publishing, Google Docs, LaTeX, EPUB, and evidence defaults"}),
+        json!({"id": "google-auth", "label": "Google Docs authorization", "purpose": "Desktop OAuth client, least-privilege scopes, and session-only tokens"}),
+        json!({"id": "transforms", "label": "Transforms and templates", "purpose": "External engines, safe database profiles, transform templates, and installer plans"}),
+        json!({"id": "release", "label": "Distribution readiness", "purpose": "Release evidence, Homebrew, platform packaging, signing, accessibility, and freshness gates"}),
+        json!({"id": "support", "label": "Support bundle", "purpose": "Redaction-safe diagnostics and handoff JSON for support or IT"}),
+    ]
+}
+
+fn setup_provider_profiles() -> Vec<Value> {
+    vec![
+        setup_provider_profile(
+            "openai-compatible",
+            "OpenAI-compatible API",
+            "api",
+            "https://api.openai.com/v1/chat/completions",
+            "OPENAI_API_KEY",
+            "General cloud LLM access with organization-approved models.",
+        ),
+        setup_provider_profile(
+            "anthropic-compatible",
+            "Anthropic-compatible API",
+            "api",
+            "https://api.anthropic.com/v1/messages",
+            "ANTHROPIC_API_KEY",
+            "Claude API access through approved account controls.",
+        ),
+        setup_provider_profile(
+            "ollama-local",
+            "Ollama local",
+            "ollama",
+            "http://127.0.0.1:11434/api/chat",
+            "",
+            "Local model execution for Docs Live, agents, and Deep Research.",
+        ),
+        setup_provider_profile(
+            "ollama-cloud",
+            "Ollama cloud or remote",
+            "ollama",
+            "https://ollama.example.com/api/chat",
+            "OLLAMA_API_KEY",
+            "Remote Ollama endpoint with optional authorization header.",
+        ),
+        setup_provider_profile(
+            "local-openai",
+            "Local OpenAI-compatible endpoint",
+            "api",
+            "http://127.0.0.1:1234/v1/chat/completions",
+            "",
+            "LM Studio, llama.cpp servers, or internal OpenAI-compatible gateways.",
+        ),
+        setup_provider_profile(
+            "private-openai",
+            "Private network gateway",
+            "api",
+            "https://llm.internal.example/v1/chat/completions",
+            "NEDITOR_AI_API_KEY",
+            "Enterprise gateway that keeps provider routing inside the organization.",
+        ),
+        setup_provider_profile(
+            "claude-code-cli",
+            "Claude Code CLI",
+            "local-agent",
+            "claude",
+            "",
+            "Governed local-agent handoff without storing API credentials in NEditor.",
+        ),
+        setup_provider_profile(
+            "codex-cli",
+            "Codex CLI",
+            "local-agent",
+            "codex",
+            "",
+            "Governed implementation or review handoff through the local Codex CLI.",
+        ),
+        setup_provider_profile(
+            "opencode-cli",
+            "OpenCode CLI",
+            "local-agent",
+            "opencode",
+            "",
+            "Governed local-agent handoff through OpenCode.",
+        ),
+        setup_provider_profile(
+            "google-antigravity-cli",
+            "Google Antigravity",
+            "local-agent",
+            "antigravity",
+            "",
+            "Governed local-agent handoff for Google Antigravity where installed.",
+        ),
+    ]
+}
+
+fn setup_provider_profile(
+    id: &str,
+    label: &str,
+    kind: &str,
+    endpoint: &str,
+    key_env: &str,
+    use_when: &str,
+) -> Value {
+    json!({
+        "id": id,
+        "label": label,
+        "kind": kind,
+        "endpoint": endpoint,
+        "keyEnv": key_env,
+        "useWhen": use_when,
+        "secretPolicy": "Store non-secret defaults only; provide API keys through environment variables or session prompts.",
+        "setupSteps": [
+            "Choose the provider profile.",
+            "Confirm endpoint and model.",
+            "Set or verify the key environment variable when the provider requires one.",
+            "Run a governed provider handoff before using generated text in a release document."
+        ]
+    })
+}
+
+fn setup_checklist_items() -> Vec<Value> {
+    vec![
+        json!({"id": "identity", "required": true, "evidence": "business profile fields and reusable placeholders"}),
+        json!({"id": "providers", "required": true, "evidence": "provider profile, model, endpoint, and key-env defaults"}),
+        json!({"id": "ollama-models", "required": false, "evidence": "model list refreshed from /api/tags before selecting an Ollama model"}),
+        json!({"id": "google-auth", "required": false, "evidence": "session-only OAuth token and Docs/Drive scopes"}),
+        json!({"id": "tts", "required": false, "evidence": "native TTS runtime check and model-download acknowledgement when needed"}),
+        json!({"id": "transforms", "required": false, "evidence": "handler installer plan, trusted executable paths, and probe results"}),
+        json!({"id": "exports", "required": true, "evidence": "export profile, approval gate, release target, and manifest defaults"}),
+        json!({"id": "support", "required": true, "evidence": "redaction-safe support bundle and release evidence work orders"}),
+    ]
+}
+
+fn setup_report_markdown(report: &Value) -> String {
+    let platform = readiness_string_field(report, "platform").unwrap_or("unknown");
+    let ollama = report.get("ollamaModelPicker").unwrap_or(&Value::Null);
+    let transform = report
+        .get("transformHandlerInstaller")
+        .unwrap_or(&Value::Null);
+    let mut lines = vec![
+        "# NEditor Setup Packet".to_string(),
+        "".to_string(),
+        format!("Platform: {platform}"),
+        "".to_string(),
+        "## Configuration Center".to_string(),
+        "".to_string(),
+        "| Area | Purpose |".to_string(),
+        "| --- | --- |".to_string(),
+    ];
+    for section in readiness_array_field(report, "configurationCenter") {
+        lines.push(format!(
+            "| {} | {} |",
+            markdown_cell(readiness_string_field(&section, "label").unwrap_or("Setup area")),
+            markdown_cell(readiness_string_field(&section, "purpose").unwrap_or(""))
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Guided Provider Setup".to_string(),
+        "".to_string(),
+        "| Profile | Kind | Endpoint or command | Key environment | Use when |".to_string(),
+        "| --- | --- | --- | --- | --- |".to_string(),
+    ]);
+    for provider in readiness_array_field(report, "guidedProviderSetup") {
+        lines.push(format!(
+            "| {} | {} | {} | {} | {} |",
+            markdown_cell(readiness_string_field(&provider, "label").unwrap_or("Provider")),
+            markdown_cell(readiness_string_field(&provider, "kind").unwrap_or("")),
+            markdown_cell(readiness_string_field(&provider, "endpoint").unwrap_or("")),
+            markdown_cell(readiness_string_field(&provider, "keyEnv").unwrap_or("")),
+            markdown_cell(readiness_string_field(&provider, "useWhen").unwrap_or("")),
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Ollama Model Picker".to_string(),
+        "".to_string(),
+        format!(
+            "- Endpoint: `{}`",
+            markdown_cell(readiness_string_field(ollama, "endpoint").unwrap_or(""))
+        ),
+        format!(
+            "- Tags endpoint: `{}`",
+            markdown_cell(readiness_string_field(ollama, "tagsEndpoint").unwrap_or(""))
+        ),
+        format!(
+            "- Discovery command: `{}`",
+            markdown_cell(readiness_string_field(ollama, "discoveryCommand").unwrap_or(""))
+        ),
+        "- Save only model name, endpoint, and non-secret defaults after selecting a returned model.".to_string(),
+        "".to_string(),
+        "## Transform Handler Installer".to_string(),
+        "".to_string(),
+        format!(
+            "- Coverage complete: {}",
+            transform
+                .get("coverageComplete")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        ),
+        format!(
+            "- Registered engines: {}",
+            readiness_array_field(transform, "registeredEngines")
+                .iter()
+                .filter_map(|value| value.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        "| Manager | Mode | Commands | Handlers |".to_string(),
+        "| --- | --- | --- | --- |".to_string(),
+    ]);
+    for plan in readiness_array_field(transform, "plans") {
+        let commands = readiness_array_field(&plan, "commands")
+            .iter()
+            .filter_map(|value| value.as_str())
+            .collect::<Vec<_>>()
+            .join("<br>");
+        let handlers = readiness_array_field(&plan, "handlers")
+            .iter()
+            .filter_map(|value| value.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        lines.push(format!(
+            "| {} | {} | {} | {} |",
+            markdown_cell(readiness_string_field(&plan, "manager").unwrap_or("manual")),
+            markdown_cell(readiness_string_field(&plan, "mode").unwrap_or("copy-only")),
+            markdown_cell(&commands),
+            markdown_cell(&handlers),
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Setup Checklist".to_string(),
+        "".to_string(),
+        "| Item | Required | Evidence |".to_string(),
+        "| --- | --- | --- |".to_string(),
+    ]);
+    for item in readiness_array_field(report, "setupChecklist") {
+        lines.push(format!(
+            "| {} | {} | {} |",
+            markdown_cell(readiness_string_field(&item, "id").unwrap_or("setup")),
+            item.get("required")
+                .and_then(Value::as_bool)
+                .map(|value| if value { "yes" } else { "no" })
+                .unwrap_or("no"),
+            markdown_cell(readiness_string_field(&item, "evidence").unwrap_or("")),
+        ));
+    }
+    lines.join("\n")
+}
+
 fn run_completions_command(args: &[String]) -> Result<CliOutcome, String> {
     let shell = args
         .first()
@@ -8794,7 +9199,10 @@ fn improvement_evidence_signals(item: &ImprovementItem) -> Vec<String> {
 }
 
 fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool {
-    if matches!(item.number, 11 | 18 | 32 | 33 | 40 | 79 | 80) {
+    if matches!(
+        item.number,
+        11 | 18 | 32 | 33 | 40 | 79 | 80 | 91 | 92 | 93 | 94
+    ) {
         return false;
     }
     let text = format!(
@@ -16650,6 +17058,9 @@ _ned() {{
       handlers|transform-handlers)
         COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
         ;;
+      setup|config|configure|configurator)
+        COMPREPLY=( $(compgen -W "--json --markdown --report --platform --ollama-endpoint --ollama-url" -- "$cur") )
+        ;;
       readiness|release-readiness)
         COMPREPLY=( $(compgen -W "--json --strict --report --action-plan --plan --evidence-kit" -- "$cur") )
         ;;
@@ -16784,6 +17195,9 @@ _ned() {{
     handlers|transform-handlers)
       _arguments '--json[print machine-readable JSON]' '--commands-only[print copyable commands only]' '--platform[show setup for another platform]:platform:($handler_platforms)'
       ;;
+    setup|config|configure|configurator)
+      _arguments '--json[print machine-readable JSON]' '--markdown[print Markdown setup packet]' '--report[alias for --markdown]' '--platform[show setup for another platform]:platform:($handler_platforms)' '--ollama-endpoint[Ollama chat or tags endpoint]:url:' '--ollama-url[alias for --ollama-endpoint]:url:'
+      ;;
     readiness|release-readiness)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when release gaps remain]' '--report[read a specific release-readiness report]:file:_files' '--action-plan[attach release evidence-kit work items for each gap]' '--plan[alias for --action-plan]' '--evidence-kit[read a release evidence-kit directory or manifest]:file:_files'
       ;;
@@ -16881,6 +17295,9 @@ fn fish_completion_script() -> String {
     for platform in ["macos", "windows", "linux", "manual"] {
         lines.push(format!(
             "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l platform -a '{platform}'"
+        ));
+        lines.push(format!(
+            "complete -c ned -n '__fish_seen_subcommand_from setup config configure configurator' -l platform -a '{platform}'"
         ));
     }
     lines.extend([
@@ -16983,6 +17400,16 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from read-aloud tts speak' -l script-output -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates outlines latex-templates tex-templates transform-templates xforms targets inspect doctor' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from setup config configure configurator' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from setup config configure configurator' -l markdown"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from setup config configure configurator' -l report"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from setup config configure configurator' -l ollama-endpoint -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from setup config configure configurator' -l ollama-url -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
@@ -18042,6 +18469,7 @@ fn help_text() -> String {
         "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--outline-output outline.md] [--coverage-output coverage.md] [--json|--markdown|--matrix|--checklist|--outline|--coverage]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
+        "  ned setup [--json|--markdown] [--platform macos|windows|linux|manual] [--ollama-endpoint http://127.0.0.1:11434/api/chat]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json] [--action-plan --evidence-kit .tmp/release-evidence-kit]"
             .to_string(),
         "  ned evidence [--json] [--strict] [--evidence-root .tmp]".to_string(),

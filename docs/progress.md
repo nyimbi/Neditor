@@ -16,16 +16,51 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `49333d8 Count local
-  capabilities from local evidence`
+- Latest inspected committed baseline before this update: `56d73e7 Make deep
+  research audits portable from ned`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: clean and aligned with `origin/main`.
+- Worktree before this log update: local setup-packet implementation in progress.
 
 ## Durable Planning Artifacts
 
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Scriptable Setup Packet
+
+The consolidated configurator now has a scriptable terminal counterpart:
+`ned setup` and its `config`, `configure`, and `configurator` aliases emit a
+redaction-safe setup packet in Markdown or JSON. The packet mirrors the desktop
+Configuration Center with setup areas for business identity, LLM access, local
+agent tools, Docs Live voice, read-aloud, exports, Google Docs authorization,
+transforms, release readiness, and support bundles.
+
+The packet also includes guided provider setup profiles for OpenAI-compatible,
+Anthropic-compatible, local and cloud Ollama, local OpenAI-compatible gateways,
+private network gateways, Claude Code, Codex, OpenCode, and Google Antigravity.
+Its Ollama model picker derives the `/api/tags` discovery endpoint from a local
+or cloud chat/generate/embed endpoint, lists the document workflows that need a
+model choice, and records only non-secret defaults. Transform handler installer
+coverage is attached from the registered external engines and platform-specific
+setup plans, so support desks can see the copyable commands and any coverage
+gaps without opening the app.
+
+This moves the conservative 100-improvement audit from 84/100 to 88/100
+implementation-evidenced items. Items 91 Unified configurator, 92 Guided
+provider setup, 93 Ollama model picker, and 94 Transform handler installer now
+have executable CLI evidence. The remaining 12 items still require live
+provider/runtime, publishing, voice/TTS/accessibility, Homebrew, or release
+evidence before the platform can be called complete.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 35 CLI tests passed and the debug `ned` binary rebuilt; `ned_cli_reports_unified_setup_packet` verifies JSON setup areas, guided Ollama/Codex provider setup, derived Ollama `/api/tags`, Deep Research model workflow coverage, complete transform handler installer coverage, and Markdown setup headings. |
+| `src-tauri/target/debug/ned setup --platform macos --ollama-endpoint https://ollama.example.com/team/api/chat --json` | Pass | Direct smoke returned `neditor.ned-setup.v1`, macOS setup areas, guided provider profiles, derived `https://ollama.example.com/team/api/tags`, setup checklist evidence, and complete transform handler installer coverage. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 88/100 implementation-evidenced items and 12 partial/external-proof items. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting the scriptable setup packet. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after adding the setup packet and CLI audit assertions. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Deep Research Audit Packet
 
