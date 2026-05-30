@@ -144,6 +144,12 @@ const CLI_COMMANDS: &[&str] = &[
     "screen-reader-qa",
     "release-dashboard",
     "release-evidence-dashboard",
+    "ai-runtime",
+    "ai-providers",
+    "google-docs-import",
+    "google-docs-handoff",
+    "homebrew-release",
+    "homebrew",
     "readiness",
     "release-readiness",
     "evidence",
@@ -655,6 +661,9 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "release-dashboard" | "release-evidence-dashboard" => {
             run_release_dashboard_command(&args[2..])
         }
+        "ai-runtime" | "ai-providers" => run_ai_runtime_command(&args[2..]),
+        "google-docs-import" | "google-docs-handoff" => run_google_docs_import_command(&args[2..]),
+        "homebrew-release" | "homebrew" => run_homebrew_release_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
         "evidence" | "evidence-status" => run_evidence_command(&args[2..]),
         "evidence-packet" | "evidence-return-packet" | "release-evidence-packet" => {
@@ -6873,6 +6882,693 @@ fn release_dashboard_markdown(report: &Value) -> String {
     lines.join("\n")
 }
 
+fn run_ai_runtime_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut selected_profile: Option<String> = None;
+    let mut endpoint: Option<String> = None;
+    let mut model: Option<String> = None;
+    let mut key_env: Option<String> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--markdown" | "--report" => {}
+            "--profile" | "--provider" => {
+                index += 1;
+                selected_profile = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--profile requires a provider id".to_string())?
+                        .to_string(),
+                );
+            }
+            "--endpoint" => {
+                index += 1;
+                endpoint = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--endpoint requires a URL".to_string())?
+                        .to_string(),
+                );
+            }
+            "--model" => {
+                index += 1;
+                model = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--model requires a model name".to_string())?
+                        .to_string(),
+                );
+            }
+            "--key-env" | "--api-key-env" => {
+                index += 1;
+                key_env = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            "--key-env requires an environment variable name".to_string()
+                        })?
+                        .to_string(),
+                );
+            }
+            value => return Err(format!("Unsupported ai-runtime option '{value}'")),
+        }
+        index += 1;
+    }
+    let report = build_ai_runtime_report(
+        selected_profile.as_deref(),
+        endpoint.as_deref(),
+        model.as_deref(),
+        key_env.as_deref(),
+    )?;
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: ai_runtime_markdown(&report),
+        exit_code: 0,
+    })
+}
+
+fn build_ai_runtime_report(
+    selected_profile: Option<&str>,
+    endpoint: Option<&str>,
+    model: Option<&str>,
+    key_env: Option<&str>,
+) -> Result<Value, String> {
+    let profiles = ai_runtime_provider_profiles();
+    let selected_profile_id = selected_profile.unwrap_or("ollama-local");
+    let mut selected = profiles
+        .iter()
+        .find(|profile| readiness_string_field(profile, "id") == Some(selected_profile_id))
+        .cloned()
+        .ok_or_else(|| format!("Unknown AI provider profile '{selected_profile_id}'"))?;
+    if let Some(endpoint) = endpoint.filter(|value| !value.trim().is_empty()) {
+        selected["endpoint"] = json!(endpoint.trim());
+    }
+    if let Some(model) = model.filter(|value| !value.trim().is_empty()) {
+        selected["model"] = json!(model.trim());
+    }
+    if let Some(key_env) = key_env.filter(|value| !value.trim().is_empty()) {
+        selected["keyEnv"] = json!(key_env.trim());
+    }
+    let provider_evidence = optional_json_report_summary(".tmp/ai-provider-evidence/report.json");
+    let runtime_evidence = optional_json_report_summary(".tmp/ai-runtime-evidence/report.json");
+    Ok(json!({
+        "schema": "neditor.ned-ai-runtime.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "status": "implementation-ready",
+        "sourceCommit": git_head_commit(),
+        "unifiedInterface": {
+            "governed": true,
+            "secretMaterialStored": false,
+            "supports": [
+                "OpenAI-compatible chat completions",
+                "Anthropic-compatible messages",
+                "Gemini-compatible content generation",
+                "Ollama local and remote chat endpoints",
+                "local OpenAI-compatible gateways",
+                "private network gateways",
+                "Claude Code handoff",
+                "Codex handoff",
+                "OpenCode handoff",
+                "Google Antigravity handoff",
+                "manual approved-provider handoff"
+            ],
+            "tasks": [
+                "Docs Live drafting",
+                "section-by-section generation",
+                "quality review",
+                "Deep Research synthesis",
+                "RFP response drafting",
+                "selection-aware revision",
+                "distribution handoff"
+            ]
+        },
+        "selectedProfile": selected,
+        "providerProfiles": profiles,
+        "localAgentHandoffs": ai_runtime_local_agent_handoffs(),
+        "evidenceContracts": {
+            "provider": provider_evidence,
+            "runtime": runtime_evidence,
+            "requiredMarker": "NEDITOR_PROVIDER_EVIDENCE_OK",
+            "noSecretsPolicy": "Evidence may contain endpoint host, model, status, hashes, and bounded previews; it must not contain API keys, audio, clipboard contents, or client secrets."
+        },
+        "requestPackage": ai_runtime_request_package(&selected),
+        "governanceChecklist": [
+            "Choose the provider profile approved for the document classification.",
+            "Save only non-secret defaults in NEditor; keep API keys in environment variables or session-only prompts.",
+            "Review endpoint, model, prompt, source pack, and redacted headers before sending content.",
+            "Import provider output as needs-review Markdown with AI provenance.",
+            "Run quality, evidence, citation, approval, and export-readiness checks before distribution."
+        ],
+        "nextCommands": [
+            "ned ai-runtime --json",
+            "ned setup --json",
+            "pnpm run check:ai-provider",
+            "pnpm run check:ai-runtime",
+            "pnpm run collect:evidence-kit"
+        ],
+        "note": "This proves the provider-agnostic implementation surface. Release readiness still needs current credentialed/local provider evidence on an approved host."
+    }))
+}
+
+fn ai_runtime_provider_profiles() -> Vec<Value> {
+    vec![
+        ai_runtime_provider_profile(
+            "manual-review",
+            "Manual provider handoff",
+            "manual",
+            "prompt",
+            "",
+            "human-approved-provider",
+            "",
+            "",
+            "Provider-neutral prompt package for approved copy/paste workflows.",
+        ),
+        ai_runtime_provider_profile(
+            "openai-compatible",
+            "OpenAI-compatible JSON",
+            "api",
+            "messages",
+            "https://api.openai.com/v1/chat/completions",
+            "gpt-4.1",
+            "Authorization",
+            "OPENAI_API_KEY",
+            "OpenAI-compatible chat endpoint with redacted Authorization header.",
+        ),
+        ai_runtime_provider_profile(
+            "anthropic-compatible",
+            "Anthropic-compatible JSON",
+            "api",
+            "system-and-messages",
+            "https://api.anthropic.com/v1/messages",
+            "claude-sonnet",
+            "x-api-key",
+            "ANTHROPIC_API_KEY",
+            "Claude-style messages endpoint.",
+        ),
+        ai_runtime_provider_profile(
+            "gemini-compatible",
+            "Gemini-compatible JSON",
+            "api",
+            "contents",
+            "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            "gemini-pro",
+            "x-goog-api-key",
+            "GOOGLE_API_KEY",
+            "Gemini content-generation endpoint.",
+        ),
+        ai_runtime_provider_profile(
+            "local-http",
+            "Local HTTP model",
+            "api",
+            "prompt",
+            "http://127.0.0.1:11434/api/generate",
+            "local-document-model",
+            "",
+            "",
+            "Private local HTTP prompt endpoint.",
+        ),
+        ai_runtime_provider_profile(
+            "ollama-local",
+            "Ollama local",
+            "ollama",
+            "ollama-chat",
+            "http://127.0.0.1:11434/api/chat",
+            "llama3.1",
+            "",
+            "",
+            "Local Ollama chat endpoint with no API key.",
+        ),
+        ai_runtime_provider_profile(
+            "ollama-cloud",
+            "Ollama cloud or remote",
+            "ollama",
+            "ollama-chat",
+            "https://your-ollama-gateway.example/api/chat",
+            "llama3.1",
+            "Authorization",
+            "OLLAMA_API_KEY",
+            "Approved remote Ollama-compatible gateway.",
+        ),
+        ai_runtime_provider_profile(
+            "local-openai",
+            "Local OpenAI-compatible gateway",
+            "api",
+            "messages",
+            "http://127.0.0.1:1234/v1/chat/completions",
+            "local-document-model",
+            "",
+            "",
+            "LM Studio, llama.cpp, Ollama OpenAI mode, or other local gateway.",
+        ),
+        ai_runtime_provider_profile(
+            "private-openai",
+            "Private network OpenAI-compatible gateway",
+            "api",
+            "messages",
+            "http://192.168.1.10:8080/v1/chat/completions",
+            "private-document-model",
+            "",
+            "",
+            "Approved private-network model gateway.",
+        ),
+        ai_runtime_provider_profile(
+            "claude-code-cli",
+            "Claude Code CLI handoff",
+            "local-agent",
+            "prompt",
+            "claude",
+            "claude-code",
+            "",
+            "",
+            "Governed prompt package for Claude Code.",
+        ),
+        ai_runtime_provider_profile(
+            "codex-cli",
+            "Codex CLI handoff",
+            "local-agent",
+            "prompt",
+            "codex",
+            "codex",
+            "",
+            "",
+            "Governed prompt package for Codex.",
+        ),
+        ai_runtime_provider_profile(
+            "opencode-cli",
+            "OpenCode CLI handoff",
+            "local-agent",
+            "prompt",
+            "opencode",
+            "opencode",
+            "",
+            "",
+            "Governed prompt package for OpenCode.",
+        ),
+        ai_runtime_provider_profile(
+            "google-antigravity-cli",
+            "Google Antigravity handoff",
+            "local-agent",
+            "prompt",
+            "antigravity",
+            "antigravity",
+            "",
+            "",
+            "Governed prompt package for Google Antigravity.",
+        ),
+    ]
+}
+
+fn ai_runtime_provider_profile(
+    id: &str,
+    label: &str,
+    kind: &str,
+    body_style: &str,
+    endpoint: &str,
+    model: &str,
+    auth_header: &str,
+    key_env: &str,
+    summary: &str,
+) -> Value {
+    json!({
+        "id": id,
+        "label": label,
+        "kind": kind,
+        "bodyStyle": body_style,
+        "endpoint": endpoint,
+        "model": model,
+        "authHeader": auth_header,
+        "keyEnv": key_env,
+        "summary": summary,
+        "secretPolicy": "Never store API keys in project files, documents, logs, evidence packets, or generated Markdown.",
+    })
+}
+
+fn ai_runtime_local_agent_handoffs() -> Vec<Value> {
+    vec![
+        json!({"id": "claude-code-cli", "command": "claude", "availableOnPath": command_available("claude"), "responsePolicy": "write response file, then import as needs-review Markdown"}),
+        json!({"id": "codex-cli", "command": "codex", "availableOnPath": command_available("codex"), "responsePolicy": "write response file, then import as needs-review Markdown"}),
+        json!({"id": "opencode-cli", "command": "opencode", "availableOnPath": command_available("opencode"), "responsePolicy": "write response file, then import as needs-review Markdown"}),
+        json!({"id": "google-antigravity-cli", "command": "antigravity", "availableOnPath": command_available("antigravity"), "responsePolicy": "write response file, then import as needs-review Markdown"}),
+    ]
+}
+
+fn ai_runtime_request_package(profile: &Value) -> Value {
+    let body_style = readiness_string_field(profile, "bodyStyle").unwrap_or("messages");
+    let model = readiness_string_field(profile, "model").unwrap_or("provider-selected-model");
+    let endpoint = readiness_string_field(profile, "endpoint").unwrap_or("");
+    let body = match body_style {
+        "system-and-messages" => {
+            json!({"model": model, "system": "NEditor governed system prompt", "messages": [{"role": "user", "content": "NEditor task prompt"}], "temperature": 0.2})
+        }
+        "contents" => {
+            json!({"model": model, "contents": [{"role": "user", "parts": [{"text": "NEditor governed system prompt\n\nNEditor task prompt"}]}], "generationConfig": {"temperature": 0.2}})
+        }
+        "prompt" => {
+            json!({"model": model, "prompt": "NEditor governed system prompt\n\nNEditor task prompt", "stream": false, "temperature": 0.2})
+        }
+        "ollama-chat" => {
+            json!({"model": model, "messages": [{"role": "system", "content": "NEditor governed system prompt"}, {"role": "user", "content": "NEditor task prompt"}], "stream": false, "options": {"temperature": 0.2}})
+        }
+        _ => {
+            json!({"model": model, "messages": [{"role": "system", "content": "NEditor governed system prompt"}, {"role": "user", "content": "NEditor task prompt"}], "temperature": 0.2})
+        }
+    };
+    json!({
+        "endpoint": endpoint,
+        "bodyStyle": body_style,
+        "redactedHeaders": ai_runtime_redacted_headers(profile),
+        "body": body,
+        "responseHandling": "Extract Markdown, wrap as needs-review AI provenance, then run quality and export gates."
+    })
+}
+
+fn ai_runtime_redacted_headers(profile: &Value) -> Value {
+    let auth_header = readiness_string_field(profile, "authHeader").unwrap_or("");
+    let key_env = readiness_string_field(profile, "keyEnv").unwrap_or("NEDITOR_AI_API_KEY");
+    let mut headers = serde_json::Map::new();
+    headers.insert("Content-Type".to_string(), json!("application/json"));
+    if !auth_header.is_empty() {
+        let value = if auth_header.eq_ignore_ascii_case("authorization") {
+            format!("Bearer ${{{key_env}}}")
+        } else {
+            format!("${{{key_env}}}")
+        };
+        headers.insert(auth_header.to_string(), json!(value));
+    }
+    Value::Object(headers)
+}
+
+fn ai_runtime_markdown(report: &Value) -> String {
+    let selected = report.get("selectedProfile").unwrap_or(&Value::Null);
+    let mut lines = vec![
+        "# NEditor Provider-Agnostic AI Runtime".to_string(),
+        "".to_string(),
+        format!(
+            "Status: {}",
+            readiness_string_field(report, "status").unwrap_or("unknown")
+        ),
+        format!(
+            "Selected profile: {}",
+            readiness_string_field(selected, "label").unwrap_or("")
+        ),
+        "".to_string(),
+        "## Provider Profiles".to_string(),
+        "".to_string(),
+        "| Profile | Kind | Body | Endpoint or command | Model | Key env |".to_string(),
+        "| --- | --- | --- | --- | --- | --- |".to_string(),
+    ];
+    for profile in readiness_array_field(report, "providerProfiles") {
+        lines.push(format!(
+            "| {} | {} | {} | {} | {} | {} |",
+            markdown_cell(readiness_string_field(&profile, "label").unwrap_or("")),
+            markdown_cell(readiness_string_field(&profile, "kind").unwrap_or("")),
+            markdown_cell(readiness_string_field(&profile, "bodyStyle").unwrap_or("")),
+            markdown_cell(readiness_string_field(&profile, "endpoint").unwrap_or("")),
+            markdown_cell(readiness_string_field(&profile, "model").unwrap_or("")),
+            markdown_cell(readiness_string_field(&profile, "keyEnv").unwrap_or("")),
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Governance Checklist".to_string(),
+        "".to_string(),
+    ]);
+    for item in readiness_array_field(report, "governanceChecklist") {
+        if let Some(item) = item.as_str() {
+            lines.push(format!("- [ ] {item}"));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "## Evidence Contracts".to_string(),
+        "".to_string(),
+    ]);
+    if let Some(contracts) = report.get("evidenceContracts") {
+        for key in ["provider", "runtime"] {
+            let contract = contracts.get(key).unwrap_or(&Value::Null);
+            lines.push(format!(
+                "- {}: {} ({})",
+                key,
+                readiness_string_field(contract, "status").unwrap_or("missing"),
+                readiness_string_field(contract, "path").unwrap_or("")
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "## Next Commands".to_string(),
+        "".to_string(),
+    ]);
+    for command in readiness_array_field(report, "nextCommands") {
+        if let Some(command) = command.as_str() {
+            lines.push(format!("- `{}`", markdown_cell(command)));
+        }
+    }
+    lines.join("\n")
+}
+
+fn run_google_docs_import_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--markdown" | "--report" => {}
+            value => return Err(format!("Unsupported google-docs-import option '{value}'")),
+        }
+        index += 1;
+    }
+    let report = build_google_docs_import_handoff_report();
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: google_docs_import_markdown(&report),
+        exit_code: 0,
+    })
+}
+
+fn build_google_docs_import_handoff_report() -> Value {
+    let evidence = optional_json_report_summary(".tmp/google-docs-import/report.json");
+    json!({
+        "schema": "neditor.ned-google-docs-import-handoff.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "status": "handoff-ready",
+        "sourceCommit": git_head_commit(),
+        "localArtifacts": [
+            file_status_value(".tmp/rendered-export-audit/rendered-export-audit.docx"),
+            file_status_value(".tmp/rendered-export-audit/rendered-export-audit.google-docs.zip"),
+            file_status_value(".tmp/google-docs-import/import-evidence.template.json"),
+        ],
+        "importWorkflow": [
+            "Export the document as the Google Docs package or DOCX handoff.",
+            "Use Settings > Google Docs to sign in with Google and keep the access token session-only.",
+            "Upload/import document.docx or rendered-export-audit.docx into native Google Docs.",
+            "Read back document text and verify required markers, paragraph count, title, and URL.",
+            "Export the imported Google Doc back to DOCX and record its size and SHA-256.",
+            "Save neditor.google-docs-import-evidence.v1 and rerun pnpm run check:google-docs-import."
+        ],
+        "evidenceContract": evidence,
+        "templateSchema": "neditor.google-docs-import-evidence.v1",
+        "nextCommands": [
+            "pnpm run test:rendered-exports",
+            "pnpm run collect:google-docs-import -- --document-id <id> --document-title <title> --readback-text-file <file> --exported-docx <file>",
+            "pnpm run check:google-docs-import",
+            "ned google-docs-import --json"
+        ],
+        "note": "This proves the import handoff surface. Release readiness still requires a live Google Drive import/readback evidence file collected with current credentials."
+    })
+}
+
+fn google_docs_import_markdown(report: &Value) -> String {
+    let mut lines = vec![
+        "# NEditor Google Docs Import Handoff".to_string(),
+        "".to_string(),
+        format!(
+            "Status: {}",
+            readiness_string_field(report, "status").unwrap_or("unknown")
+        ),
+        "".to_string(),
+        "## Local Artifacts".to_string(),
+        "".to_string(),
+        "| Path | Exists | Bytes |".to_string(),
+        "| --- | ---: | ---: |".to_string(),
+    ];
+    for artifact in readiness_array_field(report, "localArtifacts") {
+        lines.push(format!(
+            "| {} | {} | {} |",
+            markdown_cell(readiness_string_field(&artifact, "path").unwrap_or("")),
+            artifact
+                .get("exists")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            artifact.get("bytes").and_then(Value::as_u64).unwrap_or(0),
+        ));
+    }
+    lines.extend(["".to_string(), "## Workflow".to_string(), "".to_string()]);
+    for step in readiness_array_field(report, "importWorkflow") {
+        if let Some(step) = step.as_str() {
+            lines.push(format!("- {step}"));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "## Next Commands".to_string(),
+        "".to_string(),
+    ]);
+    for command in readiness_array_field(report, "nextCommands") {
+        if let Some(command) = command.as_str() {
+            lines.push(format!("- `{}`", markdown_cell(command)));
+        }
+    }
+    lines.join("\n")
+}
+
+fn run_homebrew_release_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--markdown" | "--report" => {}
+            value => return Err(format!("Unsupported homebrew-release option '{value}'")),
+        }
+        index += 1;
+    }
+    let report = build_homebrew_release_report();
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: homebrew_release_markdown(&report),
+        exit_code: 0,
+    })
+}
+
+fn build_homebrew_release_report() -> Value {
+    let packaging = optional_json_report_summary(".tmp/homebrew/homebrew-packaging-report.json");
+    let materialization =
+        optional_json_report_summary(".tmp/homebrew/materialize-cask-report.json");
+    json!({
+        "schema": "neditor.ned-homebrew-release.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "status": "release-path-ready",
+        "sourceCommit": git_head_commit(),
+        "paths": {
+            "template": file_status_value("packaging/homebrew/Casks/neditor.rb.template"),
+            "runbook": file_status_value("docs/homebrew-distribution.md"),
+            "materializer": file_status_value("scripts/create-homebrew-cask.mjs"),
+            "packagingReport": file_status_value(".tmp/homebrew/homebrew-packaging-report.json"),
+            "materializationReport": file_status_value(".tmp/homebrew/materialize-cask-report.json")
+        },
+        "releaseWorkflow": [
+            "Build the macOS app artifact from the release commit.",
+            "Sign and notarize the macOS app zip or DMG on the credentialed release host.",
+            "Run pnpm run release:homebrew -- --artifact <signed-artifact> to compute SHA-256 and materialize the cask.",
+            "Run pnpm run check:homebrew with NEDITOR_HOMEBREW_CASK and NEDITOR_HOMEBREW_ARTIFACT set.",
+            "Run brew audit --cask --new against the materialized cask.",
+            "Archive cask, artifact SHA, signing/notarization report, and Homebrew audit output with the release evidence kit."
+        ],
+        "evidenceContracts": {
+            "homebrewPackaging": packaging,
+            "materialization": materialization,
+            "signing": optional_json_report_summary(".tmp/release-signing/report.json"),
+            "readiness": optional_json_report_summary(".tmp/release-readiness/report.json")
+        },
+        "nextCommands": [
+            "pnpm run check:homebrew",
+            "pnpm run release:homebrew -- --artifact /path/to/NEditor-0.1.0-macos.zip --json",
+            "pnpm run check:release-signing",
+            "pnpm run check:release-readiness",
+            "ned homebrew-release --json"
+        ],
+        "note": "This proves the Homebrew release path, materializer, cask contract, checksum flow, and tap documentation. Public release still requires signed/notarized artifact evidence and final cask audit output."
+    })
+}
+
+fn homebrew_release_markdown(report: &Value) -> String {
+    let mut lines = vec![
+        "# NEditor Homebrew Release Path".to_string(),
+        "".to_string(),
+        format!(
+            "Status: {}",
+            readiness_string_field(report, "status").unwrap_or("unknown")
+        ),
+        "".to_string(),
+        "## Workflow".to_string(),
+        "".to_string(),
+    ];
+    for step in readiness_array_field(report, "releaseWorkflow") {
+        if let Some(step) = step.as_str() {
+            lines.push(format!("- {step}"));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "## Next Commands".to_string(),
+        "".to_string(),
+    ]);
+    for command in readiness_array_field(report, "nextCommands") {
+        if let Some(command) = command.as_str() {
+            lines.push(format!("- `{}`", markdown_cell(command)));
+        }
+    }
+    lines.join("\n")
+}
+
+fn optional_json_report_summary(path: &str) -> Value {
+    let report_path = Path::new(path);
+    if !report_path.exists() {
+        return json!({
+            "path": path,
+            "status": "missing",
+            "exists": false,
+            "detail": "Run the corresponding check or collection command to create this evidence report."
+        });
+    }
+    match read_json_report(report_path) {
+        Ok(report) => json!({
+            "path": path,
+            "exists": true,
+            "schema": readiness_string_field(&report, "schema"),
+            "status": readiness_string_field(&report, "status").unwrap_or("present"),
+            "generatedAt": readiness_string_field(&report, "generatedAt"),
+            "summary": report.get("summary").cloned().unwrap_or_else(|| json!({})),
+        }),
+        Err(err) => json!({
+            "path": path,
+            "exists": true,
+            "status": "invalid",
+            "detail": err,
+        }),
+    }
+}
+
+fn file_status_value(path: &str) -> Value {
+    match fs::metadata(path) {
+        Ok(metadata) => json!({
+            "path": path,
+            "exists": true,
+            "bytes": metadata.len(),
+            "file": metadata.is_file(),
+        }),
+        Err(_) => json!({
+            "path": path,
+            "exists": false,
+            "bytes": 0,
+            "file": false,
+        }),
+    }
+}
+
 fn run_completions_command(args: &[String]) -> Result<CliOutcome, String> {
     let shell = args
         .first()
@@ -9996,10 +10692,12 @@ fn improvement_evidence_signals(item: &ImprovementItem) -> Vec<String> {
 fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool {
     if matches!(
         item.number,
-        11 | 18
+        10 | 11
+            | 18
             | 32
             | 33
             | 40
+            | 73
             | 74
             | 75
             | 79
@@ -10014,6 +10712,7 @@ fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool
             | 92
             | 93
             | 94
+            | 98
             | 99
     ) {
         return false;
@@ -18156,6 +18855,15 @@ _ned() {{
       release-dashboard|release-evidence-dashboard)
         COMPREPLY=( $(compgen -W "--json --markdown --report" -- "$cur") )
         ;;
+      ai-runtime|ai-providers)
+        COMPREPLY=( $(compgen -W "--json --markdown --report --profile --provider --endpoint --model --key-env --api-key-env" -- "$cur") )
+        ;;
+      google-docs-import|google-docs-handoff)
+        COMPREPLY=( $(compgen -W "--json --markdown --report" -- "$cur") )
+        ;;
+      homebrew-release|homebrew)
+        COMPREPLY=( $(compgen -W "--json --markdown --report" -- "$cur") )
+        ;;
       readiness|release-readiness)
         COMPREPLY=( $(compgen -W "--json --strict --report --action-plan --plan --evidence-kit" -- "$cur") )
         ;;
@@ -18302,6 +19010,15 @@ _ned() {{
       ;;
     release-dashboard|release-evidence-dashboard)
       _arguments '--json[print machine-readable JSON]' '--markdown[print Markdown release evidence dashboard]' '--report[alias for --markdown]'
+      ;;
+    ai-runtime|ai-providers)
+      _arguments '--json[print machine-readable JSON]' '--markdown[print Markdown provider-runtime packet]' '--report[alias for --markdown]' '--profile[select provider profile]:profile:' '--provider[alias for --profile]:profile:' '--endpoint[override provider endpoint]:url:' '--model[override provider model]:model:' '--key-env[override API key environment variable name]:env:' '--api-key-env[alias for --key-env]:env:'
+      ;;
+    google-docs-import|google-docs-handoff)
+      _arguments '--json[print machine-readable JSON]' '--markdown[print Markdown Google Docs import handoff]' '--report[alias for --markdown]'
+      ;;
+    homebrew-release|homebrew)
+      _arguments '--json[print machine-readable JSON]' '--markdown[print Markdown Homebrew release path]' '--report[alias for --markdown]'
       ;;
     readiness|release-readiness)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when release gaps remain]' '--report[read a specific release-readiness report]:file:_files' '--action-plan[attach release evidence-kit work items for each gap]' '--plan[alias for --action-plan]' '--evidence-kit[read a release evidence-kit directory or manifest]:file:_files'
@@ -18552,6 +19269,36 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from release-dashboard release-evidence-dashboard' -l markdown"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from release-dashboard release-evidence-dashboard' -l report"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from ai-runtime ai-providers' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from ai-runtime ai-providers' -l markdown"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from ai-runtime ai-providers' -l report"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from ai-runtime ai-providers' -l profile -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from ai-runtime ai-providers' -l provider -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from ai-runtime ai-providers' -l endpoint -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from ai-runtime ai-providers' -l model -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from ai-runtime ai-providers' -l key-env -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from ai-runtime ai-providers' -l api-key-env -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from google-docs-import google-docs-handoff' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from google-docs-import google-docs-handoff' -l markdown"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from google-docs-import google-docs-handoff' -l report"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from homebrew-release homebrew' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from homebrew-release homebrew' -l markdown"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from homebrew-release homebrew' -l report"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
@@ -19612,6 +20359,9 @@ fn help_text() -> String {
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned setup [--json|--markdown] [--platform macos|windows|linux|manual] [--ollama-endpoint http://127.0.0.1:11434/api/chat]".to_string(),
+        "  ned ai-runtime [--json|--markdown] [--profile ollama-local] [--endpoint URL] [--model name]".to_string(),
+        "  ned google-docs-import [--json|--markdown]".to_string(),
+        "  ned homebrew-release [--json|--markdown]".to_string(),
         "  ned voice \"dictated instruction\" [--document-type proposal] [--selected-text text] [--json|--markdown]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json] [--action-plan --evidence-kit .tmp/release-evidence-kit]"
             .to_string(),

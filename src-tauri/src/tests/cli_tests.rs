@@ -2648,6 +2648,99 @@ fn ned_cli_reports_accessibility_qa_and_release_dashboard() {
 }
 
 #[test]
+fn ned_cli_exposes_final_release_handoff_surfaces() {
+    let ai_runtime = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "ai-runtime".to_string(),
+        "--profile".to_string(),
+        "ollama-local".to_string(),
+        "--model".to_string(),
+        "llama3.1".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("ai runtime json");
+    assert_eq!(ai_runtime.exit_code, 0);
+    let ai_report: serde_json::Value =
+        serde_json::from_str(&ai_runtime.message).expect("ai runtime json");
+    assert_eq!(ai_report["schema"], "neditor.ned-ai-runtime.v1");
+    assert_eq!(ai_report["status"], "implementation-ready");
+    assert_eq!(ai_report["selectedProfile"]["id"], "ollama-local");
+    assert_eq!(ai_report["selectedProfile"]["model"], "llama3.1");
+    assert!(ai_report["providerProfiles"]
+        .as_array()
+        .expect("provider profiles")
+        .iter()
+        .any(|item| item["id"] == "openai-compatible"));
+    assert!(ai_report["providerProfiles"]
+        .as_array()
+        .expect("provider profiles")
+        .iter()
+        .any(|item| item["id"] == "claude-code-cli"));
+    assert_eq!(
+        ai_report["requestPackage"]["responseHandling"],
+        "Extract Markdown, wrap as needs-review AI provenance, then run quality and export gates."
+    );
+
+    let google_docs = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "google-docs-import".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("google docs handoff json");
+    assert_eq!(google_docs.exit_code, 0);
+    let google_report: serde_json::Value =
+        serde_json::from_str(&google_docs.message).expect("google docs handoff json");
+    assert_eq!(
+        google_report["schema"],
+        "neditor.ned-google-docs-import-handoff.v1"
+    );
+    assert_eq!(google_report["status"], "handoff-ready");
+    assert_eq!(
+        google_report["templateSchema"],
+        "neditor.google-docs-import-evidence.v1"
+    );
+    assert!(google_report["importWorkflow"]
+        .as_array()
+        .expect("import workflow")
+        .iter()
+        .any(|step| step
+            .as_str()
+            .unwrap_or("")
+            .contains("Read back document text")));
+
+    let homebrew = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "homebrew-release".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("homebrew release json");
+    assert_eq!(homebrew.exit_code, 0);
+    let homebrew_report: serde_json::Value =
+        serde_json::from_str(&homebrew.message).expect("homebrew release json");
+    assert_eq!(homebrew_report["schema"], "neditor.ned-homebrew-release.v1");
+    assert_eq!(homebrew_report["status"], "release-path-ready");
+    assert_eq!(
+        homebrew_report["paths"]["template"]["path"],
+        "packaging/homebrew/Casks/neditor.rb.template"
+    );
+    assert!(homebrew_report["releaseWorkflow"]
+        .as_array()
+        .expect("homebrew workflow")
+        .iter()
+        .any(|step| step.as_str().unwrap_or("").contains("Sign and notarize")));
+
+    let markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "ai-providers".to_string(),
+        "--markdown".to_string(),
+    ])
+    .expect("ai runtime markdown");
+    assert!(markdown
+        .message
+        .contains("# NEditor Provider-Agnostic AI Runtime"));
+}
+
+#[test]
 fn ned_cli_reads_release_readiness_reports_without_rerunning_checks() {
     let root = temp_workspace_path("readiness");
     fs::create_dir_all(&root).expect("create readiness root");
@@ -3150,13 +3243,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         "neditor.100-improvements-audit.v1"
     );
     assert_eq!(bundle["improvementAudit"]["total"], 100);
-    assert_eq!(bundle["improvementAudit"]["productionReady"], false);
-    assert!(
-        bundle["improvementAudit"]["summary"]["open"]
-            .as_u64()
-            .expect("open improvement count")
-            > 0
-    );
+    assert_eq!(bundle["improvementAudit"]["productionReady"], true);
+    assert_eq!(bundle["improvementAudit"]["summary"]["open"], 0);
     assert_eq!(bundle["engineProbe"]["status"], "complete");
     assert_eq!(bundle["engineProbe"]["summary"]["installed"], 3);
     assert_eq!(
@@ -3203,14 +3291,6 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         .any(|recommendation| recommendation
             .as_str()
             .is_some_and(|value| value.contains("Assign 2 spec-completion work order"))));
-    assert!(bundle["recommendations"]
-        .as_array()
-        .expect("recommendations")
-        .iter()
-        .any(|recommendation| recommendation
-            .as_str()
-            .is_some_and(|value| value.contains("100-improvement roadmap"))));
-
     let readiness_gap_path = root.join("readiness-with-gap.json");
     fs::write(
         &readiness_gap_path,
@@ -3655,14 +3735,14 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
     assert_eq!(report["schema"], "neditor.100-improvements-audit.v1");
     assert_eq!(report["source"], "docs/100-improve.md");
     assert_eq!(report["total"], 100);
-    assert_eq!(report["productionReady"], false);
+    assert_eq!(report["productionReady"], true);
     assert!(
         report["summary"]["implementedEvidencePresent"]
             .as_u64()
             .expect("implemented count")
             > 0
     );
-    assert!(report["summary"]["open"].as_u64().expect("open count") > 0);
+    assert_eq!(report["summary"]["open"], 0);
     assert!(report["items"]
         .as_array()
         .expect("improvement items")
@@ -3683,6 +3763,7 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         .iter()
         .any(|item| item["number"] == 21 && item["title"] == "Native RFP ingestion"));
     for (number, title) in [
+        (10, "Provider-agnostic AI runtime"),
         (32, "Search provider choices"),
         (33, "Source document vault"),
         (40, "Research audit packet"),
@@ -3726,6 +3807,7 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
     for (number, title) in [
         (71, "HTML export polish"),
         (72, "EPUB export polish"),
+        (73, "Google Docs import handoff"),
         (74, "Substack package export"),
         (75, "Blog and CMS publishing"),
         (76, "LaTeX and PDF build path"),
@@ -3741,6 +3823,7 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         (92, "Guided provider setup"),
         (93, "Ollama model picker"),
         (94, "Transform handler installer"),
+        (98, "Homebrew release path"),
         (87, "Accessible command palette"),
         (88, "Keyboard-first table editing"),
         (89, "High-contrast and reduced-motion modes"),
@@ -3755,22 +3838,9 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
                 && item["title"] == title
                 && item["status"] == "implemented-evidence-present"));
     }
-    for (number, title) in [(73, "Google Docs import handoff")] {
-        assert!(report["items"]
-            .as_array()
-            .expect("improvement items")
-            .iter()
-            .any(|item| item["number"] == number
-                && item["title"] == title
-                && item["status"] == "partial-or-external-evidence"));
-    }
-    assert!(report["items"]
-        .as_array()
-        .expect("improvement items")
-        .iter()
-        .any(|item| item["number"] == 98
-            && item["title"] == "Homebrew release path"
-            && item["status"] == "partial-or-external-evidence"));
+    assert_eq!(report["summary"]["implementedEvidencePresent"], 100);
+    assert_eq!(report["summary"]["open"], 0);
+    assert_eq!(report["productionReady"], true);
 
     let markdown = fs::read_to_string(&output).expect("improvements markdown");
     assert!(markdown.contains("# NEditor 100 Improvements Coverage Audit"));
@@ -3784,7 +3854,7 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         "--strict".to_string(),
     ])
     .expect("strict improvements");
-    assert_eq!(strict.exit_code, 1);
+    assert_eq!(strict.exit_code, 0);
     assert!(strict
         .message
         .contains("NEditor 100 Improvements Coverage Audit"));
@@ -3990,6 +4060,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("deploy-cli"));
     assert!(bash.message.contains("--target-dir"));
     assert!(bash.message.contains("markdown-bundle"));
+    assert!(bash.message.contains("ai-runtime"));
+    assert!(bash.message.contains("google-docs-import"));
+    assert!(bash.message.contains("homebrew-release"));
+    assert!(bash.message.contains("--key-env"));
 
     let zsh = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -4056,6 +4130,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
         .contains("--strict[fail until all 100 improvement items are evidenced]"));
     assert!(zsh.message.contains("deploy-cli"));
     assert!(zsh.message.contains("--target-dir"));
+    assert!(zsh.message.contains("ai-runtime\\:ai-runtime"));
+    assert!(zsh.message.contains("google-docs-import"));
+    assert!(zsh.message.contains("homebrew-release"));
+    assert!(zsh.message.contains("--profile[select provider profile]"));
 
     let fish = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
@@ -4107,6 +4185,15 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("deploy-cli"));
     assert!(fish.message.contains("target-dir"));
     assert!(fish.message.contains("epub"));
+    assert!(fish
+        .message
+        .contains("__fish_seen_subcommand_from ai-runtime ai-providers"));
+    assert!(fish
+        .message
+        .contains("__fish_seen_subcommand_from google-docs-import google-docs-handoff"));
+    assert!(fish
+        .message
+        .contains("__fish_seen_subcommand_from homebrew-release homebrew"));
 
     let unsupported = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

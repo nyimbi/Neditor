@@ -691,6 +691,11 @@ NEditor is built for drafts that need evidence before publication.
   guided provider profiles, Ollama model-selection workflows, transform handler
   installer plans, setup checklist evidence, and next commands without printing
   secrets.
+  `ned ai-runtime --json` exposes the governed provider runtime from the
+  terminal: OpenAI-compatible, Anthropic-compatible, Gemini-compatible, Ollama
+  local/cloud, local gateway, private gateway, Claude Code, Codex, OpenCode,
+  Google Antigravity, and manual handoff profiles, with selected request shape,
+  redacted headers, governance checklist, and evidence contracts.
   If the bundle includes manual-review spec work orders, use **Insert manual
   review kit** to add reviewer-ready sign-off templates, expected artifact
   paths, validator commands, and closure commands to the active document. Add
@@ -1021,6 +1026,13 @@ create the same release evidence dashboard from a terminal. The packet shows
 implementation, manual, credentialed, cross-platform, Homebrew, Google Docs,
 and ready-to-send lanes so release managers can see what is complete and what
 still depends on external proof.
+
+Use `ned google-docs-import --json` to prepare a Google Docs import/readback
+handoff packet with local DOCX/package artifacts, required evidence schema,
+step-by-step import workflow, and validator commands. Use
+`ned homebrew-release --json` to prepare the Homebrew cask release path,
+materializer, checksum flow, signing/notarization expectations, and audit
+commands before publishing a tap.
 
 ## Accessibility QA
 

@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `1c87a74 Route
-  dictated document commands through ned`
+- Latest inspected committed baseline before this update: `6fa7596 Make release
+  and accessibility evidence scriptable`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,48 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Final Roadmap Handoff Surfaces
+
+The final three 100-improvement items now have first-class `ned` evidence
+surfaces instead of being visible only through lower-level scripts and runbooks.
+`ned ai-runtime` exposes the provider-agnostic runtime contract for
+OpenAI-compatible, Anthropic-compatible, Gemini-compatible, Ollama local/cloud,
+local gateways, private gateways, Claude Code, Codex, OpenCode, Google
+Antigravity, and manual handoff profiles. The packet includes the selected
+profile, redacted headers, request body shape, local-agent availability,
+governance checklist, and provider/runtime evidence contracts.
+
+`ned google-docs-import` turns the Google Docs package into a concrete import
+handoff: local artifacts, required evidence schema, import/readback workflow,
+and validator commands. `ned homebrew-release` turns the Homebrew release path
+into a concrete release packet: cask template, materializer, checksum flow,
+signing/notarization expectations, evidence reports, and audit commands.
+
+This moves the conservative 100-improvement implementation audit from 97/100
+to 100/100 implementation-evidenced items. It does not claim final release
+readiness: the release dashboard still blocks ready-to-send status until live
+provider/runtime evidence, live Google Docs import/readback evidence,
+signed/notarized macOS artifacts, and Homebrew audit proof are supplied.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 39 CLI tests passed and the debug `ned` binary rebuilt; `ned_cli_exposes_final_release_handoff_surfaces` verifies the provider-agnostic runtime packet, Google Docs import handoff, Homebrew release path, Markdown output, and final roadmap audit status. |
+| `src-tauri/target/debug/ned ai-runtime --profile ollama-local --model llama3.1 --json` | Pass with release evidence pending | Direct smoke returned `neditor.ned-ai-runtime.v1`, selected Ollama profile, OpenAI/Anthropic/Gemini/Ollama/local/private/local-agent profiles, request package shape, local-agent availability, and provider/runtime evidence contract status. |
+| `src-tauri/target/debug/ned google-docs-import --json` | Pass with live Google authorization pending | Direct smoke returned `neditor.ned-google-docs-import-handoff.v1`, import/readback workflow, evidence schema, local artifact inventory, and validator commands. |
+| `src-tauri/target/debug/ned homebrew-release --json` | Pass with signing/Homebrew proof pending | Direct smoke returned `neditor.ned-homebrew-release.v1`, cask template/materializer/runbook paths, release workflow, Homebrew packaging report, signing report, readiness report, and follow-up commands. |
+| `src-tauri/target/debug/ned improvements --json` | Pass | Conservative implementation audit now reports 100/100 implementation-evidenced items, 0 open improvement items, and `productionReady: true` for the roadmap implementation checklist. |
+| `src-tauri/target/debug/ned release-dashboard --json` | Pass with release blockers | Release dashboard still reports `productionReady: false`; implementation roadmap is ready-to-send, while accessibility manual sign-off, provider/runtime proof, Google Docs live proof, Homebrew/signing proof, and cross-platform package evidence remain visible release gates. |
+| `pnpm run check:ai-provider` | Pass with provider proof pending | Refreshed `.tmp/ai-provider-evidence/report.json`; no invalid evidence, status remains `pending-live-provider-evidence` until an approved live provider response is attached. |
+| `pnpm run check:ai-runtime` | Pass with runtime proof pending | Refreshed `.tmp/ai-runtime-evidence/report.json`; status remains `pending-real-runtime-evidence` until real microphone/clipboard runtime proof is attached without storing samples. |
+| `pnpm run test:rendered-exports` | Pass | Regenerated inspectable rendered export artifacts, including the Google Docs package prerequisites consumed by the import/readback evidence contract. |
+| `pnpm run check:google-docs-import` | Pass with Google authorization pending | Refreshed `.tmp/google-docs-import/report.json`; local DOCX/package proof is current, while live Drive import/readback remains `pending-google-drive-authorization`. |
+| `pnpm run check:homebrew` | Pass with release blockers | Refreshed `.tmp/homebrew/homebrew-packaging-report.json`; cask packaging contract passes while final signed/notarized artifact and cask SHA proof remain blocked. |
+| `pnpm run check:release-readiness` | Expected fail while worktree dirty | The readiness aggregator wrote `.tmp/release-readiness/report.json` but rejected stale/dirty-source release evidence during this uncommitted slice; rerun after commit and evidence refresh before claiming release readiness. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding the final CLI evidence surfaces and docs. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting final handoff commands. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after adding the final CLI evidence surfaces. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Scriptable Accessibility And Release Dashboard
 
