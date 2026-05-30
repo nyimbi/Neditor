@@ -532,6 +532,7 @@ Research and business documents can keep reference metadata near the source.
   source-disagreement table before accepting contested findings or exporting a
   research report.
 - Use **Insert source quality** to add a source review queue with fit scores,
+  authority, recency, relevance, independence, and evidence-strength dimensions,
   ranking reasons, and recommended citation actions for every Deep Research
   source candidate before relying on generated claims.
 - Use **Insert audit packet** to add one reviewer handoff containing run

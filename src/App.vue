@@ -2260,7 +2260,7 @@
             <section v-if="deepResearchIterations.length" class="snapshot-row" aria-label="Deep research source quality review">
               <p>{{ deepResearchSourceQualitySummary }}</p>
               <small v-for="item in deepResearchSourceQualityItems.slice(0, 6)" :key="`${item.iteration}-${item.url}`">
-                {{ item.fitLabel }} | {{ item.fitScore }}/100 | {{ item.title }} | {{ item.reviewAction }}
+                {{ item.fitLabel }} | {{ item.fitScore }}/100 | {{ item.title }} | {{ item.qualityDimensions.map((dimension) => `${dimension.name} ${dimension.score}`).join(" / ") }} | {{ item.reviewAction }}
               </small>
             </section>
             <section v-if="deepResearchIterations.length" class="snapshot-row" aria-label="Deep research evidence conflict review">

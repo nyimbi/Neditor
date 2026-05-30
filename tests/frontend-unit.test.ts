@@ -6635,7 +6635,12 @@ test("Deep Research ranks stronger citation source candidates first", () => {
   equal(ranked[0].title, "AI procurement controls policy evidence");
   equal(ranked[0].fitLabel, "strong");
   ok((ranked[0].fitScore || 0) > (ranked[1].fitScore || 0));
-  ok(ranked[0].fitReasons?.some((reason) => reason.includes("government source domain")));
+  ok(ranked[0].fitReasons?.some((reason) => reason.includes("evidence")));
+  const sourceFit = assessDeepResearchSource(ranked[0], "AI procurement controls policy evidence");
+  equal(sourceFit.dimensions.length, 5);
+  ok(sourceFit.dimensions.some((dimension) => dimension.name === "authority" && dimension.reason.includes("government source domain")));
+  ok(sourceFit.dimensions.some((dimension) => dimension.name === "relevance" && dimension.score >= 80));
+  ok(sourceFit.dimensions.some((dimension) => dimension.name === "evidence" && dimension.score >= 80));
 
   const weak = assessDeepResearchSource(
     { title: "Login", url: "not a url", snippet: "", source: "DuckDuckGo" },
@@ -6655,7 +6660,8 @@ test("Deep Research ranks stronger citation source candidates first", () => {
   equal(qualityItems.length, 2);
   equal(qualityItems[0].fitLabel, "weak");
   ok(qualityItems[0].reviewAction.includes("Avoid citing"));
-  ok(qualityItems.some((item) => item.fitLabel === "strong" && item.fitReasons.some((reason) => reason.includes("government source domain"))));
+  ok(qualityItems.every((item) => item.qualityDimensions.some((dimension) => dimension.name === "independence")));
+  ok(qualityItems.some((item) => item.fitLabel === "strong" && item.qualityDimensions.some((dimension) => dimension.name === "authority" && dimension.reason.includes("government source domain"))));
   const qualityMarkdown = deepResearchSourceQualityMarkdown([
     {
       index: 1,
@@ -6668,6 +6674,9 @@ test("Deep Research ranks stronger citation source candidates first", () => {
   ok(qualityMarkdown.includes("## Deep Research Source Quality Review"));
   ok(qualityMarkdown.includes("### Fit Bands"));
   ok(qualityMarkdown.includes("### Source Review Queue"));
+  ok(qualityMarkdown.includes("Quality dimensions"));
+  ok(qualityMarkdown.includes("authority"));
+  ok(qualityMarkdown.includes("independence"));
   ok(qualityMarkdown.includes("Avoid citing unless a reviewer confirms"));
   ok(qualityMarkdown.includes("AI procurement controls policy evidence"));
 });
@@ -9311,6 +9320,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Deep research source quality review"'));
   ok(app.includes("deepResearchSourceQualityItems"));
   ok(app.includes("deepResearchSourceQualitySummary"));
+  ok(app.includes("qualityDimensions.map"));
   ok(app.includes("insertDeepResearchSourceQualityReview"));
   ok(app.includes("Insert source quality"));
   ok(app.includes("AI: Insert deep research source quality review"));

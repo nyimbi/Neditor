@@ -18,6 +18,14 @@ export interface DeepResearchSourceFit {
   score: number;
   label: string;
   reasons: string[];
+  dimensions: DeepResearchSourceQualityDimension[];
+}
+
+export interface DeepResearchSourceQualityDimension {
+  name: "authority" | "recency" | "relevance" | "independence" | "evidence";
+  score: number;
+  label: string;
+  reason: string;
 }
 
 export interface DeepResearchSourceQualityReviewItem {
@@ -29,6 +37,7 @@ export interface DeepResearchSourceQualityReviewItem {
   fitScore: number;
   fitLabel: string;
   fitReasons: string[];
+  qualityDimensions: DeepResearchSourceQualityDimension[];
   reviewAction: string;
 }
 
@@ -608,62 +617,175 @@ export function assessDeepResearchSource(source: DeepResearchSource, query: stri
   const queryTokens = significantWords(query);
   const titleTokens = new Set(significantWords(source.title));
   const snippetTokens = new Set(significantWords(source.snippet));
-  let score = 20;
-  const reasons: string[] = [];
-
   const titleMatches = queryTokens.filter((token) => titleTokens.has(token)).length;
   const snippetMatches = queryTokens.filter((token) => snippetTokens.has(token)).length;
-  if (titleMatches) {
-    score += Math.min(24, titleMatches * 8);
-    reasons.push(`${titleMatches} query term${titleMatches === 1 ? "" : "s"} in title`);
-  }
-  if (snippetMatches) {
-    score += Math.min(18, snippetMatches * 4);
-    reasons.push(`${snippetMatches} query term${snippetMatches === 1 ? "" : "s"} in snippet`);
-  }
-
   const lowerText = `${source.title} ${source.snippet}`.toLowerCase();
   const normalizedQuery = query.trim().toLowerCase();
-  if (normalizedQuery.length >= 12 && lowerText.includes(normalizedQuery)) {
-    score += 10;
-    reasons.push("exact query phrase match");
-  }
-
-  const urlAssessment = assessSourceUrl(source.url);
-  score += urlAssessment.scoreDelta;
-  reasons.push(...urlAssessment.reasons);
-
-  if (!source.snippet.trim()) {
-    score -= 5;
-    reasons.push("no snippet for quick evidence review");
-  }
-  if (/\b(?:blog|forum|reddit|x\.com|twitter|facebook|linkedin|medium\.com|substack\.com)\b/i.test(source.url)) {
-    score -= 10;
-    reasons.push("publication context may need extra verification");
-  }
-  if (/\b(?:search|login|signup|account)\b/i.test(source.url)) {
-    score -= 8;
-    reasons.push("URL may not point directly to source evidence");
-  }
-
-  const bounded = Math.max(0, Math.min(100, Math.round(score)));
+  const exactQueryMatch = normalizedQuery.length >= 12 && lowerText.includes(normalizedQuery);
+  const relevance = sourceQualityDimension(
+    "relevance",
+    15 + Math.min(45, titleMatches * 15) + Math.min(30, snippetMatches * 6) + (exactQueryMatch ? 10 : 0),
+    [
+      titleMatches ? `${titleMatches} query term${titleMatches === 1 ? "" : "s"} in title` : "limited title match",
+      snippetMatches ? `${snippetMatches} query term${snippetMatches === 1 ? "" : "s"} in snippet` : "limited snippet match",
+      exactQueryMatch ? "exact query phrase match" : "",
+    ].filter(Boolean).join("; "),
+  );
+  const authority = sourceAuthorityDimension(source);
+  const recency = sourceRecencyDimension(source);
+  const independence = sourceQualityDimension("independence", 55, "single-source independence baseline; review queue adjusts duplicate hosts");
+  const evidence = sourceEvidenceStrengthDimension(source);
+  const dimensions = [authority, recency, relevance, independence, evidence];
+  const weightedScore =
+    authority.score * 0.24 +
+    recency.score * 0.12 +
+    relevance.score * 0.3 +
+    independence.score * 0.12 +
+    evidence.score * 0.22;
+  const bounded = Math.max(0, Math.min(100, Math.round(weightedScore)));
+  const reasons = dimensions
+    .sort((left, right) => right.score - left.score)
+    .map((dimension) => `${dimension.label} ${dimension.name}: ${dimension.reason}`)
+    .slice(0, 4);
   return {
     score: bounded,
     label: sourceFitLabel(bounded),
-    reasons: reasons.length ? reasons.slice(0, 4) : ["general web source; inspect before citing"],
+    reasons: reasons.length ? reasons : ["general web source; inspect before citing"],
+    dimensions,
   };
 }
 
+function sourceAuthorityDimension(source: DeepResearchSource) {
+  const urlAssessment = assessSourceUrl(source.url);
+  const lowerUrl = source.url.toLowerCase();
+  let score = 45 + urlAssessment.scoreDelta;
+  const reasons = [...urlAssessment.reasons];
+  if (/local|saved|library/i.test(source.source)) {
+    score += 12;
+    reasons.push("saved local source library candidate");
+  }
+  if (/\b(?:blog|forum|reddit|x\.com|twitter|facebook|linkedin|medium\.com|substack\.com|social)\b/i.test(lowerUrl)) {
+    score -= 22;
+    reasons.push("social or self-publishing context requires corroboration");
+  }
+  if (/\b(?:search|login|signup|account)\b/i.test(lowerUrl)) {
+    score -= 18;
+    reasons.push("URL may not point directly to source evidence");
+  }
+  return sourceQualityDimension("authority", score, reasons.join("; ") || "general web domain; verify publisher authority");
+}
+
+function sourceRecencyDimension(source: DeepResearchSource) {
+  const years = [...`${source.title} ${source.url} ${source.snippet}`.matchAll(/\b(19\d{2}|20\d{2})\b/g)]
+    .map((match) => Number(match[1]))
+    .filter((year) => year >= 1900 && year <= new Date().getFullYear() + 1);
+  if (!years.length) return sourceQualityDimension("recency", 45, "no publication year detected in title, URL, or snippet");
+  const newest = Math.max(...years);
+  const age = Math.max(0, new Date().getFullYear() - newest);
+  if (age <= 1) return sourceQualityDimension("recency", 92, `fresh source signal from ${newest}`);
+  if (age <= 5) return sourceQualityDimension("recency", 78, `recent source signal from ${newest}`);
+  if (age <= 10) return sourceQualityDimension("recency", 58, `older but potentially useful source from ${newest}`);
+  return sourceQualityDimension("recency", 35, `stale source signal from ${newest}; confirm it still applies`);
+}
+
+function sourceEvidenceStrengthDimension(source: DeepResearchSource) {
+  const lowerUrl = source.url.toLowerCase();
+  const lowerText = `${source.title} ${source.snippet}`.toLowerCase();
+  let score = source.snippet.trim() ? 52 : 25;
+  const reasons: string[] = source.snippet.trim() ? ["snippet available for initial claim triage"] : ["no snippet for quick evidence review"];
+  if (/\.(pdf)(?:$|[?#])/.test(lowerUrl)) {
+    score += 24;
+    reasons.push("downloadable PDF source");
+  } else if (/\.(docx?|rtf)(?:$|[?#])/.test(lowerUrl)) {
+    score += 18;
+    reasons.push("downloadable document source");
+  } else if (/\.(csv|xlsx?|json)(?:$|[?#])/.test(lowerUrl)) {
+    score += 22;
+    reasons.push("data file source");
+  }
+  if (/\b(?:report|study|evaluation|audit|dataset|statistics|evidence|methodology|trial|survey|standard|guidance|policy)\b/i.test(lowerText)) {
+    score += 16;
+    reasons.push("snippet/title signals evidence-bearing material");
+  }
+  if (/\b(?:opinion|thread|comment|forum|blog)\b/i.test(lowerText)) {
+    score -= 16;
+    reasons.push("opinion or discussion source needs corroboration");
+  }
+  return sourceQualityDimension("evidence", score, reasons.join("; "));
+}
+
+function sourceQualityDimension(name: DeepResearchSourceQualityDimension["name"], score: number, reason: string): DeepResearchSourceQualityDimension {
+  const bounded = Math.max(0, Math.min(100, Math.round(score)));
+  return {
+    name,
+    score: bounded,
+    label: sourceQualityDimensionLabel(bounded),
+    reason,
+  };
+}
+
+function sourceQualityDimensionLabel(score: number) {
+  if (score >= 75) return "strong";
+  if (score >= 55) return "good";
+  if (score >= 35) return "review";
+  return "weak";
+}
+
+function sourceFitFromRankedSource(source: DeepResearchSource, query: string): DeepResearchSourceFit {
+  if (source.fitScore === undefined || !source.fitLabel) return assessDeepResearchSource(source, query);
+  return {
+    score: source.fitScore,
+    label: source.fitLabel,
+    reasons: source.fitReasons?.length ? source.fitReasons : ["review source before citing"],
+    dimensions: assessDeepResearchSource(source, query).dimensions,
+  };
+}
+
+function applyIndependenceDimension(fit: DeepResearchSourceFit, duplicateHostCount: number) {
+  const score = duplicateHostCount <= 1 ? 82 : duplicateHostCount === 2 ? 60 : 38;
+  const independence = sourceQualityDimension(
+    "independence",
+    score,
+    duplicateHostCount <= 1
+      ? "unique source host in this research set"
+      : `${duplicateHostCount} candidates share this host; avoid over-weighting one publisher`,
+  );
+  const dimensions = fit.dimensions.map((dimension) => (dimension.name === "independence" ? independence : dimension));
+  const adjustedScore = Math.max(0, Math.min(100, Math.round(
+    fit.score + (independence.score - (fit.dimensions.find((dimension) => dimension.name === "independence")?.score || 55)) * 0.12,
+  )));
+  return {
+    ...fit,
+    score: adjustedScore,
+    label: sourceFitLabel(adjustedScore),
+    reasons: dimensions
+      .sort((left, right) => right.score - left.score)
+      .map((dimension) => `${dimension.label} ${dimension.name}: ${dimension.reason}`)
+      .slice(0, 4),
+    dimensions,
+  };
+}
+
+function sourceHostKey(url: string) {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    return host || url.trim().toLowerCase();
+  } catch {
+    return url.trim().toLowerCase();
+  }
+}
+
 export function deepResearchSourceQualityReviewItems(iterations: DeepResearchIteration[]): DeepResearchSourceQualityReviewItem[] {
+  const hostCounts = new Map<string, number>();
+  for (const iteration of iterations) {
+    for (const source of iteration.results) {
+      const key = sourceHostKey(source.url);
+      hostCounts.set(key, (hostCounts.get(key) || 0) + 1);
+    }
+  }
   return iterations.flatMap((iteration) =>
     iteration.results.map((source) => {
-      const fit = source.fitScore === undefined || !source.fitLabel
-        ? assessDeepResearchSource(source, iteration.query)
-        : {
-            score: source.fitScore,
-            label: source.fitLabel,
-            reasons: source.fitReasons?.length ? source.fitReasons : ["review source before citing"],
-          };
+      const fit = applyIndependenceDimension(sourceFitFromRankedSource(source, iteration.query), hostCounts.get(sourceHostKey(source.url)) || 1);
       return {
         iteration: iteration.index,
         query: iteration.query,
@@ -673,6 +795,7 @@ export function deepResearchSourceQualityReviewItems(iterations: DeepResearchIte
         fitScore: fit.score,
         fitLabel: fit.label,
         fitReasons: fit.reasons,
+        qualityDimensions: fit.dimensions,
         reviewAction: sourceQualityReviewAction(fit.label),
       };
     }),
@@ -698,13 +821,17 @@ export function deepResearchSourceQualityMarkdown(iterations: DeepResearchIterat
     "",
     "### Source Review Queue",
     "",
-    "| Iteration | Fit | Score | Source | Why it was scored this way | Review action |",
-    "| ---: | --- | ---: | --- | --- | --- |",
+    "| Iteration | Fit | Score | Source | Quality dimensions | Why it was scored this way | Review action |",
+    "| ---: | --- | ---: | --- | --- | --- | --- |",
     ...(items.length
-      ? items.map((item) => `| ${item.iteration} | ${tableCell(item.fitLabel)} | ${item.fitScore} | ${markdownLink(tableCell(item.title), item.url)} (${tableCell(item.source)}) | ${tableCell(item.fitReasons.join("; "))} | ${tableCell(item.reviewAction)} |`)
-      : ["| - | none | 0 | No source candidates | Run Deep Research | Re-run source search, then review every candidate before citing. |"]),
+      ? items.map((item) => `| ${item.iteration} | ${tableCell(item.fitLabel)} | ${item.fitScore} | ${markdownLink(tableCell(item.title), item.url)} (${tableCell(item.source)}) | ${tableCell(formatSourceQualityDimensions(item.qualityDimensions))} | ${tableCell(item.fitReasons.join("; "))} | ${tableCell(item.reviewAction)} |`)
+      : ["| - | none | 0 | No source candidates | - | Run Deep Research | Re-run source search, then review every candidate before citing. |"]),
     "",
   ].join("\n");
+}
+
+function formatSourceQualityDimensions(dimensions: DeepResearchSourceQualityDimension[]) {
+  return dimensions.map((dimension) => `${dimension.name} ${dimension.score}/100 ${dimension.label}`).join("; ");
 }
 
 function deepResearchEvidenceConflictMarkdownFromConflicts(conflicts: DeepResearchEvidenceConflict[]) {
