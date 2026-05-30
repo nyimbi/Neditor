@@ -30,6 +30,12 @@ import {
   type ExternalConflictState,
 } from "../lib/conflict";
 import {
+  deleteDatabaseProfileState,
+  normalizeDatabaseProfiles,
+  saveDatabaseProfileState,
+  type DatabaseProfile,
+} from "../lib/databaseProfiles";
+import {
   closeDocumentTabState,
   moveDocumentTabState,
   setPinnedDocumentState,
@@ -424,6 +430,8 @@ export const useDocumentsStore = defineStore("documents", {
     transformInputModes: {} as Record<string, "stdin" | "file">,
     transformTimeoutMs: 5000,
     customTransformTemplates: [] as CustomTransformTemplate[],
+    databaseProfiles: normalizeDatabaseProfiles([]) as DatabaseProfile[],
+    activeDatabaseProfileId: "",
     customLatexTemplates: [] as CustomLatexTemplateProfile[],
     customDocumentOutlineTemplates: [] as CustomDocumentOutlineTemplate[],
     transformProbeResults: {} as Record<string, TransformProbeResult>,
@@ -1499,6 +1507,20 @@ export const useDocumentsStore = defineStore("documents", {
       const next = deleteCustomTransformTemplateState(this.customTransformTemplates, id);
       if (!next.changed) return;
       this.customTransformTemplates = next.templates;
+      await this.persistWorkspace();
+    },
+    async saveDatabaseProfile(profile: Partial<DatabaseProfile>) {
+      const next = saveDatabaseProfileState(this.databaseProfiles, this.activeDatabaseProfileId, profile);
+      if (!next.changed) return;
+      this.databaseProfiles = next.profiles;
+      this.activeDatabaseProfileId = next.activeId;
+      await this.persistWorkspace();
+    },
+    async deleteDatabaseProfile(id: string) {
+      const next = deleteDatabaseProfileState(this.databaseProfiles, this.activeDatabaseProfileId, id);
+      if (!next.changed) return;
+      this.databaseProfiles = next.profiles;
+      this.activeDatabaseProfileId = next.activeId;
       await this.persistWorkspace();
     },
     async saveCustomDocumentOutlineTemplate(template: CustomDocumentOutlineTemplate) {

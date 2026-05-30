@@ -458,6 +458,13 @@ the Markdown document's folder, blocks relative paths that escape that folder,
 and renders the result as a Markdown table that can be reviewed, copied, and
 exported with the rest of the document.
 
+Use **Configuration Center > Transforms > Safe database profiles** to save
+reusable database connection metadata without storing passwords or tokens in a
+document. Profiles can point to a local SQLite file or to an environment
+variable such as `NEDITOR_DATABASE_URL`, record owner/review notes, mark the
+profile read-only, and insert a SQL transform scaffold that keeps credentials
+in environment variables or session setup.
+
 Before inserting a calculation, chart, diagram, SQL query, or other transform,
 open Templates and review the AI template assistance cards. Accept the guidance
 into transform assistance notes, add owners and source values, then insert the

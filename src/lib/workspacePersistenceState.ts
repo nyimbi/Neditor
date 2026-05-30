@@ -1,5 +1,6 @@
 import { activeDocumentState } from "./documentSelectors.js";
 import { normalizeBusinessProfile, normalizeCustomDocumentOutlineTemplates } from "./businessDocuments.js";
+import { normalizeDatabaseProfiles, type DatabaseProfile } from "./databaseProfiles.js";
 import { normalizeGoogleIntegrationPreferences } from "./googleAuth.js";
 import { normalizeCustomTransformTemplates } from "./transformTemplates.js";
 import { applyPersistedUiPreferences } from "./uiPreferences.js";
@@ -81,6 +82,8 @@ export interface WorkspacePersistenceStateInput {
   transformInputModes: RequiredPersistedValue<"transformInputModes">;
   transformTimeoutMs: number;
   customTransformTemplates: RequiredPersistedValue<"customTransformTemplates">;
+  databaseProfiles: DatabaseProfile[];
+  activeDatabaseProfileId: string;
   customLatexTemplates: RequiredPersistedValue<"customLatexTemplates">;
   customDocumentOutlineTemplates: RequiredPersistedValue<"customDocumentOutlineTemplates">;
 }
@@ -145,6 +148,8 @@ export function applyPersistedWorkspacePreferenceState(
     transformTimeoutMs:
       typeof persisted.transformTimeoutMs === "number" ? Math.min(Math.max(persisted.transformTimeoutMs, 1), 30000) : current.transformTimeoutMs,
     customTransformTemplates: normalizeCustomTransformTemplates(persisted.customTransformTemplates),
+    databaseProfiles: normalizeDatabaseProfiles(persisted.databaseProfiles),
+    activeDatabaseProfileId: persisted.activeDatabaseProfileId || "",
     customLatexTemplates: normalizeCustomLatexTemplateProfiles(persisted.customLatexTemplates),
     customDocumentOutlineTemplates: normalizeCustomDocumentOutlineTemplates(persisted.customDocumentOutlineTemplates),
   };
@@ -229,6 +234,8 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     transformInputModes: state.transformInputModes,
     transformTimeoutMs: state.transformTimeoutMs,
     customTransformTemplates: state.customTransformTemplates,
+    databaseProfiles: state.databaseProfiles,
+    activeDatabaseProfileId: state.activeDatabaseProfileId,
     customLatexTemplates: state.customLatexTemplates,
     customDocumentOutlineTemplates: state.customDocumentOutlineTemplates,
   });

@@ -129,6 +129,13 @@ import {
   dataSourceCanImportAsEditableTable,
 } from "../src/lib/dataRefresh.js";
 import {
+  blankDatabaseProfile,
+  databaseProfileSqlTransform,
+  databaseProfileWarnings,
+  normalizeDatabaseProfiles,
+  saveDatabaseProfileState,
+} from "../src/lib/databaseProfiles.js";
+import {
   buildDocsLiveDraft,
   buildDocsLiveQuestionnaire,
   buildDocsLiveReviewPacketMarkdown,
@@ -847,6 +854,29 @@ test("transform settings helpers clear trust and clamp runtime preferences", () 
   deepEqual(probeFailure.transformProbeResults.plantuml.diagnostics, ["Java not found"]);
   equal(probeFailure.transformProbeResults.dot.ok, true);
   equal(probeFailure.statusMessage, "plantuml transform probe failed");
+});
+
+test("database profiles normalize secret-free SQL transform scaffolds", () => {
+  const blank = blankDatabaseProfile();
+  const saved = saveDatabaseProfileState([], "", {
+    ...blank,
+    name: "Client Warehouse",
+    databasePath: "postgres://user:secret@example.com/reporting",
+    connectionMode: "environment",
+    dsnEnv: "neditor_client_db",
+    secretEnv: "client-password",
+    tags: ["client", "readonly"],
+  });
+  equal(saved.activeId, "client-warehouse");
+  equal(saved.profiles[0].dsnEnv, "NEDITOR_CLIENT_DB");
+  equal(saved.profiles[0].secretEnv, "CLIENT_PASSWORD");
+  ok(!saved.profiles[0].databasePath.includes("secret"));
+  const transform = databaseProfileSqlTransform(saved.profiles[0], "SELECT * FROM reporting.results LIMIT 5;");
+  ok(transform.includes('profile="client-warehouse"'));
+  ok(transform.includes('databaseEnv="NEDITOR_CLIENT_DB"'));
+  ok(!transform.includes("client-password"));
+  deepEqual(normalizeDatabaseProfiles([saved.profiles[0], saved.profiles[0]]).map((profile) => profile.id), ["client-warehouse"]);
+  ok(databaseProfileWarnings({ ...saved.profiles[0], readonly: false }).some((warning) => warning.includes("Write-capable")));
 });
 
 test("workflow history helpers deduplicate runs drafts and guided demo progress", () => {
@@ -6987,6 +7017,16 @@ test("workspace persistence migration versions and normalizes saved settings", (
       },
       { id: "missing-body", name: "Ignored" },
     ],
+    databaseProfiles: [
+      {
+        name: "Client Warehouse",
+        driver: "sqlite",
+        connectionMode: "file",
+        databasePath: "data/client.sqlite",
+        secretEnv: "client-db-password",
+      },
+    ],
+    activeDatabaseProfileId: "client-warehouse",
     customLatexTemplates: [
       {
         id: "custom-latex-board",
@@ -7369,6 +7409,9 @@ test("workspace persistence migration versions and normalizes saved settings", (
       tags: ["margin"],
     },
   ]);
+  equal(migrated.databaseProfiles?.[0]?.name, "Client Warehouse");
+  equal(migrated.databaseProfiles?.[0]?.secretEnv, "CLIENT_DB_PASSWORD");
+  equal(migrated.activeDatabaseProfileId, "client-warehouse");
   deepEqual(migrated.customLatexTemplates, [
     {
       id: "custom-latex-board",
@@ -7495,6 +7538,8 @@ test("workspace persistence state helper builds normalized store snapshots", () 
     transformInputModes: { dot: "file" },
     transformTimeoutMs: 45_000,
     customTransformTemplates: [],
+    databaseProfiles: normalizeDatabaseProfiles([{ name: "Warehouse", databasePath: "data/warehouse.sqlite" }]),
+    activeDatabaseProfileId: "warehouse",
     customLatexTemplates: [],
     customDocumentOutlineTemplates: [],
   });
@@ -7517,6 +7562,8 @@ test("workspace persistence state helper builds normalized store snapshots", () 
   equal(workspace.transformTimeoutMs, 30_000);
   deepEqual(workspace.transformInputModes, { dot: "file" });
   deepEqual(workspace.transformEnginePaths, { dot: "/usr/bin/dot" });
+  equal(workspace.databaseProfiles?.[0]?.name, "Warehouse");
+  equal(workspace.activeDatabaseProfileId, "warehouse");
   deepEqual(workspace.googleIntegration?.scopes, ["https://www.googleapis.com/auth/drive.file"]);
   deepEqual(workspace.guidedDemoCompletedStepIds, ["intro", "ai-create"]);
 });
@@ -7576,6 +7623,8 @@ test("workspace persistence state helper applies persisted preferences and resto
     transformInputModes: {},
     transformTimeoutMs: 5000,
     customTransformTemplates: [],
+    databaseProfiles: [],
+    activeDatabaseProfileId: "",
     customLatexTemplates: [],
     customDocumentOutlineTemplates: [],
   } satisfies Parameters<typeof applyPersistedWorkspacePreferenceState>[0];
@@ -7611,6 +7660,8 @@ test("workspace persistence state helper applies persisted preferences and resto
       disabledTransformEngines: { plantuml: true },
       transformInputModes: { dot: "file" },
       transformTimeoutMs: 45_000,
+      databaseProfiles: [{ name: "Warehouse", databasePath: "data/warehouse.sqlite" }],
+      activeDatabaseProfileId: "warehouse",
       customDocumentOutlineTemplates: [{ id: "outline-qbr", name: "QBR", category: "Executive", summary: "QBR outline", outline: ["Executive Summary"], tags: ["qbr"], bestFor: ["Reviews"] }],
       guidedDemoCompletedStepIds: ["ai-create"],
     }),
@@ -7636,6 +7687,8 @@ test("workspace persistence state helper applies persisted preferences and resto
   equal(result.state.sidebar, "settings");
   equal(result.state.transformTimeoutMs, 30_000);
   deepEqual(result.state.transformInputModes, { dot: "file" });
+  equal(result.state.databaseProfiles[0]?.id, "warehouse");
+  equal(result.state.activeDatabaseProfileId, "warehouse");
   deepEqual(result.state.guidedDemoCompletedStepIds, ["ai-create"]);
   equal(result.state.customDocumentOutlineTemplates[0]?.name, "QBR");
   deepEqual(result.restoreRequest, {
@@ -8799,6 +8852,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("export_markdown_tables"));
   ok(app.includes("import_spreadsheet_table"));
   ok(app.includes("Insert SQL transform"));
+  ok(app.includes('aria-label="Safe database profile manager"'));
+  ok(app.includes("databaseProfileDraft"));
+  ok(app.includes("saveDatabaseProfileDraft"));
+  ok(app.includes("insertActiveDatabaseProfileSqlTransform"));
+  ok(app.includes("Safe Database Profiles"));
+  ok(app.includes("SQL From Database Profile"));
   ok(app.includes("Edit table at cursor"));
   ok(app.includes("Open Table Editor"));
   ok(app.includes("Go to Source Table"));

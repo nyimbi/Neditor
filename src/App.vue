@@ -4121,6 +4121,98 @@
               @change="store.setTransformTimeout(Number(eventValue($event)))"
             />
           </label>
+          <section class="database-profile-manager" aria-label="Safe database profile manager">
+            <header>
+              <div>
+                <h4>Safe database profiles</h4>
+                <span>{{ databaseProfileSummaryText }}</span>
+              </div>
+              <button type="button" @click="resetDatabaseProfileDraft">New profile</button>
+            </header>
+            <section class="agent-provider-grid">
+              <label>
+                Profile name
+                <input v-model="databaseProfileDraft.name" placeholder="Client reporting warehouse" />
+              </label>
+              <label>
+                Driver
+                <select v-model="databaseProfileDraft.driver">
+                  <option v-for="driver in databaseProfileDrivers" :key="driver.value" :value="driver.value">{{ driver.label }}</option>
+                </select>
+              </label>
+              <label>
+                Connection mode
+                <select v-model="databaseProfileDraft.connectionMode">
+                  <option v-for="mode in databaseProfileConnectionModes" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
+                </select>
+              </label>
+              <label v-if="databaseProfileDraft.connectionMode === 'file'">
+                Database path
+                <input v-model="databaseProfileDraft.databasePath" placeholder="data/example.sqlite" />
+              </label>
+              <label v-if="databaseProfileDraft.connectionMode === 'environment'">
+                DSN environment variable
+                <input v-model="databaseProfileDraft.dsnEnv" placeholder="NEDITOR_DATABASE_URL" />
+              </label>
+              <label>
+                Host
+                <input v-model="databaseProfileDraft.host" placeholder="db.example.internal" />
+              </label>
+              <label>
+                Port
+                <input v-model="databaseProfileDraft.port" placeholder="5432" />
+              </label>
+              <label>
+                Database
+                <input v-model="databaseProfileDraft.databaseName" placeholder="analytics" />
+              </label>
+              <label>
+                Username
+                <input v-model="databaseProfileDraft.username" placeholder="readonly_user" />
+              </label>
+              <label>
+                Secret environment variable
+                <input v-model="databaseProfileDraft.secretEnv" placeholder="NEDITOR_DB_PASSWORD" />
+              </label>
+              <label>
+                Tags
+                <input :value="databaseProfileDraft.tags.join(', ')" placeholder="client, reporting, readonly" @input="databaseProfileDraft.tags = inputValue($event).split(',').map((item) => item.trim()).filter(Boolean)" />
+              </label>
+            </section>
+            <label><input v-model="databaseProfileDraft.readonly" type="checkbox" /> Read-only profile</label>
+            <label>
+              Notes
+              <textarea v-model="databaseProfileDraft.notes" rows="3" placeholder="Access scope, owner, allowed datasets, review notes"></textarea>
+            </label>
+            <dl class="database-profile-preview">
+              <div v-for="row in databaseProfileDraftRows" :key="row.label">
+                <dt>{{ row.label }}</dt>
+                <dd>{{ row.value }}</dd>
+              </div>
+            </dl>
+            <p v-for="warning in databaseProfileDraftWarnings" :key="warning" class="engine-setup-status failed" role="alert">{{ warning }}</p>
+            <div class="reference-actions">
+              <button type="button" @click="saveDatabaseProfileDraft">Save profile</button>
+              <button type="button" :disabled="!activeDatabaseProfile" @click="insertActiveDatabaseProfileSqlTransform">Insert SQL from selected profile</button>
+            </div>
+            <label v-if="store.databaseProfiles.length">
+              Saved profiles
+              <select v-model="selectedDatabaseProfileId" @change="loadSelectedDatabaseProfile">
+                <option value="">Choose a profile</option>
+                <option v-for="profile in store.databaseProfiles" :key="profile.id" :value="profile.id">{{ profile.name }}</option>
+              </select>
+            </label>
+            <article v-for="profile in store.databaseProfiles" :key="profile.id" class="engine-row">
+              <h4>{{ profile.name }}</h4>
+              <small>{{ databaseProfileSummary(profile) }}</small>
+              <small>{{ databaseProfileWarnings(profile).join(' ') || "No secret or readiness warnings." }}</small>
+              <div class="reference-actions">
+                <button type="button" @click="editDatabaseProfile(profile)">Edit</button>
+                <button type="button" @click="insertDatabaseProfileSqlTransform(profile)">Insert SQL</button>
+                <button type="button" @click="store.deleteDatabaseProfile(profile.id)">Delete</button>
+              </div>
+            </article>
+          </section>
           <article v-for="engine in store.externalTransformEngines" :key="engine.name" class="engine-row">
             <h4>{{ engine.name }}</h4>
             <small>{{ engine.execution }}</small>
@@ -6818,6 +6910,17 @@ import {
 } from "./lib/citationTodoWorkflow";
 import { citationSourceLibraryAuditMarkdown, type CitationSourceAuditItem } from "./lib/citationSourceLibrary";
 import { createDebouncedTextCommit } from "./lib/debounce";
+import {
+  blankDatabaseProfile,
+  databaseProfileConnectionModes,
+  databaseProfileDrivers,
+  databaseProfilePreviewRows,
+  databaseProfileSqlTransform,
+  databaseProfileSummary,
+  databaseProfileWarnings,
+  normalizeDatabaseProfile,
+  type DatabaseProfile,
+} from "./lib/databaseProfiles";
 import { documentLayoutPresetById, documentLayoutPresets, type DocumentLayoutPresetId } from "./lib/documentLayout";
 import {
   blankCustomLatexTemplateProfile,
@@ -8226,6 +8329,8 @@ const dataSourcePathDraft = ref("");
 const dataSourceTypeDraft = ref<SupportedDataSourceKind>("csv");
 const dataSourceSheetNameDraft = ref("");
 const dataSourceSheetIndexDraft = ref("");
+const databaseProfileDraft = ref<DatabaseProfile>(blankDatabaseProfile());
+const selectedDatabaseProfileId = ref("");
 const equationEditorTemplates = [
   {
     category: "Business",
@@ -9041,6 +9146,19 @@ const dataRefreshPlan = computed(() =>
   }),
 );
 const dataRefreshWorkflowSummary = computed(() => dataRefreshSummary(dataRefreshPlan.value));
+const activeDatabaseProfile = computed(() =>
+  store.databaseProfiles.find((profile) => profile.id === selectedDatabaseProfileId.value)
+  || store.databaseProfiles.find((profile) => profile.id === store.activeDatabaseProfileId)
+  || null,
+);
+const databaseProfileDraftPreview = computed(() => normalizeDatabaseProfile(databaseProfileDraft.value) || blankDatabaseProfile());
+const databaseProfileDraftRows = computed(() => databaseProfilePreviewRows(databaseProfileDraftPreview.value));
+const databaseProfileDraftWarnings = computed(() => databaseProfileWarnings(databaseProfileDraftPreview.value));
+const databaseProfileSummaryText = computed(() =>
+  store.databaseProfiles.length
+    ? `${store.databaseProfiles.length} safe database profile${store.databaseProfiles.length === 1 ? "" : "s"} | ${activeDatabaseProfile.value ? databaseProfileSummary(activeDatabaseProfile.value) : "choose one to insert SQL"}`
+    : "No safe database profiles yet; create one to keep secrets out of documents.",
+);
 const frontMatterVariableRows = computed(() => parseFrontMatterVariables(activeFrontMatterText.value));
 const mergedMetadataVariableRows = computed(() => parseMergedMetadataVariables(active.value.compile?.metadata || {}, frontMatterVariableRows.value));
 const documentVariableManagerSummary = computed(() => {
@@ -10788,6 +10906,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "table-source-to-grid", label: "Text -> Grid", title: "Parse the editable Markdown table source and update the visual grid", icon: "commands", disabled: !tableDraft.value || !tableSourceEditDirty.value, run: () => updateTableDraftFromSourceText() },
       { id: "data-refresh", label: "Refresh Data", title: "Refresh local data source imports and inspect source-by-source stale audit status", icon: "sync", primary: true, disabled: store.compileBusy || !frontMatterDataSourceRows.value.length, run: () => refreshDataSourcesPreview() },
       { id: "data-audit", label: "Audit Data", title: "Insert a data refresh audit table for the active document", icon: "snapshot", disabled: !frontMatterDataSourceRows.value.length, run: () => insertDataRefreshAudit() },
+      { id: "database-profiles", label: "DB Profiles", title: "Configure safe SQL database profiles without storing secrets in documents", icon: "settings", run: () => openDatabaseProfiles() },
     ],
   },
   {
@@ -11003,6 +11122,8 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "template-packs", label: "Template Packs", help: "Copy, inspect, paste, and install portable NEditor template packs.", run: () => openTemplatePackManager() },
           { id: "insert-template-pack-manifest", label: "Insert Template Pack Manifest", help: "Insert the current portable template pack manifest into the document.", run: () => insertCurrentTemplatePackManifest() },
           { id: "sql-transform", label: "SQL Transform", help: "Insert a trusted read-only SQL transform scaffold for database-backed Markdown tables.", run: () => insertSqlTransformTemplate() },
+          { id: "database-profiles", label: "Safe Database Profiles", help: "Configure reusable SQL profiles without storing database secrets in documents.", run: () => openDatabaseProfiles() },
+          { id: "profile-sql-transform", label: "SQL From Database Profile", help: "Insert a SQL transform scaffold from the selected safe database profile.", disabled: !activeDatabaseProfile.value, run: () => insertActiveDatabaseProfileSqlTransform() },
           { id: "install-transform-handlers", label: "Install Transform Handlers", help: "Open the configurator workflow that downloads and installs Graphviz, D2, PlantUML, Pikchr, and SQLite handlers.", run: () => openTransformInstaller() },
           { id: "include-document", label: "Include Document", help: "Open the References sidebar builder for inserting another Markdown document into this one.", run: () => openIncludeBuilder() },
         ],
@@ -14290,6 +14411,20 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Import CSV or XLSX table", group: "Writing Tools", keywords: ["table", "spreadsheet", "csv", "xlsx", "excel"], run: () => importTableFromSpreadsheet() },
   { name: "Export selected table to CSV", group: "Writing Tools", keywords: ["table", "spreadsheet", "csv", "export"], run: () => exportSelectedTable("csv") },
   { name: "Export selected table to XLSX", group: "Writing Tools", keywords: ["table", "spreadsheet", "xlsx", "excel", "export"], run: () => exportSelectedTable("xlsx") },
+  {
+    name: "Open safe database profiles",
+    group: "Transforms",
+    description: "Configure reusable SQL database profiles without storing secrets in documents.",
+    keywords: ["database", "sql", "profile", "secrets", "sqlite", "postgres"],
+    run: () => openDatabaseProfiles(),
+  },
+  {
+    name: "Insert SQL from safe database profile",
+    group: "Transforms",
+    description: "Insert a SQL transform scaffold using the selected safe database profile.",
+    keywords: ["database", "sql", "profile", "query", "readonly"],
+    run: () => insertActiveDatabaseProfileSqlTransform(),
+  },
   { name: "Insert SQL transform", group: "Transforms", keywords: ["sql", "database", "sqlite", "query", "table"], run: () => insertSqlTransformTemplate() },
   { name: "Insert cover figure", group: "Snippet", run: () => insertFigureSnippet() },
   ...figureCropPositions
@@ -19221,6 +19356,15 @@ function openTransformInstaller() {
   store.statusMessage = "Opened transform handler installer";
 }
 
+function openDatabaseProfiles() {
+  store.sidebar = "settings";
+  selectedConfigurationSection.value = "transforms";
+  if (!selectedDatabaseProfileId.value && store.activeDatabaseProfileId) selectedDatabaseProfileId.value = store.activeDatabaseProfileId;
+  const profile = activeDatabaseProfile.value;
+  if (profile) editDatabaseProfile(profile);
+  store.statusMessage = "Opened safe database profiles";
+}
+
 function selectConfigurationSection(sectionId: string) {
   selectedConfigurationSection.value = sectionId;
   if (sectionId === "transforms" && !transformInstallerPlans.value.length) {
@@ -23126,6 +23270,45 @@ function insertSqlTransformTemplate() {
   store.statusMessage = "Inserted SQL transform; configure and trust sqlite3 in Settings > Transforms";
 }
 
+function resetDatabaseProfileDraft() {
+  databaseProfileDraft.value = blankDatabaseProfile();
+  selectedDatabaseProfileId.value = "";
+  store.statusMessage = "Started a new safe database profile";
+}
+
+function editDatabaseProfile(profile: DatabaseProfile) {
+  databaseProfileDraft.value = { ...profile, tags: [...profile.tags] };
+  selectedDatabaseProfileId.value = profile.id;
+  store.activeDatabaseProfileId = profile.id;
+  store.statusMessage = `Editing database profile ${profile.name}`;
+}
+
+function loadSelectedDatabaseProfile() {
+  const profile = activeDatabaseProfile.value;
+  if (!profile) return;
+  editDatabaseProfile(profile);
+}
+
+async function saveDatabaseProfileDraft() {
+  const profile = normalizeDatabaseProfile(databaseProfileDraft.value);
+  if (!profile) return;
+  await store.saveDatabaseProfile(profile);
+  selectedDatabaseProfileId.value = profile.id;
+  databaseProfileDraft.value = { ...profile, tags: [...profile.tags] };
+  store.statusMessage = `Saved safe database profile ${profile.name}`;
+}
+
+function insertActiveDatabaseProfileSqlTransform() {
+  const profile = activeDatabaseProfile.value;
+  if (profile) insertDatabaseProfileSqlTransform(profile);
+}
+
+function insertDatabaseProfileSqlTransform(profile: DatabaseProfile) {
+  insertBlock(databaseProfileSqlTransform(profile));
+  store.sidebar = "settings";
+  store.statusMessage = `Inserted safe SQL transform for ${profile.name}`;
+}
+
 function sortTableRows(columnIndex: number, direction: TableSortDirection) {
   const draft = tableDraft.value;
   if (!draft) return;
@@ -23547,6 +23730,8 @@ select:hover {
 .app-shell[data-theme="dark"] .template-card,
 .app-shell[data-theme="dark"] .template-pack-manager,
 .app-shell[data-theme="dark"] .data-refresh-workflow,
+.app-shell[data-theme="dark"] .database-profile-manager,
+.app-shell[data-theme="dark"] .database-profile-preview div,
 .app-shell[data-theme="dark"] .template-source,
 .app-shell[data-theme="dark"] .template-meta span,
 .app-shell[data-theme="dark"] .template-pack-counts span,
@@ -23627,6 +23812,8 @@ select:hover {
 .app-shell[data-theme="dark"] .template-card-header small,
 .app-shell[data-theme="dark"] .template-fill-fields,
 .app-shell[data-theme="dark"] .data-refresh-workflow header span,
+.app-shell[data-theme="dark"] .database-profile-manager header span,
+.app-shell[data-theme="dark"] .database-profile-preview dt,
 .app-shell[data-theme="dark"] .help-topic-button small,
 .app-shell[data-theme="dark"] .start-workspace-cockpit header span,
 .app-shell[data-theme="dark"] .start-workspace-steps small,
@@ -23791,6 +23978,8 @@ select:hover {
   .app-shell[data-theme="system"] .template-card,
   .app-shell[data-theme="system"] .template-pack-manager,
   .app-shell[data-theme="system"] .data-refresh-workflow,
+  .app-shell[data-theme="system"] .database-profile-manager,
+  .app-shell[data-theme="system"] .database-profile-preview div,
   .app-shell[data-theme="system"] .template-source,
   .app-shell[data-theme="system"] .template-meta span,
   .app-shell[data-theme="system"] .template-pack-counts span,
@@ -23871,6 +24060,8 @@ select:hover {
   .app-shell[data-theme="system"] .template-card-header small,
   .app-shell[data-theme="system"] .template-fill-fields,
   .app-shell[data-theme="system"] .data-refresh-workflow header span,
+  .app-shell[data-theme="system"] .database-profile-manager header span,
+  .app-shell[data-theme="system"] .database-profile-preview dt,
   .app-shell[data-theme="system"] .help-topic-button small,
   .app-shell[data-theme="system"] .start-workspace-cockpit header span,
   .app-shell[data-theme="system"] .start-workspace-steps small,
@@ -25627,6 +25818,52 @@ select:hover {
 
 .data-refresh-workflow .snapshot-row[data-status="blocked"] {
   border-left: 3px solid #b42318;
+}
+
+.database-profile-manager {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #d5dee8;
+  border-left: 3px solid #3b6f9e;
+  background: #f8fafc;
+}
+
+.database-profile-manager header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: start;
+}
+
+.database-profile-manager header span {
+  display: block;
+  color: #526070;
+  font-size: 12px;
+}
+
+.database-profile-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.database-profile-preview div {
+  padding: 7px;
+  border: 1px solid #d5dee8;
+  background: #ffffff;
+}
+
+.database-profile-preview dt {
+  color: #526070;
+  font-size: 11px;
+}
+
+.database-profile-preview dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .reference-actions {

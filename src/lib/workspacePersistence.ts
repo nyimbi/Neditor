@@ -1,6 +1,7 @@
 import type { AiCleanupOptions } from "../types.js";
 import type { AiProviderProfileId } from "./aiProviderPackages.js";
 import { normalizeBusinessProfile, normalizeCustomDocumentOutlineTemplates, type BusinessProfile, type CustomDocumentOutlineTemplate } from "./businessDocuments.js";
+import { normalizeDatabaseProfiles, type DatabaseProfile } from "./databaseProfiles.js";
 import { normalizeGoogleIntegrationPreferences, type GoogleIntegrationPreferences } from "./googleAuth.js";
 import type { PublishingContentFormat, PublishingDestinationProfile, PublishingTargetKind } from "./publishingWorkflow.js";
 import { normalizeCustomTransformTemplates, type CustomTransformTemplate } from "./transformTemplates.js";
@@ -456,6 +457,8 @@ export interface PersistedWorkspace {
   transformInputModes?: Record<string, TransformInputMode>;
   transformTimeoutMs?: number;
   customTransformTemplates?: CustomTransformTemplate[];
+  databaseProfiles?: Partial<DatabaseProfile>[];
+  activeDatabaseProfileId?: string;
   customLatexTemplates?: Partial<CustomLatexTemplateProfile>[];
   customDocumentOutlineTemplates?: CustomDocumentOutlineTemplate[];
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
@@ -1375,6 +1378,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   const transformTimeoutMs = numberValue(raw.transformTimeoutMs);
   if (transformTimeoutMs !== undefined) migrated.transformTimeoutMs = Math.min(Math.max(transformTimeoutMs, 1), 30000);
   migrated.customTransformTemplates = normalizeCustomTransformTemplates(raw.customTransformTemplates);
+  migrated.databaseProfiles = normalizeDatabaseProfiles(raw.databaseProfiles);
+  migrated.activeDatabaseProfileId = stringValue(raw.activeDatabaseProfileId) || "";
   migrated.customLatexTemplates = normalizeCustomLatexTemplateProfiles(raw.customLatexTemplates);
   migrated.customDocumentOutlineTemplates = normalizeCustomDocumentOutlineTemplates(raw.customDocumentOutlineTemplates);
   return migrated;
