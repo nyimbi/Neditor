@@ -263,9 +263,10 @@ pnpm run check:release-candidate
 `release:local` writes `.tmp/release-candidate/manifest.json`,
 `.tmp/release-candidate/SHA256SUMS`, and a reviewer-facing README. It builds the
 frontend and native release binaries, prepares the Tauri `ned` sidecar, refreshes
-prerequisite evidence templates, validates the release evidence kit, reruns
-release readiness, records compiled artifact hashes, and joins remaining
-readiness gaps to evidence-kit work items.
+prerequisite evidence templates, materializes the Tauri app bundle so packaged
+resources such as the capability showcase are present, validates the release
+evidence kit, reruns release readiness, records compiled artifact hashes, and
+joins remaining readiness gaps to evidence-kit work items.
 
 Useful operator flags:
 

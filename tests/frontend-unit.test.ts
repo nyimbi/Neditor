@@ -9389,8 +9389,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("stale-for-browser-workflow-sources"));
   ok(releaseCandidate.includes("options.allowFailure"));
   ok(releaseCandidate.includes("Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars."));
-  ok(releaseCandidate.includes("DMG/app prerequisite probes can also refresh the bundle after its first metadata report."));
-  ok(releaseCandidate.includes("// Release readiness treats stale full-suite browser workflow proof as a local failure.\n    // Validate it before native/rendered probes that can exhaust browser launch slots on macOS.\n    refreshBrowserWorkflowEvidence();\n    refreshPrerequisiteEvidence();\n    // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.\n    run(\"pnpm\", [\"run\", \"prepare:sidecars\"]);\n    // DMG/app prerequisite probes can also refresh the bundle after its first metadata report.\n    run(\"pnpm\", [\"run\", \"test:desktop-bundle\"]);"));
+  ok(releaseCandidate.includes("DMG/app prerequisite probes should run after the current app bundle has been materialized."));
+  ok(releaseCandidate.includes("// Release readiness treats stale full-suite browser workflow proof as a local failure.\n    // Validate it before native/rendered probes that can exhaust browser launch slots on macOS.\n    refreshBrowserWorkflowEvidence();\n    refreshPrerequisiteEvidence();\n    // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.\n    run(\"pnpm\", [\"run\", \"prepare:sidecars\"]);\n    // Cargo builds binaries, but only the Tauri bundler materializes app resources such as examples/showcase.\n    if (!skipBuild) buildTauriAppBundle();\n    // DMG/app prerequisite probes should run after the current app bundle has been materialized.\n    run(\"pnpm\", [\"run\", \"test:desktop-bundle\"]);"));
   ok(releaseCandidate.includes("NEDITOR_DESKTOP_SMOKE_LAUNCH"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"prepare:sidecars\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:release-ci\"]"));
@@ -9401,6 +9401,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"collect:evidence-kit\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:evidence-kit\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:release-readiness\"]"));
+  ok(releaseCandidate.includes("buildTauriAppBundle"));
+  ok(releaseCandidate.includes("pnpm\", [\"tauri\", \"build\", \"--bundles\", \"app\"]"));
   ok(releaseCandidate.includes("releaseCandidateGaps"));
   ok(releaseCandidate.includes("evidenceWorkItemsById"));
   ok(releaseCandidate.includes("readOptionalJson(\".tmp/release-evidence-kit/report.json\")"));

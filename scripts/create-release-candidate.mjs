@@ -39,7 +39,9 @@ if (!skipEvidence) {
     refreshPrerequisiteEvidence();
     // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.
     run("pnpm", ["run", "prepare:sidecars"]);
-    // DMG/app prerequisite probes can also refresh the bundle after its first metadata report.
+    // Cargo builds binaries, but only the Tauri bundler materializes app resources such as examples/showcase.
+    if (!skipBuild) buildTauriAppBundle();
+    // DMG/app prerequisite probes should run after the current app bundle has been materialized.
     run("pnpm", ["run", "test:desktop-bundle"]);
   }
   runReadinessBootstrap();
@@ -196,7 +198,6 @@ function refreshPrerequisiteEvidence() {
     ["pnpm", ["run", "test:rendered-exports"]],
     ["pnpm", ["run", "check:tables:manual"]],
     ["pnpm", ["run", "check:a11y:manual"]],
-    ["pnpm", ["run", "test:desktop-bundle"]],
     ["pnpm", ["run", "test:desktop-dmg"]],
     ["pnpm", ["run", "test:desktop-smoke"]],
   ];
@@ -207,6 +208,10 @@ function refreshPrerequisiteEvidence() {
     commands.push(["pnpm", ["run", "test:desktop-smoke"], { NEDITOR_DESKTOP_SMOKE_LAUNCH: "1" }], ["pnpm", ["run", "test:tauri-webdriver"]]);
   }
   for (const [command, commandArgs, env] of commands) run(command, commandArgs, env || {});
+}
+
+function buildTauriAppBundle() {
+  run("pnpm", ["tauri", "build", "--bundles", "app"]);
 }
 
 function refreshBrowserWorkflowEvidence() {

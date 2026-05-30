@@ -1035,8 +1035,10 @@ recognizes returned security review proof under paths such as
 `pnpm run release:local` creates a local release-candidate control packet under
 `.tmp/release-candidate/`. It requires a clean Git checkout by default, builds
 the production frontend and native release binaries, prepares the version-smoked
-Tauri `ned-*` sidecar, refreshes prerequisite evidence templates, validates the
-release evidence kit, reruns release readiness, and writes
+Tauri `ned-*` sidecar, materializes the current Tauri app bundle with packaged
+resources such as the capability showcase example, refreshes prerequisite
+evidence templates, validates the release evidence kit, reruns release
+readiness, and writes
 `manifest.json`, `SHA256SUMS`, and a reviewer-facing `README.md` covering the
 current commit, version, compiled artifact hashes, prepared sidecar hash,
 readiness status, commands run, evidence-kit link, and remaining release gates. Use
