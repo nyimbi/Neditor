@@ -138,6 +138,8 @@ pnpm run collect:evidence-kit
 pnpm run check:evidence-kit
 pnpm run check:platform-packaging
 pnpm run check:release-signing
+pnpm run check:homebrew
+pnpm run release:homebrew -- --artifact /path/to/NEditor-0.1.0-macos.zip --output /path/to/homebrew-neditor/Casks/neditor.rb
 ```
 
 Do not treat an unsigned local build as a public release. Signing,
