@@ -8305,6 +8305,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("agentSourcePackText"));
   ok(app.includes("agentMemoryText"));
   ok(app.includes("Document memory"));
+  ok(app.includes('aria-label="Document memory manager"'));
+  ok(app.includes("agentDocumentMemoryPreview"));
+  ok(app.includes("addAgentMemoryItem"));
+  ok(app.includes("captureAgentMemoryFromCurrentDocument"));
+  ok(app.includes("insertAgentDocumentMemoryPack"));
+  ok(app.includes("Open document memory manager"));
+  ok(app.includes("Capture document memory"));
   ok(app.includes("Source Pack Builder"));
   ok(app.includes("agentSourcePackPreview"));
   ok(app.includes("addAgentSourcePackItem"));

@@ -5191,14 +5191,55 @@
               placeholder="[claim] ARR forecast: ARR grows 18% in Q2 according to finance workbook&#10;[url] Pricing source: https://example.com/pricing&#10;[reviewer-comment] CFO: Check renewal risk before board review"
             ></textarea>
           </label>
-          <label>
-            Document memory
-            <textarea
-              v-model="agentMemoryText"
-              rows="5"
-              placeholder="[terminology] ARR: Annual recurring revenue&#10;[style] Executive tone: concise, concrete, no generic AI phrasing&#10;[rejected] Scope: Do not frame this as a product launch"
-            ></textarea>
-          </label>
+          <section class="agent-document-memory-manager" aria-label="Document memory manager">
+            <header>
+              <div>
+                <strong>Document memory</strong>
+                <span>{{ agentDocumentMemoryPreview.summary }}</span>
+              </div>
+              <button type="button" :disabled="!agentDocumentMemoryPreview.entries.length" @click="insertAgentDocumentMemoryPack">Insert pack</button>
+            </header>
+            <div class="agent-memory-add">
+              <label>
+                Memory type
+                <select v-model="agentMemoryKind">
+                  <option value="terminology">Terminology</option>
+                  <option value="style">Style</option>
+                  <option value="accepted-decision">Accepted decision</option>
+                  <option value="rejected-direction">Rejected direction</option>
+                  <option value="review-preference">Review preference</option>
+                  <option value="distribution-preference">Distribution preference</option>
+                </select>
+              </label>
+              <label>
+                Label
+                <input v-model="agentMemoryLabel" placeholder="ARR, executive voice, board handoff" />
+              </label>
+              <label>
+                Detail
+                <textarea v-model="agentMemoryDetail" rows="3" placeholder="Annual recurring revenue; keep tone concise; use Google Docs for comments and PDF for board pack."></textarea>
+              </label>
+              <button type="button" :disabled="!agentMemoryLabel.trim() && !agentMemoryDetail.trim()" @click="addAgentMemoryItem">Add memory</button>
+            </div>
+            <label>
+              Managed memory
+              <textarea
+                v-model="agentMemoryText"
+                rows="5"
+                placeholder="[terminology] ARR: Annual recurring revenue&#10;[style] Executive tone: concise, concrete, no generic AI phrasing&#10;[rejected] Scope: Do not frame this as a product launch"
+              ></textarea>
+            </label>
+            <div class="agent-memory-actions">
+              <button type="button" @click="captureAgentMemoryFromCurrentDocument">Capture from document</button>
+              <button type="button" :disabled="!agentDocumentMemoryPreview.entries.length" @click="copyAgentDocumentMemoryPack">Copy pack</button>
+            </div>
+            <ul v-if="agentDocumentMemoryPreview.entries.length" class="agent-source-pack-list">
+              <li v-for="item in agentDocumentMemoryPreview.entries.slice(0, 8)" :key="item.id">
+                <strong>{{ item.kind }} | {{ item.label }}</strong>
+                <span>{{ item.detail }}</span>
+              </li>
+            </ul>
+          </section>
           <ul v-if="agentSourcePackPreview.items.length" class="agent-source-pack-list">
             <li v-for="item in agentSourcePackPreview.items" :key="item.id">
               <strong>{{ item.kind }} | {{ item.label }}</strong>
@@ -7364,6 +7405,9 @@ const agentInstruction = ref("");
 const agentContextAnswers = ref("");
 const agentSourcePackText = ref("");
 const agentMemoryText = ref("");
+const agentMemoryKind = ref<AgentMemoryInputKind>("terminology");
+const agentMemoryLabel = ref("");
+const agentMemoryDetail = ref("");
 const agentSourcePackKind = ref<AgenticSourcePackItemKind>("note");
 const agentSourcePackLabel = ref("");
 const agentSourcePackDetail = ref("");
@@ -7915,6 +7959,14 @@ type ToolbarIconName =
   | "pin"
   | "close";
 
+type AgentMemoryInputKind =
+  | "terminology"
+  | "style"
+  | "accepted-decision"
+  | "rejected-direction"
+  | "review-preference"
+  | "distribution-preference";
+
 interface CommandBarAction {
   id: string;
   label: string;
@@ -8385,6 +8437,13 @@ const canImportLocalAgentResponse = computed(() =>
   Boolean(agentProviderPackage.value && currentLocalAgentProfile.value && localAgentResponsePath.value.trim() && !localAgentResponseBusy.value),
 );
 const agentSourcePackPreview = computed(() => buildAgenticSourcePack(agentSourcePackText.value));
+const agentDocumentMemoryPreview = computed(() =>
+  buildAgenticDocumentMemory({
+    memoryText: agentMemoryText.value,
+    contextAnswers: agentContextAnswers.value,
+    documentText: active.value.text,
+  }),
+);
 const agentPlaybookFocusOptions = [
   { value: "all", label: "All workflows" },
   { value: "approval", label: "Approval and governance" },
@@ -10506,6 +10565,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "read-selection", label: "Read Sel.", title: "Read selected text aloud", icon: "speak", run: () => readSelectionAloud() },
       { id: "read-document", label: "Read Doc", title: "Read the full document aloud", icon: "speak", run: () => readDocumentAloud() },
       { id: "biz-wizard", label: "Wizards", title: "Open the AI document creation wizard for common business, education, technical, and creative documents", icon: "ai", primary: true, run: () => openDocumentWizardHub() },
+      { id: "memory", label: "Memory", title: "Open reusable document memory for terminology, style, decisions, reviewers, and distribution preferences", icon: "agent", run: () => openAgentWorkspace() },
       { id: "setup", label: "Setup", title: "Configure LLM access, local agents, voice, exports, transforms, and release gates", icon: "settings", run: () => openConfigurationSetup() },
       { id: "biz-identity", label: "Identity", title: "Set up reusable business identity values", icon: "settings", run: () => openBusinessProfile() },
       { id: "bold", label: "Bold", title: "Bold selection", icon: "bold", run: () => wrapSelection("**") },
@@ -10743,6 +10803,8 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "docs-live", label: "Docs Live", help: "Dictate and structure a draft with context and placeholders.", run: () => openDocsLive() },
           { id: "deep-research", label: "Deep Research", help: "Search sources and generate a sourced report from a 1-page brief to a 200-page report.", run: () => openDeepResearch() },
           { id: "agent", label: "AI Agent Workspace", help: "Plan, revise, review, and distribute with governed agent workflows.", run: () => openAgentWorkspace() },
+          { id: "document-memory", label: "Document Memory", help: "Capture reusable terminology, style, accepted decisions, rejected directions, review preferences, and distribution preferences.", run: () => openAgentWorkspace() },
+          { id: "capture-document-memory", label: "Capture Document Memory", help: "Derive reusable document memory from current context and document signals.", run: () => captureAgentMemoryFromCurrentDocument() },
           { id: "ai-paste", label: "Clean AI Paste", help: "Clean pasted AI output and add provenance.", run: () => openAiPaste() },
           { id: "read-selection", label: "Read Selection Aloud", help: "Read the selected editor text using the configured TTS engine.", run: () => readSelectionAloud() },
           { id: "read-document", label: "Read Document Aloud", help: "Read the full active Markdown document using the configured TTS engine.", run: () => readDocumentAloud() },
@@ -12604,6 +12666,58 @@ function removeAgentSourcePackItem(itemId: string) {
   buildAgentWorkspacePlan();
   store.statusMessage = "Removed item from agent source pack";
 }
+function serializeAgentMemoryItem(kind: AgentMemoryInputKind, label: string, detail: string) {
+  const cleanLabel = label.trim() || kind.replace(/-/g, " ");
+  const cleanDetail = detail.trim();
+  return `[${kind}] ${cleanLabel}${cleanDetail ? `: ${cleanDetail}` : ""}`;
+}
+function addAgentMemoryItem() {
+  const serialized = serializeAgentMemoryItem(agentMemoryKind.value, agentMemoryLabel.value, agentMemoryDetail.value);
+  agentMemoryText.value = [agentMemoryText.value.trim(), serialized].filter(Boolean).join("\n");
+  agentMemoryLabel.value = "";
+  agentMemoryDetail.value = "";
+  buildAgentWorkspacePlan();
+  store.statusMessage = "Added reusable document memory";
+}
+function captureAgentMemoryFromCurrentDocument() {
+  flushEditorTextToStore();
+  const derived = buildAgenticDocumentMemory({
+    memoryText: "",
+    contextAnswers: agentContextAnswers.value,
+    documentText: active.value.text,
+  });
+  if (!derived.entries.length) {
+    store.statusMessage = "No reusable terminology, style, decision, review, or distribution memory detected";
+    return;
+  }
+  const existing = new Set(agentDocumentMemoryPreview.value.entries.map((item) => `${item.kind}:${item.label.toLowerCase()}:${item.detail.toLowerCase()}`));
+  const additions = derived.entries
+    .filter((item) => !existing.has(`${item.kind}:${item.label.toLowerCase()}:${item.detail.toLowerCase()}`))
+    .map((item) => serializeAgentMemoryItem(item.kind, item.label, item.detail));
+  if (!additions.length) {
+    store.statusMessage = "Document memory already includes the detected reusable items";
+    return;
+  }
+  agentMemoryText.value = appendTextBlock(agentMemoryText.value, additions.join("\n"));
+  buildAgentWorkspacePlan();
+  store.statusMessage = `Captured ${additions.length} reusable document memory item${additions.length === 1 ? "" : "s"}`;
+}
+function insertAgentDocumentMemoryPack() {
+  const memory = agentDocumentMemoryPreview.value;
+  if (!memory.entries.length) {
+    store.statusMessage = "Add or capture document memory before inserting a memory pack";
+    return;
+  }
+  insertBlock(["## Reusable Document Memory", "", memory.summary, "", memory.markdown, ""].join("\n"));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted reusable document memory pack";
+}
+async function copyAgentDocumentMemoryPack() {
+  const memory = agentDocumentMemoryPreview.value;
+  if (!memory.entries.length) return;
+  await navigator.clipboard?.writeText(["## Reusable Document Memory", "", memory.summary, "", memory.markdown].join("\n"));
+  store.statusMessage = "Copied reusable document memory pack";
+}
 function setAgentEditAcceptanceStatus(item: AgenticEditAcceptanceItem, status: AgentEditAcceptanceStatus) {
   const now = new Date().toISOString();
   agentEditAcceptanceStates.value = {
@@ -13665,6 +13779,27 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
   { name: "Tag release", group: "Versioning", run: () => void store.tagActiveRelease() },
   { name: "Open AI agent workspace", group: "AI", run: () => openAgentWorkspace() },
+  {
+    name: "Open document memory manager",
+    group: "AI",
+    description: "Capture reusable terminology, style, accepted decisions, rejected directions, reviewer preferences, and distribution preferences.",
+    keywords: ["document memory", "terminology", "style", "review preferences", "accepted decisions", "rejected directions"],
+    run: () => openAgentWorkspace(),
+  },
+  {
+    name: "Capture document memory",
+    group: "AI",
+    description: "Derive reusable document memory from current document and agent context signals.",
+    keywords: ["document memory", "capture memory", "terminology", "style", "decisions"],
+    run: () => captureAgentMemoryFromCurrentDocument(),
+  },
+  {
+    name: "Insert document memory pack",
+    group: "AI",
+    description: "Insert reusable document memory as a reviewable Markdown pack.",
+    keywords: ["document memory", "memory pack", "insert memory"],
+    run: () => insertAgentDocumentMemoryPack(),
+  },
   { name: "Read selected text aloud", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "macos say", "voice"], run: () => readSelectionAloud() },
   { name: "Read document aloud", group: "Writing Tools", keywords: ["tts", "speech", "full document", "supertonic", "macos say"], run: () => readDocumentAloud() },
   { name: "Check text to speech runtime", group: "Writing Tools", keywords: ["tts", "speech", "supertonic", "macos say", "setup"], run: () => checkTtsRuntime() },
@@ -23121,6 +23256,7 @@ select:hover {
 .app-shell[data-theme="dark"] .guided-demo-steps span,
 .app-shell[data-theme="dark"] .agent-playbooks,
 .app-shell[data-theme="dark"] .agent-source-pack-builder,
+.app-shell[data-theme="dark"] .agent-document-memory-manager,
 .app-shell[data-theme="dark"] .agent-source-pack-list li,
 .app-shell[data-theme="dark"] .agent-playbook-grid article,
 .app-shell[data-theme="dark"] .agent-plan > header,
@@ -23202,6 +23338,7 @@ select:hover {
 .app-shell[data-theme="dark"] .agent-workspace-modal header p,
 .app-shell[data-theme="dark"] .agent-playbooks > header span,
 .app-shell[data-theme="dark"] .agent-source-pack-builder > header span,
+.app-shell[data-theme="dark"] .agent-document-memory-manager > header span,
 .app-shell[data-theme="dark"] .agent-source-pack-list span,
 .app-shell[data-theme="dark"] .agent-playbook-grid header span,
 .app-shell[data-theme="dark"] .agent-playbook-grid dt,
@@ -23359,6 +23496,7 @@ select:hover {
   .app-shell[data-theme="system"] .guided-demo-steps span,
   .app-shell[data-theme="system"] .agent-playbooks,
   .app-shell[data-theme="system"] .agent-source-pack-builder,
+  .app-shell[data-theme="system"] .agent-document-memory-manager,
   .app-shell[data-theme="system"] .agent-source-pack-list li,
   .app-shell[data-theme="system"] .agent-playbook-grid article,
   .app-shell[data-theme="system"] .agent-plan > header,
@@ -23440,6 +23578,7 @@ select:hover {
   .app-shell[data-theme="system"] .agent-workspace-modal header p,
   .app-shell[data-theme="system"] .agent-playbooks > header span,
   .app-shell[data-theme="system"] .agent-source-pack-builder > header span,
+  .app-shell[data-theme="system"] .agent-document-memory-manager > header span,
   .app-shell[data-theme="system"] .agent-source-pack-list span,
   .app-shell[data-theme="system"] .agent-playbook-grid header span,
   .app-shell[data-theme="system"] .agent-playbook-grid dt,
@@ -27172,20 +27311,44 @@ select:hover {
 }
 
 .agent-source-pack-builder > header div,
+.agent-document-memory-manager,
+.agent-document-memory-manager > header div,
+.agent-memory-actions,
 .agent-source-pack-add,
+.agent-memory-add,
 .agent-source-pack-list {
   display: grid;
   gap: 8px;
 }
 
-.agent-source-pack-builder > header span {
+.agent-document-memory-manager {
+  padding: 10px;
+  border: 1px solid #d8e0e8;
+  border-left: 3px solid #6f4e00;
+  background: #fffaf0;
+}
+
+.agent-document-memory-manager > header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.agent-source-pack-builder > header span,
+.agent-document-memory-manager > header span {
   color: #526171;
   font-size: 12px;
 }
 
-.agent-source-pack-add {
+.agent-source-pack-add,
+.agent-memory-add {
   grid-template-columns: minmax(120px, 0.3fr) minmax(160px, 0.45fr) minmax(220px, 1fr) auto;
   align-items: end;
+}
+
+.agent-memory-actions {
+  grid-template-columns: repeat(auto-fit, minmax(140px, max-content));
 }
 
 .agent-source-pack-list {

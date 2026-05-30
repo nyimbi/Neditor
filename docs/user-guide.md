@@ -96,6 +96,8 @@ The AI Agent Workspace converts that instruction into a visible plan:
 - revision instructions for selected text or the whole document;
 - planned revision passes such as clarity, brevity, tone, evidence, legal
   caution, executive summary, accessibility, and humanization;
+- reusable document memory for terminology, style, accepted decisions,
+  rejected directions, reviewer preferences, and distribution preferences;
 - requested export targets such as PDF, Substack, LaTeX, Google Docs, or EPUB;
 - runnable next steps that open Docs Live, AI Paste cleanup, Review, or Export
   readiness.
@@ -107,7 +109,11 @@ handoff, provider request package, and saved run history instead of living only
 in a separate chat note. Use **Source Pack Builder** to add source notes, claims,
 URLs, file paths, references, and reviewer comments before planning or provider
 handoff; those managed items become part of the context pack, generated packet,
-reviewer tasks, provider source evidence pack, and saved run history. The run
+reviewer tasks, provider source evidence pack, and saved run history. Use
+**Document memory** in the same workspace to add or capture terminology, house
+style, accepted decisions, rejected directions, reviewer preferences, and
+distribution preferences; memory packs can be inserted into the Markdown source
+for human review and reused by future agent plans. The run
 history can be searched and filtered by status, workflow lane, or output target
 so generated packets, applied revisions, provider-applied drafts, evidence
 blockers, and distribution handoffs remain recoverable after the workspace
