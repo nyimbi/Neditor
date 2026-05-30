@@ -10890,7 +10890,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformEvidence.includes("replace-with-64-character-sha256"));
   ok(platformEvidence.includes("requiredWebdriverAssertions"));
   ok(platformEvidence.includes("desktop WebDriver edits document structure in outline mode"));
+  ok(platformEvidence.includes("desktop WebDriver inserts calc and chart templates from packaged templates panel"));
   ok(platformEvidence.includes("desktop WebDriver renames, duplicates, and exposes reveal affordance for real Markdown files"));
+  ok(platformEvidence.includes("transformTemplateArtifacts.sourceHasCalcTemplate must be true"));
+  ok(platformEvidence.includes("transformTemplateArtifacts.doseFillFields must include dose placeholders"));
   ok(platformEvidence.includes("outlineArtifacts.sourceEvidence.newSubsection must be true"));
   ok(platformEvidence.includes("outlineArtifacts.sourceEvidence.sourceGovernancePreserved must be true"));
   ok(platformCollector.includes("/^[ MADRCU?!]{1,2}\\s+/"));
@@ -11171,7 +11174,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseWorkflow.includes("pnpm run test:e2e"));
   ok(releaseWorkflow.includes("platform: win32"));
   ok(releaseWorkflow.includes("platform: linux"));
-  ok(releaseWorkflow.includes("bundles: msi nsis"));
+  ok(releaseWorkflow.includes("bundles: nsis"));
   ok(releaseWorkflow.includes("bundles: deb rpm appimage"));
   ok(releaseWorkflow.includes("cargo install tauri-driver --locked"));
   ok(releaseWorkflow.includes("webkit2gtk-driver"));
@@ -11453,6 +11456,7 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
 
   ok(script.includes("assertDirtyTitleWorkflow(session)"));
   ok(script.includes("assertOutlineModeWorkflow(session)"));
+  ok(script.includes("assertTransformTemplateWorkflow(session)"));
   ok(script.includes("assertFileSaveOpenWorkflow(session)"));
   ok(script.includes("assertRenameDuplicateRevealWorkflow(session)"));
   ok(script.includes("assertExportReadinessWorkflow(session)"));
@@ -11467,6 +11471,10 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("activateDocumentTabByPath(session, \"native-workflow-duplicate.md\")"));
   ok(script.includes("data-document-path"));
   ok(script.includes("native-workflow-export.html"));
+  ok(script.includes("desktop WebDriver inserts calc and chart templates from packaged templates panel"));
+  ok(script.includes("transformTemplateArtifacts"));
+  ok(script.includes("Dose by weight"));
+  ok(script.includes("KPI bar chart"));
   ok(script.includes("desktop WebDriver edits document structure in outline mode"));
   ok(script.includes("outlineArtifacts"));
   ok(script.includes("outlineModeEvidenceScript"));

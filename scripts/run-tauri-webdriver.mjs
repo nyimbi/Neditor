@@ -25,6 +25,7 @@ const webdriverWorkflowPlan = [
   "initial native title includes NEditor",
   "desktop shell renders primary commands",
   "native WebDriver switches modes and opens command palette",
+  "desktop WebDriver inserts calc and chart templates from packaged templates panel",
   "desktop WebDriver edits document structure in outline mode",
   "native title exposes dirty document state",
   "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
@@ -52,6 +53,7 @@ const report = {
   dependencies: [],
   assertions: [],
   outlineArtifacts: null,
+  transformTemplateArtifacts: null,
   fileArtifacts: null,
   exportArtifacts: null,
   preferenceArtifacts: null,
@@ -204,6 +206,7 @@ async function runWebDriverSmoke() {
   try {
     await assertInitialShell(session);
     await assertModeSwitchAndCommandPalette(session);
+    await assertTransformTemplateWorkflow(session);
     await assertOutlineModeWorkflow(session);
     await assertDirtyTitleWorkflow(session);
     await assertFileSaveOpenWorkflow(session);
@@ -282,6 +285,107 @@ async function assertModeSwitchAndCommandPalette(session) {
   );
   await closeCommandPalette(session);
   recordAssertion("native WebDriver switches modes and opens command palette");
+}
+
+async function assertTransformTemplateWorkflow(session) {
+  await showSidebar(session, "templates", ["Category", "Transform", "Search"]);
+  const inserted = await waitForValue(
+    session,
+    `
+      const controlByLabel = ${controlByLabelScript};
+      const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const setSelect = (labelText, value) => {
+        const select = controlByLabel(labelText, 'select');
+        select.value = value;
+        select.dispatchEvent(new Event('input', { bubbles: true }));
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      const setSearch = (value) => {
+        const search = controlByLabel('Search', 'input');
+        search.value = value;
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        search.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      const templateCard = (text) => [...document.querySelectorAll('article.template-card')].find((card) => normalized(card.textContent).includes(text));
+      const clickButton = (card, label) => {
+        const button = [...card.querySelectorAll('button')].find((item) => normalized(item.textContent) === label);
+        if (!button) throw new Error('Missing ' + label + ' button for ' + normalized(card.textContent));
+        button.click();
+      };
+
+      setSelect('Category', 'Science');
+      setSelect('Transform', 'calc');
+      setSearch('dose');
+      const dose = templateCard('Dose by weight');
+      if (!dose) {
+        return {
+          inserted: false,
+          reason: 'missing-dose-template',
+          cards: [...document.querySelectorAll('article.template-card')].map((card) => normalized(card.textContent)).slice(0, 8),
+        };
+      }
+      const fill = normalized(dose.querySelector('[aria-label="Template fill values"]')?.textContent || '');
+      clickButton(dose, 'Preview');
+      const preview = normalized(dose.querySelector('pre')?.textContent || '');
+      clickButton(dose, 'Insert');
+
+      setSelect('Category', 'Charts');
+      setSelect('Transform', 'chart');
+      setSearch('kpi');
+      const chart = templateCard('KPI bar chart');
+      if (!chart) {
+        return {
+          inserted: false,
+          reason: 'missing-chart-template',
+          cards: [...document.querySelectorAll('article.template-card')].map((card) => normalized(card.textContent)).slice(0, 8),
+        };
+      }
+      clickButton(chart, 'Insert');
+      return {
+        inserted: true,
+        doseFillFields: fill,
+        dosePreview: preview,
+        chartMeta: normalized(chart.textContent || ''),
+        status: document.querySelector('.status-bar')?.textContent || '',
+      };
+    `,
+    (value) =>
+      value?.inserted === true &&
+      String(value?.doseFillFields || "").includes("weight_kg") &&
+      String(value?.doseFillFields || "").includes("tablet_strength_mg") &&
+      String(value?.dosePreview || "").includes("total_dose_mg") &&
+      String(value?.chartMeta || "").includes("Charts") &&
+      String(value?.chartMeta || "").includes("chart"),
+    "packaged transform template insertion",
+  );
+  const rendered = await waitForValue(
+    session,
+    `
+      ${editorDocumentTextFunction}
+      return {
+        editor: editorDocumentText(),
+        preview: document.querySelector('#live-preview')?.textContent || '',
+        status: document.querySelector('.status-bar')?.textContent || '',
+      };
+    `,
+    (value) =>
+      String(value?.editor || "").includes("weight_kg = 72") &&
+      String(value?.editor || "").includes("Total dose: {{=total_dose_mg}} mg") &&
+      String(value?.editor || "").includes("```chart") &&
+      String(value?.editor || "").includes("title: Quarterly KPI plan") &&
+      String(value?.preview || "").includes("Total dose"),
+    "packaged transform template source and preview evidence",
+  );
+  report.transformTemplateArtifacts = {
+    doseFillFields: inserted.doseFillFields,
+    dosePreviewHasTotalDose: String(inserted.dosePreview || "").includes("total_dose_mg"),
+    chartMeta: inserted.chartMeta,
+    sourceHasCalcTemplate: String(rendered.editor || "").includes("weight_kg = 72"),
+    sourceHasChartTemplate: String(rendered.editor || "").includes("title: Quarterly KPI plan"),
+    previewHasDoseResult: String(rendered.preview || "").includes("Total dose"),
+    status: rendered.status,
+  };
+  recordAssertion("desktop WebDriver inserts calc and chart templates from packaged templates panel");
 }
 
 async function assertOutlineModeWorkflow(session) {

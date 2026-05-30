@@ -30,6 +30,7 @@ const requiredWebdriverAssertions = [
   "initial native title includes NEditor",
   "desktop shell renders primary commands",
   "native WebDriver switches modes and opens command palette",
+  "desktop WebDriver inserts calc and chart templates from packaged templates panel",
   "desktop WebDriver edits document structure in outline mode",
   "native title exposes dirty document state",
   "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
@@ -232,6 +233,15 @@ function evaluateWebdriverReport(spec) {
   requireValue(Number(report.exportArtifacts?.manifestBytes) > 100, problems, "exportArtifacts.manifestBytes must be > 100");
   requireValue(report.exportArtifacts?.target === "html", problems, "exportArtifacts.target must be html");
   requireValue(isSha256(report.exportArtifacts?.outputHash), problems, "exportArtifacts.outputHash must be a sha256");
+  requireValue(report.transformTemplateArtifacts?.sourceHasCalcTemplate === true, problems, "transformTemplateArtifacts.sourceHasCalcTemplate must be true");
+  requireValue(report.transformTemplateArtifacts?.sourceHasChartTemplate === true, problems, "transformTemplateArtifacts.sourceHasChartTemplate must be true");
+  requireValue(report.transformTemplateArtifacts?.previewHasDoseResult === true, problems, "transformTemplateArtifacts.previewHasDoseResult must be true");
+  requireValue(
+    String(report.transformTemplateArtifacts?.doseFillFields || "").includes("weight_kg") &&
+      String(report.transformTemplateArtifacts?.doseFillFields || "").includes("tablet_strength_mg"),
+    problems,
+    "transformTemplateArtifacts.doseFillFields must include dose placeholders",
+  );
   requireValue(
     Array.isArray(report.exportArtifacts?.progressEvidence) &&
       report.exportArtifacts.progressEvidence.some((step) => String(step).includes("Render") && String(step).includes("complete")),
@@ -355,6 +365,12 @@ function writeTemplates() {
               dataTablePreserved: true,
               sourceGovernancePreserved: true,
             },
+          },
+          transformTemplateArtifacts: {
+            sourceHasCalcTemplate: true,
+            sourceHasChartTemplate: true,
+            previewHasDoseResult: true,
+            doseFillFields: "weight_kg tablet_strength_mg",
           },
           fileArtifacts: {
             bytes: 1234,
