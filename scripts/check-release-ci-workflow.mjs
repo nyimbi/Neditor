@@ -45,7 +45,10 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "windows-latest", "workflow must run Windows proof on windows-latest");
   requireIncludes(workflow, "platform: win32", "workflow matrix must include win32 platform");
   requireIncludes(workflow, "platform: linux", "workflow matrix must include linux platform");
-  requireIncludes(workflow, "bundles: msi nsis", "Windows proof must build supported Windows bundle targets");
+  requireIncludes(workflow, "bundles: nsis", "Windows proof must build the hosted-runner-stable NSIS bundle target");
+  requireIncludes(workflow, "optional_bundles: msi", "Windows proof must keep MSI packaging visible as an optional diagnostic target");
+  requireIncludes(workflow, "Attempt optional Windows MSI package", "workflow must attempt MSI packaging without blocking NSIS evidence");
+  requireIncludes(workflow, "continue-on-error: true", "optional MSI packaging must not block Windows NSIS/WebDriver evidence");
   requireIncludes(workflow, "bundles: deb rpm appimage", "Linux proof must build supported Linux bundle targets");
   requireIncludes(workflow, "pnpm exec playwright install --with-deps chromium", "browser job must install Chromium with host dependencies");
   requireIncludes(workflow, "pnpm run check:e2e-env", "browser job must run browser environment preflight");

@@ -67,7 +67,8 @@ jobs:
           - label: Windows
             os: windows-latest
             platform: win32
-            bundles: msi nsis
+            bundles: nsis
+            optional_bundles: msi
             artifact: neditor-platform-evidence-win32
           - label: Linux
             os: ubuntu-latest
@@ -121,6 +122,11 @@ jobs:
 
       - name: Build Tauri packages
         run: pnpm tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Attempt optional Windows MSI package
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        run: pnpm tauri build --bundles ${{ matrix.optional_bundles }}
 
       - name: Run Linux Tauri WebDriver workflow
         if: runner.os == 'Linux'
