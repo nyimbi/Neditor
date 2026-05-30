@@ -1682,13 +1682,53 @@
               </div>
               <small>{{ versionedClauseAuditSummary }}</small>
             </header>
+            <div class="versioned-clause-editor" aria-label="Custom versioned clause editor">
+              <label>
+                Clause label
+                <input v-model="customClauseDraft.label" placeholder="Mutual confidentiality" />
+              </label>
+              <label>
+                Kind
+                <select v-model="customClauseDraft.kind">
+                  <option value="identity">Identity</option>
+                  <option value="proposal">Proposal</option>
+                  <option value="procurement">Procurement</option>
+                  <option value="delivery">Delivery</option>
+                  <option value="governance">Governance</option>
+                  <option value="review">Review</option>
+                </select>
+              </label>
+              <label>
+                Current version
+                <input v-model="customClauseDraft.currentVersion" placeholder="2026.05" />
+              </label>
+              <label>
+                Summary
+                <input v-model="customClauseDraft.summary" placeholder="Where this approved language should be used" />
+              </label>
+              <label>
+                Stale markers
+                <textarea v-model="customClauseStaleMarkersText" rows="2" aria-label="Custom clause stale markers" placeholder="legacy confidentiality clause&#10;clause:confidentiality version=2025"></textarea>
+              </label>
+              <label>
+                Clause Markdown
+                <textarea v-model="customClauseDraft.body" rows="5" aria-label="Custom versioned clause Markdown"></textarea>
+              </label>
+              <div class="template-actions">
+                <button type="button" title="Start a new custom clause draft" @click="resetCustomClauseDraft">New clause</button>
+                <button type="button" title="Save this custom clause in the workspace library" @click="saveCustomVersionedClause">Save custom clause</button>
+                <button v-if="editingCustomClauseId" type="button" title="Delete this custom clause from the workspace library" @click="deleteEditingCustomVersionedClause">Delete custom clause</button>
+              </div>
+              <p class="sidebar-hint">Custom clauses are profile-aware Markdown parts with explicit version markers. Insert the current version, and NEditor will flag stale markers before external review.</p>
+            </div>
             <div class="snippet-list" role="list" aria-label="Approved reusable clauses">
-              <article v-for="clause in versionedBusinessClauses" :key="clause.id" class="snippet-card" role="listitem">
+              <article v-for="clause in allVersionedBusinessClauses" :key="clause.id" class="snippet-card" role="listitem">
                 <div>
                   <strong>{{ clause.label }}</strong>
-                  <small>{{ clause.kind }} | v{{ clause.currentVersion }} | {{ clause.summary }}</small>
+                  <small>{{ clause.kind }} | v{{ clause.currentVersion }} | {{ clause.summary }}{{ store.customVersionedClauses.some((item) => item.id === clause.id) ? " | custom" : "" }}</small>
                 </div>
                 <button type="button" :title="`Insert ${clause.label} version ${clause.currentVersion}`" @click="insertVersionedClause(clause)">Insert current</button>
+                <button v-if="store.customVersionedClauses.some((item) => item.id === clause.id)" type="button" :title="`Edit ${clause.label}`" @click="editCustomVersionedClause(clause)">Edit</button>
               </article>
             </div>
             <div class="snippet-list" role="list" aria-label="Versioned clause audit">
@@ -7188,6 +7228,7 @@ import {
   analyzeRfpSource,
   aiDocumentWizardSteps,
   auditVersionedClauses,
+  blankCustomVersionedClause,
   blankCustomDocumentOutlineTemplate,
   builtInDocumentOutlineTemplates,
   businessDocumentSnippets,
@@ -7211,6 +7252,7 @@ import {
   type BusinessDocumentTemplate,
   type BusinessProfile,
   type CustomDocumentOutlineTemplate,
+  type CustomVersionedBusinessClause,
   type DocumentOutlineTemplate,
   type RfpAnalysis,
   type RfpWizardStepAssistance,
@@ -8143,6 +8185,8 @@ const businessProfileOpen = ref(false);
 const businessProfileDraft = ref<BusinessProfile>(normalizeBusinessProfile({}));
 const businessTemplateQuery = ref("");
 const businessSnippetQuery = ref("");
+const customClauseDraft = ref<CustomVersionedBusinessClause>(blankCustomVersionedClause());
+const editingCustomClauseId = ref("");
 const equationEditorOpen = ref(false);
 const equationDraftMode = ref<"display" | "inline">("display");
 const equationDraftLatex = ref("E = mc^2");
@@ -10021,6 +10065,7 @@ const currentTemplatePack = computed<NeditorTemplatePack>(() =>
     outlines: filteredDocumentOutlineTemplates.value.slice(0, 12),
     transforms: filteredTransformTemplates.value.slice(0, 20),
     latexTemplates: store.customLatexTemplates,
+    clauses: store.customVersionedClauses,
   }),
 );
 const currentTemplatePackJson = computed(() => templatePackJson(currentTemplatePack.value));
@@ -10083,12 +10128,28 @@ const filteredBusinessSnippets = computed(() => {
     return [snippet.label, snippet.kind, snippet.summary, snippet.body].join(" ").toLowerCase().includes(query);
   });
 });
-const versionedClauseAuditItems = computed(() => auditVersionedClauses(active.value.text));
+const allVersionedBusinessClauses = computed<VersionedBusinessClause[]>(() => [
+  ...versionedBusinessClauses,
+  ...store.customVersionedClauses,
+]);
+const customClauseStaleMarkersText = computed({
+  get: () => customClauseDraft.value.staleMarkers.join("\n"),
+  set: (value: string) => {
+    customClauseDraft.value = {
+      ...customClauseDraft.value,
+      staleMarkers: value
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    };
+  },
+});
+const versionedClauseAuditItems = computed(() => auditVersionedClauses(active.value.text, allVersionedBusinessClauses.value));
 const versionedClauseAuditSummary = computed(() => {
   const stale = versionedClauseAuditItems.value.filter((item) => item.status === "stale").length;
   const missing = versionedClauseAuditItems.value.filter((item) => item.status === "missing").length;
   const current = versionedClauseAuditItems.value.filter((item) => item.status === "current").length;
-  return `${current} current | ${stale} stale | ${missing} missing`;
+  return `${current} current | ${stale} stale | ${missing} missing | ${store.customVersionedClauses.length} custom`;
 });
 const businessProfileCompletion = computed(() => {
   const completed = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
@@ -11543,7 +11604,7 @@ const appMenus = computed<AppMenu[]>(() => [
             help: snippet.summary,
             run: () => insertBusinessSnippet(snippet),
           })),
-          ...versionedBusinessClauses.map((clause) => ({
+          ...allVersionedBusinessClauses.value.map((clause) => ({
             id: `clause-${clause.id}`,
             label: `${clause.label} v${clause.currentVersion}`,
             help: clause.summary,
@@ -14864,7 +14925,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     keywords: [snippet.kind, snippet.id],
     run: () => insertBusinessSnippet(snippet),
   })),
-  ...versionedBusinessClauses.map((clause) => ({
+  ...allVersionedBusinessClauses.value.map((clause) => ({
     name: `Insert current clause: ${clause.label}`,
     group: "Templates",
     description: `${clause.summary} Current version ${clause.currentVersion}.`,
@@ -19829,15 +19890,18 @@ async function installPastedTemplatePack() {
     existingOutlines: store.customDocumentOutlineTemplates,
     existingTransforms: store.customTransformTemplates,
     existingLatexTemplates: store.customLatexTemplates,
+    existingClauses: store.customVersionedClauses,
     pack,
   });
   const existingOutlineIds = new Set(store.customDocumentOutlineTemplates.map((template) => template.id));
   const existingTransformIds = new Set(store.customTransformTemplates.map((template) => template.id));
   const existingLatexIds = new Set(store.customLatexTemplates.map((template) => template.id));
+  const existingClauseIds = new Set(store.customVersionedClauses.map((clause) => clause.id));
   for (const template of pack.outlines.filter((template) => !existingOutlineIds.has(template.id))) await store.saveCustomDocumentOutlineTemplate(template);
   for (const template of pack.transforms.filter((template) => !existingTransformIds.has(template.id))) await store.saveCustomTransformTemplate(template);
   for (const template of pack.latexTemplates.filter((template) => !existingLatexIds.has(template.id))) store.saveCustomLatexTemplate(template);
-  templatePackStatus.value = `Installed ${result.added.outlines} outline(s), ${result.added.transforms} transform template(s), and ${result.added.latexTemplates} LaTeX template(s) from ${pack.metadata.name}. Business templates and snippets are preserved in the pack manifest.`;
+  for (const clause of pack.clauses.filter((clause) => !existingClauseIds.has(clause.id))) await store.saveCustomVersionedClause(clause);
+  templatePackStatus.value = `Installed ${result.added.outlines} outline(s), ${result.added.transforms} transform template(s), ${result.added.latexTemplates} LaTeX template(s), and ${result.added.clauses} versioned clause(s) from ${pack.metadata.name}. Business templates and snippets are preserved in the pack manifest.`;
   store.statusMessage = templatePackStatus.value;
 }
 
@@ -20000,6 +20064,42 @@ function insertVersionedClause(clause: VersionedBusinessClause) {
   insertBlock(versionedClauseMarkdown(clause, store.businessProfile));
   store.updateText(editorView?.state.doc.toString() || active.value.text);
   store.statusMessage = `Inserted ${clause.label} v${clause.currentVersion}`;
+}
+function resetCustomClauseDraft() {
+  customClauseDraft.value = blankCustomVersionedClause();
+  editingCustomClauseId.value = "";
+  store.statusMessage = "Started a new custom versioned clause";
+}
+function editCustomVersionedClause(clause: VersionedBusinessClause) {
+  customClauseDraft.value = {
+    id: clause.id,
+    label: clause.label,
+    kind: clause.kind,
+    currentVersion: clause.currentVersion,
+    summary: clause.summary,
+    staleMarkers: [...clause.staleMarkers],
+    body: clause.body,
+  };
+  editingCustomClauseId.value = clause.id;
+  store.statusMessage = `Editing custom clause ${clause.label}`;
+}
+async function saveCustomVersionedClause() {
+  const draft = { ...customClauseDraft.value, staleMarkers: [...customClauseDraft.value.staleMarkers] };
+  if (!draft.label.trim() || !draft.body.trim()) {
+    store.statusMessage = "Add a label and Markdown body before saving a custom clause";
+    return;
+  }
+  const saved = await store.saveCustomVersionedClause(draft);
+  if (saved) {
+    customClauseDraft.value = { ...saved, staleMarkers: [...saved.staleMarkers] };
+    editingCustomClauseId.value = saved.id;
+  }
+}
+async function deleteEditingCustomVersionedClause() {
+  const id = editingCustomClauseId.value;
+  if (!id) return;
+  await store.deleteCustomVersionedClause(id);
+  resetCustomClauseDraft();
 }
 
 function startBusinessDocumentWizard(template: BusinessDocumentTemplate) {
@@ -27582,6 +27682,40 @@ select:hover {
 .snippet-list {
   display: grid;
   gap: 8px;
+}
+
+.versioned-clause-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #d8e0e8;
+  border-radius: 7px;
+  background: #f9fbfd;
+}
+
+.versioned-clause-editor label:nth-of-type(5),
+.versioned-clause-editor label:nth-of-type(6),
+.versioned-clause-editor .template-actions,
+.versioned-clause-editor .sidebar-hint {
+  grid-column: 1 / -1;
+}
+
+.versioned-clause-editor textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+
+.app-shell[data-theme="dark"] .versioned-clause-editor {
+  border-color: #30445d;
+  background: #1f2b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-shell[data-theme="system"] .versioned-clause-editor {
+    border-color: #30445d;
+    background: #1f2b3b;
+  }
 }
 
 .business-document-card details ol {

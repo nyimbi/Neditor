@@ -105,6 +105,8 @@ export interface VersionedBusinessClause {
   staleMarkers: string[];
 }
 
+export type CustomVersionedBusinessClause = VersionedBusinessClause;
+
 export interface VersionedClauseAuditItem {
   id: string;
   label: string;
@@ -1073,7 +1075,10 @@ export const versionedBusinessClauses: VersionedBusinessClause[] = [
 ];
 
 export function versionedClauseMarkdown(clause: VersionedBusinessClause, profile: Partial<BusinessProfile> = {}) {
-  return `${fillBusinessTemplate(clause.body, profile).trimEnd()}\n`;
+  const body = fillBusinessTemplate(clause.body, profile).trimEnd();
+  const currentPattern = new RegExp(`clause:${escapeRegExp(clause.id)}\\s+version=${escapeRegExp(clause.currentVersion)}\\b`, "i");
+  if (currentPattern.test(body)) return `${body}\n`;
+  return `<!-- clause:${clause.id} version=${clause.currentVersion} status=current -->\n${body}\n`;
 }
 
 export function auditVersionedClauses(markdown: string, clauses: VersionedBusinessClause[] = versionedBusinessClauses): VersionedClauseAuditItem[] {
@@ -1113,6 +1118,105 @@ export function auditVersionedClauses(markdown: string, clauses: VersionedBusine
       detail: "Current approved clause not found in document.",
     };
   });
+}
+
+export function createCustomVersionedClauseId() {
+  return `custom-clause-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function blankCustomVersionedClause(): CustomVersionedBusinessClause {
+  return {
+    id: createCustomVersionedClauseId(),
+    label: "Custom approved clause",
+    kind: "governance",
+    currentVersion: "2026.05",
+    summary: "Reusable approved language for client-facing documents.",
+    staleMarkers: [],
+    body: [
+      "## Approved Clause",
+      "",
+      "Add approved language here. Use {{companyName}}, {{defaultClientName}}, and other saved profile fields where repeated identity should be filled automatically.",
+    ].join("\n"),
+  };
+}
+
+export function normalizeCustomVersionedClauses(value: unknown): CustomVersionedBusinessClause[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const clauses: CustomVersionedBusinessClause[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const id = slugifyClauseId(outlineStringValue(record.id) || outlineStringValue(record.label) || createCustomVersionedClauseId());
+    if (!id || seen.has(id)) continue;
+    const label = outlineStringValue(record.label) || "Custom approved clause";
+    const body = outlineStringValue(record.body);
+    if (!body) continue;
+    seen.add(id);
+    clauses.push({
+      id,
+      label,
+      kind: normalizeBusinessSnippetKind(record.kind),
+      currentVersion: outlineStringValue(record.currentVersion ?? record.current_version ?? record.version) || "2026.05",
+      summary: outlineStringValue(record.summary) || "Reusable approved language for client-facing documents.",
+      staleMarkers: outlineStringArray(record.staleMarkers ?? record.stale_markers, 20),
+      body,
+    });
+  }
+  return clauses.slice(0, 80);
+}
+
+export interface SaveCustomVersionedClauseStateResult {
+  clauses: CustomVersionedBusinessClause[];
+  clause: CustomVersionedBusinessClause | null;
+  changed: boolean;
+}
+
+export interface DeleteCustomVersionedClauseStateResult {
+  clauses: CustomVersionedBusinessClause[];
+  changed: boolean;
+}
+
+export function saveCustomVersionedClauseState(
+  clauses: CustomVersionedBusinessClause[],
+  clause: CustomVersionedBusinessClause,
+): SaveCustomVersionedClauseStateResult {
+  const normalizedClauses = normalizeCustomVersionedClauses(clauses);
+  const [normalized] = normalizeCustomVersionedClauses([clause]);
+  if (!normalized) return { clauses: normalizedClauses, clause: null, changed: false };
+  const existingIndex = normalizedClauses.findIndex((candidate) => candidate.id === normalized.id);
+  if (existingIndex >= 0) {
+    return {
+      clauses: normalizedClauses.map((candidate, index) => (index === existingIndex ? normalized : candidate)),
+      clause: normalized,
+      changed: true,
+    };
+  }
+  return { clauses: [...normalizedClauses, normalized], clause: normalized, changed: true };
+}
+
+export function deleteCustomVersionedClauseState(
+  clauses: CustomVersionedBusinessClause[],
+  id: string,
+): DeleteCustomVersionedClauseStateResult {
+  const normalizedClauses = normalizeCustomVersionedClauses(clauses);
+  const nextClauses = normalizedClauses.filter((clause) => clause.id !== id);
+  return { clauses: nextClauses, changed: nextClauses.length !== normalizedClauses.length };
+}
+
+function slugifyClauseId(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+function normalizeBusinessSnippetKind(value: unknown): BusinessSnippetKind {
+  const candidate = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (["identity", "proposal", "procurement", "delivery", "governance", "review"].includes(candidate)) return candidate as BusinessSnippetKind;
+  return "governance";
 }
 
 function escapeRegExp(value: string) {

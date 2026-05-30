@@ -1,5 +1,5 @@
 import { activeDocumentState } from "./documentSelectors.js";
-import { normalizeBusinessProfile, normalizeCustomDocumentOutlineTemplates } from "./businessDocuments.js";
+import { normalizeBusinessProfile, normalizeCustomDocumentOutlineTemplates, normalizeCustomVersionedClauses } from "./businessDocuments.js";
 import { normalizeDatabaseProfiles, type DatabaseProfile } from "./databaseProfiles.js";
 import { normalizeGoogleIntegrationPreferences } from "./googleAuth.js";
 import { normalizeCustomTransformTemplates } from "./transformTemplates.js";
@@ -86,6 +86,7 @@ export interface WorkspacePersistenceStateInput {
   activeDatabaseProfileId: string;
   customLatexTemplates: RequiredPersistedValue<"customLatexTemplates">;
   customDocumentOutlineTemplates: RequiredPersistedValue<"customDocumentOutlineTemplates">;
+  customVersionedClauses: RequiredPersistedValue<"customVersionedClauses">;
 }
 
 export type WorkspacePreferenceStateInput = Omit<WorkspacePersistenceStateInput, "documents" | "activeId">;
@@ -152,6 +153,7 @@ export function applyPersistedWorkspacePreferenceState(
     activeDatabaseProfileId: persisted.activeDatabaseProfileId || "",
     customLatexTemplates: normalizeCustomLatexTemplateProfiles(persisted.customLatexTemplates),
     customDocumentOutlineTemplates: normalizeCustomDocumentOutlineTemplates(persisted.customDocumentOutlineTemplates),
+    customVersionedClauses: normalizeCustomVersionedClauses(persisted.customVersionedClauses),
   };
   const restoreRequest = persisted.openFiles?.length
     ? {
@@ -238,5 +240,6 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     activeDatabaseProfileId: state.activeDatabaseProfileId,
     customLatexTemplates: state.customLatexTemplates,
     customDocumentOutlineTemplates: state.customDocumentOutlineTemplates,
+    customVersionedClauses: state.customVersionedClauses,
   });
 }

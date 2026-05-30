@@ -102,12 +102,16 @@ import {
   businessSnippetMarkdown,
   businessTemplateMarkdown,
   businessWizardContext,
+  blankCustomVersionedClause,
   normalizeBusinessProfile,
+  normalizeCustomVersionedClauses,
   rfpComplianceChecklistMarkdown,
   rfpComplianceMatrixMarkdown,
   rfpProposalOutlineBullets,
   rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
+  saveCustomVersionedClauseState,
+  deleteCustomVersionedClauseState,
   versionedBusinessClauses,
   versionedClauseMarkdown,
 } from "../src/lib/businessDocuments.js";
@@ -3818,6 +3822,25 @@ test("business document helpers fill identity templates snippets and wizard cont
   equal(auditVersionedClauses(clauseMarkdown).find((item) => item.id === "standard-confidentiality")?.status, "current");
   equal(auditVersionedClauses("legacy confidentiality clause").find((item) => item.id === "standard-confidentiality")?.status, "stale");
   equal(auditVersionedClauses("# Draft").find((item) => item.id === "standard-confidentiality")?.status, "missing");
+  const customClause = {
+    ...blankCustomVersionedClause(),
+    id: "Mutual Confidentiality",
+    label: "Mutual confidentiality",
+    kind: "governance" as const,
+    currentVersion: "2026.06",
+    summary: "Custom legal-approved NDA language.",
+    staleMarkers: ["old mutual NDA", "clause:mutual-confidentiality version=2025"],
+    body: "<!-- clause:mutual-confidentiality version=2026.06 status=current -->\n## Mutual Confidentiality\n{{companyName}} and {{defaultClientName}} will protect shared information.",
+  };
+  const normalizedCustomClauses = normalizeCustomVersionedClauses([customClause]);
+  equal(normalizedCustomClauses[0].id, "mutual-confidentiality");
+  ok(versionedClauseMarkdown(normalizedCustomClauses[0], profile).includes("Acme Advisory and Globex"));
+  equal(auditVersionedClauses("old mutual NDA", normalizedCustomClauses)[0].status, "stale");
+  const savedCustomClause = saveCustomVersionedClauseState([], customClause);
+  equal(savedCustomClause.clauses.length, 1);
+  equal(savedCustomClause.clause?.id, "mutual-confidentiality");
+  const deletedCustomClause = deleteCustomVersionedClauseState(savedCustomClause.clauses, "mutual-confidentiality");
+  equal(deletedCustomClause.clauses.length, 0);
   const dottedSnippet = fillBusinessTemplate(
     [
       "Prepared by {{profile.owner}}",
@@ -7376,6 +7399,18 @@ test("workspace persistence migration versions and normalizes saved settings", (
       },
       { id: "missing-outline", name: "Ignored" },
     ],
+    customVersionedClauses: [
+      {
+        id: "mutual-confidentiality",
+        label: " Mutual Confidentiality ",
+        kind: "governance",
+        currentVersion: " 2026.06 ",
+        summary: " Legal-approved language. ",
+        staleMarkers: [" old mutual NDA ", ""],
+        body: "<!-- clause:mutual-confidentiality version=2026.06 status=current -->\n## Mutual Confidentiality\nApproved body.",
+      },
+      { id: "missing-body", label: "Ignored" },
+    ],
   });
 
   equal(migrated.schemaVersion, WORKSPACE_SCHEMA_VERSION);
@@ -7758,6 +7793,17 @@ test("workspace persistence migration versions and normalizes saved settings", (
       bestFor: ["Reviews"],
     },
   ]);
+  deepEqual(migrated.customVersionedClauses, [
+    {
+      id: "mutual-confidentiality",
+      label: "Mutual Confidentiality",
+      kind: "governance",
+      currentVersion: "2026.06",
+      summary: "Legal-approved language.",
+      staleMarkers: ["old mutual NDA"],
+      body: "<!-- clause:mutual-confidentiality version=2026.06 status=current -->\n## Mutual Confidentiality\nApproved body.",
+    },
+  ]);
 });
 
 test("workspace persistence state helper builds normalized store snapshots", () => {
@@ -7861,6 +7907,17 @@ test("workspace persistence state helper builds normalized store snapshots", () 
     activeDatabaseProfileId: "warehouse",
     customLatexTemplates: [],
     customDocumentOutlineTemplates: [],
+    customVersionedClauses: [
+      {
+        id: "mutual-confidentiality",
+        label: "Mutual confidentiality",
+        kind: "governance",
+        currentVersion: "2026.06",
+        summary: "Legal-approved custom clause.",
+        staleMarkers: ["old NDA"],
+        body: "<!-- clause:mutual-confidentiality version=2026.06 status=current -->\n## Mutual Confidentiality\nApproved body.",
+      },
+    ],
   });
 
   equal(workspace.schemaVersion, WORKSPACE_SCHEMA_VERSION);
@@ -7883,6 +7940,7 @@ test("workspace persistence state helper builds normalized store snapshots", () 
   deepEqual(workspace.transformEnginePaths, { dot: "/usr/bin/dot" });
   equal(workspace.databaseProfiles?.[0]?.name, "Warehouse");
   equal(workspace.activeDatabaseProfileId, "warehouse");
+  equal(workspace.customVersionedClauses?.[0]?.id, "mutual-confidentiality");
   deepEqual(workspace.googleIntegration?.scopes, ["https://www.googleapis.com/auth/drive.file"]);
   deepEqual(workspace.guidedDemoCompletedStepIds, ["intro", "ai-create"]);
 });
@@ -7946,6 +8004,7 @@ test("workspace persistence state helper applies persisted preferences and resto
     activeDatabaseProfileId: "",
     customLatexTemplates: [],
     customDocumentOutlineTemplates: [],
+    customVersionedClauses: [],
   } satisfies Parameters<typeof applyPersistedWorkspacePreferenceState>[0];
 
   const result = applyPersistedWorkspacePreferenceState(
@@ -7982,6 +8041,17 @@ test("workspace persistence state helper applies persisted preferences and resto
       databaseProfiles: [{ name: "Warehouse", databasePath: "data/warehouse.sqlite" }],
       activeDatabaseProfileId: "warehouse",
       customDocumentOutlineTemplates: [{ id: "outline-qbr", name: "QBR", category: "Executive", summary: "QBR outline", outline: ["Executive Summary"], tags: ["qbr"], bestFor: ["Reviews"] }],
+      customVersionedClauses: [
+        {
+          id: "mutual-confidentiality",
+          label: "Mutual confidentiality",
+          kind: "governance",
+          currentVersion: "2026.06",
+          summary: "Legal-approved custom clause.",
+          staleMarkers: ["old NDA"],
+          body: "<!-- clause:mutual-confidentiality version=2026.06 status=current -->\n## Mutual Confidentiality\nApproved body.",
+        },
+      ],
       guidedDemoCompletedStepIds: ["ai-create"],
     }),
   );
@@ -8010,6 +8080,7 @@ test("workspace persistence state helper applies persisted preferences and resto
   equal(result.state.activeDatabaseProfileId, "warehouse");
   deepEqual(result.state.guidedDemoCompletedStepIds, ["ai-create"]);
   equal(result.state.customDocumentOutlineTemplates[0]?.name, "QBR");
+  equal(result.state.customVersionedClauses[0]?.label, "Mutual confidentiality");
   deepEqual(result.restoreRequest, {
     openFiles: ["/a.md", "/b.md"],
     activePath: "/b.md",
@@ -8247,6 +8318,17 @@ test("template packs serialize portable marketplace metadata and install reusabl
     snippets: [businessDocumentSnippets[0]],
     outlines: [builtInDocumentOutlineTemplates[0]],
     transforms: [builtinTransformTemplates.find((template) => template.id === "calc-business-roi")!],
+    clauses: [
+      {
+        id: "mutual-confidentiality",
+        label: "Mutual confidentiality",
+        kind: "governance",
+        currentVersion: "2026.06",
+        summary: "Legal-approved custom clause.",
+        staleMarkers: ["old NDA"],
+        body: "<!-- clause:mutual-confidentiality version=2026.06 status=current -->\n## Mutual Confidentiality\n{{companyName}} and {{defaultClientName}} approve this language.",
+      },
+    ],
     latexTemplates: [
       {
         id: "example-proposal-tex",
@@ -8267,28 +8349,33 @@ test("template packs serialize portable marketplace metadata and install reusabl
   equal(pack.schema, templatePackSchema);
   equal(pack.metadata.publisher, "Example Strategy");
   ok(pack.metadata.placeholders.includes("client"));
+  ok(pack.metadata.placeholders.includes("companyName"));
   ok(pack.metadata.usageGuidance[0].includes("Replace placeholders"));
   ok(templatePackSummaryRows(pack).some((row) => row.label === "Transform templates" && row.value === "1"));
+  ok(templatePackSummaryRows(pack).some((row) => row.label === "Versioned clauses" && row.value === "1"));
 
   const parsed = parseTemplatePackJson(templatePackJson(pack));
   if (!parsed) throw new Error("expected parsed template pack");
   equal(parsed.metadata.name, "Proposal acceleration pack");
   equal(parsed.transforms[0].id, "calc-business-roi");
+  equal(parsed.clauses[0].id, "mutual-confidentiality");
 
   const firstInstall = installTemplatePackState({
     existingOutlines: [],
     existingTransforms: [],
     existingLatexTemplates: [],
+    existingClauses: [],
     pack: parsed,
   });
-  deepEqual(firstInstall.added, { outlines: 1, transforms: 1, latexTemplates: 1 });
+  deepEqual(firstInstall.added, { outlines: 1, transforms: 1, latexTemplates: 1, clauses: 1 });
   const secondInstall = installTemplatePackState({
     existingOutlines: firstInstall.outlines,
     existingTransforms: firstInstall.transforms,
     existingLatexTemplates: firstInstall.latexTemplates,
+    existingClauses: firstInstall.clauses,
     pack: parsed,
   });
-  deepEqual(secondInstall.added, { outlines: 0, transforms: 0, latexTemplates: 0 });
+  deepEqual(secondInstall.added, { outlines: 0, transforms: 0, latexTemplates: 0, clauses: 0 });
   equal(parseTemplatePackJson("{ bad json"), null);
 });
 
@@ -8615,6 +8702,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Open equation editor"));
   ok(app.includes('aria-label="Reusable document parts"'));
   ok(app.includes('aria-label="Versioned reusable clauses"'));
+  ok(app.includes('aria-label="Custom versioned clause editor"'));
+  ok(app.includes("Save custom clause"));
+  ok(app.includes("allVersionedBusinessClauses"));
+  ok(app.includes("saveCustomVersionedClause"));
   ok(app.includes('aria-label="Business identity setup"'));
   ok(app.includes("businessProfileFields"));
   ok(app.includes("businessDocumentTemplates"));

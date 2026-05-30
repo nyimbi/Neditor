@@ -1,6 +1,13 @@
 import type { AiCleanupOptions } from "../types.js";
 import type { AiProviderProfileId } from "./aiProviderPackages.js";
-import { normalizeBusinessProfile, normalizeCustomDocumentOutlineTemplates, type BusinessProfile, type CustomDocumentOutlineTemplate } from "./businessDocuments.js";
+import {
+  normalizeBusinessProfile,
+  normalizeCustomDocumentOutlineTemplates,
+  normalizeCustomVersionedClauses,
+  type BusinessProfile,
+  type CustomDocumentOutlineTemplate,
+  type CustomVersionedBusinessClause,
+} from "./businessDocuments.js";
 import { normalizeDatabaseProfiles, type DatabaseProfile } from "./databaseProfiles.js";
 import { normalizeGoogleIntegrationPreferences, type GoogleIntegrationPreferences } from "./googleAuth.js";
 import type { PublishingContentFormat, PublishingDestinationProfile, PublishingTargetKind } from "./publishingWorkflow.js";
@@ -461,6 +468,7 @@ export interface PersistedWorkspace {
   activeDatabaseProfileId?: string;
   customLatexTemplates?: Partial<CustomLatexTemplateProfile>[];
   customDocumentOutlineTemplates?: CustomDocumentOutlineTemplate[];
+  customVersionedClauses?: CustomVersionedBusinessClause[];
   aiCleanupDefaults?: Partial<AiCleanupOptions>;
   agentRunHistory?: Partial<AgentRunHistoryItem>[];
   docsLiveDraftHistory?: Partial<DocsLiveDraftHistoryItem>[];
@@ -1382,6 +1390,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   migrated.activeDatabaseProfileId = stringValue(raw.activeDatabaseProfileId) || "";
   migrated.customLatexTemplates = normalizeCustomLatexTemplateProfiles(raw.customLatexTemplates);
   migrated.customDocumentOutlineTemplates = normalizeCustomDocumentOutlineTemplates(raw.customDocumentOutlineTemplates);
+  migrated.customVersionedClauses = normalizeCustomVersionedClauses(raw.customVersionedClauses);
   return migrated;
 }
 

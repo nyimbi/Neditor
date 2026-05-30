@@ -6,13 +6,16 @@ import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import {
   deleteCustomDocumentOutlineTemplateState,
+  deleteCustomVersionedClauseState,
   normalizeBusinessProfile,
   saveCustomDocumentOutlineTemplateState,
+  saveCustomVersionedClauseState,
   workspaceDocumentOutlineLibraryJson,
   workspaceDocumentOutlineTemplatesFromJson,
   workspaceOutlineLibraryPath,
   type BusinessProfile,
   type CustomDocumentOutlineTemplate,
+  type CustomVersionedBusinessClause,
 } from "../lib/businessDocuments";
 import {
   saveAiProviderDefaultsState,
@@ -434,6 +437,7 @@ export const useDocumentsStore = defineStore("documents", {
     activeDatabaseProfileId: "",
     customLatexTemplates: [] as CustomLatexTemplateProfile[],
     customDocumentOutlineTemplates: [] as CustomDocumentOutlineTemplate[],
+    customVersionedClauses: [] as CustomVersionedBusinessClause[],
     transformProbeResults: {} as Record<string, TransformProbeResult>,
     snapshots: [] as SnapshotListItem[],
     exportReadiness: null as ExportReadinessReport | null,
@@ -1536,6 +1540,21 @@ export const useDocumentsStore = defineStore("documents", {
       this.customDocumentOutlineTemplates = next.templates;
       if (this.workspaceRoot) await this.deleteWorkspaceDocumentOutlineTemplate(id);
       this.statusMessage = "Deleted custom outline from the app library and workspace outline file";
+      await this.persistWorkspace();
+    },
+    async saveCustomVersionedClause(clause: CustomVersionedBusinessClause) {
+      const next = saveCustomVersionedClauseState(this.customVersionedClauses, clause);
+      if (!next.changed || !next.clause) return null;
+      this.customVersionedClauses = next.clauses;
+      this.statusMessage = `Saved custom clause ${next.clause.label} v${next.clause.currentVersion}`;
+      await this.persistWorkspace();
+      return next.clause;
+    },
+    async deleteCustomVersionedClause(id: string) {
+      const next = deleteCustomVersionedClauseState(this.customVersionedClauses, id);
+      if (!next.changed) return;
+      this.customVersionedClauses = next.clauses;
+      this.statusMessage = "Deleted custom versioned clause";
       await this.persistWorkspace();
     },
     async loadWorkspaceDocumentOutlineTemplates() {
