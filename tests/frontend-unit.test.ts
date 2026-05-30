@@ -7832,6 +7832,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("documentLayoutPresets"));
   ok(app.includes('store.sidebar === \'layout\''));
   ok(app.includes('aria-label="Layout advisor summary"'));
+  ok(app.includes('aria-label="Professional cover builder"'));
+  ok(app.includes("coverBuilderDraft"));
+  ok(app.includes("coverBuilderEffective"));
+  ok(app.includes("applyCoverBuilderMetadata"));
+  ok(app.includes("insertCoverBuilderSection"));
+  ok(app.includes("{{page-break}}"));
+  ok(app.includes('label: "Professional Cover Builder"'));
   ok(app.includes('aria-label="Business layout presets"'));
   ok(app.includes('aria-label="Layout quality findings"'));
   ok(app.includes("layoutQualityRecommendations"));

@@ -807,6 +807,58 @@
               <button type="button" @click="insertDocumentLayoutPreset('wide-landscape-section')">Insert wide section</button>
             </div>
           </section>
+          <section class="cover-builder" aria-label="Professional cover builder">
+            <header>
+              <div>
+                <h3>Cover Builder</h3>
+                <small>{{ coverBuilderSummary }}</small>
+              </div>
+              <button type="button" title="Reload cover fields from current metadata and business identity" @click="resetCoverBuilderDraft">
+                Load defaults
+              </button>
+            </header>
+            <div class="cover-builder-grid">
+              <label>
+                Title
+                <input v-model="coverBuilderDraft.title" :placeholder="coverBuilderDefaults.title" />
+              </label>
+              <label>
+                Subtitle
+                <input v-model="coverBuilderDraft.subtitle" :placeholder="coverBuilderDefaults.subtitle" />
+              </label>
+              <label>
+                Client
+                <input v-model="coverBuilderDraft.client" :placeholder="coverBuilderDefaults.client" />
+              </label>
+              <label>
+                Prepared by
+                <input v-model="coverBuilderDraft.preparedBy" :placeholder="coverBuilderDefaults.preparedBy" />
+              </label>
+              <label>
+                Date
+                <input v-model="coverBuilderDraft.date" type="date" :placeholder="coverBuilderDefaults.date" />
+              </label>
+              <label>
+                Confidentiality
+                <input v-model="coverBuilderDraft.confidentiality" :placeholder="coverBuilderDefaults.confidentiality" />
+              </label>
+              <label>
+                Status
+                <select v-model="coverBuilderDraft.status">
+                  <option v-for="status in releaseStatuses" :key="status" :value="status">{{ status }}</option>
+                </select>
+              </label>
+              <label>
+                Version
+                <input v-model="coverBuilderDraft.version" :placeholder="coverBuilderDefaults.version" />
+              </label>
+            </div>
+            <div class="cover-builder-actions">
+              <button type="button" title="Write cover metadata to front matter and enable cover page export" @click="applyCoverBuilderMetadata">Apply metadata</button>
+              <button type="button" title="Insert a Markdown cover section with the current cover values" @click="insertCoverBuilderSection">Insert cover section</button>
+              <button type="button" title="Apply metadata and insert the cover section in one step" @click="applyCoverBuilderPackage">Apply and insert</button>
+            </div>
+          </section>
           <section class="layout-preset-grid" aria-label="Business layout presets">
             <article v-for="preset in documentLayoutPresets" :key="preset.id" class="snapshot-row" data-status="improve">
               <strong>{{ preset.label }}</strong>
@@ -7886,6 +7938,16 @@ const listOfTablesSnippet = "[LIST_OF_TABLES]\n";
 const glossarySectionSnippet = "[GLOSSARY]\n";
 const glossarySnippet = "```glossary\nARR: Annual recurring revenue.\nCAC: Customer acquisition cost.\n```\n";
 const layoutSnippet = documentLayoutPresetById("two-column-section").snippet;
+const coverBuilderDraft = ref({
+  title: "",
+  subtitle: "",
+  client: "",
+  preparedBy: "",
+  date: "",
+  confidentiality: "Confidential",
+  status: "in-review",
+  version: "0.1.0",
+});
 const commentSnippet = "<!-- comment: unresolved | author: local | at: 2026-05-18T00:00:00Z | Review note. -->\n";
 const aiSnippet =
   "```ai-source\nprovider: OpenAI\nmodel: ChatGPT\ndate: 2026-05-18\npromptSummary: \nreviewedBy: \nreviewedAt: \nstatus: needs-review\n```\n";
@@ -8559,6 +8621,33 @@ const layoutAdvisorDetail = computed(() => {
   if (layoutQualityRecommendations.value.length) return layoutQualityRecommendations.value.map((item) => item.label).join(" | ");
   return "No deterministic wide-table, gutter, or section-reset issues were detected.";
 });
+const coverBuilderDefaults = computed(() => {
+  const metadata = active.value.compile?.metadata || {};
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    title: String(metadata.title || active.value.compile?.semantic.title || active.value.title.replace(/\.[^.]+$/, "") || "Document title"),
+    subtitle: String(metadata.subtitle || metadata.description || "Prepared for review"),
+    client: String(metadata.client || metadata.customer || store.businessProfile.defaultClientName || "Client organization"),
+    preparedBy: String(metadata.preparedBy || metadata.author || store.businessProfile.fullName || store.businessProfile.companyName || "Prepared by"),
+    date: String(metadata.date || metadata.approvedAt || today).slice(0, 10),
+    confidentiality: String(metadata.confidentiality || "Confidential"),
+    status: String(metadata.status || "in-review"),
+    version: String(metadata.version || "0.1.0"),
+  };
+});
+const coverBuilderEffective = computed(() => ({
+  title: coverBuilderDraft.value.title.trim() || coverBuilderDefaults.value.title,
+  subtitle: coverBuilderDraft.value.subtitle.trim() || coverBuilderDefaults.value.subtitle,
+  client: coverBuilderDraft.value.client.trim() || coverBuilderDefaults.value.client,
+  preparedBy: coverBuilderDraft.value.preparedBy.trim() || coverBuilderDefaults.value.preparedBy,
+  date: coverBuilderDraft.value.date.trim() || coverBuilderDefaults.value.date,
+  confidentiality: coverBuilderDraft.value.confidentiality.trim() || coverBuilderDefaults.value.confidentiality,
+  status: coverBuilderDraft.value.status.trim() || coverBuilderDefaults.value.status,
+  version: coverBuilderDraft.value.version.trim() || coverBuilderDefaults.value.version,
+}));
+const coverBuilderSummary = computed(() =>
+  `${coverBuilderEffective.value.title} | ${coverBuilderEffective.value.client} | ${coverBuilderEffective.value.status} v${coverBuilderEffective.value.version}`,
+);
 const qualityRecommendationSummary = computed(() => formatQualityRecommendationSummary(qualityImprovementRecommendations.value));
 const qualityStepAssistance = computed<QualityStepAssistance[]>(() =>
   buildQualityStepAssistance({
@@ -10083,6 +10172,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
       { id: "layout-advisor", label: "Layout", title: "Open the Layout Advisor for columns, wide sections, gutters, and export-safe flow", icon: "layout", run: () => openLayoutAdvisor() },
+      { id: "cover-builder", label: "Cover", title: "Open the professional cover builder", icon: "layout", primary: true, run: () => openLayoutAdvisor() },
       { id: "install-handlers", label: "Handlers", title: "Download and install transform handlers", icon: "settings", run: () => openTransformInstaller() },
       { id: "biz-part", label: "Part", title: "Insert a reusable business document part", icon: "templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
       { id: "include", label: "Include", title: "Open the include document builder", icon: "include", run: () => openIncludeBuilder() },
@@ -10292,6 +10382,8 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "calc", label: "Calculation", help: "Insert a calculation block.", run: () => insertBlock(calcSnippet) },
           { id: "equation", label: "Equation Editor", help: "Open equation templates and LaTeX insertion.", run: () => openEquationEditor() },
           { id: "layout-two-column", label: "Two-column Section", help: "Insert an export-aware two-column section for polished business narratives.", run: () => insertDocumentLayoutPreset("two-column-section") },
+          { id: "cover-builder", label: "Professional Cover Builder", help: "Open the cover builder for title, client, status, version, confidentiality, and cover-page metadata.", run: () => openLayoutAdvisor() },
+          { id: "insert-cover-section", label: "Insert Cover Section", help: "Insert the current professional cover section into the Markdown source.", run: () => insertCoverBuilderSection() },
           { id: "layout-three-column", label: "Three-column Brief", help: "Insert a dense three-column section for short highlights, options, and decisions.", run: () => insertDocumentLayoutPreset("three-column-brief") },
           { id: "layout-wide", label: "Wide Landscape Section", help: "Insert a single-column landscape section for wide tables, timelines, or compliance matrices.", run: () => insertDocumentLayoutPreset("wide-landscape-section") },
           { id: "layout-reset", label: "Return to Single Column", help: "Reset the document back to normal portrait single-column flow.", run: () => insertDocumentLayoutPreset("single-column-reset") },
@@ -10306,12 +10398,17 @@ const appMenus = computed<AppMenu[]>(() => [
       {
         id: "layout",
         label: "Document layout",
-        items: documentLayoutPresets.map((preset) => ({
-          id: `layout-${preset.id}`,
-          label: preset.label,
-          help: preset.summary,
-          run: () => insertDocumentLayoutPreset(preset.id),
-        })),
+        items: [
+          { id: "cover-builder", label: "Professional Cover Builder", help: "Open and apply business cover metadata and cover-page section controls.", run: () => openLayoutAdvisor() },
+          { id: "cover-metadata", label: "Apply Cover Metadata", help: "Write cover metadata to front matter and enable cover-page export.", run: () => applyCoverBuilderMetadata() },
+          { id: "cover-section", label: "Insert Cover Section", help: "Insert a professional Markdown cover section with a page break.", run: () => insertCoverBuilderSection() },
+          ...documentLayoutPresets.map((preset) => ({
+            id: `layout-${preset.id}`,
+            label: preset.label,
+            help: preset.summary,
+            run: () => insertDocumentLayoutPreset(preset.id),
+          })),
+        ],
       },
       {
         id: "wizards",
@@ -13416,6 +13513,9 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Insert list of tables", group: "Snippet", run: () => insertBlock(listOfTablesSnippet) },
   { name: "Insert glossary section", group: "Snippet", run: () => insertBlock(glossarySectionSnippet) },
   { name: "Insert glossary", group: "Snippet", run: () => insertBlock(glossarySnippet) },
+  { name: "Open professional cover builder", group: "Layout", description: "Open the business cover builder for title, client, status, version, and confidentiality.", keywords: ["cover", "title page", "client", "confidential"], run: () => openLayoutAdvisor() },
+  { name: "Apply cover metadata", group: "Layout", description: "Write professional cover metadata to front matter and enable cover page export.", keywords: ["cover", "metadata", "front matter"], run: () => applyCoverBuilderMetadata() },
+  { name: "Insert professional cover section", group: "Layout", description: "Insert a Markdown cover section with title, client, version, status, and page break.", keywords: ["cover", "title page", "page break"], run: () => insertCoverBuilderSection() },
   { name: "Open Layout Advisor", group: "Layout", description: "Review column, wide-table, gutter, and section-reset recommendations before export.", keywords: ["layout", "columns", "wide tables", "gutter", "landscape", "advisor"], run: () => openLayoutAdvisor() },
   ...documentLayoutPresets.map((preset) => ({
     name: preset.commandName,
@@ -20984,6 +21084,70 @@ function insertDocumentLayoutPreset(id: DocumentLayoutPresetId) {
   store.statusMessage = `Inserted ${preset.label}`;
 }
 
+function resetCoverBuilderDraft() {
+  coverBuilderDraft.value = { ...coverBuilderDefaults.value };
+  store.statusMessage = "Loaded cover builder defaults";
+}
+
+function coverBuilderYamlValue(value: string) {
+  return JSON.stringify(value.trim());
+}
+
+function applyCoverBuilderMetadata() {
+  flushEditorTextToStore();
+  const cover = coverBuilderEffective.value;
+  let nextText = active.value.text;
+  nextText = upsertFrontMatterField(nextText, "title", coverBuilderYamlValue(cover.title));
+  nextText = upsertFrontMatterField(nextText, "subtitle", coverBuilderYamlValue(cover.subtitle));
+  nextText = upsertFrontMatterField(nextText, "client", coverBuilderYamlValue(cover.client));
+  nextText = upsertFrontMatterField(nextText, "preparedBy", coverBuilderYamlValue(cover.preparedBy));
+  nextText = upsertFrontMatterField(nextText, "date", coverBuilderYamlValue(cover.date));
+  nextText = upsertFrontMatterField(nextText, "confidentiality", coverBuilderYamlValue(cover.confidentiality));
+  nextText = upsertFrontMatterField(nextText, "status", coverBuilderYamlValue(cover.status));
+  nextText = upsertFrontMatterField(nextText, "version", coverBuilderYamlValue(cover.version));
+  nextText = upsertFrontMatterField(nextText, "coverPage", "true");
+  store.exportDefaults.coverPage = true;
+  store.updateText(nextText);
+  store.statusMessage = "Applied cover metadata and enabled cover page export";
+  void nextTick(() => syncEditorViewFromActiveDocument());
+}
+
+function coverBuilderSectionMarkdown() {
+  const cover = coverBuilderEffective.value;
+  return [
+    "{{section-break columns=1 margins=wide orientation=portrait section=cover}}",
+    "",
+    `# ${cover.title}`,
+    "",
+    `## ${cover.subtitle}`,
+    "",
+    `**Prepared for:** ${cover.client}`,
+    "",
+    `**Prepared by:** ${cover.preparedBy}`,
+    "",
+    `**Date:** ${cover.date}`,
+    "",
+    `**Status:** ${cover.status}`,
+    "",
+    `**Version:** ${cover.version}`,
+    "",
+    `**Confidentiality:** ${cover.confidentiality}`,
+    "",
+    "{{page-break}}",
+  ].join("\n");
+}
+
+function insertCoverBuilderSection() {
+  insertBlock(coverBuilderSectionMarkdown());
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted professional cover section";
+}
+
+function applyCoverBuilderPackage() {
+  applyCoverBuilderMetadata();
+  void nextTick(() => insertCoverBuilderSection());
+}
+
 function insertFigureSnippet(position: FigureCropPosition = "center") {
   insertBlock(formatFigureSnippet(position));
 }
@@ -22312,6 +22476,7 @@ select:hover {
 .app-shell[data-theme="dark"] .start-workspace-cockpit,
 .app-shell[data-theme="dark"] .start-workspace-steps li,
 .app-shell[data-theme="dark"] .document-map-row,
+.app-shell[data-theme="dark"] .cover-builder,
 .app-shell[data-theme="dark"] .help-topic-header small,
 .app-shell[data-theme="dark"] .help-keywords span,
 .app-shell[data-theme="dark"] .guided-demo-progress,
@@ -22388,6 +22553,7 @@ select:hover {
 .app-shell[data-theme="dark"] .start-workspace-steps span,
 .app-shell[data-theme="dark"] .document-map header small,
 .app-shell[data-theme="dark"] .document-map-row small,
+.app-shell[data-theme="dark"] .cover-builder header small,
 .app-shell[data-theme="dark"] .help-topic-header p,
 .app-shell[data-theme="dark"] .help-when,
 .app-shell[data-theme="dark"] .help-tips,
@@ -22548,6 +22714,7 @@ select:hover {
   .app-shell[data-theme="system"] .start-workspace-cockpit,
   .app-shell[data-theme="system"] .start-workspace-steps li,
   .app-shell[data-theme="system"] .document-map-row,
+  .app-shell[data-theme="system"] .cover-builder,
   .app-shell[data-theme="system"] .help-topic-header small,
   .app-shell[data-theme="system"] .help-keywords span,
   .app-shell[data-theme="system"] .guided-demo-progress,
@@ -22624,6 +22791,7 @@ select:hover {
   .app-shell[data-theme="system"] .start-workspace-steps span,
   .app-shell[data-theme="system"] .document-map header small,
   .app-shell[data-theme="system"] .document-map-row small,
+  .app-shell[data-theme="system"] .cover-builder header small,
   .app-shell[data-theme="system"] .help-topic-header p,
   .app-shell[data-theme="system"] .help-when,
   .app-shell[data-theme="system"] .help-tips,
@@ -22739,6 +22907,7 @@ select:hover {
 .app-shell[data-high-contrast="true"] .start-workspace-cockpit,
 .app-shell[data-high-contrast="true"] .start-workspace-steps li,
 .app-shell[data-high-contrast="true"] .document-map-row,
+.app-shell[data-high-contrast="true"] .cover-builder,
 .app-shell[data-high-contrast="true"] .help-topic-header small,
 .app-shell[data-high-contrast="true"] .help-keywords span,
 .app-shell[data-high-contrast="true"] .guided-demo-progress,
@@ -23945,6 +24114,47 @@ select:hover {
   resize: vertical;
   min-height: 136px;
   font-family: var(--editor-font, "SFMono-Regular", Consolas, monospace);
+}
+
+.cover-builder {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid #d7dee7;
+  border-left: 3px solid #2f6f7e;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.cover-builder header,
+.cover-builder-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cover-builder h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.cover-builder header small {
+  color: #526171;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.cover-builder-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cover-builder-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }
 
 .outline-planner-actions {
@@ -29530,6 +29740,10 @@ select:hover {
   .outline-mode-actions {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .cover-builder-grid {
+    grid-template-columns: 1fr;
   }
 
   .sidebar {
