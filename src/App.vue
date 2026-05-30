@@ -1488,6 +1488,7 @@
                 <span><strong>{{ rfpAnalysis.complianceChecklist.length }}</strong> checklist items</span>
                 <span><strong>{{ rfpAnalysis.criticalDisqualifiers.length }}</strong> critical traps</span>
                 <span><strong>{{ rfpAnalysis.proposalOutline.activities.length }}</strong> outline activities</span>
+                <span><strong>{{ rfpAnalysis.winThemes.length }}</strong> win themes</span>
                 <span><strong>{{ rfpAnalysis.verificationSummary.rowsNeedingEvidence }}</strong> evidence checks</span>
               </div>
               <details open>
@@ -1534,6 +1535,17 @@
                 </ul>
               </details>
               <details open>
+                <summary>Win theme builder</summary>
+                <ol>
+                  <li v-for="theme in rfpAnalysis.winThemes" :key="theme.id">
+                    <strong>{{ theme.id }}: {{ theme.title }}</strong>
+                    <p>{{ theme.buyerSignal }}</p>
+                    <small>{{ theme.proposalPlacement }} | {{ theme.proofPoint }}</small>
+                    <p class="sidebar-hint">{{ theme.riskToAvoid }}</p>
+                  </li>
+                </ol>
+              </details>
+              <details open>
                 <summary>Requirement verification</summary>
                 <ul>
                   <li v-for="item in rfpAnalysis.verificationSummary.checklist" :key="`verify-${item}`">{{ item }}</li>
@@ -1548,6 +1560,7 @@
               </details>
               <div class="template-actions">
                 <button type="button" title="Insert only the generated compliance matrix into the active document" @click="insertRfpComplianceMatrix">Insert matrix</button>
+                <button type="button" title="Insert evaluator-facing win themes into the active document" @click="insertRfpWinThemes">Insert win themes</button>
                 <button type="button" title="Replace the active document with the compliance checklist followed by a scored proposal outline" @click="createRfpProposalOutline">Create outline</button>
                 <button type="button" title="Replace the active document with a full responsive RFP response draft" @click="createResponsiveRfpResponse">Create response</button>
                 <button type="button" title="Send the analyzed RFP to Docs Live for section-by-section drafting" @click="sendRfpResponseToDocsLive">Docs Live</button>
@@ -7295,6 +7308,7 @@ import {
   rfpProposalOutlineBullets,
   rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
+  rfpWinThemesMarkdown,
   versionedBusinessClauses,
   versionedClauseMarkdown,
   type BusinessDocumentSnippet,
@@ -20410,6 +20424,12 @@ function insertRfpComplianceMatrix() {
   store.statusMessage = `Inserted compliance matrix with ${analysis.complianceRows.length} requirements`;
 }
 
+function insertRfpWinThemes() {
+  const analysis = ensureRfpAnalysis();
+  insertBlock(rfpWinThemesMarkdown(analysis));
+  store.statusMessage = `Inserted ${analysis.winThemes.length} RFP win theme${analysis.winThemes.length === 1 ? "" : "s"}`;
+}
+
 function createRfpProposalOutline() {
   const analysis = ensureRfpAnalysis();
   store.updateText(rfpProposalOutlineMarkdown(analysis, store.businessProfile, rfpResponseContextNotes.value));
@@ -20498,6 +20518,9 @@ function rfpResponseAnalysisBrief(analysis: RfpAnalysis, responseNotes = "") {
     "",
     "Implied intent:",
     ...analysis.impliedIntent.map((item) => `- ${item}`),
+    "",
+    "Win themes:",
+    ...analysis.winThemes.map((theme) => `- ${theme.id}: ${theme.title} | Buyer signal: ${theme.buyerSignal} | Proof: ${theme.proofPoint} | Placement: ${theme.proposalPlacement}`),
     "",
     "Requirements:",
     ...analysis.complianceRows.map((item) => `- ${item.id} [${item.category}]: ${item.text} | Suggested response: ${item.suggestedResponse} | ${item.responseStrategy} | ${item.complianceStatus} | ${item.verification}`),

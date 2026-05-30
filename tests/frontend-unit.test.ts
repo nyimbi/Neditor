@@ -115,6 +115,7 @@ import {
   rfpProposalOutlineBullets,
   rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
+  rfpWinThemesMarkdown,
   saveCustomBusinessSnippetState,
   deleteCustomBusinessSnippetState,
   saveCustomVersionedClauseState,
@@ -3987,6 +3988,10 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(analysis.verificationSummary.checklist.some((item) => item.includes("annex reference")));
   ok(analysis.verificationSummary.checklist.some((item) => item.includes("bilingual")));
   ok(analysis.verificationSummary.checklist.some((item) => item.includes("placeholder")));
+  equal(analysis.winThemes.length, 4);
+  ok(analysis.winThemes.some((theme) => theme.title === "Compliance without surprises" && theme.proofPoint.includes("RFP-REQ")));
+  ok(analysis.winThemes.some((theme) => theme.title === "Evaluator-readable proof" && theme.buyerSignal.includes("technical merit")));
+  ok(analysis.winThemes.every((theme) => theme.responsePromise.includes("evidence-gated")));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes(`source line ${row.sourceLine}`))));
   ok(analysis.complianceRows.every((row) => row.verificationChecklist.some((item) => item.includes("Requirement type:"))));
   ok(analysis.complianceRows.some((row) => row.verificationChecklist.some((item) => item.includes("Disqualification risk flagged"))));
@@ -4032,11 +4037,18 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(checklist.includes("Annex C"));
   ok(checklist.includes("bilingual EN/FR"));
 
+  const winThemes = rfpWinThemesMarkdown(analysis);
+  ok(winThemes.includes("## RFP Win Theme Builder"));
+  ok(winThemes.includes("Compliance without surprises"));
+  ok(winThemes.includes("Evaluator-readable proof"));
+  ok(winThemes.includes("Proposal placement"));
+
   const outline = rfpProposalOutlineMarkdown(analysis, profile, "Win theme: reduce implementation risk.");
   ok(outline.includes("# Technical Proposal Outline for Globex"));
   ok(outline.indexOf("## Compliance Checklist") < outline.indexOf("[TOC]"));
   ok(outline.indexOf("[TOC]") < outline.indexOf("## 1. RFP Metadata"));
   ok(outline.includes("## Proposal Planning Prompt"));
+  ok(outline.includes("## RFP Win Theme Builder"));
   ok(outline.includes("Extract the evaluator model, scoring weights, sub-criteria"));
   ok(outline.includes("Terms of Reference map"));
   ok(outline.includes("Turn sustainability, transition, maintenance"));
@@ -4055,6 +4067,7 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(response.includes("## Compliance Checklist"));
   ok(response.indexOf("## Compliance Checklist") < response.indexOf("[TOC]"));
   ok(response.indexOf("[TOC]") < response.indexOf("## Proposal Planning Prompt"));
+  ok(response.indexOf("## Proposal Planning Prompt") < response.indexOf("## RFP Win Theme Builder"));
   ok(response.indexOf("[TOC]") < response.indexOf("## Proposal Outline"));
   ok(response.indexOf("## Proposal Outline") < response.indexOf("## Evaluator-Aligned Section Drafts"));
   ok(response.includes("- Proposed Methodology & Technical Approach"));
@@ -4066,6 +4079,7 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(response.includes("## Buyer Intent Analysis"));
   ok(response.includes("### Response Context and Decision Notes"));
   ok(response.includes("Win theme: reduce implementation risk."));
+  ok(response.includes("RFP-WIN-01: Compliance without surprises"));
   ok(response.includes("### Stated Intent"));
   ok(response.includes("### Implied Intent"));
   ok(response.includes("## Compliance Matrix"));
@@ -8852,6 +8866,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Native RFP response wizard"'));
   ok(app.includes('aria-label="RFP analysis results"'));
   ok(app.includes('aria-label="RFP response context notes"'));
+  ok(app.includes("Win theme builder"));
+  ok(app.includes("Insert win themes"));
+  ok(app.includes("insertRfpWinThemes"));
+  ok(app.includes("rfpWinThemesMarkdown"));
   ok(app.includes("AI RFP step assistance"));
   ok(app.includes("rfpWizardStepAssistance"));
   ok(app.includes("appendRfpWizardSuggestion"));

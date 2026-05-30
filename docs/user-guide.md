@@ -630,6 +630,10 @@ NEditor is built for drafts that need evidence before publication.
   response section. The full response draft also groups those answers into a
   **Requirement Response Drafts** section, so each response area has usable
   starter prose while the evidence owner and proof requirements remain visible.
+  The same wizard now builds evaluator-facing win themes from stated intent,
+  implied intent, scoring criteria, risks, and capability signals; use
+  **Insert win themes** when reviewers need a compact strategy table before
+  drafting or red-team review.
   The RFP wizard also shows AI step assistance for source intake, requirement
   analysis, buyer intent, response drafting, evidence QA, and handoff; accepting
   a suggestion puts the answer, rationale, and context signals into editable

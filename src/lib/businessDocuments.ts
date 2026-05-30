@@ -248,6 +248,16 @@ export interface RfpVerificationSummary {
   checklist: string[];
 }
 
+export interface RfpWinTheme {
+  id: string;
+  title: string;
+  buyerSignal: string;
+  responsePromise: string;
+  proofPoint: string;
+  proposalPlacement: string;
+  riskToAvoid: string;
+}
+
 export interface RfpAnalysis {
   source: {
     kind: RfpSourceKind;
@@ -276,6 +286,7 @@ export interface RfpAnalysis {
   risks: string[];
   questions: string[];
   warnings: string[];
+  winThemes: RfpWinTheme[];
   completenessScore: number;
 }
 
@@ -1967,6 +1978,16 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
   const risks = inferRfpRisks(requirements, timelines, budgetHints, mandatoryAttachments, criticalDisqualifiers, placeholderRisks);
   const questions = inferRfpQuestions(requirements, timelines, budgetHints, evaluationCriteria, mandatoryAttachments, normalizedProfile);
   const warnings = inferRfpWarnings(input, normalizedText, requirements);
+  const winThemes = buildRfpWinThemes({
+    capabilities,
+    statedIntent,
+    impliedIntent,
+    evaluationCriteria,
+    scoringWeights,
+    risks,
+    complianceRows,
+    profile: normalizedProfile,
+  });
   const completenessScore = Math.max(0, Math.min(100, Math.round(
     20 +
       Math.min(requirements.length, 12) * 4 +
@@ -2008,6 +2029,7 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
     risks,
     questions,
     warnings,
+    winThemes,
     completenessScore,
   };
 }
@@ -2050,6 +2072,29 @@ export function rfpComplianceChecklistMarkdown(analysis: RfpAnalysis) {
     "| ID | Section | Risk | Requirement | Verification method | Owner | Reference |",
     "| --- | --- | --- | --- | --- | --- | --- |",
     ...rows.map((row) => `| ${escapeMarkdownTableCell(row.id)} | ${escapeMarkdownTableCell(row.section)} | ${escapeMarkdownTableCell(row.risk)} | ${escapeMarkdownTableCell(row.requirement)} | ${escapeMarkdownTableCell(row.verification)} | ${escapeMarkdownTableCell(row.owner)} | ${escapeMarkdownTableCell(row.reference)} |`),
+  ].join("\n");
+}
+
+export function rfpWinThemesMarkdown(analysis: RfpAnalysis) {
+  const themes = analysis.winThemes.length ? analysis.winThemes : [
+    {
+      id: "RFP-WIN-01",
+      title: "Complete and easy-to-score response",
+      buyerSignal: "No analyzed RFP signals yet.",
+      responsePromise: "Analyze the source RFP before finalizing themes.",
+      proofPoint: "Attach requirement, evaluator, and capability evidence.",
+      proposalPlacement: "Executive Response; Proposal Outline; Compliance Matrix",
+      riskToAvoid: "Do not draft generic sales copy before the RFP is analyzed.",
+    },
+  ];
+  return [
+    "## RFP Win Theme Builder",
+    "",
+    "Use these themes to shape the executive response, section headings, proof points, and reviewer checks. Treat them as strategic framing, not replacement for requirement-level compliance.",
+    "",
+    "| Theme | Buyer signal | Response promise | Proof point | Proposal placement | Risk to avoid |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...themes.map((theme) => `| ${escapeMarkdownTableCell(`${theme.id}: ${theme.title}`)} | ${escapeMarkdownTableCell(theme.buyerSignal)} | ${escapeMarkdownTableCell(theme.responsePromise)} | ${escapeMarkdownTableCell(theme.proofPoint)} | ${escapeMarkdownTableCell(theme.proposalPlacement)} | ${escapeMarkdownTableCell(theme.riskToAvoid)} |`),
   ].join("\n");
 }
 
@@ -2110,6 +2155,8 @@ export function rfpProposalOutlineMarkdown(analysis: RfpAnalysis, profile: Parti
       notes ? `- Bid context notes: ${notes}` : "",
       "",
       rfpProposalPlanningPromptMarkdown(analysis, responseNotes),
+      "",
+      rfpWinThemesMarkdown(analysis),
       "",
       "## 2. Scoring Scheme and Page Allocation",
       "",
@@ -2303,6 +2350,7 @@ function rfpEvaluatorAlignedSectionDraftsMarkdown(analysis: RfpAnalysis, profile
     ? outline.scoringScheme.map((item) => `- ${item.criterion}: address ${item.weight}${item.unit} through named evidence, section labels, and reviewer checks.`)
     : ["- No explicit scoring weights were detected; use equal emphasis across compliance, technical approach, team, delivery, risk, sustainability, and commercial clarity."];
   const criticalRows = criticalChecklistRows(analysis.complianceChecklist);
+  const winThemeBullets = analysis.winThemes.map((theme) => `- ${theme.id}: ${theme.title} - ${theme.responsePromise}`);
   const notes = responseNotes.trim();
   return fillBusinessTemplate(
     [
@@ -2316,6 +2364,7 @@ function rfpEvaluatorAlignedSectionDraftsMarkdown(analysis: RfpAnalysis, profile
       "",
       "Evaluator priorities to mirror:",
       ...scoringBullets,
+      ...winThemeBullets,
       criticalRows.length ? `- Pass/fail gates to clear first: ${criticalRows.map((item) => item.id).join(", ")}.` : "- No explicit automatic-exclusion gate was detected; bid reviewers must confirm mandatory submission language manually.",
       notes ? `- Bid-team emphasis: ${notes}` : "",
       "",
@@ -2405,6 +2454,8 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       "[TOC]",
       "",
       rfpProposalPlanningPromptMarkdown(analysis, responseNotes),
+      "",
+      rfpWinThemesMarkdown(analysis),
       "",
       "## Proposal Outline",
       "",
@@ -3359,6 +3410,78 @@ function inferImpliedRfpIntent(
   if (profile.industry && !profile.industry.startsWith("{{")) intent.add(`The response should translate ${profile.industry} expertise into buyer-specific outcomes, not generic capability language.`);
   if (!intent.size) intent.add("The buyer likely wants a low-risk, complete, easy-to-evaluate response; keep every requirement mapped and every assumption visible.");
   return [...intent];
+}
+
+function buildRfpWinThemes(input: {
+  capabilities: string[];
+  statedIntent: string[];
+  impliedIntent: string[];
+  evaluationCriteria: string[];
+  scoringWeights: RfpScoringWeight[];
+  risks: string[];
+  complianceRows: RfpComplianceRow[];
+  profile: Record<keyof BusinessProfile, string>;
+}): RfpWinTheme[] {
+  const company = input.profile.companyName && !input.profile.companyName.startsWith("{{")
+    ? input.profile.companyName
+    : "the bidder";
+  const buyerSignals = dedupeStrings([
+    ...input.evaluationCriteria,
+    ...input.scoringWeights.map((item) => `${item.criterion} weighted at ${item.weight}${item.unit}`),
+    ...input.statedIntent,
+    ...input.impliedIntent,
+  ]);
+  const capabilities = input.capabilities.length
+    ? input.capabilities
+    : ["Bid-specific delivery capability to be evidenced by the response team"];
+  const themeSeeds = [
+    {
+      title: "Compliance without surprises",
+      signal: buyerSignals.find((signal) => /compliance|mandatory|attachment|risk|declaration|disqualif|nonresponsive|rejected/i.test(signal)) || buyerSignals[0],
+      placement: "Executive Response; Compliance Matrix; Submission QA Checklist",
+      risk: input.risks.find((risk) => /mandatory|attachment|compliance|disqualif|nonresponsive/i.test(risk)) || "Do not bury mandatory evidence in generic proposal prose.",
+      rowPattern: /compliance|mandatory|format|attachment/i,
+    },
+    {
+      title: "Evaluator-readable proof",
+      signal: buyerSignals.find((signal) => /scor|evaluation|criteria|weight|technical merit|points/i.test(signal)) || buyerSignals[1],
+      placement: "Scoring Scheme; Proposed Methodology; Compliance Summary Table",
+      risk: "Do not make evaluators hunt for proof points; mirror criteria in headings, tables, and evidence callouts.",
+      rowPattern: /technical|team|experience|governance|solution|requirement/i,
+    },
+    {
+      title: "Credible delivery control",
+      signal: buyerSignals.find((signal) => /timeline|schedule|milestone|delivery|implementation|support|handover|risk|qa|validation/i.test(signal)) || buyerSignals[2],
+      placement: "Work Plan & Timeline; Risk Management; Quality Assurance & Monitoring",
+      risk: input.risks.find((risk) => /timeline|delivery|risk|quality|schedule/i.test(risk)) || "Do not overpromise timing, staffing, or acceptance evidence without named owners.",
+      rowPattern: /timeline|delivery|governance|technical|team/i,
+    },
+    {
+      title: "Business value with commercial clarity",
+      signal: buyerSignals.find((signal) => /budget|price|cost|value|commercial|financial/i.test(signal)) || buyerSignals[3],
+      placement: "Executive Response; Pricing and Budget Response; Risk and Assumptions",
+      risk: input.risks.find((risk) => /budget|pricing|commercial|cost/i.test(risk)) || "Do not let value claims conflict with pricing assumptions or exclusions.",
+      rowPattern: /pricing|requirement|compliance/i,
+    },
+  ];
+  const themes: RfpWinTheme[] = [];
+  for (const seed of themeSeeds) {
+    const supportingRows = input.complianceRows.filter((row) => seed.rowPattern.test(`${row.category} ${row.responseSection} ${row.text}`)).slice(0, 3);
+    const supportingCapability = capabilities.find((capability) => seed.rowPattern.test(capability)) || capabilities[themes.length % capabilities.length];
+    const buyerSignal = seed.signal || "Buyer wants a low-risk, complete, easy-to-score response.";
+    themes.push({
+      id: `RFP-WIN-${String(themes.length + 1).padStart(2, "0")}`,
+      title: seed.title,
+      buyerSignal,
+      responsePromise: `${company} will make this theme visible through direct requirement answers, evaluator-facing headings, and evidence-gated response text.`,
+      proofPoint: supportingRows.length
+        ? `${supportingCapability}; mapped rows: ${supportingRows.map((row) => `${row.id} ${row.category}`).join(", ")}.`
+        : `${supportingCapability}; attach a named case, CV, certificate, control, or delivery artifact before submission.`,
+      proposalPlacement: seed.placement,
+      riskToAvoid: seed.risk,
+    });
+  }
+  return themes;
 }
 
 function inferRfpRisks(
