@@ -37,6 +37,7 @@
     "check:structure": "node scripts/check-project-structure.mjs",
     "check:tables:manual": "node scripts/check-table-editor-manual-signoff.mjs",
     "collect:ai-provider": "node scripts/collect-ai-provider-evidence.mjs",
+    "collect:ai-runtime": "node scripts/collect-ai-runtime-evidence.mjs",
     "collect:google-docs-import": "node scripts/collect-google-docs-import-evidence.mjs",
     "collect:engine-evidence": "node scripts/check-external-engines.mjs --write-evidence",
     "collect:platform-evidence": "node scripts/collect-platform-evidence.mjs",

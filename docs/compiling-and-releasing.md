@@ -266,6 +266,36 @@ Typical returned evidence includes:
 Release readiness rejects stale evidence when it was collected for a different
 source commit or when the current source tree is dirty.
 
+### AI Runtime Device Evidence
+
+The AI runtime gap must be closed from a real browser or packaged Tauri WebView
+session that can request microphone permission and exercise clipboard read/write
+without storing content. On the device host, generate the readiness input
+template:
+
+```sh
+pnpm run collect:ai-runtime -- --write-template
+```
+
+Run the Docs Live **Check AI runtime** action, save the JSON-shaped readiness
+result using the template shape in
+`.tmp/ai-runtime-evidence/templates/runtime-readiness.template.json`, and then
+collect validator-ready evidence:
+
+```sh
+pnpm run collect:ai-runtime -- \
+  --readiness-json /path/to/runtime-readiness.json \
+  --microphone-result stream-opened \
+  --clipboard-write-succeeded true
+pnpm run check:ai-runtime
+```
+
+The collector requires a clean Git tree, records only capability states and
+character counts, sets `audioStored: false` and clipboard `contentStored:
+false`, and refuses to store audio or clipboard material in release evidence.
+Return `.tmp/ai-runtime-evidence/external/runtime-evidence.json` through the
+release evidence kit or ingest it into the release checkout.
+
 ### Release-Device Performance Evidence
 
 The performance-profile gap must be closed with a real release-device run, not

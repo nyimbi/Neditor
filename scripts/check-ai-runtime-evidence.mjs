@@ -157,6 +157,7 @@ function discoverEvidenceFiles(dir) {
 
 function writeTemplate() {
   const templatePath = join(templatesDir, "runtime-evidence.template.json");
+  const readinessTemplatePath = join(templatesDir, "runtime-readiness.template.json");
   writeFileSync(
     templatePath,
     `${JSON.stringify(
@@ -201,10 +202,47 @@ function writeTemplate() {
       2,
     )}\n`,
   );
+  writeFileSync(
+    readinessTemplatePath,
+    `${JSON.stringify(
+      {
+        schema: "neditor.ai-runtime-readiness.v1",
+        generatedAt: new Date().toISOString(),
+        platform: process.platform,
+        arch: process.arch,
+        runtime: "tauri-webview",
+        secureContext: true,
+        speechRecognition: {
+          supported: true,
+          state: "available",
+          detail: "SpeechRecognition API is available.",
+        },
+        microphonePermission: {
+          supported: true,
+          state: "granted",
+          detail: "microphone permission is granted.",
+        },
+        clipboardRead: {
+          supported: true,
+          state: "granted",
+          detail: "Clipboard rich read succeeded (30 characters detected, content not stored).",
+        },
+        clipboardWrite: {
+          supported: true,
+          state: "granted",
+          detail: "clipboard-write permission is granted.",
+        },
+        issues: [],
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 function writeReport(status, evidence, invalid) {
   const templatePath = join(templatesDir, "runtime-evidence.template.json");
+  const readinessTemplatePath = join(templatesDir, "runtime-readiness.template.json");
   writeFileSync(
     reportPath,
     `${JSON.stringify(
@@ -219,6 +257,10 @@ function writeReport(status, evidence, invalid) {
         template: {
           path: relative(templatePath),
           bytes: statSync(templatePath).size,
+        },
+        readinessTemplate: {
+          path: relative(readinessTemplatePath),
+          bytes: statSync(readinessTemplatePath).size,
         },
         summary: {
           acceptedEvidence: evidence.filter((item) => item.status === "accepted").length,

@@ -10578,6 +10578,7 @@ test("local verification scripts expose local baseline checks", () => {
   const aiProviderEvidence = readFileSync("scripts/check-ai-provider-evidence.mjs", "utf8");
   const aiProviderCollector = readFileSync("scripts/collect-ai-provider-evidence.mjs", "utf8");
   const aiRuntimeEvidence = readFileSync("scripts/check-ai-runtime-evidence.mjs", "utf8");
+  const aiRuntimeCollector = readFileSync("scripts/collect-ai-runtime-evidence.mjs", "utf8");
   const securityReview = readFileSync("scripts/check-security-review-evidence.mjs", "utf8");
   const specCompletion = readFileSync("scripts/check-spec-completion-matrix.mjs", "utf8");
   const manualReviewEvidence = readFileSync("scripts/check-manual-review-evidence.mjs", "utf8");
@@ -10627,6 +10628,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["check:spec-completion"], "node scripts/check-spec-completion-matrix.mjs");
   equal(scripts["check:structure"], "node scripts/check-project-structure.mjs");
   equal(scripts["collect:ai-provider"], "node scripts/collect-ai-provider-evidence.mjs");
+  equal(scripts["collect:ai-runtime"], "node scripts/collect-ai-runtime-evidence.mjs");
   equal(scripts["collect:google-docs-import"], "node scripts/collect-google-docs-import-evidence.mjs");
   equal(scripts["collect:engine-evidence"], "node scripts/check-external-engines.mjs --write-evidence");
   equal(scripts["collect:platform-evidence"], "node scripts/collect-platform-evidence.mjs");
@@ -10733,6 +10735,16 @@ test("local verification scripts expose local baseline checks", () => {
   ok(aiRuntimeEvidence.includes("forbiddenEvidenceKeys"));
   ok(aiRuntimeEvidence.includes("clipboardText"));
   ok(aiRuntimeEvidence.includes("audioSample"));
+  ok(aiRuntimeEvidence.includes("runtime-readiness.template.json"));
+  ok(aiRuntimeEvidence.includes("neditor.ai-runtime-readiness.v1"));
+  ok(aiRuntimeCollector.includes("NEDITOR_AI_RUNTIME_READINESS_JSON"));
+  ok(aiRuntimeCollector.includes("NEDITOR_AI_RUNTIME_MICROPHONE_RESULT"));
+  ok(aiRuntimeCollector.includes("NEDITOR_AI_RUNTIME_CLIPBOARD_WRITE_SUCCEEDED"));
+  ok(aiRuntimeCollector.includes("AI runtime evidence must be collected from a clean Git tree"));
+  ok(aiRuntimeCollector.includes("neditor.ai-runtime-evidence.v1"));
+  ok(aiRuntimeCollector.includes("audioStored: false"));
+  ok(aiRuntimeCollector.includes("contentStored: false"));
+  ok(aiRuntimeCollector.includes("Validate it with: pnpm run check:ai-runtime"));
   ok(securityReview.includes("neditor.security-review-evidence.v1"));
   ok(securityReview.includes("NEDITOR_SECURITY_REVIEW_EVIDENCE_DIR"));
   ok(securityReview.includes("NEDITOR_SECURITY_REVIEW_EVIDENCE"));
@@ -10897,6 +10909,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("Optional CI path: gh workflow run neditor-release-evidence.yml"));
   ok(evidenceKitCollector.includes("provider-evidence.template.json"));
   ok(evidenceKitCollector.includes("runtime-evidence.template.json"));
+  ok(evidenceKitCollector.includes("runtime-readiness.template.json"));
+  ok(evidenceKitCollector.includes("collect:ai-runtime"));
   ok(evidenceKitCollector.includes("security-review.template.json"));
   ok(evidenceKitCollector.includes("native-profile.template.json"));
   ok(evidenceKitCollector.includes("native-profile-metrics.template.json"));
@@ -10933,7 +10947,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("runbooks/independent-security-review.md"));
   ok(evidenceKitChecker.includes("runbooks/homebrew-release.md"));
   ok(evidenceKitChecker.includes("runbooks/release-device-performance-profile.md"));
-  ok(evidenceKitChecker.includes("const expectedTemplateCount = 18"));
+  ok(evidenceKitChecker.includes("const expectedTemplateCount = 19"));
   ok(evidenceKitChecker.includes("runbooks/table-editor-human-review.md"));
   ok(evidenceKitChecker.includes("runbooks/optional-external-engines.md"));
   ok(evidenceKitChecker.includes("runbooks/spec-completion-closure.md"));

@@ -28,6 +28,32 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-30 AI Runtime Evidence Collector
+
+NEditor now has a first-class AI runtime evidence collector for the real-device
+Docs Live voice and clipboard proof. `pnpm run collect:ai-runtime -- --write-template`
+writes a readiness input template, and `pnpm run collect:ai-runtime` converts a
+real browser or packaged Tauri WebView readiness JSON plus explicit microphone
+and clipboard-write observations into validator-shaped
+`neditor.ai-runtime-evidence.v1` evidence.
+
+This does not close the runtime gap by itself. The collector requires a clean
+Git tree and a real device session, records only capability states and character
+counts, and explicitly writes `audioStored: false` and clipboard
+`contentStored: false` so release evidence cannot contain audio or clipboard
+payloads.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/collect-ai-runtime-evidence.mjs` | Pass | Collector syntax is valid after adding readiness-template generation, clean-tree enforcement, microphone/clipboard proof fields, and no-content evidence output. |
+| `node --check scripts/check-ai-runtime-evidence.mjs` | Pass | Validator syntax is valid after adding the generated runtime-readiness input template to the AI runtime report. |
+| `pnpm run collect:ai-runtime -- --help` | Pass | Help output documents readiness JSON, microphone result, clipboard kind/count/write proof, runtime, output, environment variables, and template generation. |
+| `pnpm run collect:ai-runtime -- --write-template` | Pass | Wrote `.tmp/ai-runtime-evidence/templates/runtime-readiness.template.json` without requiring or synthesizing real-device runtime evidence. |
+| `pnpm run check:ai-runtime` | Pass with real-device proof pending | Wrote `.tmp/ai-runtime-evidence/report.json`; status remains `pending-real-runtime-evidence` until returned evidence from a real microphone/clipboard host is supplied. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including static coverage for the collector script, package command, runtime-readiness template, evidence-kit runbook, and runtime validator contract. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked after adding the AI runtime device evidence runbook section. |
+| `git diff --check` | Pass | No whitespace errors are present in this AI runtime evidence workflow slice. |
+
 ## 2026-05-30 Performance Profile Evidence Collector
 
 NEditor now has a first-class release-device performance evidence collector
