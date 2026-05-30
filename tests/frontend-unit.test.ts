@@ -8612,8 +8612,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned profile --workspace . --set companyName=Acme --json"));
   ok(app.includes("ned profile --fields --json"));
   ok(app.includes("ned profile --workspace . --get companyName"));
-  ok(app.includes("ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --json"));
+  ok(app.includes("ned rfp-response rfp.pdf --output response.md --matrix-output matrix.md --checklist-output checklist.md --json"));
   ok(app.includes("ned analyze-rfp - --matrix"));
+  ok(app.includes("ned analyze-rfp - --checklist"));
   ok(app.includes("ned new tender.md --template tender --workspace . --fill-profile --json"));
   ok(app.includes("ned new podcast.md --template podcast-script --workspace . --fill-profile --json"));
   ok(app.includes("ned outlines --category Procurement --query RFP --json"));
@@ -8715,6 +8716,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(cli.includes("neditor.ned-rfp-response.v1"));
   ok(cli.includes("run_rfp_response_command"));
   ok(cli.includes("--matrix-output"));
+  ok(cli.includes("--checklist-output"));
+  ok(cli.includes('"--checklist" => checklist_only = true'));
   ok(cli.includes("--ids-only"));
   ok(cli.includes("neditor.ned-evidence-status.v1"));
   ok(cli.includes("neditor.ned-default-reader.v1"));

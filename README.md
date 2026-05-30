@@ -113,8 +113,9 @@ ned snippets --workspace . --markdown business-contact-block --fill-profile
 ned profile --fields --json
 ned profile --workspace . --get companyName
 ned profile --workspace . --placeholders
-ned rfp-response buyer-rfp.pdf --output response.md --matrix-output compliance-matrix.md --json
+ned rfp-response buyer-rfp.pdf --output response.md --matrix-output compliance-matrix.md --checklist-output compliance-checklist.md --json
 cat buyer-rfp.md | ned analyze-rfp - --matrix
+cat buyer-rfp.md | ned analyze-rfp - --checklist
 ned targets --json
 ned handlers --platform windows --commands-only
 ned readiness --json
@@ -266,8 +267,10 @@ script/style noise, uses the page title when available, and decodes common
 HTML/XML entities before analysis. Use
 `--context` to add win themes or bid notes, `--workspace`
 to reuse `.neditor/business-profile.json`, `--matrix` for matrix-only terminal
-output, and `--matrix-output` when a submission owner needs a separate
-compliance workbook starter. `ned targets` lists export
+output, `--checklist` for checklist-only terminal output, `--matrix-output`
+when a submission owner needs a separate compliance workbook starter, and
+`--checklist-output` when reviewers need the front-of-proposal checklist as its
+own Markdown artifact. `ned targets` lists export
 formats, with `--json` output for help desk scripts and deployment checks. `ned
 handlers` lists copyable setup plans for optional transform handlers such as
 Graphviz, D2, PlantUML, Pikchr, and SQLite; use `--commands-only` when a support

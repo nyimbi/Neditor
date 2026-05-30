@@ -395,6 +395,7 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     .expect("write rfp");
     let response = temp_markdown_path("customer-support-rfp-response");
     let matrix = temp_markdown_path("customer-support-rfp-matrix");
+    let checklist = temp_markdown_path("customer-support-rfp-checklist");
     let outcome = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "rfp-response".to_string(),
@@ -407,6 +408,8 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
         response.to_string_lossy().to_string(),
         "--matrix-output".to_string(),
         matrix.to_string_lossy().to_string(),
+        "--checklist-output".to_string(),
+        checklist.to_string_lossy().to_string(),
         "--json".to_string(),
     ])
     .expect("rfp response json");
@@ -567,6 +570,14 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
         report["analysis"]["verificationSummary"]["allRequirementsMapped"],
         true
     );
+    assert!(report["complianceChecklistMarkdown"]
+        .as_str()
+        .expect("checklist markdown")
+        .contains("## Compliance Checklist"));
+    assert!(report["outputs"]["checklist"]
+        .as_str()
+        .expect("checklist output")
+        .ends_with(".md"));
     let response_text = fs::read_to_string(&response).expect("response markdown");
     assert!(response_text.contains("## Compliance Checklist"));
     assert!(response_text.contains("Scored criteria and win themes"));
@@ -632,6 +643,10 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     let matrix_text = fs::read_to_string(&matrix).expect("matrix markdown");
     assert!(matrix_text.contains("| ID | Requirement | Category | Compliance status |"));
     assert!(matrix_text.contains("RFP-REQ-001"));
+    let checklist_text = fs::read_to_string(&checklist).expect("checklist markdown");
+    assert!(checklist_text.contains("## Compliance Checklist"));
+    assert!(checklist_text.contains("Scored criteria and win themes"));
+    assert!(checklist_text.contains("Document checklist - attachments required"));
 
     let stdin_matrix = crate::cli::run_cli_with_args_and_stdin(
         &[
@@ -647,6 +662,22 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     assert!(stdin_matrix
         .message
         .contains("pricing and implementation timeline"));
+
+    let stdin_checklist = crate::cli::run_cli_with_args_and_stdin(
+        &[
+            "ned".to_string(),
+            "analyze-rfp".to_string(),
+            "-".to_string(),
+            "--checklist".to_string(),
+        ],
+        Some("Failure to submit the signed declaration will be rejected."),
+    )
+    .expect("stdin rfp checklist");
+    assert!(stdin_checklist.message.contains("## Compliance Checklist"));
+    assert!(stdin_checklist
+        .message
+        .contains("Critical Disqualification Traps"));
+    assert!(stdin_checklist.message.contains("signed declaration"));
 }
 
 #[test]
@@ -2839,6 +2870,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("publish"));
     assert!(bash.message.contains("--token-env"));
     assert!(bash.message.contains("--matrix-output"));
+    assert!(bash.message.contains("--checklist-output"));
+    assert!(bash.message.contains("--matrix --checklist"));
     assert!(bash.message.contains("deploy-cli"));
     assert!(bash.message.contains("--target-dir"));
     assert!(bash.message.contains("markdown-bundle"));
@@ -2870,6 +2903,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--endpoint"));
     assert!(zsh.message.contains("--allow-not-ready"));
     assert!(zsh.message.contains("--matrix-output"));
+    assert!(zsh.message.contains("--checklist-output"));
+    assert!(zsh
+        .message
+        .contains("'--checklist[print compliance checklist Markdown]'"));
     assert!(zsh.message.contains("deploy-cli"));
     assert!(zsh.message.contains("--target-dir"));
 
@@ -2893,6 +2930,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("fields"));
     assert!(fish.message.contains("get"));
     assert!(fish.message.contains("matrix-output"));
+    assert!(fish.message.contains("checklist-output"));
+    assert!(fish.message.contains("-l checklist"));
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("publish"));
