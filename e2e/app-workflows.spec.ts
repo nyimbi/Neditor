@@ -1816,6 +1816,17 @@ async function setMockClipboardText(page: Page, text: string, mime = "text/plain
   await page.evaluate(({ value, type }) => window.__NEDITOR_E2E__.setClipboardText(value, type), { value: text, type: mime });
 }
 
+async function setDocsLiveWizardStep(dialog: Locator, step: "brief" | "outline" | "context" | "variables" | "draft") {
+  const names = {
+    brief: /Brief type, title, decisions/,
+    outline: /Outline structure and queue/,
+    context: /Context voice, sources, answers/,
+    variables: /Variables placeholders and evidence/,
+    draft: /Draft generate, review, apply/,
+  };
+  await dialog.getByRole("button", { name: names[step] }).click();
+}
+
 async function activeFileRowText(page: Page) {
   return page.locator(".sidebar .file-row.active").innerText();
 }
@@ -3092,8 +3103,10 @@ test("generates a Docs Live draft from outline, context, and placeholders", asyn
 
   await dialog.getByLabel("Document type").selectOption("proposal");
   await dialog.getByLabel("Document title").fill("Acme Renewal Proposal");
-  await dialog.getByLabel("Outline").fill("- Executive Summary\n- Proposed Approach\n- Investment");
-  await dialog.getByRole("button", { name: "Build questionnaire" }).click();
+  await setDocsLiveWizardStep(dialog, "outline");
+  await dialog.getByRole("textbox", { name: "Outline", exact: true }).fill("- Executive Summary\n- Proposed Approach\n- Investment");
+  await setDocsLiveWizardStep(dialog, "context");
+  await dialog.getByRole("button", { name: "Refresh questions" }).click();
   await expect(dialog.getByLabel("AI-created questionnaire")).toHaveValue(/For "Executive Summary"/);
   await setMockClipboardText(page, "<p>Runtime clipboard proof</p>", "text/html");
   await dialog.getByRole("button", { name: "Check AI runtime" }).click();
@@ -3103,11 +3116,12 @@ test("generates a Docs Live draft from outline, context, and placeholders", asyn
   await dialog.getByRole("button", { name: "Start dictation" }).click();
   await expect(dialog.getByLabel("Spoken direction")).toHaveValue(/Create a client proposal for Acme/);
   await dialog
-    .getByLabel("Context and answers")
+    .getByLabel("Context and constraints")
     .fill("The goal is to renew the platform contract. Include a clear recommendation and review notes.");
   await dialog
     .getByLabel("Questionnaire answers")
     .fill("The reader should approve renewal. Keep pricing assumptions visible for human review.");
+  await setDocsLiveWizardStep(dialog, "variables");
   await dialog.getByLabel("Placeholder values").fill("client: Acme\nowner: Commercial team\ndeadline: June 1");
 
   await dialog.getByRole("button", { name: "Generate draft" }).click();
@@ -3133,11 +3147,15 @@ test("keeps long-form Docs Live wizards outline-first before sequential prose", 
 
   await dialog.getByLabel("Document type").selectOption("technical-textbook");
   await dialog.getByLabel("Document title").fill("Distributed Systems Textbook");
+  await setDocsLiveWizardStep(dialog, "outline");
   const outlineInput = dialog.getByRole("textbox", { name: "Outline", exact: true });
   await outlineInput.fill("");
-  await dialog.getByLabel("Context and answers").fill("Audience: senior engineering students. Evidence: course notes. Owner: Faculty.");
+  await setDocsLiveWizardStep(dialog, "context");
+  await dialog.getByLabel("Context and constraints").fill("Audience: senior engineering students. Evidence: course notes. Owner: Faculty.");
+  await setDocsLiveWizardStep(dialog, "variables");
   await dialog.getByLabel("Placeholder values").fill("audience: senior engineering students\nowner: Faculty\nevidence: course notes");
-  await dialog.getByRole("button", { name: "Build questionnaire" }).click();
+  await setDocsLiveWizardStep(dialog, "context");
+  await dialog.getByRole("button", { name: "Refresh questions" }).click();
   await expect(dialog.getByLabel("AI-created questionnaire")).toHaveValue(/locked before prose is drafted/);
 
   await dialog.getByRole("button", { name: "Generate draft" }).click();
@@ -3150,18 +3168,21 @@ test("keeps long-form Docs Live wizards outline-first before sequential prose", 
   await expect(markdown).toHaveValue(/Final Instructional Quality Review/);
   await expect(markdown).toHaveValue(/Prose intentionally blocked until the textbook architecture is approved/);
 
-  await dialog
-    .getByRole("textbox", { name: "Outline", exact: true })
-    .fill("- Textbook Architecture\n- Chapter 1 - Conceptual Foundation\n- Chapter 2 - Consensus and Replication\n- Instructional Quality Review");
+  await setDocsLiveWizardStep(dialog, "outline");
+  await outlineInput.fill("- Textbook Architecture\n- Chapter 1 - Conceptual Foundation\n- Chapter 2 - Consensus and Replication\n- Instructional Quality Review");
   await dialog.getByRole("button", { name: "Generate draft" }).click();
   await expect(workflow).toContainText("Textbook architecture locked");
   await expect(markdown).toHaveValue(/draft this chapter in sequence/);
   await expect(markdown).not.toHaveValue(/Prose intentionally blocked until the textbook architecture is approved/);
 
+  await setDocsLiveWizardStep(dialog, "brief");
   await dialog.getByLabel("Document type").selectOption("novel");
   await dialog.getByLabel("Document title").fill("The Atlas Signal");
+  await setDocsLiveWizardStep(dialog, "outline");
   await outlineInput.fill("");
-  await dialog.getByLabel("Context and answers").fill("Audience: adult speculative fiction readers. Owner: Lead author. Evidence: story bible.");
+  await setDocsLiveWizardStep(dialog, "context");
+  await dialog.getByLabel("Context and constraints").fill("Audience: adult speculative fiction readers. Owner: Lead author. Evidence: story bible.");
+  await setDocsLiveWizardStep(dialog, "variables");
   await dialog.getByLabel("Placeholder values").fill("audience: adult speculative fiction readers\nowner: Lead author\nevidence: story bible");
   await dialog.getByRole("button", { name: "Generate draft" }).click();
   await expect(workflow).toContainText("Suggested outline ready");
@@ -3170,9 +3191,8 @@ test("keeps long-form Docs Live wizards outline-first before sequential prose", 
   await expect(markdown).toHaveValue(/Final Narrative Quality Review/);
   await expect(markdown).toHaveValue(/Prose intentionally blocked until the plot architecture is approved/);
 
-  await dialog
-    .getByRole("textbox", { name: "Outline", exact: true })
-    .fill("- Story Premise\n- Plot Outline\n- Chapter 1 - Opening Image\n- Chapter 2 - Inciting Incident\n- Narrative Quality Review");
+  await setDocsLiveWizardStep(dialog, "outline");
+  await outlineInput.fill("- Story Premise\n- Plot Outline\n- Chapter 1 - Opening Image\n- Chapter 2 - Inciting Incident\n- Narrative Quality Review");
   await dialog.getByRole("button", { name: "Generate draft" }).click();
   await expect(workflow).toContainText("Plot architecture locked");
   await expect(markdown).toHaveValue(/Chapter goal, conflict, turn, emotional consequence, and open question/);
@@ -3190,10 +3210,14 @@ test("keeps production Docs Live wizards structure-first before script drafting"
 
   await dialog.getByLabel("Document type").selectOption("podcast-script");
   await dialog.getByLabel("Document title").fill("Future of Support");
+  await setDocsLiveWizardStep(dialog, "outline");
   await outlineInput.fill("");
-  await dialog.getByLabel("Context and answers").fill("Audience: support leaders. Owner: Producer. Evidence: interview notes.");
+  await setDocsLiveWizardStep(dialog, "context");
+  await dialog.getByLabel("Context and constraints").fill("Audience: support leaders. Owner: Producer. Evidence: interview notes.");
+  await setDocsLiveWizardStep(dialog, "variables");
   await dialog.getByLabel("Placeholder values").fill("audience: support leaders\nowner: Producer\nevidence: interview notes");
-  await dialog.getByRole("button", { name: "Build questionnaire" }).click();
+  await setDocsLiveWizardStep(dialog, "context");
+  await dialog.getByRole("button", { name: "Refresh questions" }).click();
   await expect(dialog.getByLabel("AI-created questionnaire")).toHaveValue(/segment rundown/);
 
   await dialog.getByRole("button", { name: "Generate draft" }).click();
@@ -3206,16 +3230,21 @@ test("keeps production Docs Live wizards structure-first before script drafting"
   await expect(markdown).toHaveValue(/Final Audio Production Quality Review/);
   await expect(markdown).toHaveValue(/Prose intentionally blocked until the episode architecture is approved/);
 
+  await setDocsLiveWizardStep(dialog, "outline");
   await outlineInput.fill("- Episode Architecture\n- Segment Rundown\n- Cold Open\n- Segment 1\n- Segment 2\n- Audio Production Review");
   await dialog.getByRole("button", { name: "Generate draft" }).click();
   await expect(workflow).toContainText("Episode architecture locked");
   await expect(markdown).toHaveValue(/draft this segment in sequence/);
   await expect(markdown).not.toHaveValue(/Prose intentionally blocked until the episode architecture is approved/);
 
+  await setDocsLiveWizardStep(dialog, "brief");
   await dialog.getByLabel("Document type").selectOption("movie-script");
   await dialog.getByLabel("Document title").fill("The Signal Room");
+  await setDocsLiveWizardStep(dialog, "outline");
   await outlineInput.fill("");
-  await dialog.getByLabel("Context and answers").fill("Audience: streaming thriller viewers. Owner: Screenwriter. Evidence: treatment notes.");
+  await setDocsLiveWizardStep(dialog, "context");
+  await dialog.getByLabel("Context and constraints").fill("Audience: streaming thriller viewers. Owner: Screenwriter. Evidence: treatment notes.");
+  await setDocsLiveWizardStep(dialog, "variables");
   await dialog.getByLabel("Placeholder values").fill("audience: streaming thriller viewers\nowner: Screenwriter\nevidence: treatment notes");
   await dialog.getByRole("button", { name: "Generate draft" }).click();
   await expect(workflow).toContainText("Suggested outline ready");
@@ -3224,6 +3253,7 @@ test("keeps production Docs Live wizards structure-first before script drafting"
   await expect(markdown).toHaveValue(/Final Screenplay Quality Review/);
   await expect(markdown).toHaveValue(/Prose intentionally blocked until the screen story architecture is approved/);
 
+  await setDocsLiveWizardStep(dialog, "outline");
   await outlineInput.fill("- Screen Story Architecture\n- Beat Sheet\n- Act I\n- Act II\n- Act III\n- Screenplay Quality Review");
   await dialog.getByRole("button", { name: "Generate draft" }).click();
   await expect(workflow).toContainText("Screen story architecture locked");
@@ -3972,9 +4002,13 @@ test("builds business documents from saved identity snippets and local-agent han
   await expect(docsLive).toBeVisible();
   await expect(docsLive.getByLabel("Document type")).toHaveValue("rfp-response");
   await expect(docsLive.getByLabel("Document title")).toHaveValue(/RFP response for Globex/);
-  await expect(docsLive.getByLabel("Outline")).toHaveValue(/Compliance Matrix/);
+  await setDocsLiveWizardStep(docsLive, "outline");
+  await expect(docsLive.getByRole("textbox", { name: "Outline", exact: true })).toHaveValue(/Compliance Matrix/);
+  await setDocsLiveWizardStep(docsLive, "variables");
   await expect(docsLive.getByLabel("Placeholder values")).toHaveValue(/companyName: Acme Advisory/);
-  await expect(docsLive.getByLabel("Context and answers")).toHaveValue(/Agent handoff options/);
+  await setDocsLiveWizardStep(docsLive, "context");
+  await expect(docsLive.getByLabel("Context and constraints")).toHaveValue(/Agent handoff options/);
+  await setDocsLiveWizardStep(docsLive, "draft");
   await expect(docsLive.getByLabel("AI document creation wizard stages")).toContainText("Quality assurance");
   await docsLive.getByRole("button", { name: "Close Docs Live" }).click();
   await expect(docsLive).toBeHidden();

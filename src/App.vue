@@ -4379,7 +4379,7 @@
           <section v-else-if="docsLiveWizardStep === 'outline'" class="docs-live-wizard-panel" aria-label="Docs Live outline planner">
             <section class="docs-live-outline-tools">
               <label>
-                Editable outline
+                Outline
                 <textarea v-model="docsLiveOutlineText" rows="12" placeholder="- Executive Summary&#10;- Recommendation&#10;- Next Steps" @input="handleDocsLiveOutlineInput"></textarea>
               </label>
               <aside class="docs-live-suggested-outline" aria-label="Suggested outline for selected document type">
@@ -5989,6 +5989,7 @@
           :key="command.name"
           class="command-row"
           type="button"
+          :aria-label="`${command.name} ${command.group}`"
           @click="runCommand(command.run)"
         >
           <span class="command-row-main">
