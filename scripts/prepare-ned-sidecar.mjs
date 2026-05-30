@@ -9,11 +9,15 @@ const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
 const manifestPath = join(root, "src-tauri", "Cargo.toml");
 const binariesDir = join(root, "src-tauri", "binaries");
 const extension = process.platform === "win32" ? ".exe" : "";
+const args = new Set(process.argv.slice(2));
+const fromExistingReleaseBinary = args.has("--from-existing-release-binary");
 const targetTriple = process.env.NEDITOR_SIDECAR_TARGET_TRIPLE || rustTargetTriple();
 const source = join(root, "src-tauri", "target", "release", `ned${extension}`);
 const target = join(binariesDir, `ned-${targetTriple}${extension}`);
 
-run("cargo", ["build", "--manifest-path", manifestPath, "--locked", "--release", "--bin", "ned"]);
+if (!fromExistingReleaseBinary) {
+  run("cargo", ["build", "--manifest-path", manifestPath, "--locked", "--release", "--bin", "ned"]);
+}
 if (!existsSync(source)) {
   fail(`ned release binary was not produced at ${relative(source)}`);
 }

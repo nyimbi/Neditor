@@ -9050,6 +9050,7 @@ test("local verification scripts expose local baseline checks", () => {
   const releaseCandidate = readFileSync("scripts/create-release-candidate.mjs", "utf8");
   const releaseCandidateChecker = readFileSync("scripts/check-release-candidate.mjs", "utf8");
   const desktopBundleChecker = readFileSync("scripts/check-desktop-bundle.mjs", "utf8");
+  const sidecarPrep = readFileSync("scripts/prepare-ned-sidecar.mjs", "utf8");
 
   equal(scripts.check, "vue-tsc --noEmit");
   equal(scripts["check:ai-roadmap"], "node scripts/check-ai-first-roadmap.mjs");
@@ -9391,7 +9392,9 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidate.includes("Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars."));
   ok(releaseCandidate.includes("Bundle materialization can refresh target/release/neditor, so smoke the native command after it."));
   ok(releaseCandidate.includes("DMG/app prerequisite probes should run after the current app bundle and command smoke have been materialized."));
-  ok(releaseCandidate.includes("// Release readiness treats stale full-suite browser workflow proof as a local failure.\n    // Validate it before native/rendered probes that can exhaust browser launch slots on macOS.\n    refreshBrowserWorkflowEvidence();\n    refreshPrerequisiteEvidence();\n    // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.\n    run(\"pnpm\", [\"run\", \"prepare:sidecars\"]);\n    // Cargo builds binaries, but only the Tauri bundler materializes app resources such as examples/showcase.\n    if (!skipBuild) buildTauriAppBundle();\n    // Bundle materialization can refresh target/release/neditor, so smoke the native command after it.\n    run(\"pnpm\", [\"run\", \"test:desktop-smoke\"]);\n    // DMG/app prerequisite probes should run after the current app bundle and command smoke have been materialized.\n    run(\"pnpm\", [\"run\", \"test:desktop-bundle\"]);"));
+  ok(releaseCandidate.includes("Tauri bundling can also refresh/sign target/release/ned after sidecar preparation."));
+  ok(releaseCandidate.includes("--from-existing-release-binary"));
+  ok(releaseCandidate.includes("// Release readiness treats stale full-suite browser workflow proof as a local failure.\n    // Validate it before native/rendered probes that can exhaust browser launch slots on macOS.\n    refreshBrowserWorkflowEvidence();\n    refreshPrerequisiteEvidence();\n    // Tauri prerequisite builds can refresh target/release/ned after beforeBuildCommand prepares sidecars.\n    run(\"pnpm\", [\"run\", \"prepare:sidecars\"]);\n    // Cargo builds binaries, but only the Tauri bundler materializes app resources such as examples/showcase.\n    if (!skipBuild) buildTauriAppBundle();\n    // Bundle materialization can refresh target/release/neditor, so smoke the native command after it.\n    run(\"pnpm\", [\"run\", \"test:desktop-smoke\"]);\n    // DMG/app prerequisite probes should run after the current app bundle and command smoke have been materialized.\n    run(\"pnpm\", [\"run\", \"test:desktop-bundle\"]);\n    // Tauri bundling can also refresh/sign target/release/ned after sidecar preparation.\n    // Sync that final release CLI into the sidecar without recompiling a different binary.\n    run(\"node\", [\"scripts/prepare-ned-sidecar.mjs\", \"--from-existing-release-binary\"]);"));
   ok(releaseCandidate.includes("NEDITOR_DESKTOP_SMOKE_LAUNCH"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"prepare:sidecars\"]"));
   ok(releaseCandidate.includes("pnpm\", [\"run\", \"check:release-ci\"]"));
@@ -9448,6 +9451,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidateChecker.includes("NEDITOR_RELEASE_CANDIDATE_ALLOW_NONRELEASEABLE"));
   ok(desktopBundleChecker.includes("examples\", \"showcase\", \"neditor-capability-showcase.md"));
   ok(desktopBundleChecker.includes("capability showcase example is missing"));
+  ok(sidecarPrep.includes("fromExistingReleaseBinary"));
+  ok(sidecarPrep.includes("--from-existing-release-binary"));
   ok(releaseCandidate.includes("readyToSend: workItem.readyToSend === true"));
   ok(releaseCandidate.includes("releaseGateLine"));
   ok(releaseCandidate.includes("runbooks: ${runbooks}; returns: ${returns}; validators: ${validators}"));

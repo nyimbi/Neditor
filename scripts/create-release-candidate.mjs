@@ -45,6 +45,9 @@ if (!skipEvidence) {
     run("pnpm", ["run", "test:desktop-smoke"]);
     // DMG/app prerequisite probes should run after the current app bundle and command smoke have been materialized.
     run("pnpm", ["run", "test:desktop-bundle"]);
+    // Tauri bundling can also refresh/sign target/release/ned after sidecar preparation.
+    // Sync that final release CLI into the sidecar without recompiling a different binary.
+    run("node", ["scripts/prepare-ned-sidecar.mjs", "--from-existing-release-binary"]);
   }
   runReadinessBootstrap();
   run("pnpm", ["run", "collect:evidence-kit"]);
