@@ -1218,7 +1218,7 @@ fn run_publish_command(args: &[String], stdin_text: Option<&str>) -> Result<CliO
                 index += 1;
                 destination_kind = args
                     .get(index)
-                    .ok_or_else(|| "--destination requires generic-webhook, wordpress-rest, ghost-admin, or substack-manual".to_string())?
+                    .ok_or_else(|| "--destination requires generic-webhook, wordpress-rest, ghost-admin, substack-manual, or static-site-bundle".to_string())?
                     .to_string();
             }
             "--endpoint" => {
@@ -9201,7 +9201,7 @@ fn improvement_evidence_signals(item: &ImprovementItem) -> Vec<String> {
 fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool {
     if matches!(
         item.number,
-        11 | 18 | 32 | 33 | 40 | 79 | 80 | 91 | 92 | 93 | 94
+        11 | 18 | 32 | 33 | 40 | 74 | 75 | 79 | 80 | 91 | 92 | 93 | 94
     ) {
         return false;
     }
@@ -9703,6 +9703,15 @@ fn build_cli_publish_payload(
         "input": options.input_path,
         "target": options.export_target,
         "destinationKind": options.destination_kind,
+        "destinationLabel": cli_publish_destination_label(&options.destination_kind),
+        "destinationWorkflow": cli_publish_destination_workflow(&options.destination_kind),
+        "supportedDestinations": [
+            "generic-webhook",
+            "wordpress-rest",
+            "ghost-admin",
+            "substack-manual",
+            "static-site-bundle"
+        ],
         "method": "POST",
         "endpointUrl": options.endpoint_url.trim(),
         "title": title,
@@ -9717,6 +9726,31 @@ fn build_cli_publish_payload(
         "markdown": markdown,
         "html": html,
         "text": text,
+        "targetPayload": cli_publish_target_payload(
+            &options.destination_kind,
+            &title,
+            &slug,
+            &status,
+            &description,
+            &canonical_url,
+            &language,
+            &tags,
+            &options.content_format,
+            &content,
+            &markdown,
+            &html,
+            &text,
+            response,
+            readiness,
+        ),
+        "handoffFiles": cli_publish_handoff_files(
+            &options.destination_kind,
+            &slug,
+            &options.content_format,
+        ),
+        "substackPackage": cli_publish_substack_package(&options.destination_kind, &title, &description, &tags, &html, &text),
+        "staticSiteBundle": cli_publish_static_site_bundle(&options.destination_kind, &title, &slug, &description, &language),
+        "deliveryInstructions": cli_publish_destination_instructions(&options.destination_kind),
         "auth": {
             "headerName": options.auth_header_name.trim(),
             "tokenEnv": options.token_env.trim(),
@@ -9732,6 +9766,234 @@ fn build_cli_publish_payload(
         },
         "curlTemplate": cli_publish_curl_template(options),
     })
+}
+
+fn cli_publish_destination_label(destination: &str) -> &'static str {
+    match destination {
+        "wordpress-rest" => "WordPress REST draft",
+        "ghost-admin" => "Ghost Admin draft",
+        "substack-manual" => "Substack manual handoff",
+        "static-site-bundle" => "Static site bundle",
+        _ => "Generic webhook",
+    }
+}
+
+fn cli_publish_destination_workflow(destination: &str) -> &'static str {
+    match destination {
+        "wordpress-rest" | "ghost-admin" | "generic-webhook" => "session-token-api-payload",
+        "substack-manual" => "manual-copy-package",
+        "static-site-bundle" => "static-file-bundle",
+        _ => "session-token-api-payload",
+    }
+}
+
+fn cli_publish_destination_instructions(destination: &str) -> Vec<&'static str> {
+    match destination {
+        "wordpress-rest" => vec![
+            "Keep the WordPress post status as draft until final review is complete.",
+            "Use --token-env so NEditor never writes CMS credentials into the payload.",
+            "Inspect targetPayload before posting to the WordPress REST endpoint.",
+        ],
+        "ghost-admin" => vec![
+            "Send through an approved Ghost Admin proxy or integration endpoint.",
+            "Keep the generated post as draft until Ghost preview is reviewed.",
+            "Use --token-env so NEditor never writes Ghost credentials into the payload.",
+        ],
+        "substack-manual" => vec![
+            "Copy substackPackage.copyReadyHtml into the Substack editor.",
+            "Paste the title, preview text, and tags from the metadata before publishing.",
+            "Review Substack's editor preview manually because direct Substack publishing is not assumed.",
+        ],
+        "static-site-bundle" => vec![
+            "Write each staticSiteBundle file to the target site repository or CMS import folder.",
+            "Review index.html, post.md, post.txt, metadata.json, and manifest files before deploying.",
+            "Run the site's own preview/build before public release.",
+        ],
+        _ => vec![
+            "Post targetPayload to the approved webhook or CMS bridge.",
+            "Use --token-env so NEditor never writes publishing credentials into the payload.",
+            "Keep dry-run or staging review enabled until the destination accepts the draft safely.",
+        ],
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cli_publish_target_payload(
+    destination: &str,
+    title: &str,
+    slug: &str,
+    status: &str,
+    description: &str,
+    canonical_url: &Option<String>,
+    language: &str,
+    tags: &[String],
+    content_format: &str,
+    content: &str,
+    markdown: &str,
+    html: &str,
+    text: &str,
+    response: &CompileResponse,
+    readiness: &ExportReadinessReport,
+) -> Value {
+    let audit = json!({
+        "sourceHash": response.export_manifest.source_hash,
+        "appVersion": response.export_manifest.app_version,
+        "readiness": readiness.readiness,
+        "diagnosticCount": readiness.diagnostics.len(),
+        "generatedAt": response.export_manifest.exported_at
+    });
+    match destination {
+        "wordpress-rest" => json!({
+            "title": title,
+            "slug": slug,
+            "status": "draft",
+            "content": content,
+            "excerpt": description,
+            "meta": audit,
+        }),
+        "ghost-admin" => json!({
+            "posts": [{
+                "title": title,
+                "slug": slug,
+                "status": "draft",
+                "html": if content_format == "html" { html } else { content },
+                "custom_excerpt": description,
+                "tags": tags.iter().map(|name| json!({ "name": name })).collect::<Vec<_>>(),
+                "metadata": audit,
+            }]
+        }),
+        "substack-manual" => json!({
+            "title": title,
+            "subtitle": description,
+            "slug": slug,
+            "tags": tags,
+            "copyReadyHtml": html,
+            "plainTextPreview": text,
+            "metadata": audit,
+        }),
+        "static-site-bundle" => json!({
+            "files": cli_publish_static_site_files(slug, title, description, canonical_url, language, markdown, html, text, &audit),
+            "deployState": if matches!(status.to_ascii_lowercase().as_str(), "approved" | "published") { "ready-for-site-preview" } else { "draft-review-required" },
+            "metadata": audit,
+        }),
+        _ => json!({
+            "packageType": "neditor-publishing-handoff",
+            "target": "cms",
+            "title": title,
+            "slug": slug,
+            "status": status,
+            "description": description,
+            "canonicalUrl": canonical_url,
+            "language": language,
+            "tags": tags,
+            "contentFormat": content_format,
+            "content": content,
+            "markdown": markdown,
+            "html": html,
+            "text": text,
+            "audit": audit,
+        }),
+    }
+}
+
+fn cli_publish_handoff_files(destination: &str, slug: &str, content_format: &str) -> Vec<Value> {
+    let mut files = vec![
+        json!({"path": "post.md", "content": "markdown"}),
+        json!({"path": "post.html", "content": "html"}),
+        json!({"path": "post.txt", "content": "text"}),
+        json!({"path": "metadata.json", "content": "publishing metadata and audit proof"}),
+    ];
+    if destination == "substack-manual" {
+        files.push(json!({"path": "substack-copy.html", "content": "copy-ready Substack HTML"}));
+        files.push(json!({"path": "preview.txt", "content": "newsletter preview text"}));
+    }
+    if destination == "static-site-bundle" {
+        files.push(json!({"path": "index.html", "content": "static site HTML entrypoint"}));
+        files.push(json!({"path": format!("{slug}.{}", if content_format == "text" { "txt" } else { "md" }), "content": "static source fallback"}));
+        files.push(json!({"path": "neditor-manifest.json", "content": "source hash, app version, and readiness evidence"}));
+    }
+    files
+}
+
+fn cli_publish_substack_package(
+    destination: &str,
+    title: &str,
+    description: &str,
+    tags: &[String],
+    html: &str,
+    text: &str,
+) -> Value {
+    if destination != "substack-manual" {
+        return Value::Null;
+    }
+    json!({
+        "copyReadyHtml": html,
+        "title": title,
+        "subtitle": description,
+        "previewText": text.chars().take(280).collect::<String>(),
+        "tags": tags,
+        "manualChecklist": [
+            "Paste copyReadyHtml into the Substack editor.",
+            "Verify images, tables, equations, links, and footnotes in Substack preview.",
+            "Confirm title, subtitle, tags, and canonical URL before publishing."
+        ]
+    })
+}
+
+fn cli_publish_static_site_bundle(
+    destination: &str,
+    title: &str,
+    slug: &str,
+    description: &str,
+    language: &str,
+) -> Value {
+    if destination != "static-site-bundle" {
+        return Value::Null;
+    }
+    json!({
+        "title": title,
+        "slug": slug,
+        "language": language,
+        "description": description,
+        "files": [
+            "index.html",
+            "post.md",
+            "post.txt",
+            "metadata.json",
+            "neditor-manifest.json"
+        ],
+        "deploymentChecklist": [
+            "Commit the bundle files to the site repository or import them into the static CMS.",
+            "Run the static site generator preview.",
+            "Verify canonical URL, metadata, images, and accessibility before deploy."
+        ]
+    })
+}
+
+fn cli_publish_static_site_files(
+    slug: &str,
+    title: &str,
+    description: &str,
+    canonical_url: &Option<String>,
+    language: &str,
+    markdown: &str,
+    html: &str,
+    text: &str,
+    audit: &Value,
+) -> Vec<Value> {
+    vec![
+        json!({"path": "index.html", "mediaType": "text/html", "content": html}),
+        json!({"path": "post.md", "mediaType": "text/markdown", "content": markdown}),
+        json!({"path": "post.txt", "mediaType": "text/plain", "content": text}),
+        json!({"path": "metadata.json", "mediaType": "application/json", "content": {
+            "title": title,
+            "slug": slug,
+            "description": description,
+            "canonicalUrl": canonical_url,
+            "language": language,
+        }}),
+        json!({"path": "neditor-manifest.json", "mediaType": "application/json", "content": audit}),
+    ]
 }
 
 fn cli_publish_text_report(payload: &Value, output_path: Option<&str>) -> String {
@@ -9757,6 +10019,12 @@ fn cli_publish_text_report(payload: &Value, output_path: Option<&str>) -> String
 }
 
 fn cli_publish_curl_template(options: &CliPublishPayloadOptions) -> String {
+    if matches!(
+        options.destination_kind.as_str(),
+        "substack-manual" | "static-site-bundle"
+    ) {
+        return "Manual publishing destination: inspect handoffFiles and targetPayload; no network post is required.".to_string();
+    }
     if options.endpoint_url.trim().is_empty() {
         return "Set --endpoint before posting this payload.".to_string();
     }
@@ -9842,11 +10110,15 @@ fn validate_publish_target(target: &str) -> Result<(), String> {
 fn validate_publish_destination(destination: &str) -> Result<(), String> {
     if matches!(
         destination,
-        "generic-webhook" | "wordpress-rest" | "ghost-admin" | "substack-manual"
+        "generic-webhook"
+            | "wordpress-rest"
+            | "ghost-admin"
+            | "substack-manual"
+            | "static-site-bundle"
     ) {
         Ok(())
     } else {
-        Err("Publish destination must be generic-webhook, wordpress-rest, ghost-admin, or substack-manual.".to_string())
+        Err("Publish destination must be generic-webhook, wordpress-rest, ghost-admin, substack-manual, or static-site-bundle.".to_string())
     }
 }
 
@@ -16937,7 +17209,8 @@ fn bash_completion_script() -> String {
     let templates = NEW_DOCUMENT_TEMPLATES.join(" ");
     let targets = format!("{} all", SUPPORTED_EXPORT_TARGETS.join(" "));
     let publish_targets = "blog substack html";
-    let publish_destinations = "generic-webhook wordpress-rest ghost-admin substack-manual";
+    let publish_destinations =
+        "generic-webhook wordpress-rest ghost-admin substack-manual static-site-bundle";
     let publish_formats = "html markdown text";
     let shells = COMPLETION_SHELLS.join(" ");
     let handler_platforms = "macos windows linux manual";
@@ -17113,7 +17386,8 @@ fn zsh_completion_script() -> String {
     let templates = NEW_DOCUMENT_TEMPLATES.join(" ");
     let targets = format!("{} all", SUPPORTED_EXPORT_TARGETS.join(" "));
     let publish_targets = "blog substack html";
-    let publish_destinations = "generic-webhook wordpress-rest ghost-admin substack-manual";
+    let publish_destinations =
+        "generic-webhook wordpress-rest ghost-admin substack-manual static-site-bundle";
     let publish_formats = "html markdown text";
     let shells = COMPLETION_SHELLS.join(" ");
     let handler_platforms = "macos windows linux manual";
@@ -17274,6 +17548,7 @@ fn fish_completion_script() -> String {
         "wordpress-rest",
         "ghost-admin",
         "substack-manual",
+        "static-site-bundle",
     ] {
         lines.push(format!(
             "complete -c ned -n '__fish_seen_subcommand_from publish' -l destination -a '{destination}'"

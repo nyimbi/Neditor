@@ -3577,6 +3577,8 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
     for (number, title) in [
         (71, "HTML export polish"),
         (72, "EPUB export polish"),
+        (74, "Substack package export"),
+        (75, "Blog and CMS publishing"),
         (76, "LaTeX and PDF build path"),
         (77, "DOCX style mapping"),
         (78, "Markdown bundle export"),
@@ -3599,8 +3601,6 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
     }
     for (number, title) in [
         (73, "Google Docs import handoff"),
-        (74, "Substack package export"),
-        (75, "Blog and CMS publishing"),
         (81, "Voice command interface"),
         (83, "Read selected text aloud"),
     ] {
@@ -4125,8 +4125,17 @@ fn ned_cli_prepares_publish_payload_without_persisting_secrets() {
     assert_eq!(report["payload"]["schema"], "neditor.publish-payload.v1");
     assert_eq!(report["payload"]["target"], "blog");
     assert_eq!(report["payload"]["destinationKind"], "wordpress-rest");
+    assert_eq!(
+        report["payload"]["destinationWorkflow"],
+        "session-token-api-payload"
+    );
     assert_eq!(report["payload"]["contentFormat"], "markdown");
     assert_eq!(report["payload"]["title"], "Test Report");
+    assert_eq!(report["payload"]["targetPayload"]["status"], "draft");
+    assert!(report["payload"]["targetPayload"]["content"]
+        .as_str()
+        .expect("wordpress content")
+        .contains("# Test Report"));
     assert_eq!(report["payload"]["auth"]["headerName"], "X-NEditor-Token");
     assert_eq!(
         report["payload"]["auth"]["tokenEnv"],
@@ -4152,6 +4161,100 @@ fn ned_cli_prepares_publish_payload_without_persisting_secrets() {
         "https://cms.example.com/wp-json/wp/v2/posts"
     );
     assert!(!written.contains("secret-token-value"));
+}
+
+#[test]
+fn ned_cli_prepares_substack_and_static_site_publishing_handoffs() {
+    let source = temp_markdown_path("publish-handoffs");
+    fs::write(&source, super::sample_document()).expect("write source markdown");
+
+    let substack = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "publish".to_string(),
+        source.to_string_lossy().to_string(),
+        "--target".to_string(),
+        "substack".to_string(),
+        "--destination".to_string(),
+        "substack-manual".to_string(),
+        "--format".to_string(),
+        "html".to_string(),
+        "--allow-not-ready".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("substack handoff");
+    let substack_report: serde_json::Value =
+        serde_json::from_str(&substack.message).expect("substack json");
+    assert_eq!(
+        substack_report["payload"]["destinationKind"],
+        "substack-manual"
+    );
+    assert_eq!(
+        substack_report["payload"]["destinationWorkflow"],
+        "manual-copy-package"
+    );
+    assert!(
+        substack_report["payload"]["substackPackage"]["copyReadyHtml"]
+            .as_str()
+            .expect("substack copy html")
+            .contains("Test Report")
+    );
+    assert!(substack_report["payload"]["handoffFiles"]
+        .as_array()
+        .expect("substack files")
+        .iter()
+        .any(|file| file["path"] == "substack-copy.html"));
+    assert!(substack_report["payload"]["deliveryInstructions"]
+        .as_array()
+        .expect("substack instructions")
+        .iter()
+        .any(|item| item
+            .as_str()
+            .is_some_and(|value| value.contains("Substack editor"))));
+    assert!(substack_report["payload"]["curlTemplate"]
+        .as_str()
+        .expect("manual curl")
+        .contains("Manual publishing destination"));
+
+    let static_site = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "publish".to_string(),
+        source.to_string_lossy().to_string(),
+        "--target".to_string(),
+        "blog".to_string(),
+        "--destination".to_string(),
+        "static-site-bundle".to_string(),
+        "--format".to_string(),
+        "html".to_string(),
+        "--allow-not-ready".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("static site handoff");
+    let static_report: serde_json::Value =
+        serde_json::from_str(&static_site.message).expect("static site json");
+    assert_eq!(
+        static_report["payload"]["destinationKind"],
+        "static-site-bundle"
+    );
+    assert_eq!(
+        static_report["payload"]["destinationWorkflow"],
+        "static-file-bundle"
+    );
+    assert!(static_report["payload"]["staticSiteBundle"]["files"]
+        .as_array()
+        .expect("static bundle files")
+        .contains(&serde_json::json!("index.html")));
+    assert!(static_report["payload"]["targetPayload"]["files"]
+        .as_array()
+        .expect("static target files")
+        .iter()
+        .any(|file| file["path"] == "neditor-manifest.json"));
+    assert!(static_report["payload"]["deliveryInstructions"]
+        .as_array()
+        .expect("static instructions")
+        .iter()
+        .any(|item| item
+            .as_str()
+            .is_some_and(|value| value.contains("site repository"))));
 }
 
 #[test]

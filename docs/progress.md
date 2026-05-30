@@ -16,16 +16,54 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `56d73e7 Make deep
-  research audits portable from ned`
+- Latest inspected committed baseline before this update: `fe35df0 Make setup
+  state scriptable from ned`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: local setup-packet implementation in progress.
+- Worktree before this log update: clean and aligned with `origin/main`.
 
 ## Durable Planning Artifacts
 
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Publishing Handoff Targets
+
+Publishing handoffs now distinguish API destinations from manual/file
+destinations instead of treating every publish operation as one generic JSON
+post. `ned publish` supports `generic-webhook`, `wordpress-rest`,
+`ghost-admin`, `substack-manual`, and `static-site-bundle` destinations. The
+payload now includes a destination label, workflow type, supported destination
+list, target-specific payload, handoff file inventory, delivery instructions,
+and explicit Substack or static-site bundle metadata when those workflows are
+selected.
+
+Substack handoffs expose copy-ready HTML, title/subtitle metadata, preview
+text, tags, and a manual checklist. Static-site handoffs expose a concrete file
+bundle model with `index.html`, `post.md`, `post.txt`, `metadata.json`, and
+`neditor-manifest.json`, plus deployment review steps. WordPress and Ghost keep
+draft-shaped target payloads and session-token-only credential handling.
+Frontend publishing workflow helpers now include the same static-site bundle
+destination, so the app's publishing panel, preflight checks, and CLI stay
+aligned.
+
+This moves the conservative 100-improvement audit from 88/100 to 90/100
+implementation-evidenced items. Items 74 Substack package export and 75 Blog
+and CMS publishing now have executable package/payload evidence. The remaining
+10 items still require provider/runtime, Google Docs readback, voice/TTS,
+accessibility, Homebrew, or release evidence closure.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 36 CLI tests passed and the debug `ned` binary rebuilt; `ned_cli_prepares_substack_and_static_site_publishing_handoffs` verifies Substack manual copy HTML, handoff files, delivery instructions, static-site bundle files, and manifest handoff payloads. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding the static-site publishing destination to the frontend workflow model. |
+| `pnpm run test:unit` | Pass | 134 frontend unit/static tests passed; publishing workflow coverage now verifies static-site bundle preview files, no-send state, warnings, and target preflight review alongside webhook, WordPress, Ghost, and Substack flows. |
+| `src-tauri/target/debug/ned publish README.md --target substack --destination substack-manual --allow-not-ready --json` | Pass | Direct smoke returned `neditor.ned-publish.v1` with `destinationWorkflow: manual-copy-package`, copy-ready Substack content, handoff files, and manual delivery instructions without requiring a network endpoint. |
+| `src-tauri/target/debug/ned publish README.md --target blog --destination static-site-bundle --allow-not-ready --json` | Pass | Direct smoke returned `destinationWorkflow: static-file-bundle` with `index.html`, `post.md`, `post.txt`, `metadata.json`, and `neditor-manifest.json` target files. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 90/100 implementation-evidenced items and 10 partial/external-proof items. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting the expanded publishing handoff. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after adding destination-specific publishing payloads. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Scriptable Setup Packet
 

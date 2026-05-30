@@ -1,4 +1,4 @@
-export type PublishingTargetKind = "generic-webhook" | "wordpress-rest" | "ghost-admin" | "substack-manual";
+export type PublishingTargetKind = "generic-webhook" | "wordpress-rest" | "ghost-admin" | "substack-manual" | "static-site-bundle";
 export type PublishingContentFormat = "html" | "markdown" | "text";
 
 export interface PublishingDestinationProfile {
@@ -81,6 +81,7 @@ export const publishingTargetLabels: Record<PublishingTargetKind, string> = {
   "wordpress-rest": "WordPress REST draft",
   "ghost-admin": "Ghost Admin draft",
   "substack-manual": "Substack manual handoff",
+  "static-site-bundle": "Static site bundle",
 };
 
 export function buildPublishingHandoff(input: PublishingHandoffInput): PublishingHandoff {
@@ -156,6 +157,7 @@ export function buildPublishingRequestPreview(
   if (!url) warnings.push("Add an endpoint URL before sending.");
   if (url && !canUseUrl) warnings.push("Use HTTPS, or HTTP only for localhost/private development endpoints.");
   if (input.targetKind === "substack-manual") warnings.push("Substack is configured as a copy/paste handoff.");
+  if (input.targetKind === "static-site-bundle") warnings.push("Static site bundles are file-based handoffs.");
 
   const body = publishingBodyForTarget(handoff, input);
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -164,7 +166,7 @@ export function buildPublishingRequestPreview(
   if (authHeaderName && authToken) headers[authHeaderName] = authToken;
 
   return {
-    canSend: Boolean(url && canUseUrl && input.targetKind !== "substack-manual"),
+    canSend: Boolean(url && canUseUrl && !["substack-manual", "static-site-bundle"].includes(input.targetKind)),
     method: "POST",
     url,
     headers,
@@ -188,11 +190,11 @@ export function buildPublishingPreflightReport(
     {
       id: "endpoint",
       label: "Endpoint safety",
-      status: preview.canSend || targetKind === "substack-manual" ? "ready" : "blocked",
+      status: preview.canSend || targetKind === "substack-manual" || targetKind === "static-site-bundle" ? "ready" : "blocked",
       detail: preview.url
         ? preview.warnings.find((warning) => /HTTPS|endpoint/i.test(warning)) || `Endpoint: ${preview.url}`
-        : targetKind === "substack-manual"
-          ? "Manual Substack handoff does not require an endpoint."
+        : targetKind === "substack-manual" || targetKind === "static-site-bundle"
+          ? `${publishingTargetLabels[targetKind]} does not require an endpoint.`
           : "Add a publishing endpoint before sending.",
     },
     {
@@ -230,9 +232,11 @@ export function buildPublishingPreflightReport(
     {
       id: "target",
       label: "Target workflow",
-      status: targetKind === "substack-manual" ? "needs-review" : "ready",
+      status: ["substack-manual", "static-site-bundle"].includes(targetKind) ? "needs-review" : "ready",
       detail: targetKind === "substack-manual"
         ? "Substack remains a manual copy/paste workflow; verify the editor preview before publishing."
+        : targetKind === "static-site-bundle"
+          ? "Static site bundles must be reviewed in the target site preview before deployment."
         : publishingTargetHelp(targetKind),
     },
     ...preview.warnings
@@ -289,6 +293,7 @@ export function publishingTargetHelp(targetKind: PublishingTargetKind) {
   if (targetKind === "wordpress-rest") return "Posts a draft-shaped JSON body to a WordPress posts endpoint.";
   if (targetKind === "ghost-admin") return "Builds a Ghost Admin draft payload; configure your endpoint/auth proxy before sending.";
   if (targetKind === "substack-manual") return "Creates copy-ready HTML and metadata because Substack publishing normally happens in its editor.";
+  if (targetKind === "static-site-bundle") return "Creates a file-based handoff for static site repositories and CMS import folders.";
   return "Posts a portable NEditor publishing packet to a webhook, automation, or CMS bridge.";
 }
 
@@ -316,6 +321,28 @@ function publishingBodyForTarget(handoff: PublishingHandoff, input: PublishingEn
           tags: handoff.tags.map((name) => ({ name })),
           metadata: publishingAuditMetadata(handoff),
         },
+      ],
+    };
+  }
+  if (input.targetKind === "static-site-bundle") {
+    return {
+      packageType: "neditor-static-site-bundle",
+      title: handoff.title,
+      slug: handoff.slug,
+      description: handoff.description,
+      canonicalUrl: handoff.canonicalUrl,
+      language: handoff.language,
+      files: [
+        { path: "index.html", mediaType: "text/html", content: handoff.html },
+        { path: "post.md", mediaType: "text/markdown", content: handoff.markdown },
+        { path: "post.txt", mediaType: "text/plain", content: handoff.text },
+        { path: "metadata.json", mediaType: "application/json", content: { title: handoff.title, slug: handoff.slug, description: handoff.description, canonicalUrl: handoff.canonicalUrl, language: handoff.language } },
+        { path: "neditor-manifest.json", mediaType: "application/json", content: publishingAuditMetadata(handoff) },
+      ],
+      deploymentChecklist: [
+        "Commit or import the files into the target site repository or static CMS.",
+        "Run the static site preview/build before public deployment.",
+        "Verify metadata, images, accessibility, links, and canonical URL.",
       ],
     };
   }

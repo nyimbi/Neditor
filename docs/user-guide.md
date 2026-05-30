@@ -882,12 +882,15 @@ and an embedded NEditor manifest. Substack packages also include a minimal
 `metadata.json` files name the primary publish file, fallback files, and
 target-specific publishing steps so the package remains self-describing outside
 NEditor. For teams that publish through an internal CMS bridge, static-site
-automation, WordPress REST endpoint, or Ghost Admin proxy, the toolbar
-**Publish** action and the **Export** -> **Publishing** menu open the same
-**Publish and distribute** handoff. It builds a reviewable JSON payload, keeps
-endpoint tokens session-only, supports dry-run preview before sending, and
-blocks unsafe non-local HTTP endpoints so business users can post through an
-approved publishing bridge without copying files by hand.
+automation, WordPress REST endpoint, Ghost Admin proxy, or Substack copy/paste
+workflow, the toolbar **Publish** action and the **Export** -> **Publishing**
+menu open the same **Publish and distribute** handoff. It builds a reviewable
+target payload, keeps endpoint tokens session-only, supports dry-run preview
+before sending, blocks unsafe non-local HTTP endpoints, and records
+target-specific handoff files plus delivery instructions. Static-site and
+Substack destinations are explicit manual/file bundle workflows, so users get
+the files, metadata, and preview checklist without a misleading network-send
+button.
 Use **Insert preflight** to add a publishing audit section before sending. It
 records endpoint safety, dry-run state, public metadata, content payload
 availability, secret handling, target workflow caveats, and the exact blockers
@@ -896,6 +899,8 @@ The packaged CLI exposes the same handoff for automation:
 
 ```sh
 ned publish document.md --target blog --destination wordpress-rest --endpoint https://cms.example.com/wp-json/wp/v2/posts --token-env CMS_TOKEN --output publish-payload.json --json
+ned publish document.md --target substack --destination substack-manual --allow-not-ready --json
+ned publish document.md --target blog --destination static-site-bundle --allow-not-ready --json
 ```
 
 Reusable business identity values live in `.neditor/business-profile.json`.

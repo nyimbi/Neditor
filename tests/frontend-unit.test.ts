@@ -5320,6 +5320,25 @@ test("publishing workflow builds endpoint payloads without persisting secrets", 
     dryRun: true,
   });
   ok(substackPreflight.needsReview.some((item) => item.id === "target"));
+
+  const staticSite = buildPublishingRequestPreview(handoff, {
+    targetKind: "static-site-bundle",
+    endpointUrl: "",
+    contentFormat: "html",
+  });
+  equal(staticSite.canSend, false);
+  equal(staticSite.body.packageType, "neditor-static-site-bundle");
+  ok(Array.isArray(staticSite.body.files));
+  ok((staticSite.body.files as Array<{ path: string }>).some((file) => file.path === "index.html"));
+  ok(staticSite.warnings.some((warning) => warning.includes("Static site")));
+  const staticPreflight = buildPublishingPreflightReport(handoff, staticSite, {
+    targetKind: "static-site-bundle",
+    endpointUrl: "",
+    contentFormat: "html",
+    dryRun: true,
+  });
+  equal(staticPreflight.blockers.length, 0);
+  ok(staticPreflight.needsReview.some((item) => item.id === "target"));
 });
 
 test("agentic workflow planner coordinates creation revision review and distribution", () => {
