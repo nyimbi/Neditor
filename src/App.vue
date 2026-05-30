@@ -623,6 +623,57 @@
             </div>
             <p class="sidebar-hint">{{ outlineDraftItems.length }} planned sections. Use indentation, bullets, numbers, or Markdown heading marks.</p>
           </section>
+          <section class="document-map" aria-label="Document map">
+            <header>
+              <div>
+                <h3>Document Map</h3>
+                <small>{{ documentMapSummary }}</small>
+              </div>
+              <button
+                type="button"
+                :class="{ active: documentMapBlockersOnly }"
+                title="Focus all unresolved review, citation, metadata, and diagnostic blockers"
+                @click="focusDocumentMapBlockers"
+              >
+                {{ documentMapBlockersOnly ? "All items" : "Blockers" }}
+              </button>
+            </header>
+            <div class="document-map-controls">
+              <label>
+                Search map
+                <input v-model="documentMapQuery" type="search" placeholder="heading, comment, figure, warning" />
+              </label>
+              <label>
+                Show
+                <select v-model="documentMapFilter">
+                  <option v-for="filter in documentMapFilterOptions" :key="filter.id" :value="filter.id">{{ filter.label }}</option>
+                </select>
+              </label>
+            </div>
+            <div class="document-map-counts" aria-label="Document map counts">
+              <button v-for="filter in documentMapFilterOptions" :key="filter.id" type="button" :class="{ active: documentMapFilter === filter.id }" @click="documentMapFilter = filter.id">
+                <strong>{{ documentMapCountByFilter(filter.id) }}</strong>
+                <span>{{ filter.shortLabel }}</span>
+              </button>
+            </div>
+            <div v-if="filteredDocumentMapItems.length" class="document-map-list" role="list" aria-label="Navigable document map items">
+              <button
+                v-for="item in filteredDocumentMapItems"
+                :key="item.id"
+                type="button"
+                role="listitem"
+                class="document-map-row"
+                :data-kind="item.kind"
+                @click="goToDocumentMapItem(item)"
+              >
+                <span class="document-map-kind">{{ documentMapKindLabel(item.kind) }}</span>
+                <span class="document-map-label">{{ item.label }}</span>
+                <small>{{ item.detail }}</small>
+                <span class="document-map-status">{{ item.status }}</span>
+              </button>
+            </div>
+            <p v-else class="sidebar-hint">No document map items match the current filter.</p>
+          </section>
           <section class="outline-library" aria-label="Document outline library">
             <header>
               <div>
@@ -7256,6 +7307,9 @@ const publishingAuthToken = ref("");
 const publishingDryRun = ref(true);
 const publishingBusy = ref(false);
 const publishingTargetOptions = Object.entries(publishingTargetLabels).map(([value, label]) => ({ value: value as PublishingTargetKind, label }));
+const documentMapQuery = ref("");
+const documentMapFilter = ref<DocumentMapFilter>("all");
+const documentMapBlockersOnly = ref(false);
 const helpQuery = ref("");
 const helpCategory = ref<"all" | HelpCategory>("all");
 const selectedHelpTopicId = ref("getting-started");
@@ -7366,6 +7420,22 @@ interface CompilerOutputInventoryItem {
   label: string;
   status: "present" | "empty";
   detail: string;
+}
+
+type DocumentMapFilter = "all" | "structure" | "review" | "evidence" | "media" | "diagnostics";
+type DocumentMapKind = "heading" | "comment" | "citation" | "figure" | "table" | "equation" | "diagnostic";
+
+interface DocumentMapItem {
+  id: string;
+  kind: DocumentMapKind;
+  group: Exclude<DocumentMapFilter, "all">;
+  label: string;
+  detail: string;
+  status: string;
+  line?: number | null;
+  end_line?: number | null;
+  column?: number | null;
+  source_file?: string | null;
 }
 
 type HelpCategory = "basics" | "writing" | "structure" | "content" | "review" | "export" | "settings";
@@ -8540,6 +8610,88 @@ const outlineHeadings = computed(() =>
     ];
   }),
 );
+const documentMapFilterOptions: { id: DocumentMapFilter; label: string; shortLabel: string }[] = [
+  { id: "all", label: "All map items", shortLabel: "All" },
+  { id: "structure", label: "Structure", shortLabel: "Heads" },
+  { id: "review", label: "Review", shortLabel: "Review" },
+  { id: "evidence", label: "Evidence", shortLabel: "Cites" },
+  { id: "media", label: "Media, tables, equations", shortLabel: "Media" },
+  { id: "diagnostics", label: "Diagnostics", shortLabel: "Issues" },
+];
+const documentMapItems = computed<DocumentMapItem[]>(() => {
+  const headingItems = outlineHeadings.value.map((heading): DocumentMapItem => ({
+    id: `heading-${heading.source_file || "document"}-${heading.line}-${heading.anchor || heading.text}`,
+    kind: "heading",
+    group: "structure",
+    label: heading.text || "Untitled heading",
+    detail: `${outlineHeadingKind(heading.level)} | line ${heading.line}`,
+    status: heading.level <= 4 ? "outline" : "deep heading",
+    line: heading.line,
+    end_line: heading.end_line,
+    source_file: heading.source_file,
+  }));
+  const commentItems = (active.value.compile?.semantic.comments || []).map((comment): DocumentMapItem => ({
+    id: `comment-${comment.line}-${comment.text}`,
+    kind: "comment",
+    group: "review",
+    label: comment.text || "Review comment",
+    detail: `${comment.author || "local"} | line ${comment.line}`,
+    status: comment.state === "resolved" ? "resolved" : "unresolved",
+    line: Number(comment.line) || null,
+  }));
+  const citationItems = citationTodoItems.value.map((todo): DocumentMapItem => ({
+    id: `citation-${todo.id}`,
+    kind: "citation",
+    group: "evidence",
+    label: todo.excerpt || todo.marker,
+    detail: `Line ${todo.line}${todo.column ? `, column ${todo.column}` : ""}`,
+    status: todo.status,
+    line: todo.line,
+    column: todo.column,
+  }));
+  const mediaItems = captionedReferenceItems.value.map((item): DocumentMapItem => ({
+    id: `${item.kind}-${item.source_file || "document"}-${item.line}-${item.id || item.label}`,
+    kind: item.kind,
+    group: "media",
+    label: item.label,
+    detail: `${captionKindLabel(item.kind)} | line ${item.line}`,
+    status: item.status === "ready" ? "ready" : item.status === "missing-label" ? "needs label" : "needs caption",
+    line: item.line,
+    end_line: item.end_line,
+    source_file: item.source_file,
+  }));
+  const diagnosticItems = (active.value.compile?.diagnostics || []).map((diagnostic, index): DocumentMapItem => ({
+    id: `diagnostic-${diagnostic.line || "global"}-${index}`,
+    kind: "diagnostic",
+    group: "diagnostics",
+    label: diagnostic.message || "Compiler diagnostic",
+    detail: diagnostic.line ? `Line ${diagnostic.line}` : "Document-wide",
+    status: diagnostic.severity || "diagnostic",
+    line: diagnostic.line || null,
+    column: diagnostic.column || null,
+    end_line: diagnostic.end_line || diagnostic.line || null,
+    source_file: diagnostic.source_file || null,
+  }));
+  return [...headingItems, ...commentItems, ...citationItems, ...mediaItems, ...diagnosticItems].sort((left, right) => {
+    const leftLine = left.line || Number.MAX_SAFE_INTEGER;
+    const rightLine = right.line || Number.MAX_SAFE_INTEGER;
+    return leftLine - rightLine || left.group.localeCompare(right.group) || left.label.localeCompare(right.label);
+  });
+});
+const documentMapSummary = computed(() => {
+  const blockers = documentMapItems.value.filter(documentMapItemNeedsAttention).length;
+  const suffix = documentMapBlockersOnly.value ? " | blockers only" : "";
+  return `${documentMapItems.value.length} map items | ${blockers} need attention${suffix}`;
+});
+const filteredDocumentMapItems = computed(() => {
+  const query = documentMapQuery.value.trim().toLowerCase();
+  return documentMapItems.value.filter((item) => {
+    if (documentMapFilter.value !== "all" && item.group !== documentMapFilter.value) return false;
+    if (documentMapBlockersOnly.value && !documentMapItemNeedsAttention(item)) return false;
+    if (!query) return true;
+    return [item.kind, item.group, item.label, item.detail, item.status].join(" ").toLowerCase().includes(query);
+  });
+});
 const crossReferenceRows = computed<CrossReferenceRow[]>(() => active.value.compile?.semantic.cross_references || []);
 const referenceLabelRows = computed<ReferenceLabelRow[]>(() => {
   const seen = new Set<string>();
@@ -17841,6 +17993,41 @@ function outlineHeadingKind(level: number) {
   return "Subsubsection";
 }
 
+function documentMapKindLabel(kind: DocumentMapKind) {
+  if (kind === "heading") return "Heading";
+  if (kind === "comment") return "Comment";
+  if (kind === "citation") return "Citation";
+  if (kind === "diagnostic") return "Issue";
+  return captionKindLabel(kind);
+}
+
+function documentMapItemNeedsAttention(item: DocumentMapItem) {
+  return !["ready", "resolved", "outline", "deep heading"].includes(item.status);
+}
+
+function documentMapCountByFilter(filter: DocumentMapFilter) {
+  if (filter === "all") return documentMapItems.value.length;
+  return documentMapItems.value.filter((item) => item.group === filter).length;
+}
+
+function focusDocumentMapBlockers() {
+  documentMapBlockersOnly.value = !documentMapBlockersOnly.value;
+  if (documentMapBlockersOnly.value) {
+    documentMapQuery.value = "";
+    documentMapFilter.value = "all";
+  }
+  store.statusMessage = documentMapBlockersOnly.value ? "Document Map focused on blockers" : "Document Map showing all items";
+}
+
+function goToDocumentMapItem(item: DocumentMapItem) {
+  void goToSourceTarget({
+    line: item.line,
+    end_line: item.end_line || item.line,
+    column: item.column,
+    source_file: item.source_file,
+  });
+}
+
 function outlineHeadingMarker(level: number) {
   return "#".repeat(Math.max(1, Math.min(4, Math.trunc(level) || 1)));
 }
@@ -22124,6 +22311,7 @@ select:hover {
 .app-shell[data-theme="dark"] .help-topic-button,
 .app-shell[data-theme="dark"] .start-workspace-cockpit,
 .app-shell[data-theme="dark"] .start-workspace-steps li,
+.app-shell[data-theme="dark"] .document-map-row,
 .app-shell[data-theme="dark"] .help-topic-header small,
 .app-shell[data-theme="dark"] .help-keywords span,
 .app-shell[data-theme="dark"] .guided-demo-progress,
@@ -22198,6 +22386,8 @@ select:hover {
 .app-shell[data-theme="dark"] .start-workspace-cockpit header span,
 .app-shell[data-theme="dark"] .start-workspace-steps small,
 .app-shell[data-theme="dark"] .start-workspace-steps span,
+.app-shell[data-theme="dark"] .document-map header small,
+.app-shell[data-theme="dark"] .document-map-row small,
 .app-shell[data-theme="dark"] .help-topic-header p,
 .app-shell[data-theme="dark"] .help-when,
 .app-shell[data-theme="dark"] .help-tips,
@@ -22357,6 +22547,7 @@ select:hover {
   .app-shell[data-theme="system"] .help-topic-button,
   .app-shell[data-theme="system"] .start-workspace-cockpit,
   .app-shell[data-theme="system"] .start-workspace-steps li,
+  .app-shell[data-theme="system"] .document-map-row,
   .app-shell[data-theme="system"] .help-topic-header small,
   .app-shell[data-theme="system"] .help-keywords span,
   .app-shell[data-theme="system"] .guided-demo-progress,
@@ -22431,6 +22622,8 @@ select:hover {
   .app-shell[data-theme="system"] .start-workspace-cockpit header span,
   .app-shell[data-theme="system"] .start-workspace-steps small,
   .app-shell[data-theme="system"] .start-workspace-steps span,
+  .app-shell[data-theme="system"] .document-map header small,
+  .app-shell[data-theme="system"] .document-map-row small,
   .app-shell[data-theme="system"] .help-topic-header p,
   .app-shell[data-theme="system"] .help-when,
   .app-shell[data-theme="system"] .help-tips,
@@ -22545,6 +22738,7 @@ select:hover {
 .app-shell[data-high-contrast="true"] .help-topic-button,
 .app-shell[data-high-contrast="true"] .start-workspace-cockpit,
 .app-shell[data-high-contrast="true"] .start-workspace-steps li,
+.app-shell[data-high-contrast="true"] .document-map-row,
 .app-shell[data-high-contrast="true"] .help-topic-header small,
 .app-shell[data-high-contrast="true"] .help-keywords span,
 .app-shell[data-high-contrast="true"] .guided-demo-progress,
@@ -23765,6 +23959,113 @@ select:hover {
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #d7dee7;
+}
+
+.document-map {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #d7dee7;
+}
+
+.document-map header,
+.document-map-counts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.document-map h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.document-map header small {
+  color: #526171;
+  font-size: 11px;
+}
+
+.document-map-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.document-map-counts {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.document-map-counts button {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  gap: 4px;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 7px;
+}
+
+.document-map-counts button.active,
+.document-map header button.active {
+  border-color: #2f6f9f;
+  background: #eaf4fb;
+}
+
+.document-map-list {
+  display: grid;
+  gap: 6px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.document-map-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 7px;
+  align-items: center;
+  width: 100%;
+  padding: 7px;
+  border: 1px solid #d7dee7;
+  border-left: 3px solid #8897a7;
+  border-radius: 6px;
+  background: #ffffff;
+  color: inherit;
+  text-align: left;
+}
+
+.document-map-row[data-kind="comment"],
+.document-map-row[data-kind="citation"],
+.document-map-row[data-kind="diagnostic"] {
+  border-left-color: #a45b39;
+}
+
+.document-map-row[data-kind="figure"],
+.document-map-row[data-kind="table"],
+.document-map-row[data-kind="equation"] {
+  border-left-color: #2f6f7e;
+}
+
+.document-map-kind,
+.document-map-status {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.document-map-label,
+.document-map-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-map-row small {
+  grid-column: 2 / 4;
+  color: #526171;
+  font-size: 11px;
 }
 
 .outline-library header,

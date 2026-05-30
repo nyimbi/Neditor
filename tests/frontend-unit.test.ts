@@ -8988,6 +8988,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("NEditor Start Workspace Checklist"));
   ok(app.includes("Open Start Workspace"));
   ok(app.includes("Insert Start Workspace checklist"));
+  ok(app.includes('aria-label="Document map"'));
+  ok(app.includes('aria-label="Navigable document map items"'));
+  ok(app.includes("documentMapItems"));
+  ok(app.includes("filteredDocumentMapItems"));
+  ok(app.includes("focusDocumentMapBlockers"));
+  ok(app.includes("goToDocumentMapItem"));
+  ok(app.includes("documentMapKindLabel"));
   ok(app.includes('store.sidebar === \'templates\''));
   ok(store.includes("toolbarTextSize: 10"));
   ok(store.includes("toolbarCollapsedRows: []"));
