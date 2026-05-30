@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `ce525b7 Expose final
-  roadmap release handoffs`
+- Latest inspected committed baseline before this update: `270a3cc Validate
+  manual review assets in evidence kits`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,33 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Current-Binary macOS Evidence Refresh
+
+The macOS release binary and frontend bundle were rebuilt from current source,
+then the bounded native desktop smoke and macOS WebDriver fallback were
+refreshed against that rebuilt binary. This closed the two locally actionable
+stale current-binary release gaps that were visible at the start of this slice:
+`macos-native-launch-current-binary-proof` and
+`macos-webdriver-current-binary-proof`.
+
+The platform is still not fully release-ready because 17 external/manual gates
+remain: release signing/notarization, Windows/Linux supported-host package
+execution, live Google Docs import/readback, Homebrew artifact/cask proof, live
+provider/runtime evidence, release-device performance profile, independent
+security sign-off, open spec matrix rows, rendered-export human sign-off,
+accessibility assistive-technology sign-off, table-editor human sign-off, and
+spec manual-review work-order sign-offs.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run build` | Pass | Vue/TypeScript build refreshed `dist/` from current `src/App.vue` and production assets. |
+| `pnpm run prepare:sidecars` | Pass | Rebuilt and staged `src-tauri/binaries/ned-aarch64-apple-darwin`. |
+| `./node_modules/.bin/tauri build --bundles app` | Pass | Rebuilt `src-tauri/target/release/neditor` and `src-tauri/target/release/bundle/macos/NEditor.app` from current frontend/Rust sources. |
+| `NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke` | Pass | Wrote current native command, window, UI, and workflow smoke reports. The workflow report status is `passed` with 116 assertions. |
+| `pnpm run test:desktop-bundle` | Pass | Verified macOS `.app` bundle metadata, executable, packaged CLI sidecar, and icon after rebuild. |
+| `pnpm run test:tauri-webdriver` | Pass on macOS fallback path | macOS WebDriver smoke skipped as unsupported but refreshed `.tmp/desktop-webdriver/report.json` with current native launch fallback proof. |
+| `pnpm run check:release-readiness` | Pass with external gaps | Release readiness now reports `current-host-ready-with-external-gaps` with 17 evidence gaps, down from 19 at the start of this slice. |
 
 ## 2026-05-30 Manual Review Evidence Handoff
 
