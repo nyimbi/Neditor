@@ -115,6 +115,7 @@ import {
   rfpProposalOutlineBullets,
   rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
+  rfpSubmissionPackageChecklistMarkdown,
   rfpWinThemesMarkdown,
   saveCustomBusinessSnippetState,
   deleteCustomBusinessSnippetState,
@@ -4043,6 +4044,16 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   ok(checklist.includes("Annex C"));
   ok(checklist.includes("bilingual EN/FR"));
 
+  const submissionChecklist = rfpSubmissionPackageChecklistMarkdown(analysis);
+  ok(submissionChecklist.includes("## RFP Submission Package Checklist"));
+  ok(submissionChecklist.includes("Submission deadline, time zone, and upload path confirmed"));
+  ok(submissionChecklist.includes("Every compliance-matrix row has owner evidence"));
+  ok(submissionChecklist.includes("Critical disqualification trap resolved"));
+  ok(submissionChecklist.includes("Required attachment included"));
+  ok(submissionChecklist.includes("Annex C completed and cross-checked"));
+  ok(submissionChecklist.includes("Bilingual / French-language obligation covered"));
+  ok(submissionChecklist.includes("Placeholder or unfinished response text removed"));
+
   const winThemes = rfpWinThemesMarkdown(analysis);
   ok(winThemes.includes("## RFP Win Theme Builder"));
   ok(winThemes.includes("Compliance without surprises"));
@@ -4052,6 +4063,8 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   const outline = rfpProposalOutlineMarkdown(analysis, profile, "Win theme: reduce implementation risk.");
   ok(outline.includes("# Technical Proposal Outline for Globex"));
   ok(outline.indexOf("## Compliance Checklist") < outline.indexOf("[TOC]"));
+  ok(outline.indexOf("## RFP Submission Package Checklist") < outline.indexOf("[TOC]"));
+  ok(outline.indexOf("## Compliance Checklist") < outline.indexOf("## RFP Submission Package Checklist"));
   ok(outline.indexOf("[TOC]") < outline.indexOf("## 1. RFP Metadata"));
   ok(outline.includes("## Proposal Planning Prompt"));
   ok(outline.includes("## RFP Win Theme Builder"));
@@ -4072,6 +4085,8 @@ test("RFP response wizard analyzes requirements intent and compliance coverage",
   const response = rfpResponseMarkdown(analysis, profile, "Win theme: reduce implementation risk.");
   ok(response.includes("## Compliance Checklist"));
   ok(response.indexOf("## Compliance Checklist") < response.indexOf("[TOC]"));
+  ok(response.indexOf("## RFP Submission Package Checklist") < response.indexOf("[TOC]"));
+  ok(response.indexOf("## Compliance Checklist") < response.indexOf("## RFP Submission Package Checklist"));
   ok(response.indexOf("[TOC]") < response.indexOf("## Proposal Planning Prompt"));
   ok(response.indexOf("## Proposal Planning Prompt") < response.indexOf("## RFP Win Theme Builder"));
   ok(response.indexOf("[TOC]") < response.indexOf("## Proposal Outline"));
@@ -8973,6 +8988,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Insert win themes"));
   ok(app.includes("insertRfpWinThemes"));
   ok(app.includes("rfpWinThemesMarkdown"));
+  ok(app.includes("Submission package checklist"));
+  ok(app.includes("Insert RFP Submission Checklist"));
+  ok(app.includes("Insert submission checklist"));
+  ok(app.includes("insertRfpSubmissionChecklist"));
+  ok(app.includes("rfpSubmissionPackageChecklistMarkdown"));
+  ok(app.includes("deadline, page-limit, attachment, annex, language, placeholder, and evidence gates"));
   ok(app.includes("AI RFP step assistance"));
   ok(app.includes("rfpWizardStepAssistance"));
   ok(app.includes("appendRfpWizardSuggestion"));

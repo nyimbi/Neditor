@@ -2098,6 +2098,124 @@ export function rfpWinThemesMarkdown(analysis: RfpAnalysis) {
   ].join("\n");
 }
 
+export function rfpSubmissionPackageChecklistMarkdown(analysis: RfpAnalysis) {
+  const rows = rfpSubmissionPackageChecklistRows(analysis);
+  return [
+    "## RFP Submission Package Checklist",
+    "",
+    `Source: ${analysis.source.title || "RFP source"} (${analysis.source.kind}; ${analysis.source.wordCount} words)`,
+    `Deadline: ${analysis.proposalOutline.metadata.submissionDeadline}`,
+    `Page limit: ${analysis.proposalOutline.metadata.pageLimitSource}`,
+    `Readiness: ${analysis.verificationSummary.rowsNeedingEvidence} compliance row(s) still need evidence review; ${analysis.criticalDisqualifiers.length} critical trap(s) detected.`,
+    "",
+    "| Done | Gate | Owner | Risk | Verification evidence | Source |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| [ ] | ${escapeMarkdownTableCell(row.gate)} | ${escapeMarkdownTableCell(row.owner)} | ${escapeMarkdownTableCell(row.risk)} | ${escapeMarkdownTableCell(row.verification)} | ${escapeMarkdownTableCell(row.source)} |`),
+    "",
+  ].join("\n");
+}
+
+function rfpSubmissionPackageChecklistRows(analysis: RfpAnalysis) {
+  const rows: Array<{ gate: string; owner: string; risk: string; verification: string; source: string }> = [];
+  const add = (gate: string, owner: string, risk: string, verification: string, source: string) => {
+    rows.push({ gate, owner, risk, verification, source });
+  };
+  add(
+    "Submission deadline, time zone, and upload path confirmed",
+    "Bid Coordinator",
+    /not specified/i.test(analysis.proposalOutline.metadata.submissionDeadline) ? "high" : "critical",
+    "Calendar hold, portal instructions, final upload owner, and backup uploader are documented.",
+    analysis.proposalOutline.metadata.submissionDeadline,
+  );
+  add(
+    "Technical proposal page limit and formatting rules checked",
+    "Bid Coordinator",
+    /not specified/i.test(analysis.proposalOutline.metadata.pageLimitSource) ? "medium" : "high",
+    "Final export proves page count, font, file type, filename, signatures, and required packaging.",
+    analysis.proposalOutline.metadata.pageLimitSource,
+  );
+  add(
+    "Every compliance-matrix row has owner evidence",
+    "Bid Owner",
+    analysis.verificationSummary.rowsNeedingEvidence ? "high" : "medium",
+    `${analysis.verificationSummary.rowsNeedingEvidence} row(s) still need evidence review; attach proof or formal deferral before submission.`,
+    `${analysis.complianceRows.length} compliance row(s)`,
+  );
+  for (const disqualifier of analysis.criticalDisqualifiers.slice(0, 8)) {
+    add(
+      "Critical disqualification trap resolved",
+      "Bid Manager",
+      "critical",
+      disqualifier,
+      "Critical disqualifier scan",
+    );
+  }
+  for (const attachment of analysis.mandatoryAttachments.slice(0, 12)) {
+    add(
+      "Required attachment included",
+      "Bid Coordinator",
+      "high",
+      `Attach, sign, date, and filename-check: ${attachment}`,
+      "Mandatory attachment scan",
+    );
+  }
+  for (const annex of analysis.annexReferences.slice(0, 12)) {
+    add(
+      `${annex.annex} completed and cross-checked`,
+      "Bid Coordinator",
+      /must|required|shall|submit|signed|included/i.test(annex.requirement) ? "high" : "medium",
+      annex.requirement,
+      `Source line ${annex.sourceLine}`,
+    );
+  }
+  for (const item of analysis.bilingualRequirements.slice(0, 8)) {
+    add(
+      "Bilingual / French-language obligation covered",
+      "Delivery Lead",
+      "high",
+      item,
+      "Language requirement scan",
+    );
+  }
+  for (const item of analysis.placeholderRisks.slice(0, 8)) {
+    add(
+      "Placeholder or unfinished response text removed",
+      "Reviewer",
+      "high",
+      item,
+      "Placeholder-risk scan",
+    );
+  }
+  if (analysis.scoringWeights.length) {
+    add(
+      "Scored criteria mirrored in headings and win themes",
+      "Proposal Strategist",
+      "medium",
+      analysis.scoringWeights.map((item) => `${item.criterion}: ${item.weight}${item.unit}`).join("; "),
+      "Evaluation scoring scan",
+    );
+  }
+  if (analysis.warnings.length) {
+    add(
+      "RFP source capture warnings resolved",
+      "Bid Coordinator",
+      "high",
+      analysis.warnings.join("; "),
+      "RFP intake warnings",
+    );
+  }
+  if (!rows.some((row) => row.gate.includes("Required attachment"))) {
+    add(
+      "Attachment schedule manually confirmed",
+      "Bid Coordinator",
+      "medium",
+      "No mandatory attachment hints were detected; manually inspect appendices, forms, certificates, CVs, declarations, schedules, and financial documents.",
+      "Manual checklist",
+    );
+  }
+  return rows.slice(0, 60);
+}
+
 export function rfpProposalOutlineMarkdown(analysis: RfpAnalysis, profile: Partial<BusinessProfile> = {}, responseNotes = "") {
   const placeholders = businessProfilePlaceholderMap(profile);
   const outline = analysis.proposalOutline;
@@ -2142,6 +2260,8 @@ export function rfpProposalOutlineMarkdown(analysis: RfpAnalysis, profile: Parti
       businessDocumentSnippets[0].body,
       "",
       rfpComplianceChecklistMarkdown(analysis),
+      "",
+      rfpSubmissionPackageChecklistMarkdown(analysis),
       "",
       "[TOC]",
       "",
@@ -2450,6 +2570,8 @@ export function rfpResponseMarkdown(analysis: RfpAnalysis, profile: Partial<Busi
       businessDocumentSnippets[0].body,
       "",
       rfpComplianceChecklistMarkdown(analysis),
+      "",
+      rfpSubmissionPackageChecklistMarkdown(analysis),
       "",
       "[TOC]",
       "",

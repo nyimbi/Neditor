@@ -1492,6 +1492,15 @@
                 <span><strong>{{ rfpAnalysis.verificationSummary.rowsNeedingEvidence }}</strong> evidence checks</span>
               </div>
               <details open>
+                <summary>Submission package checklist</summary>
+                <ul>
+                  <li>Deadline: {{ rfpAnalysis.proposalOutline.metadata.submissionDeadline }}</li>
+                  <li>Page limit: {{ rfpAnalysis.proposalOutline.metadata.pageLimitSource }}</li>
+                  <li>{{ rfpAnalysis.mandatoryAttachments.length }} attachment hint(s), {{ rfpAnalysis.annexReferences.length }} annex reference(s), {{ rfpAnalysis.bilingualRequirements.length }} language obligation(s)</li>
+                  <li>{{ rfpAnalysis.placeholderRisks.length }} placeholder trap(s), {{ rfpAnalysis.warnings.length }} source-capture warning(s)</li>
+                </ul>
+              </details>
+              <details open>
                 <summary>Proposal outline planner</summary>
                 <ul>
                   <li>Deadline: {{ rfpAnalysis.proposalOutline.metadata.submissionDeadline }}</li>
@@ -1560,6 +1569,7 @@
               </details>
               <div class="template-actions">
                 <button type="button" title="Insert only the generated compliance matrix into the active document" @click="insertRfpComplianceMatrix">Insert matrix</button>
+                <button type="button" title="Insert deadline, page-limit, attachment, annex, language, placeholder, and evidence gates into the active document" @click="insertRfpSubmissionChecklist">Insert submission checklist</button>
                 <button type="button" title="Insert evaluator-facing win themes into the active document" @click="insertRfpWinThemes">Insert win themes</button>
                 <button type="button" title="Replace the active document with the compliance checklist followed by a scored proposal outline" @click="createRfpProposalOutline">Create outline</button>
                 <button type="button" title="Replace the active document with a full responsive RFP response draft" @click="createResponsiveRfpResponse">Create response</button>
@@ -7337,6 +7347,7 @@ import {
   rfpProposalOutlineBullets,
   rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
+  rfpSubmissionPackageChecklistMarkdown,
   rfpWinThemesMarkdown,
   versionedBusinessClauses,
   versionedClauseMarkdown,
@@ -11782,12 +11793,15 @@ const appMenus = computed<AppMenu[]>(() => [
       {
         id: "wizards",
         label: "Document wizards",
-        items: businessDocumentTemplates.map((template) => ({
-          id: `wizard-${template.id}`,
-          label: template.label,
-          help: template.summary,
-          run: () => startBusinessDocumentWizard(template),
-        })),
+        items: [
+          ...businessDocumentTemplates.map((template) => ({
+            id: `wizard-${template.id}`,
+            label: template.label,
+            help: template.summary,
+            run: () => startBusinessDocumentWizard(template),
+          })),
+          { id: "rfp-submission-checklist", label: "Insert RFP Submission Checklist", help: "Insert deadline, page-limit, attachment, annex, language, placeholder, and evidence gates for the analyzed RFP.", disabled: !rfpAnalysis.value, run: () => insertRfpSubmissionChecklist() },
+        ],
       },
       {
         id: "parts",
@@ -14813,6 +14827,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Insert publishing preflight audit", group: "Export", keywords: ["publish", "preflight", "audit", "cms", "webhook", "substack"], run: () => insertPublishingPreflightAudit() },
   { name: "Copy publishing preflight audit", group: "Export", keywords: ["publish", "preflight", "audit", "copy"], run: () => void copyPublishingPreflightAudit() },
   { name: "Save publishing destination", group: "Export", keywords: ["publish", "destination", "profile", "webhook", "cms"], run: () => savePublishingDestinationProfile() },
+  { name: "Insert RFP submission checklist", group: "Templates", description: "Insert deadline, page-limit, attachment, annex, language, placeholder, and evidence gates for the analyzed RFP.", keywords: ["rfp", "submission checklist", "annex", "attachments", "compliance"], run: () => insertRfpSubmissionChecklist() },
   { name: "Export HTML", group: "Export", run: () => void exportDocumentAs("html") },
   { name: "Export EPUB", group: "Export", run: () => void exportDocumentAs("epub") },
   { name: "Export document", group: "Export", run: () => void exportDocument() },
@@ -20553,6 +20568,12 @@ function insertRfpComplianceMatrix() {
   const analysis = ensureRfpAnalysis();
   insertBlock(rfpComplianceMatrixMarkdown(analysis));
   store.statusMessage = `Inserted compliance matrix with ${analysis.complianceRows.length} requirements`;
+}
+
+function insertRfpSubmissionChecklist() {
+  const analysis = ensureRfpAnalysis();
+  insertBlock(rfpSubmissionPackageChecklistMarkdown(analysis));
+  store.statusMessage = "Inserted RFP submission package checklist";
 }
 
 function insertRfpWinThemes() {
