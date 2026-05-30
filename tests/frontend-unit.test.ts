@@ -6677,11 +6677,16 @@ test("configuration setup helpers score readiness and generate context-aware ass
     releaseEvidenceCrossPlatformCount: 1,
     releaseEvidenceStaleCount: 1,
     releaseEvidenceReadyToSendCount: 0,
+    supportBundleReady: false,
+    supportBundleStatus: "",
+    supportBundleRecommendationCount: 0,
+    supportBundleEvidenceAttentionCount: 0,
   });
-  equal(formatConfigurationSetupSummary(status), "7/9 setup areas ready");
+  equal(formatConfigurationSetupSummary(status), "7/10 setup areas ready");
   equal(status.items.find((item) => item.id === "tts")?.done, false);
   equal(status.items.find((item) => item.id === "google-auth")?.detail, "authorized until 2026-05-28T12:00:00.000Z");
   ok(status.items.find((item) => item.id === "release")?.detail.includes("blocked: 3 complete"));
+  equal(status.items.find((item) => item.id === "support")?.detail, "preview required");
   equal(configurationSetupStepById("unknown").id, "identity");
   equal(isConfigurationSetupStepId("transforms"), true);
 
@@ -6719,6 +6724,10 @@ test("configuration setup helpers score readiness and generate context-aware ass
     releaseEvidenceCrossPlatformCount: 1,
     releaseEvidenceStaleCount: 1,
     releaseEvidenceReadyToSendCount: 0,
+    supportBundleReady: false,
+    supportBundleStatus: "",
+    supportBundleRecommendationCount: 0,
+    supportBundleEvidenceAttentionCount: 0,
   });
   equal(assistance.stepId, "transforms");
   ok(assistance.suggestedAnswer.includes("Ready engines: 2"));
@@ -6758,10 +6767,57 @@ test("configuration setup helpers score readiness and generate context-aware ass
     releaseEvidenceCrossPlatformCount: 1,
     releaseEvidenceStaleCount: 1,
     releaseEvidenceReadyToSendCount: 0,
+    supportBundleReady: false,
+    supportBundleStatus: "",
+    supportBundleRecommendationCount: 0,
+    supportBundleEvidenceAttentionCount: 0,
   });
   equal(releaseAssistance.stepId, "release");
   ok(releaseAssistance.suggestedAnswer.includes("Resolve blocked (1), stale (1), manual (2), credentialed (1), and cross-platform (1) lanes"));
   ok(releaseAssistance.contextSignals.includes("Ready-to-send lanes: 0"));
+
+  const supportAssistance = buildConfigurationSetupStepAssistance({
+    step: configurationSetupStepById("support"),
+    status,
+    setupSummary: formatConfigurationSetupSummary(status),
+    setupNotesWordCount: 12,
+    businessDone: 7,
+    businessTotal: 10,
+    missingBusinessLabels: ["Company address"],
+    agentProviderId: "openai-compatible",
+    agentProviderModel: "gpt-4.1",
+    agentProviderEndpoint: "https://api.openai.com/v1/chat/completions",
+    agentProviderKeyEnv: "OPENAI_API_KEY",
+    localAgentProfileCount: 4,
+    docsLiveRuntimeIssueCount: 1,
+    ttsEngine: "supertonic-cli",
+    ttsRuntimeSummary: "Supertonic not found on PATH",
+    exportTarget: "pdf",
+    exportLayoutPreset: "board",
+    citationStyle: "apa",
+    googleClientId: "desktop-client.apps.googleusercontent.com",
+    googleScopeCount: 2,
+    googleAuthorized: true,
+    googleTokenExpiresAt: "2026-05-28T12:00:00.000Z",
+    readyEngineCount: 2,
+    disabledEngineCount: 1,
+    externalEngineCount: 6,
+    releaseEvidenceStatus: "blocked",
+    releaseEvidenceSummary: "3 complete | 1 blocked | 2 manual | 1 credentialed | 1 cross-platform | 1 stale | 0 ready-to-send",
+    releaseEvidenceBlockedCount: 1,
+    releaseEvidenceManualCount: 2,
+    releaseEvidenceCredentialedCount: 1,
+    releaseEvidenceCrossPlatformCount: 1,
+    releaseEvidenceStaleCount: 1,
+    releaseEvidenceReadyToSendCount: 0,
+    supportBundleReady: true,
+    supportBundleStatus: "preview ready",
+    supportBundleRecommendationCount: 4,
+    supportBundleEvidenceAttentionCount: 2,
+  });
+  equal(supportAssistance.stepId, "support");
+  ok(supportAssistance.suggestedAnswer.includes("Support bundle preview is ready"));
+  ok(supportAssistance.contextSignals.includes("Support recommendations: 4"));
 
   const sections = buildConfigurationCenterSections({
     setupSummary: "7/9 setup areas ready",
@@ -6778,10 +6834,13 @@ test("configuration setup helpers score readiness and generate context-aware ass
     installerPlanCount: 3,
     releaseEvidenceStatus: "blocked",
     releaseEvidenceSummary: "3 complete | 1 blocked | 2 manual | 1 credentialed | 1 cross-platform | 1 stale | 0 ready-to-send",
+    supportBundleStatus: "preview ready",
+    supportBundleRecommendationCount: 4,
   });
-  deepEqual(sections.map((section) => section.id), ["overview", "appearance", "files", "exports", "google-auth", "ai", "transforms", "release"]);
+  deepEqual(sections.map((section) => section.id), ["overview", "appearance", "files", "exports", "google-auth", "ai", "transforms", "release", "support"]);
   equal(sections.find((section) => section.id === "transforms")?.summary, "6 external engines; 3 installer plan");
   ok(sections.find((section) => section.id === "release")?.detail.includes("ready-to-send state"));
+  ok(sections.find((section) => section.id === "support")?.detail.includes("Redaction-safe support bundle"));
 });
 
 test("Google OAuth helpers normalize setup without exposing stored tokens", () => {
@@ -9095,9 +9154,16 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(configurationSetup.includes("Release evidence"));
   ok(configurationSetup.includes("releaseEvidenceReadyToSendCount"));
   ok(configurationSetup.includes("Release readiness should be based on the same evidence lanes"));
+  ok(configurationSetup.includes("Support and diagnostics"));
+  ok(configurationSetup.includes("supportBundleReady"));
+  ok(configurationSetup.includes("Non-technical support teams need one redaction-safe artifact"));
   ok(app.includes('aria-label="Release evidence configuration"'));
   ok(app.includes('aria-label="Configurator release evidence dashboard"'));
   ok(app.includes('aria-label="Setup wizard release evidence lane counts"'));
+  ok(app.includes('aria-label="Support and diagnostics configuration"'));
+  ok(app.includes('aria-label="Configurator support bundle"'));
+  ok(app.includes('aria-label="Configurator support bundle recommendations"'));
+  ok(app.includes("Open support setup wizard"));
   ok(app.includes("openConfigurationSetup('release')"));
   ok(app.includes("LLM access defaults"));
   ok(app.includes('aria-label="Google Docs authorization"'));

@@ -4178,6 +4178,58 @@
               </article>
             </section>
           </section>
+          <section v-show="selectedConfigurationSection === 'support'" class="configuration-center-panel" aria-label="Support and diagnostics configuration">
+            <section class="transform-handler-installer" aria-label="Configurator support bundle">
+              <header>
+                <div>
+                  <h3>Support bundle</h3>
+                  <span>Create a redaction-safe setup and release-readiness handoff for help desks, release managers, or internal IT.</span>
+                </div>
+                <button type="button" :disabled="supportBundleBusy" @click="previewSupportBundle">
+                  {{ supportBundleBusy ? "Building..." : "Preview support bundle" }}
+                </button>
+              </header>
+              <div class="support-bundle-actions">
+                <button type="button" :disabled="supportBundleBusy" @click="saveSupportBundle">Save JSON</button>
+                <button type="button" @click="openConfigurationSetup('support')">Open support setup wizard</button>
+                <span>{{ supportBundleStatus || "The bundle contains setup status and evidence summaries, not document content or secrets." }}</span>
+              </div>
+              <dl v-if="supportBundleReport" class="transform-installer-summary">
+                <div>
+                  <dt>Doctor</dt>
+                  <dd>{{ supportBundleReport.doctor?.status || "unknown" }}</dd>
+                </div>
+                <div>
+                  <dt>Release</dt>
+                  <dd>{{ supportBundleReport.releaseReadiness?.status || "unknown" }}</dd>
+                </div>
+                <div>
+                  <dt>Evidence attention</dt>
+                  <dd>{{ (supportBundleReport.evidenceReportSummary?.attention || 0) + (supportBundleReport.evidenceReportSummary?.missing || 0) }}</dd>
+                </div>
+                <div>
+                  <dt>Recommendations</dt>
+                  <dd>{{ supportBundleReport.recommendations?.length || 0 }}</dd>
+                </div>
+                <div>
+                  <dt>Output</dt>
+                  <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
+                </div>
+              </dl>
+              <section v-if="supportBundleRecommendationGroups.length" class="support-bundle-recommendations" aria-label="Configurator support bundle recommendations">
+                <article v-for="group in supportBundleRecommendationGroups" :key="group.id" :data-priority="group.priority">
+                  <header>
+                    <span>{{ group.label }}</span>
+                    <small>{{ group.items.length }} item{{ group.items.length === 1 ? "" : "s" }}</small>
+                  </header>
+                  <ul>
+                    <li v-for="recommendation in group.items" :key="recommendation">{{ recommendation }}</li>
+                  </ul>
+                </article>
+              </section>
+              <p class="sidebar-hint">Use this support artifact when a non-technical user needs help configuring NEditor, validating release readiness, or handing setup evidence to internal IT without sharing document content or secrets.</p>
+            </section>
+          </section>
           <section v-show="selectedConfigurationSection === 'transforms'" class="configuration-center-panel" aria-label="Transform engine configuration">
           <h3>Transform engines</h3>
           <section class="transform-handler-installer" aria-label="Transform handler installer">
@@ -4870,6 +4922,36 @@
                 <button type="button" @click="insertReleaseReadinessAudit">Insert release audit</button>
               </div>
               <p class="sidebar-hint">Ready-to-send requires complete local, visual, accessibility, platform, Homebrew, signing, and credentialed evidence. Manual and external gates stay visible until proof is attached.</p>
+            </section>
+            <section v-else-if="currentConfigurationSetupStep.id === 'support'" class="business-profile-preview">
+              <p>{{ supportBundleStatus || "Preview the redaction-safe support bundle before handing setup or release diagnostics to another person." }}</p>
+              <dl v-if="supportBundleReport" class="transform-installer-summary">
+                <div>
+                  <dt>Recommendations</dt>
+                  <dd>{{ supportBundleReport.recommendations?.length || 0 }}</dd>
+                </div>
+                <div>
+                  <dt>Release status</dt>
+                  <dd>{{ supportBundleReport.releaseReadiness?.status || "unknown" }}</dd>
+                </div>
+                <div>
+                  <dt>Evidence reports</dt>
+                  <dd>
+                    {{ supportBundleReport.evidenceReportSummary?.ready || 0 }} ready,
+                    {{ supportBundleReport.evidenceReportSummary?.attention || 0 }} attention,
+                    {{ supportBundleReport.evidenceReportSummary?.missing || 0 }} missing
+                  </dd>
+                </div>
+                <div>
+                  <dt>Output</dt>
+                  <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
+                </div>
+              </dl>
+              <div class="reference-actions">
+                <button type="button" :disabled="supportBundleBusy" @click="previewSupportBundle">Preview support bundle</button>
+                <button type="button" :disabled="supportBundleBusy" @click="saveSupportBundle">Save support JSON</button>
+              </div>
+              <p class="sidebar-hint">The support bundle includes setup status, command paths, release evidence summaries, spec work orders, and transform health, but not active document content or stored secrets.</p>
             </section>
             <section v-else class="business-profile-preview">
               <p>{{ currentConfigurationSetupStep.summary }}</p>
@@ -10064,6 +10146,10 @@ const configurationSetupStatus = computed(() =>
     releaseEvidenceCrossPlatformCount: releaseEvidenceDashboard.value.counts["cross-platform"],
     releaseEvidenceStaleCount: releaseEvidenceDashboard.value.counts.stale,
     releaseEvidenceReadyToSendCount: releaseEvidenceDashboard.value.counts["ready-to-send"],
+    supportBundleReady: Boolean(supportBundleReport.value),
+    supportBundleStatus: supportBundleStatus.value,
+    supportBundleRecommendationCount: supportBundleReport.value?.recommendations?.length || 0,
+    supportBundleEvidenceAttentionCount: (supportBundleReport.value?.evidenceReportSummary?.attention || 0) + (supportBundleReport.value?.evidenceReportSummary?.missing || 0),
   }),
 );
 const configurationSetupSummary = computed(() => formatConfigurationSetupSummary(configurationSetupStatus.value));
@@ -10107,6 +10193,10 @@ const configurationSetupStepAssistance = computed(() => {
     releaseEvidenceCrossPlatformCount: releaseEvidenceDashboard.value.counts["cross-platform"],
     releaseEvidenceStaleCount: releaseEvidenceDashboard.value.counts.stale,
     releaseEvidenceReadyToSendCount: releaseEvidenceDashboard.value.counts["ready-to-send"],
+    supportBundleReady: Boolean(supportBundleReport.value),
+    supportBundleStatus: supportBundleStatus.value,
+    supportBundleRecommendationCount: supportBundleReport.value?.recommendations?.length || 0,
+    supportBundleEvidenceAttentionCount: (supportBundleReport.value?.evidenceReportSummary?.attention || 0) + (supportBundleReport.value?.evidenceReportSummary?.missing || 0),
   });
 });
 const selectedTransformInstallerPlan = computed(() =>
@@ -10139,6 +10229,8 @@ const configurationCenterSections = computed(() =>
     installerPlanCount: transformInstallerPlans.value.length,
     releaseEvidenceStatus: releaseEvidenceDashboard.value.status,
     releaseEvidenceSummary: releaseEvidenceDashboard.value.summary,
+    supportBundleStatus: supportBundleStatus.value || (supportBundleReport.value ? "preview ready" : "preview required"),
+    supportBundleRecommendationCount: supportBundleReport.value?.recommendations?.length || 0,
   }),
 );
 const rfpAnalysisSummary = computed(() => {
@@ -19781,6 +19873,9 @@ function selectConfigurationSection(sectionId: string) {
   if (sectionId === "files" && !cliDeployPlan.value) {
     void loadCliDeployPlan();
   }
+  if (sectionId === "support" && !supportBundleReport.value && !supportBundleBusy.value) {
+    void previewSupportBundle();
+  }
 }
 
 function selectSidebarPanel(panelId: string) {
@@ -19854,11 +19949,15 @@ async function runConfigurationSetupStep(stepId: ConfigurationSetupStepId) {
     selectedConfigurationSection.value = "transforms";
     await loadTransformHandlerInstallers();
     await store.compileActive();
-  } else {
+  } else if (stepId === "release") {
     closeConfigurationSetup();
     store.sidebar = "settings";
     selectedConfigurationSection.value = "release";
     store.statusMessage = "Opened release evidence setup with Homebrew, signing, accessibility, platform, and freshness lanes";
+  } else {
+    store.sidebar = "settings";
+    selectedConfigurationSection.value = "support";
+    await previewSupportBundle();
   }
 }
 

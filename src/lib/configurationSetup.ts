@@ -53,6 +53,12 @@ export const configurationSetupSteps = [
     summary: "Track Homebrew, platform packaging, signing, accessibility, performance, security, and release evidence gates.",
     actionLabel: "Open release checks",
   },
+  {
+    id: "support",
+    title: "Support bundle",
+    summary: "Create redaction-safe setup, release, evidence, engine, and spec-completion diagnostics for help desks and internal IT.",
+    actionLabel: "Preview support bundle",
+  },
 ] as const;
 
 export type ConfigurationSetupStepId = (typeof configurationSetupSteps)[number]["id"];
@@ -108,6 +114,10 @@ export interface ConfigurationSetupStatusInput {
   releaseEvidenceCrossPlatformCount: number;
   releaseEvidenceStaleCount: number;
   releaseEvidenceReadyToSendCount: number;
+  supportBundleReady: boolean;
+  supportBundleStatus: string;
+  supportBundleRecommendationCount: number;
+  supportBundleEvidenceAttentionCount: number;
 }
 
 export interface ConfigurationSetupAssistanceInput {
@@ -144,6 +154,10 @@ export interface ConfigurationSetupAssistanceInput {
   releaseEvidenceCrossPlatformCount: number;
   releaseEvidenceStaleCount: number;
   releaseEvidenceReadyToSendCount: number;
+  supportBundleReady: boolean;
+  supportBundleStatus: string;
+  supportBundleRecommendationCount: number;
+  supportBundleEvidenceAttentionCount: number;
 }
 
 export interface ConfigurationCenterSectionInput {
@@ -161,6 +175,8 @@ export interface ConfigurationCenterSectionInput {
   installerPlanCount: number;
   releaseEvidenceStatus: string;
   releaseEvidenceSummary: string;
+  supportBundleStatus: string;
+  supportBundleRecommendationCount: number;
 }
 
 export function configurationSetupStepById(stepId: string): (typeof configurationSetupSteps)[number] {
@@ -231,6 +247,14 @@ export function buildConfigurationSetupStatus(input: ConfigurationSetupStatusInp
         : releaseNeedsAction
           ? `${input.releaseEvidenceStatus}: ${input.releaseEvidenceSummary}`
           : "release evidence not generated",
+    },
+    {
+      id: "support",
+      label: "Support bundle",
+      done: input.supportBundleReady,
+      detail: input.supportBundleReady
+        ? `${input.supportBundleStatus || "preview ready"}; ${input.supportBundleRecommendationCount} recommendation(s); ${input.supportBundleEvidenceAttentionCount} evidence report(s) need attention`
+        : input.supportBundleStatus || "preview required",
     },
   ];
   return {
@@ -319,6 +343,17 @@ export function buildConfigurationSetupStepAssistance(input: ConfigurationSetupA
         `Ready-to-send lanes: ${input.releaseEvidenceReadyToSendCount}`,
       );
       break;
+    case "support":
+      suggestedAnswer = input.supportBundleReady
+        ? `Support bundle preview is ready. Review ${input.supportBundleRecommendationCount} recommendation(s) and ${input.supportBundleEvidenceAttentionCount} evidence report(s) needing attention, then save the JSON before handing the installation or release case to help desk, internal IT, or release management.`
+        : "Preview the support bundle before support handoff. The bundle should summarize setup diagnostics, release readiness, evidence reports, transform engines, specification work orders, and release-candidate state without including document content or secrets.";
+      rationale = "Non-technical support teams need one redaction-safe artifact that explains setup state, release gaps, and evidence work without requiring them to inspect developer tools.";
+      contextSignals.push(
+        `Support bundle status: ${input.supportBundleStatus || "not previewed"}`,
+        `Support recommendations: ${input.supportBundleRecommendationCount}`,
+        `Evidence reports needing attention: ${input.supportBundleEvidenceAttentionCount}`,
+      );
+      break;
   }
   return {
     stepId: input.step.id,
@@ -387,6 +422,12 @@ export function buildConfigurationCenterSections(input: ConfigurationCenterSecti
       label: "Release evidence",
       summary: `${input.releaseEvidenceStatus}; ${input.releaseEvidenceSummary}`,
       detail: "Release gates, evidence freshness, credentialed proof, platform packaging, signing, Homebrew, and ready-to-send state.",
+    },
+    {
+      id: "support",
+      label: "Support and diagnostics",
+      summary: `${input.supportBundleStatus || "preview required"}; ${input.supportBundleRecommendationCount} recommendation(s)`,
+      detail: "Redaction-safe support bundle preview, setup diagnostics, release evidence summaries, spec work orders, transform health, and handoff JSON.",
     },
   ] as const;
 }
