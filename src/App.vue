@@ -21573,6 +21573,7 @@ function goToCitationTodo(todo: CitationTodoItem) {
 }
 
 function setFrontMatterField(key: string, value: string) {
+  flushEditorTextToStore();
   store.updateText(upsertFrontMatterField(active.value.text, key, value.trim()));
 }
 
