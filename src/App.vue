@@ -2223,6 +2223,29 @@
             <div class="reference-actions">
               <button type="button" @click="insertDataSourceTemplate">Insert data source template</button>
             </div>
+            <section class="data-refresh-workflow" aria-label="Data refresh workflow">
+              <header>
+                <strong>Data refresh workflow</strong>
+                <span>{{ dataRefreshWorkflowSummary }}</span>
+              </header>
+              <div class="reference-actions">
+                <button type="button" :disabled="!frontMatterDataSourceRows.length || store.compileBusy" @click="refreshDataSourcesPreview">
+                  {{ store.compileBusy ? "Refreshing..." : "Refresh preview imports" }}
+                </button>
+                <button type="button" :disabled="!frontMatterDataSourceRows.length" @click="insertDataRefreshAudit">Insert refresh audit</button>
+                <button type="button" :disabled="!frontMatterDataSourceRows.length || store.compileBusy" @click="refreshDataSourcesAndInsertAudit">Refresh and audit</button>
+              </div>
+              <article v-for="row in dataRefreshPlan.rows" :key="row.id" class="snapshot-row" :data-status="row.status">
+                <p>{{ row.source.name || row.source.path || "Unnamed data source" }}</p>
+                <small>{{ row.label }} | {{ row.verification }}</small>
+                <small v-for="item in row.evidence" :key="item">{{ item }}</small>
+                <div class="reference-actions">
+                  <button v-if="row.source.line" type="button" @click="goToSourceTarget({ line: row.source.line })">Go to source</button>
+                  <button v-if="row.importableTable" type="button" :disabled="tableDataBusy" @click="importDataSourceAsEditableTable(row.source)">Import as editable table</button>
+                </div>
+              </article>
+              <p v-if="!dataRefreshPlan.rows.length" class="sidebar-hint">Declare local data sources first, then refresh preview imports and record an audit before distribution.</p>
+            </section>
             <article v-for="source in frontMatterDataSourceRows" :key="source.id" class="snapshot-row" :data-status="source.status">
               <p>{{ source.name || source.path || "Unnamed data source" }}</p>
               <small>{{ source.kind.toUpperCase() }} | {{ source.status }} | {{ source.source }}{{ source.line ? ` | line ${source.line}` : "" }}</small>
@@ -6915,8 +6938,15 @@ import {
   parseFrontMatterDataSources,
   parseFrontMatterVariables,
   parseMergedMetadataVariables,
+  type FrontMatterDataSourceRow,
   type SupportedDataSourceKind,
 } from "./lib/frontMatterManagers";
+import {
+  buildDataRefreshPlan,
+  dataRefreshAuditMarkdown,
+  dataRefreshSummary,
+  dataSourceCanImportAsEditableTable,
+} from "./lib/dataRefresh";
 import {
   formatIncludeDirective,
   includeChildDocumentStarterMarkdown,
@@ -8006,6 +8036,7 @@ type ToolbarIconName =
   | "duplicate"
   | "reveal"
   | "snapshot"
+  | "sync"
   | "export"
   | "ai"
   | "agent"
@@ -8116,6 +8147,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   duplicate: ["M8 8h11v11H8z", "M5 16H4a1 1 0 0 1-1-1V5h10v1"],
   reveal: ["M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z", "M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"],
   snapshot: ["M4 7h3l2-2h6l2 2h3v12H4z", "M12 10a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"],
+  sync: ["M20 6v5h-5", "M4 18v-5h5", "M5.5 9a7 7 0 0 1 11.8-2.5L20 11", "M18.5 15a7 7 0 0 1-11.8 2.5L4 13"],
   export: ["M12 3v12", "M7 8l5-5 5 5", "M5 15v4h14v-4"],
   ai: ["M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z", "M5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8z"],
   agent: ["M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z", "M9 12h6", "M12 9v6"],
@@ -8999,6 +9031,16 @@ const dataSourceManagerSummary = computed(() => {
   const blocked = rows.length - ready;
   return `${rows.length} local data sources | ${ready} ready | ${blocked} need attention`;
 });
+const dataRefreshPlan = computed(() =>
+  buildDataRefreshPlan({
+    sources: frontMatterDataSourceRows.value,
+    includeGraph: active.value.compile?.include_graph || [],
+    diagnostics: active.value.compile?.diagnostics || [],
+    documentText: active.value.text,
+    generatedAt: store.lastPreviewCompiledAt || new Date().toISOString(),
+  }),
+);
+const dataRefreshWorkflowSummary = computed(() => dataRefreshSummary(dataRefreshPlan.value));
 const frontMatterVariableRows = computed(() => parseFrontMatterVariables(activeFrontMatterText.value));
 const mergedMetadataVariableRows = computed(() => parseMergedMetadataVariables(active.value.compile?.metadata || {}, frontMatterVariableRows.value));
 const documentVariableManagerSummary = computed(() => {
@@ -10744,6 +10786,8 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "table-cell", label: "Cell", title: "Load the Markdown table cell under the cursor and write its value back to the source text", icon: "table", run: () => loadTableTextCellAtCursor() },
       { id: "table-grid-to-text", label: "Grid -> Text", title: "Apply the current visual table grid back to the Markdown source table", icon: "save", disabled: !tableDraft.value || tableDraftHasErrors.value || tableDraftSourceChanged.value, run: () => applyTableDraft() },
       { id: "table-source-to-grid", label: "Text -> Grid", title: "Parse the editable Markdown table source and update the visual grid", icon: "commands", disabled: !tableDraft.value || !tableSourceEditDirty.value, run: () => updateTableDraftFromSourceText() },
+      { id: "data-refresh", label: "Refresh Data", title: "Refresh local data source imports and inspect source-by-source stale audit status", icon: "sync", primary: true, disabled: store.compileBusy || !frontMatterDataSourceRows.value.length, run: () => refreshDataSourcesPreview() },
+      { id: "data-audit", label: "Audit Data", title: "Insert a data refresh audit table for the active document", icon: "snapshot", disabled: !frontMatterDataSourceRows.value.length, run: () => insertDataRefreshAudit() },
     ],
   },
   {
@@ -10931,6 +10975,8 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "edit-table-cell-at-cursor", label: "Edit Table Cell at Cursor", help: "Load the exact Markdown table cell under the source cursor and write its value back into the text.", run: () => loadTableTextCellAtCursor() },
           { id: "go-to-source-table", label: "Go to Source Table", help: "Jump from the visual table grid back to the source Markdown table lines.", disabled: !canGoToTableSource.value, run: () => goToSelectedTableSource() },
           { id: "import-table", label: "Import CSV/XLSX Table", help: "Import spreadsheet data into the editable table grid.", disabled: tableDataBusy.value, run: () => importTableFromSpreadsheet() },
+          { id: "refresh-data-sources", label: "Refresh Data Sources", help: "Recompile local front matter data sources and update the data refresh workflow.", disabled: store.compileBusy || !frontMatterDataSourceRows.value.length, run: () => refreshDataSourcesPreview() },
+          { id: "insert-data-refresh-audit", label: "Insert Data Refresh Audit", help: "Insert a source-by-source audit table for refreshed CSV, TSV, JSON, YAML, and XLSX inputs.", disabled: !frontMatterDataSourceRows.value.length, run: () => insertDataRefreshAudit() },
           { id: "export-table-csv", label: "Export Table as CSV", help: "Export the current table draft or selected Markdown table to CSV.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("csv") },
           { id: "export-table-xlsx", label: "Export Table as XLSX", help: "Export the current table draft or selected Markdown table to XLSX.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("xlsx") },
           { id: "figure", label: "Figure", help: "Insert a figure scaffold.", run: () => insertFigureSnippet() },
@@ -14081,6 +14127,20 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     description: "Jump from the selected visual table draft back to its source Markdown table lines.",
     keywords: ["table", "source", "markdown table", "jump"],
     run: () => goToSelectedTableSource(),
+  },
+  {
+    name: "Refresh data sources",
+    group: "Tables",
+    description: "Recompile front matter CSV, TSV, JSON, YAML, and XLSX data sources and update refresh status.",
+    keywords: ["data source", "refresh", "csv", "xlsx", "stale data", "front matter"],
+    run: () => refreshDataSourcesPreview(),
+  },
+  {
+    name: "Insert data refresh audit",
+    group: "Tables",
+    description: "Insert an auditable source-by-source data refresh checklist into the document.",
+    keywords: ["data source", "refresh audit", "stale data", "verification", "front matter"],
+    run: () => insertDataRefreshAudit(),
   },
   {
     name: "Create new table draft",
@@ -20527,6 +20587,40 @@ function addFrontMatterDataSource() {
   store.statusMessage = `Added ${dataSourceTypeDraft.value.toUpperCase()} data source`;
 }
 
+async function refreshDataSourcesPreview() {
+  if (!frontMatterDataSourceRows.value.length) return;
+  await store.compileActive();
+  await waitForPreviewCompileIdle(2000);
+  store.statusMessage = `Refreshed preview imports for ${frontMatterDataSourceRows.value.length} data source${frontMatterDataSourceRows.value.length === 1 ? "" : "s"}`;
+}
+
+async function refreshDataSourcesAndInsertAudit() {
+  await refreshDataSourcesPreview();
+  insertDataRefreshAudit();
+}
+
+function insertDataRefreshAudit() {
+  if (!frontMatterDataSourceRows.value.length) return;
+  insertBlock(dataRefreshAuditMarkdown(dataRefreshPlan.value, new Date().toISOString()));
+  store.statusMessage = "Inserted data refresh audit";
+}
+
+async function importDataSourceAsEditableTable(source: FrontMatterDataSourceRow) {
+  if (!dataSourceCanImportAsEditableTable(source)) {
+    store.statusMessage = "Only ready CSV, TSV, and XLSX data sources can be imported as editable tables";
+    return;
+  }
+  const path = dataSourceAbsolutePath(source.path);
+  await importSpreadsheetTableFromPath(path, source.kind === "xlsx" ? source.sheetIndex : undefined, source.kind === "xlsx" ? source.sheetName : undefined);
+}
+
+function dataSourceAbsolutePath(path: string) {
+  const normalized = normalizeDocumentPath(path.trim());
+  if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized)) return normalized;
+  const base = active.value.path ? folderFromDocumentPath(active.value.path) : normalizeDocumentPath(store.workspaceRoot || "");
+  return base ? `${base}/${normalized}` : normalized;
+}
+
 function addDocumentVariable() {
   const key = documentVariableNameDraft.value.trim();
   if (!key) return;
@@ -22933,11 +23027,11 @@ async function importSelectedSpreadsheetWorksheet() {
   await importSpreadsheetTableFromPath(tableImportSourcePath.value, tableImportSelectedSheetIndex.value);
 }
 
-async function importSpreadsheetTableFromPath(path: string, sheetIndex?: number) {
+async function importSpreadsheetTableFromPath(path: string, sheetIndex?: number, sheetName?: string) {
   tableDataBusy.value = true;
   try {
     const response = await invoke<ImportSpreadsheetTableResponse>("import_spreadsheet_table", {
-      request: { path, sheet_index: sheetIndex },
+      request: { path, sheet_index: sheetIndex, sheet_name: sheetName },
     });
     applyImportedSpreadsheetTable(response);
     store.sidebar = "tables";
@@ -23452,6 +23546,7 @@ select:hover {
 .app-shell[data-theme="dark"] .command-group,
 .app-shell[data-theme="dark"] .template-card,
 .app-shell[data-theme="dark"] .template-pack-manager,
+.app-shell[data-theme="dark"] .data-refresh-workflow,
 .app-shell[data-theme="dark"] .template-source,
 .app-shell[data-theme="dark"] .template-meta span,
 .app-shell[data-theme="dark"] .template-pack-counts span,
@@ -23531,6 +23626,7 @@ select:hover {
 
 .app-shell[data-theme="dark"] .template-card-header small,
 .app-shell[data-theme="dark"] .template-fill-fields,
+.app-shell[data-theme="dark"] .data-refresh-workflow header span,
 .app-shell[data-theme="dark"] .help-topic-button small,
 .app-shell[data-theme="dark"] .start-workspace-cockpit header span,
 .app-shell[data-theme="dark"] .start-workspace-steps small,
@@ -23694,6 +23790,7 @@ select:hover {
   .app-shell[data-theme="system"] .command-group,
   .app-shell[data-theme="system"] .template-card,
   .app-shell[data-theme="system"] .template-pack-manager,
+  .app-shell[data-theme="system"] .data-refresh-workflow,
   .app-shell[data-theme="system"] .template-source,
   .app-shell[data-theme="system"] .template-meta span,
   .app-shell[data-theme="system"] .template-pack-counts span,
@@ -23773,6 +23870,7 @@ select:hover {
 
   .app-shell[data-theme="system"] .template-card-header small,
   .app-shell[data-theme="system"] .template-fill-fields,
+  .app-shell[data-theme="system"] .data-refresh-workflow header span,
   .app-shell[data-theme="system"] .help-topic-button small,
   .app-shell[data-theme="system"] .start-workspace-cockpit header span,
   .app-shell[data-theme="system"] .start-workspace-steps small,
@@ -25496,6 +25594,39 @@ select:hover {
   display: grid;
   gap: 8px;
   margin: 6px 0 12px;
+}
+
+.data-refresh-workflow {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #d5dee8;
+  border-left: 3px solid #2f6f7e;
+  background: #f8fafc;
+}
+
+.data-refresh-workflow header {
+  display: grid;
+  gap: 3px;
+}
+
+.data-refresh-workflow header span {
+  color: #526070;
+  font-size: 12px;
+}
+
+.data-refresh-workflow .snapshot-row[data-status="current"] {
+  border-left: 3px solid #2f855a;
+}
+
+.data-refresh-workflow .snapshot-row[data-status="needs-refresh"],
+.data-refresh-workflow .snapshot-row[data-status="stale-audit"],
+.data-refresh-workflow .snapshot-row[data-status="missing-compile"] {
+  border-left: 3px solid #c68a1a;
+}
+
+.data-refresh-workflow .snapshot-row[data-status="blocked"] {
+  border-left: 3px solid #b42318;
 }
 
 .reference-actions {

@@ -123,6 +123,12 @@ import { commandSearchText, compactCommandKeywords, joinCommandDescription } fro
 import { saveAiProviderDefaultsState, saveBusinessProfileState, saveTtsPreferencesState } from "../src/lib/configurationProfiles.js";
 import { createDebouncedTextCommit, PREVIEW_DEBOUNCE_MS } from "../src/lib/debounce.js";
 import {
+  buildDataRefreshPlan,
+  dataRefreshAuditMarkdown,
+  dataRefreshSummary,
+  dataSourceCanImportAsEditableTable,
+} from "../src/lib/dataRefresh.js";
+import {
   buildDocsLiveDraft,
   buildDocsLiveQuestionnaire,
   buildDocsLiveReviewPacketMarkdown,
@@ -2620,6 +2626,54 @@ test("front matter managers inventory data sources and document variables", () =
   ok(appendedWorkbook.includes("sheet: \"Risk Sheet\""));
   ok(appendedWorkbook.includes("sheetIndex: 2"));
   equal(parseFrontMatterDataSources(appendedWorkbook)[0]?.sheetName, "Risk Sheet");
+});
+
+test("data refresh planner tracks compiled sources stale audits and table import readiness", () => {
+  const text = [
+    "---",
+    "dataSources:",
+    "  - name: Revenue",
+    "    path: data/revenue.csv",
+    "    type: csv",
+    "  - name: Outside",
+    "    path: ../outside.csv",
+    "    type: csv",
+    "---",
+    "",
+    "# Report",
+  ].join("\n");
+  const sources = parseFrontMatterDataSources(text);
+  const initial = buildDataRefreshPlan({
+    sources,
+    includeGraph: [{ child: "/workspace/report/data/revenue.csv" }],
+    diagnostics: [],
+    documentText: text,
+    generatedAt: "2026-05-30T08:00:00.000Z",
+  });
+  equal(initial.summary.needsRefresh, 1);
+  equal(initial.summary.blocked, 1);
+  ok(initial.rows.find((row) => row.source.name === "Revenue")?.importableTable);
+  ok(dataSourceCanImportAsEditableTable(sources[0]));
+  const audit = dataRefreshAuditMarkdown(initial, "2026-05-30T08:00:00.000Z");
+  ok(audit.includes("neditor:data-refresh"));
+  ok(audit.includes("Revenue"));
+  const current = buildDataRefreshPlan({
+    sources,
+    includeGraph: [{ child: "/workspace/report/data/revenue.csv" }],
+    diagnostics: [],
+    documentText: `${text}\n\n${audit}`,
+    generatedAt: "2026-05-30T08:05:00.000Z",
+  });
+  equal(current.summary.current, 1);
+  equal(current.rows.find((row) => row.source.name === "Revenue")?.status, "current");
+  ok(dataRefreshSummary(current).includes("1 current"));
+  const stale = buildDataRefreshPlan({
+    sources,
+    includeGraph: [],
+    diagnostics: [],
+    documentText: `${text}\n\n${audit}`,
+  });
+  equal(stale.rows.find((row) => row.source.name === "Revenue")?.status, "missing-compile");
 });
 
 test("front matter managers handle CRLF quoted YAML and safer path checks", () => {
@@ -9020,6 +9074,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("chooseFrontMatterDataSourceFile"));
   ok(app.includes("frontMatterDataSourceRelativePath"));
   ok(app.includes("dataSourceKindFromPath"));
+  ok(app.includes('aria-label="Data refresh workflow"'));
+  ok(app.includes("dataRefreshPlan"));
+  ok(app.includes("dataRefreshWorkflowSummary"));
+  ok(app.includes("refreshDataSourcesPreview"));
+  ok(app.includes("insertDataRefreshAudit"));
+  ok(app.includes("importDataSourceAsEditableTable"));
+  ok(app.includes("Refresh Data Sources"));
+  ok(app.includes("Insert Data Refresh Audit"));
   ok(app.includes("Data source type"));
   ok(app.includes("dataSourceSheetNameDraft"));
   ok(app.includes("dataSourceSheetIndexDraft"));

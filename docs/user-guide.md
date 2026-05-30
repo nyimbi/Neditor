@@ -306,6 +306,14 @@ templates, and LaTeX templates into the local workspace library; business
 templates and snippets remain preserved in the pack manifest for review and
 copy-forward use.
 
+Use **References > Local data sources** for CSV, TSV, JSON, YAML, and XLSX
+inputs that should travel with a document. The **Data refresh workflow** shows
+which sources are compiled, blocked, stale against the last audit, or ready to
+import as editable Markdown tables. Choose **Refresh preview imports** after
+source files change, **Import as editable table** for CSV/TSV/XLSX sources that
+need hand editing in the table grid, and **Insert refresh audit** before review
+or export so reviewers can see source status and verification notes.
+
 ## Product Boundaries
 
 NEditor is a local-first desktop workbench for document files. It does not
