@@ -699,6 +699,11 @@ NEditor is built for drafts that need evidence before publication.
   implied intent, scoring criteria, risks, and capability signals; use
   **Insert win themes** when reviewers need a compact strategy table before
   drafting or red-team review.
+  From the terminal, `ned rfp-response buyer-rfp.pdf --outline-output proposal-outline.md`
+  writes the same pre-drafting packet as a standalone artifact: compliance
+  checklist first, evaluator planning prompt second, and score-aware proposal
+  outline third. Use `ned analyze-rfp - --outline` to print that packet from
+  pasted or piped RFP text.
   The RFP wizard also shows AI step assistance for source intake, requirement
   analysis, buyer intent, response drafting, evidence QA, and handoff; accepting
   a suggestion puts the answer, rationale, and context signals into editable

@@ -4775,12 +4775,14 @@ fn run_rfp_response_command(
     let mut output: Option<PathBuf> = None;
     let mut matrix_output: Option<PathBuf> = None;
     let mut checklist_output: Option<PathBuf> = None;
+    let mut outline_output: Option<PathBuf> = None;
     let mut workspace = PathBuf::from(".");
     let mut context_notes = String::new();
     let mut json_output = false;
     let mut markdown_output = false;
     let mut matrix_only = false;
     let mut checklist_only = false;
+    let mut outline_only = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -4820,6 +4822,12 @@ fn run_rfp_response_command(
                     "--checklist-output requires a Markdown output path".to_string()
                 })?));
             }
+            "--outline-output" | "--proposal-outline-output" => {
+                index += 1;
+                outline_output = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--outline-output requires a Markdown output path".to_string()
+                })?));
+            }
             "--workspace" | "-w" => {
                 index += 1;
                 workspace = PathBuf::from(
@@ -4838,6 +4846,7 @@ fn run_rfp_response_command(
             "--markdown" => markdown_output = true,
             "--matrix" => matrix_only = true,
             "--checklist" => checklist_only = true,
+            "--outline" | "--proposal-outline" => outline_only = true,
             "-" => {
                 if source.is_some() {
                     return Err("Only one RFP source can be analyzed at a time.".to_string());
@@ -4860,13 +4869,18 @@ fn run_rfp_response_command(
     if url.is_some() && source.is_none() {
         source = url.clone();
     }
-    if matrix_only && checklist_only {
+    let terminal_only_modes = [matrix_only, checklist_only, outline_only]
+        .into_iter()
+        .filter(|enabled| *enabled)
+        .count();
+    if terminal_only_modes > 1 {
         return Err(
-            "Choose only one terminal-only RFP output mode: --matrix or --checklist.".to_string(),
+            "Choose only one terminal-only RFP output mode: --matrix, --checklist, or --outline."
+                .to_string(),
         );
     }
     let source = source.ok_or_else(|| {
-        "Usage: ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--json|--markdown|--matrix|--checklist]"
+        "Usage: ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--outline-output outline.md] [--json|--markdown|--matrix|--checklist|--outline]"
             .to_string()
     })?;
     let inferred_type =
@@ -4903,6 +4917,7 @@ fn run_rfp_response_command(
     let analysis = analyze_rfp_text(&imported, &profile);
     let matrix_markdown = rfp_cli_compliance_matrix_markdown(&analysis);
     let checklist_markdown = rfp_cli_compliance_checklist_markdown(&analysis);
+    let outline_markdown = rfp_cli_outline_packet_markdown(&analysis, &context_notes);
     let response_markdown = rfp_cli_response_markdown(&analysis, &profile, &context_notes);
 
     if let Some(path) = output.as_ref() {
@@ -4914,6 +4929,9 @@ fn run_rfp_response_command(
     if let Some(path) = checklist_output.as_ref() {
         write_cli_markdown_output(path, &checklist_markdown)?;
     }
+    if let Some(path) = outline_output.as_ref() {
+        write_cli_markdown_output(path, &outline_markdown)?;
+    }
 
     if json_output {
         return Ok(CliOutcome {
@@ -4923,12 +4941,14 @@ fn run_rfp_response_command(
                 "responseMarkdown": response_markdown,
                 "complianceMatrixMarkdown": matrix_markdown,
                 "complianceChecklistMarkdown": checklist_markdown,
+                "proposalOutlineMarkdown": outline_markdown,
                 "profileApplied": profile_applied,
                 "profilePath": path_to_display(&profile_path),
                 "outputs": {
                     "response": output.as_ref().map(|path| path_to_display(path)),
                     "matrix": matrix_output.as_ref().map(|path| path_to_display(path)),
                     "checklist": checklist_output.as_ref().map(|path| path_to_display(path)),
+                    "outline": outline_output.as_ref().map(|path| path_to_display(path)),
                 },
             }))
             .map_err(|err| err.to_string())?,
@@ -4947,6 +4967,12 @@ fn run_rfp_response_command(
             exit_code: 0,
         });
     }
+    if outline_only {
+        return Ok(CliOutcome {
+            message: outline_markdown,
+            exit_code: 0,
+        });
+    }
     if markdown_output || output.is_none() {
         return Ok(CliOutcome {
             message: response_markdown,
@@ -4961,7 +4987,11 @@ fn run_rfp_response_command(
                 .as_ref()
                 .map(|path| path.display().to_string())
                 .unwrap_or_else(|| "(stdout)".to_string()),
-            rfp_cli_output_suffix(matrix_output.as_ref(), checklist_output.as_ref())
+            rfp_cli_output_suffix(
+                matrix_output.as_ref(),
+                checklist_output.as_ref(),
+                outline_output.as_ref(),
+            )
         ),
         exit_code: 0,
     })
@@ -4970,6 +5000,7 @@ fn run_rfp_response_command(
 fn rfp_cli_output_suffix(
     matrix_output: Option<&PathBuf>,
     checklist_output: Option<&PathBuf>,
+    outline_output: Option<&PathBuf>,
 ) -> String {
     let mut outputs = Vec::new();
     if let Some(path) = matrix_output {
@@ -4977,6 +5008,9 @@ fn rfp_cli_output_suffix(
     }
     if let Some(path) = checklist_output {
         outputs.push(format!("checklist to {}", path.display()));
+    }
+    if let Some(path) = outline_output {
+        outputs.push(format!("outline to {}", path.display()));
     }
     if outputs.is_empty() {
         String::new()
@@ -12484,6 +12518,15 @@ fn rfp_cli_compliance_matrix_markdown(analysis: &RfpCliAnalysis) -> String {
     lines.join("\n")
 }
 
+fn rfp_cli_outline_packet_markdown(analysis: &RfpCliAnalysis, context_notes: &str) -> String {
+    [
+        rfp_cli_compliance_checklist_markdown(analysis),
+        rfp_cli_proposal_planning_prompt_markdown(analysis, context_notes),
+        rfp_cli_proposal_outline_markdown(analysis),
+    ]
+    .join("\n\n")
+}
+
 fn rfp_cli_response_markdown(
     analysis: &RfpCliAnalysis,
     profile: &BusinessProfile,
@@ -14438,7 +14481,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --topic --query --document-type --type --audience --provider --document --file --path --searxng-url --tavily-api-key --pages --target-pages --iterations --results --results-per-iteration --save-sources --output" -- "$cur") )
         ;;
       rfp|rfp-response|analyze-rfp)
-        COMPREPLY=( $(compgen -W "--source-type --kind --url --output --matrix-output --checklist-output --workspace --context --notes --json --markdown --matrix --checklist" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--source-type --kind --url --output --matrix-output --checklist-output --outline-output --proposal-outline-output --workspace --context --notes --json --markdown --matrix --checklist --outline --proposal-outline" -- "$cur") )
         ;;
       handlers|transform-handlers)
         COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
@@ -14560,7 +14603,7 @@ _ned() {{
       _arguments '--json[print machine-readable JSON]' '--topic[research topic]:topic:' '--query[alias for --topic]:topic:' '--document-type[report type]:type:' '--type[alias for --document-type]:type:' '--audience[target readers]:audience:' '--provider[search provider]:provider:(duckduckgo searxng tavily local-library)' '--document[Markdown document whose source vault should be used]:file:_files -g "*.md"' '--file[alias for --document]:file:_files -g "*.md"' '--path[alias for --document]:file:_files -g "*.md"' '--searxng-url[SearXNG base URL]:url:' '--tavily-api-key[Tavily API key for this run]:key:' '--pages[target pages 1-200]:number:' '--target-pages[alias for --pages]:number:' '--iterations[search loops 1-5]:number:' '--results[results per loop]:number:' '--results-per-iteration[alias for --results]:number:' '--save-sources[download returned sources into the document vault]' '--output[write Deep Research Markdown dossier]:file:_files'
       ;;
     rfp|rfp-response|analyze-rfp)
-      _arguments '*:RFP source:_files' '--source-type[source type]:kind:(markdown pdf docx url)' '--kind[source type alias]:kind:(markdown pdf docx url)' '--url[fetch public RFP URL]:url:' '--output[write response Markdown]:file:_files' '--matrix-output[write compliance matrix Markdown]:file:_files' '--checklist-output[write compliance checklist Markdown]:file:_files' '--workspace[workspace containing .neditor]:directory:_files -/' '--context[response guidance]:notes:' '--notes[response guidance alias]:notes:' '--json[print machine-readable JSON]' '--markdown[print response Markdown]' '--matrix[print compliance matrix Markdown]' '--checklist[print compliance checklist Markdown]'
+      _arguments '*:RFP source:_files' '--source-type[source type]:kind:(markdown pdf docx url)' '--kind[source type alias]:kind:(markdown pdf docx url)' '--url[fetch public RFP URL]:url:' '--output[write response Markdown]:file:_files' '--matrix-output[write compliance matrix Markdown]:file:_files' '--checklist-output[write compliance checklist Markdown]:file:_files' '--outline-output[write compliance checklist and proposal outline Markdown]:file:_files' '--proposal-outline-output[alias for --outline-output]:file:_files' '--workspace[workspace containing .neditor]:directory:_files -/' '--context[response guidance]:notes:' '--notes[response guidance alias]:notes:' '--json[print machine-readable JSON]' '--markdown[print response Markdown]' '--matrix[print compliance matrix Markdown]' '--checklist[print compliance checklist Markdown]' '--outline[print compliance checklist and proposal outline Markdown]' '--proposal-outline[alias for --outline]'
       ;;
     targets)
       _arguments '--json[print machine-readable JSON]'
@@ -14826,6 +14869,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l output -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l matrix-output -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l checklist-output -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l outline-output -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l proposal-outline-output -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l workspace -s w -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l context -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l notes -r".to_string(),
@@ -14833,6 +14878,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l markdown".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l matrix".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l checklist".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l outline".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l proposal-outline".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l commands-only"
@@ -15711,7 +15758,7 @@ fn help_text() -> String {
         "  ned sources --document report.md --download-url https://example.com/source.pdf --title \"Source title\" [--citation-key key] [--bibliography]".to_string(),
         "  ned deep-research --topic \"market evidence\" [--provider duckduckgo|searxng|tavily|local-library] [--pages 20] [--output research-dossier.md] [--json]".to_string(),
         "  ned deep-research --topic \"market evidence\" --document report.md --save-sources --output research-dossier.md".to_string(),
-        "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--json|--markdown|--matrix|--checklist]".to_string(),
+        "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--outline-output outline.md] [--json|--markdown|--matrix|--checklist|--outline]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json] [--action-plan --evidence-kit .tmp/release-evidence-kit]"

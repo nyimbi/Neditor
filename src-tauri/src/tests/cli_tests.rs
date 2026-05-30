@@ -396,6 +396,7 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     let response = temp_markdown_path("customer-support-rfp-response");
     let matrix = temp_markdown_path("customer-support-rfp-matrix");
     let checklist = temp_markdown_path("customer-support-rfp-checklist");
+    let outline = temp_markdown_path("customer-support-rfp-outline");
     let outcome = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "rfp-response".to_string(),
@@ -410,6 +411,8 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
         matrix.to_string_lossy().to_string(),
         "--checklist-output".to_string(),
         checklist.to_string_lossy().to_string(),
+        "--outline-output".to_string(),
+        outline.to_string_lossy().to_string(),
         "--json".to_string(),
     ])
     .expect("rfp response json");
@@ -578,6 +581,26 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
         .as_str()
         .expect("checklist output")
         .ends_with(".md"));
+    assert!(report["outputs"]["outline"]
+        .as_str()
+        .expect("outline output")
+        .ends_with(".md"));
+    assert!(report["proposalOutlineMarkdown"]
+        .as_str()
+        .expect("outline markdown")
+        .contains("## Proposal Outline"));
+    assert!(
+        report["proposalOutlineMarkdown"]
+            .as_str()
+            .expect("outline markdown")
+            .find("## Compliance Checklist")
+            .expect("outline checklist")
+            < report["proposalOutlineMarkdown"]
+                .as_str()
+                .expect("outline markdown")
+                .find("## Proposal Planning Prompt")
+                .expect("outline planning prompt")
+    );
     let response_text = fs::read_to_string(&response).expect("response markdown");
     assert!(response_text.contains("## Compliance Checklist"));
     assert!(response_text.contains("Scored criteria and win themes"));
@@ -647,6 +670,28 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     assert!(checklist_text.contains("## Compliance Checklist"));
     assert!(checklist_text.contains("Scored criteria and win themes"));
     assert!(checklist_text.contains("Document checklist - attachments required"));
+    let outline_text = fs::read_to_string(&outline).expect("outline markdown");
+    assert!(outline_text.contains("## Compliance Checklist"));
+    assert!(outline_text.contains("## Proposal Planning Prompt"));
+    assert!(outline_text.contains("## Proposal Outline"));
+    assert!(
+        outline_text
+            .find("## Compliance Checklist")
+            .expect("outline checklist")
+            < outline_text
+                .find("## Proposal Planning Prompt")
+                .expect("outline planning")
+    );
+    assert!(
+        outline_text
+            .find("## Proposal Planning Prompt")
+            .expect("outline planning")
+            < outline_text
+                .find("## Proposal Outline")
+                .expect("outline body")
+    );
+    assert!(outline_text.contains("### 2. Scoring Scheme and Page Allocation"));
+    assert!(outline_text.contains("### 3. Mandatory Pass/Fail Gates"));
 
     let stdin_matrix = crate::cli::run_cli_with_args_and_stdin(
         &[
@@ -678,6 +723,24 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
         .message
         .contains("Critical Disqualification Traps"));
     assert!(stdin_checklist.message.contains("signed declaration"));
+
+    let stdin_outline = crate::cli::run_cli_with_args_and_stdin(
+        &[
+            "ned".to_string(),
+            "analyze-rfp".to_string(),
+            "-".to_string(),
+            "--outline".to_string(),
+        ],
+        Some("Evaluation criteria: methodology 60%, price 40%. Vendor must submit Annex B signed declaration."),
+    )
+    .expect("stdin rfp outline");
+    assert!(stdin_outline.message.contains("## Compliance Checklist"));
+    assert!(stdin_outline
+        .message
+        .contains("## Proposal Planning Prompt"));
+    assert!(stdin_outline.message.contains("## Proposal Outline"));
+    assert!(stdin_outline.message.contains("methodology"));
+    assert!(stdin_outline.message.contains("Annex B"));
 }
 
 #[test]
@@ -3254,7 +3317,9 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("--token-env"));
     assert!(bash.message.contains("--matrix-output"));
     assert!(bash.message.contains("--checklist-output"));
+    assert!(bash.message.contains("--outline-output"));
     assert!(bash.message.contains("--matrix --checklist"));
+    assert!(bash.message.contains("--proposal-outline"));
     assert!(bash.message.contains("deploy-cli"));
     assert!(bash.message.contains("--target-dir"));
     assert!(bash.message.contains("markdown-bundle"));
@@ -3302,6 +3367,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh
         .message
         .contains("'--checklist[print compliance checklist Markdown]'"));
+    assert!(zsh.message.contains("--outline-output"));
+    assert!(zsh
+        .message
+        .contains("--outline[print compliance checklist and proposal outline Markdown]"));
     assert!(zsh.message.contains("deploy-cli"));
     assert!(zsh.message.contains("--target-dir"));
 
@@ -3335,7 +3404,9 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("get"));
     assert!(fish.message.contains("matrix-output"));
     assert!(fish.message.contains("checklist-output"));
+    assert!(fish.message.contains("outline-output"));
     assert!(fish.message.contains("-l checklist"));
+    assert!(fish.message.contains("-l proposal-outline"));
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("publish"));
@@ -3901,6 +3972,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("epub"));
     assert!(outcome.message.contains("or all"));
     assert!(outcome.message.contains("rfp-response"));
+    assert!(outcome.message.contains("--outline-output outline.md"));
 }
 
 fn temp_markdown_path(label: &str) -> std::path::PathBuf {

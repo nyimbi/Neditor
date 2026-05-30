@@ -6251,6 +6251,28 @@ single run.
 | `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting `ned deep-research`. |
 | `git diff --check` | Pass | No whitespace errors are present in the CLI Deep Research slice. |
 
+## 2026-05-30 CLI RFP Proposal Outline Packet
+
+`ned rfp-response` and `ned analyze-rfp` now expose the evaluator-driven
+proposal outline as a standalone terminal artifact. `--outline-output` writes a
+pre-drafting packet that starts with the compliance checklist, follows with the
+proposal planning prompt, and then presents the score-aware proposal outline.
+`--outline` prints the same packet to stdout for pasted or piped RFP text, so
+bid teams can review mandatory gates, scoring, annexes, ToR signals, team
+requirements, technical mandates, sustainability, risk, QA, and KPI coverage
+before drafting the full proposal.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_analyzes_rfp_sources_and_writes_response --lib` | Pass | Focused CLI fixture proves `--outline-output`, JSON `proposalOutlineMarkdown`, ordered checklist/planning-prompt/outline content, scoring and pass/fail sections, and stdin `--outline` output. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_generates_shell_completions_without_external_dependencies --lib` | Pass | Bash, zsh, and fish completions expose `--outline-output`, `--proposal-outline-output`, `--outline`, and `--proposal-outline` for RFP analysis commands. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_help_names_supported_conversion_targets --lib` | Pass | CLI help now advertises the standalone RFP outline output path alongside response, matrix, and checklist outputs. |
+| `pnpm run check:cli` | Pass | 30 CLI tests passed and rebuilt the debug `ned` binary after adding standalone RFP outline packets. |
+| `printf ... \| src-tauri/target/debug/ned analyze-rfp - --outline` | Pass | Direct smoke printed the compliance checklist, proposal planning prompt, proposal outline, detected 60:40 scoring, Annex B requirement, and pass/fail gate from piped RFP text. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed after the RFP outline CLI updates. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting standalone RFP outline packets. |
+| `git diff --check` | Pass | No whitespace errors are present in the CLI RFP outline slice. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
