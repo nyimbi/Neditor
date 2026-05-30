@@ -5401,6 +5401,7 @@
                   <span>Natural commands become scoped drafting actions before generation.</span>
                 </div>
                 <button type="button" :disabled="!docsLiveVoiceCommandPlan.length" @click="appendDocsLiveVoiceCommandPlan">Use commands</button>
+                <button type="button" :disabled="!docsLiveDraftingCommandCount" @click="runDocsLiveVoiceDraftingCommands">Run drafting</button>
                 <button type="button" :disabled="!docsLiveWorkflowCommandCount" @click="runDocsLiveVoiceWorkflowCommands">Run workflows</button>
               </header>
               <ul v-if="docsLiveVoiceCommandPlan.length">
@@ -5408,6 +5409,7 @@
                   <strong>{{ docsLiveVoiceCommandActionLabel(item.action) }} -> {{ item.target }}</strong>
                   <span>{{ item.prompt }}</span>
                   <small>{{ item.confidence }} | {{ item.rationale }}</small>
+                  <button v-if="!item.workflowRoute" type="button" @click="runDocsLiveVoiceDraftingCommand(item)">Draft with agent</button>
                   <button v-if="item.workflowRoute" type="button" @click="runDocsLiveVoiceWorkflowCommand(item)">Run {{ item.workflowLabel }}</button>
                 </li>
               </ul>
@@ -9090,6 +9092,7 @@ const docsLiveVoiceCommandPlan = computed<DocsLiveVoiceCommandPlanItem[]>(() =>
   }),
 );
 const docsLiveWorkflowCommandCount = computed(() => docsLiveVoiceCommandPlan.value.filter((item) => item.workflowRoute).length);
+const docsLiveDraftingCommandCount = computed(() => docsLiveVoiceCommandPlan.value.filter((item) => !item.workflowRoute).length);
 const canRunAgentProvider = computed(() => {
   if (agentProviderBusy.value || !agentProviderPackage.value?.profile.endpoint) return false;
   return !agentProviderPackage.value.profile.authHeader || Boolean(agentProviderApiKey.value.trim());
@@ -22893,6 +22896,113 @@ function appendDocsLiveVoiceCommandPlan() {
   }
   docsLiveQuestionnaireAnswerText.value = appendTextBlock(docsLiveQuestionnaireAnswerText.value, docsLiveVoiceCommandPlanMarkdown(plan));
   store.statusMessage = `Added ${plan.length} Docs Live voice command${plan.length === 1 ? "" : "s"} to drafting notes`;
+}
+
+function runDocsLiveVoiceDraftingCommands() {
+  const draftingCommands = docsLiveVoiceCommandPlan.value.filter((item) => !item.workflowRoute);
+  if (!draftingCommands.length) {
+    store.statusMessage = "No runnable Docs Live drafting voice commands detected";
+    return;
+  }
+  runDocsLiveVoiceDraftingCommandSet(draftingCommands);
+}
+
+function runDocsLiveVoiceDraftingCommand(item: DocsLiveVoiceCommandPlanItem) {
+  if (item.workflowRoute) {
+    void runDocsLiveVoiceWorkflowCommand(item);
+    return;
+  }
+  runDocsLiveVoiceDraftingCommandSet([item]);
+}
+
+function runDocsLiveVoiceDraftingCommandSet(items: DocsLiveVoiceCommandPlanItem[]) {
+  const instruction = buildDocsLiveVoiceDraftingInstruction(items);
+  closeDocsLive();
+  openAgentWorkspace(instruction);
+  generateAgentWorkspaceRun();
+  buildAgentProviderPackage();
+  store.statusMessage = `Prepared governed agent draft for ${items.length} voice edit command${items.length === 1 ? "" : "s"}`;
+}
+
+function buildDocsLiveVoiceDraftingInstruction(items: DocsLiveVoiceCommandPlanItem[]) {
+  const context = docsLiveVoiceDraftingContext();
+  const commands = items
+    .map((item, index) => [
+      `${index + 1}. ${docsLiveVoiceCommandActionLabel(item.action)} -> ${item.target}`,
+      `   Spoken command: ${item.command}`,
+      `   Drafting instruction: ${item.prompt}`,
+      `   Rationale: ${item.rationale}`,
+      `   Confidence: ${item.confidence}`,
+    ].join("\n"))
+    .join("\n\n");
+  return [
+    "Apply these Docs Live voice drafting commands as a governed NEditor edit.",
+    "",
+    "Preserve verified facts, citations, placeholders, approval metadata, and review comments. Return proposed Markdown with AI provenance and human review notes before final acceptance.",
+    "",
+    `Document: ${active.value.compile?.semantic.title || active.value.title}`,
+    `Target context: ${context.scope}`,
+    context.heading ? `Current heading: ${context.heading}` : "",
+    "",
+    "Voice drafting commands:",
+    commands,
+    "",
+    "Current source context:",
+    context.text ? markdownFence("markdown", context.text) : "No source context was available; ask for missing document text before changing content.",
+  ].filter(Boolean).join("\n");
+}
+
+function markdownFence(language: string, text: string) {
+  return [`\`\`\`${language}`, text.replace(/```/g, "~~~"), "```"].join("\n");
+}
+
+function docsLiveVoiceDraftingContext() {
+  flushEditorTextToStore();
+  const selected = currentEditorSelectionText().trim();
+  if (selected) return { scope: "current editor selection", heading: "", text: selected.slice(0, 8_000) };
+  const section = currentEditorSectionExcerpt();
+  if (section.text.trim()) return section;
+  return {
+    scope: "active document excerpt",
+    heading: active.value.compile?.semantic.title || active.value.title,
+    text: active.value.text.trim().slice(0, 8_000),
+  };
+}
+
+function currentEditorSectionExcerpt() {
+  if (!editorView) return { scope: "active document excerpt", heading: "", text: "" };
+  const doc = editorView.state.doc;
+  const cursorLine = doc.lineAt(editorView.state.selection.main.from);
+  let startLine = 1;
+  let endLine = doc.lines;
+  let heading = "";
+  let headingLevel = 0;
+  for (let lineNumber = cursorLine.number; lineNumber >= 1; lineNumber -= 1) {
+    const line = doc.line(lineNumber);
+    const match = line.text.match(/^(#{1,6})\s+(.+)/);
+    if (!match) continue;
+    startLine = lineNumber;
+    headingLevel = match[1].length;
+    heading = match[2].trim();
+    break;
+  }
+  if (headingLevel) {
+    for (let lineNumber = startLine + 1; lineNumber <= doc.lines; lineNumber += 1) {
+      const line = doc.line(lineNumber);
+      const match = line.text.match(/^(#{1,6})\s+\S/);
+      if (match && match[1].length <= headingLevel) {
+        endLine = lineNumber - 1;
+        break;
+      }
+    }
+  }
+  const start = doc.line(startLine).from;
+  const end = doc.line(endLine).to;
+  return {
+    scope: heading ? "current Markdown section" : "active document excerpt",
+    heading,
+    text: doc.sliceString(start, Math.min(end, start + 8_000)).trim(),
+  };
 }
 
 async function runDocsLiveVoiceWorkflowCommands() {

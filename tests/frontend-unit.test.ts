@@ -9219,6 +9219,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Docs Live voice command plan"'));
   ok(app.includes("docsLiveVoiceCommandPlan"));
   ok(app.includes("appendDocsLiveVoiceCommandPlan"));
+  ok(app.includes("docsLiveDraftingCommandCount"));
+  ok(app.includes("runDocsLiveVoiceDraftingCommands"));
+  ok(app.includes("runDocsLiveVoiceDraftingCommandSet"));
+  ok(app.includes("buildDocsLiveVoiceDraftingInstruction"));
+  ok(app.includes("Current source context:"));
+  ok(app.includes("Draft with agent"));
+  ok(app.includes("Run drafting"));
   ok(app.includes("docsLiveWorkflowCommandCount"));
   ok(app.includes("runDocsLiveVoiceWorkflowCommands"));
   ok(app.includes("routeDocsLiveVoiceWorkflowCommand"));
