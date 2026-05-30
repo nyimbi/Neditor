@@ -645,9 +645,12 @@ NEditor is built for drafts that need evidence before publication.
   and exports. The same configurator also exposes **Support and diagnostics**,
   where users can preview or save a redaction-safe support bundle with setup
   diagnostics, release evidence summaries, spec work orders, transform health,
-  and recommendations for help desks or internal IT. Add the suggestion to
-  editable setup notes when a non-technical user needs a clear setup record
-  before changing configuration.
+  and recommendations for help desks or internal IT. After previewing the
+  bundle, use **Insert handoff** to add a redaction-safe support and release
+  handoff to the active document with recommendations, release assignments,
+  spec-closure work orders, release-candidate status, next commands, and
+  privacy notes. Add the suggestion to editable setup notes when a
+  non-technical user needs a clear setup record before changing configuration.
 - For Claude Code, Codex, OpenCode, and Google Antigravity profiles, use
   **Prepare local agent workspace** to write the governed prompt package under
   `.neditor/agent-handoffs` in the active document folder. NEditor reports the

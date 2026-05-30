@@ -2932,7 +2932,7 @@
                 <strong>Print preview</strong>
                 <span>{{ printPreviewReport.summary }}</span>
               </div>
-              <button type="button" :class="{ active: printPreviewEnabled }" title="Show approximate page geometry, pagination, margins, columns, and page-break warnings in the preview" @click="togglePrintPreview">
+              <button type="button" :class="{ active: printPreviewEnabled }" title="Show approximate page geometry, pagination, margins, columns, and page-break warnings in the preview" @click="() => togglePrintPreview()">
                 {{ printPreviewEnabled ? "Hide" : "Show" }}
               </button>
             </header>
@@ -4162,6 +4162,7 @@
             </header>
             <div class="support-bundle-actions">
               <button type="button" :disabled="supportBundleBusy" title="Choose where to write the support bundle JSON" @click="saveSupportBundle">Save JSON</button>
+              <button type="button" :disabled="!supportBundleReport" title="Insert a redaction-safe setup, release, and spec-closure handoff into the active document" @click="insertSupportBundleHandoff">Insert handoff</button>
               <span>{{ supportBundleStatus || "The bundle contains setup status and evidence summaries, not document content or secrets." }}</span>
             </div>
             <dl v-if="supportBundleReport" class="transform-installer-summary">
@@ -4350,6 +4351,7 @@
               </header>
               <div class="support-bundle-actions">
                 <button type="button" :disabled="supportBundleBusy" @click="saveSupportBundle">Save JSON</button>
+                <button type="button" :disabled="!supportBundleReport" @click="insertSupportBundleHandoff">Insert handoff</button>
                 <button type="button" @click="openConfigurationSetup('support')">Open support setup wizard</button>
                 <span>{{ supportBundleStatus || "The bundle contains setup status and evidence summaries, not document content or secrets." }}</span>
               </div>
@@ -5115,6 +5117,7 @@
               <div class="reference-actions">
                 <button type="button" :disabled="supportBundleBusy" @click="previewSupportBundle">Preview support bundle</button>
                 <button type="button" :disabled="supportBundleBusy" @click="saveSupportBundle">Save support JSON</button>
+                <button type="button" :disabled="!supportBundleReport" @click="insertSupportBundleHandoff">Insert support handoff</button>
               </div>
               <p class="sidebar-hint">The support bundle includes setup status, command paths, release evidence summaries, spec work orders, and transform health, but not active document content or stored secrets.</p>
             </section>
@@ -7282,6 +7285,7 @@ import {
   buildAgenticApprovalGateMarkdown,
   buildAgenticDataNarrativeAuditMarkdown,
   buildAgenticLifecycleTaskBrief,
+  buildAgenticDocumentMemory,
   buildAgenticReleaseEvidenceAuditPackage,
   buildAgenticSectionWorkBrief,
   buildAgenticSourcePack,
@@ -7572,6 +7576,7 @@ import {
   templatePackSummaryRows,
   type NeditorTemplatePack,
 } from "./lib/templatePacks";
+import { supportBundleHandoffMarkdown } from "./lib/supportBundleHandoff";
 import {
   buildTtsModelDownloadPlan,
   formatTtsRuntimeSummary,
@@ -10339,8 +10344,8 @@ const currentTemplatePack = computed<NeditorTemplatePack>(() =>
     version: templatePackVersion.value,
     license: templatePackLicense.value,
     summary: templatePackSummary.value,
-    tags: templatePackTags.value,
-    usageGuidance: templatePackUsageGuidance.value,
+    tags: templatePackTags.value.split(",").map((tag) => tag.trim()).filter(Boolean),
+    usageGuidance: templatePackUsageGuidance.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
     outlineRules: ["Keep outline headings in document order.", "Preserve proposal and RFP compliance sections when present.", "Run Docs Live section drafting only after the outline is approved."],
     examples: ["Board pack starter", "Proposal response pack", "Research report pack"],
     businessTemplates: filteredBusinessTemplates.value.slice(0, 12),
@@ -11123,7 +11128,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
     actions: [
       { label: "Open brand kits", run: () => openBrandKitManager() },
       { label: "Prepare export", run: () => prepareForExport() },
-      { label: "Save profile", run: () => saveExportProfile() },
+      { label: "Save profile", run: () => saveExportProfileFromPanel() },
     ],
     keywords: ["brand", "brand kit", "page design", "layout preset", "cover", "watermark", "export profile"],
   },
@@ -22097,6 +22102,19 @@ async function previewSupportBundle() {
 
 async function saveSupportBundle() {
   await createSupportBundleFromSettings(true);
+}
+
+function insertSupportBundleHandoff() {
+  if (!supportBundleReport.value) {
+    supportBundleStatus.value = "Preview the support bundle before inserting the handoff";
+    return;
+  }
+  flushEditorTextToStore();
+  insertBlock(supportBundleHandoffMarkdown(supportBundleReport.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "settings";
+  selectedConfigurationSection.value = "support";
+  store.statusMessage = "Inserted support and release handoff";
 }
 
 async function createSupportBundleFromSettings(writeToFile: boolean) {

@@ -6110,6 +6110,22 @@ without opening the full JSON unless they need machine-readable details.
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting stayed clean after adding action-plan preview helpers. |
 | `src-tauri/target/debug/ned support-bundle --workspace .` | Pass | Live smoke now prints release status lanes, first six release work items, spec classification/owner lanes, first six spec work orders, and next command chains. |
 
+## 2026-05-30 Support Bundle Handoff Insertion
+
+The Configuration Center and setup wizard now let users insert a redaction-safe
+support and release handoff from the current support-bundle preview. The
+inserted Markdown summarizes setup status, release readiness, evidence reports,
+transform health, release assignments, spec-closure work orders,
+release-candidate status, next commands, and privacy notes so non-technical
+users can hand actionable setup and release work to help desks, internal IT, or
+release managers without opening raw JSON.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue type checking passed after wiring the insert action and cleaning stale App.vue type errors. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including support-bundle handoff Markdown coverage and UI exposure guards. |
+| `git diff --check` | Pass | The support-bundle handoff slice has no whitespace errors. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
