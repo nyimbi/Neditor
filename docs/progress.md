@@ -28,6 +28,29 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-30 Table Editor Manual Signoff Collector
+
+NEditor now has a collector for the table-editor human signoff gate.
+`pnpm run collect:tables:manual` reads the generated
+`.tmp/table-editor/manual-review-template.json`, applies reviewer-provided
+platform details, artifact references, notes, and supported-host status, and
+emits a completed `neditor.table-editor.manual-signoff.v1` JSON file for
+`pnpm run check:tables:manual`.
+
+This does not perform the human review. It packages a real reviewer session into
+the strict schema, requires a clean Git tree, preserves prerequisite report
+hashes from the generated template, and keeps unresolved blockers empty only
+when the reviewer says the source/grid/export workflows passed.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/collect-table-editor-manual-signoff.mjs` | Pass | Collector syntax is valid after adding template reading, reviewer/platform/session fields, supported-host results, and validation guidance. |
+| `pnpm run collect:tables:manual -- --help` | Pass | Help output documents template, output, reviewer, platform, duration, evidence, notes, supported-host, and environment-variable inputs. |
+| `pnpm run check:tables:manual` | Pass with human review pending | Wrote `.tmp/table-editor/manual-review-template.json` and `.tmp/table-editor/manual-review-summary.json`; status remains pending until a real reviewer signoff is supplied. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including static coverage for the collector script, package command, evidence-kit runbook, and table-editor signoff contract. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked after adding the table-editor human signoff evidence section. |
+| `git diff --check` | Pass | No whitespace errors are present in this table-editor signoff workflow slice. |
+
 ## 2026-05-30 Security Review Evidence Collector
 
 NEditor now has a first-class independent security-review evidence collector.

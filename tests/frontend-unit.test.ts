@@ -10583,6 +10583,7 @@ test("local verification scripts expose local baseline checks", () => {
   const securityReviewCollector = readFileSync("scripts/collect-security-review-evidence.mjs", "utf8");
   const specCompletion = readFileSync("scripts/check-spec-completion-matrix.mjs", "utf8");
   const manualReviewEvidence = readFileSync("scripts/check-manual-review-evidence.mjs", "utf8");
+  const tableEditorSignoffCollector = readFileSync("scripts/collect-table-editor-manual-signoff.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
   const googleDocsCollector = readFileSync("scripts/collect-google-docs-import-evidence.mjs", "utf8");
   const platformCollector = readFileSync("scripts/collect-platform-evidence.mjs", "utf8");
@@ -10637,6 +10638,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
   equal(scripts["collect:security-review"], "node scripts/collect-security-review-evidence.mjs");
+  equal(scripts["collect:tables:manual"], "node scripts/collect-table-editor-manual-signoff.mjs");
   equal(scripts["ingest:evidence"], "node scripts/ingest-release-evidence.mjs");
   equal(scripts["release:local"], "node scripts/create-release-candidate.mjs");
   equal(scripts["release:homebrew"], "node scripts/create-homebrew-cask.mjs");
@@ -10803,6 +10805,13 @@ test("local verification scripts expose local baseline checks", () => {
   ok(manualReviewEvidence.includes("acceptanceCriteria"));
   ok(manualReviewEvidence.includes("validatorCommands"));
   ok(manualReviewEvidence.includes("current-source-identity"));
+  ok(tableEditorSignoffCollector.includes("neditor.table-editor.manual-signoff.v1"));
+  ok(tableEditorSignoffCollector.includes("NEDITOR_TABLE_EDITOR_SIGNOFF_TEMPLATE"));
+  ok(tableEditorSignoffCollector.includes("NEDITOR_TABLE_EDITOR_REVIEWER_NAME"));
+  ok(tableEditorSignoffCollector.includes("Table editor manual signoff must be collected from a clean Git tree"));
+  ok(tableEditorSignoffCollector.includes("Validate it with: NEDITOR_TABLE_EDITOR_SIGNOFF"));
+  ok(tableEditorSignoffCollector.includes("supportedHostResults"));
+  ok(tableEditorSignoffCollector.includes("unresolvedBlockers: []"));
   ok(performanceProfile.includes("neditor.performance-profile-evidence.v1"));
   ok(performanceProfile.includes("NEDITOR_PERFORMANCE_PROFILE_EVIDENCE_DIR"));
   ok(performanceProfile.includes("NEDITOR_PERFORMANCE_PROFILE_EVIDENCE"));
@@ -10894,6 +10903,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("release-device-native-performance-profile"));
   ok(evidenceKitCollector.includes("google-docs-live-import-readback"));
   ok(evidenceKitCollector.includes("rendered-export-native-viewer-human-signoff"));
+  ok(evidenceKitCollector.includes("collect:tables:manual"));
   ok(evidenceKitCollector.includes("rendered-export-automated-visual-proof"));
   ok(evidenceKitCollector.includes("macos-native-launch-current-binary-proof"));
   ok(evidenceKitCollector.includes("macos-native-window-visibility-proof"));

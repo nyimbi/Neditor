@@ -252,7 +252,7 @@ const runbooks = [
       "pnpm run test:desktop-smoke",
       "pnpm run check:tables:manual",
       "Perform source-to-grid, grid-to-source, concurrent-source protection, spreadsheet exchange, rendered export, keyboard/accessibility, and supported-host table sessions.",
-      "Fill templates/table-editor/manual-review-template.json.",
+      "Run pnpm run collect:tables:manual -- --template templates/table-editor/manual-review-template.json --reviewer-name \"Reviewer Name\" --platform-version \"OS Version\" --platform-device \"Device\" --webview-or-browser \"Tauri WebView\" --evidence-reference /path/to/table-review-artifacts --notes \"Reviewed source/grid/export workflows with no blockers.\".",
       "NEDITOR_TABLE_EDITOR_SIGNOFF=/path/to/completed-signoff.json pnpm run check:tables:manual",
     ],
     returns: ["completed table editor manual-review signoff JSON"],

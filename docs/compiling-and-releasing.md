@@ -466,6 +466,35 @@ optional tool output, and writes
 `.tmp/security-review/external/security-review.json`. Return that JSON through
 the release evidence kit or ingest it into the release checkout.
 
+## Table Editor Human Signoff Evidence
+
+The table-editor release gate requires a named human review of source-to-grid,
+grid-to-source, concurrent edit protection, spreadsheet exchange, rendered
+exports, keyboard/accessibility behavior, and supported-host results. Generate
+the strict template first:
+
+```sh
+pnpm run check:tables:manual
+```
+
+After the reviewer has completed the table sessions and collected artifact
+references, package the signoff:
+
+```sh
+pnpm run collect:tables:manual -- \
+  --reviewer-name "Reviewer Name" \
+  --platform-version "macOS 15.5" \
+  --platform-device "MacBook Pro" \
+  --webview-or-browser "Tauri WebView" \
+  --evidence-reference /path/to/table-review-artifacts \
+  --notes "Reviewed source/grid/export workflows with no blockers."
+NEDITOR_TABLE_EDITOR_SIGNOFF=.tmp/table-editor/external/manual-review-signoff.json pnpm run check:tables:manual
+```
+
+The collector requires a clean Git tree and uses the generated
+`.tmp/table-editor/manual-review-template.json` so prerequisite report hashes,
+source commit, and current app version stay aligned.
+
 ## Homebrew Release
 
 Use a cask, not a formula. The template lives at
