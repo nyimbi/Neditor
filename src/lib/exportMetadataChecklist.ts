@@ -81,19 +81,25 @@ export function buildExportMetadataChecklist(input: ExportMetadataChecklistInput
     const approvedAt = metadataText(metadata, text, ["approvedAt"]);
     const owner = metadataText(metadata, text, ["owner"]);
     const releaseTarget = metadataText(metadata, text, ["releaseTarget"]);
+    const sourceConfidence = metadataText(metadata, text, ["sourceConfidence", "source_confidence"]);
+    const unresolvedComments = unresolvedReviewCommentCount(text);
     const missing = [
       !["approved", "published"].includes(status) ? "approved or published status" : "",
       !approver ? "approvedBy or reviewer" : "",
       !approvedAt ? "approvedAt" : "",
       !owner ? "owner" : "",
       !releaseTarget ? "releaseTarget" : "",
+      !isReleaseReadySourceConfidence(sourceConfidence) ? "sourceConfidence" : "",
+      unresolvedComments ? "resolved comments" : "",
     ].filter(Boolean);
     items.push({
       id: "release-approval",
       label: "Release approval",
       status: missing.length ? "missing" : "complete",
-      detail: missing.length ? `Missing ${missing.join(", ")}.` : `Approved for ${releaseTarget || EXPORT_TARGET_LABELS[target]}.`,
-      suggestion: "Use the Review panel or Add suggested metadata before external distribution.",
+      detail: missing.length
+        ? `Missing ${missing.join(", ")}${unresolvedComments ? ` (${unresolvedComments} unresolved)` : ""}.`
+        : `Approved for ${releaseTarget || EXPORT_TARGET_LABELS[target]} with ${sourceConfidence} source confidence.`,
+      suggestion: "Use the Review panel or Add suggested metadata before external distribution, then resolve comments and confirm source confidence.",
     });
   }
 
@@ -304,6 +310,16 @@ function isPublicHttpUrl(value: string) {
 function isLanguageTag(value: string) {
   const trimmed = value.trim();
   return Boolean(trimmed) && trimmed.length <= 35 && trimmed.split("-").every((part) => Boolean(part) && part.length <= 8 && /^[a-z0-9]+$/i.test(part));
+}
+
+function isReleaseReadySourceConfidence(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return Boolean(normalized) && !["todo", "tbd", "unknown", "unverified", "needs-review", "needs review", "draft"].includes(normalized);
+}
+
+function unresolvedReviewCommentCount(text: string) {
+  const matches = text.match(/<!--\s*comment:[\s\S]*?-->/gi) || [];
+  return matches.filter((comment) => !/\bresolved\b/i.test(comment)).length;
 }
 
 function trimForChecklist(value: string) {

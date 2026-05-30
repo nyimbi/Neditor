@@ -16,16 +16,44 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `8be5602 Make business
-  profiles carry reusable credentials`
+- Latest inspected committed baseline before this update: `cbbe079 Stop treating
+  design as signing evidence`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: clean and aligned with `origin/main`.
+- Worktree before this log update: source-confidence approval gate changes
+  pending verification.
 
 ## Durable Planning Artifacts
 
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Source-Confidence Approval Gate
+
+External distribution is now blocked until a document has release-grade approval
+metadata and no unresolved review comments. Blog, Substack, Google Docs, EPUB,
+HTML, and related external handoff targets require `status: approved` or
+`published`, `approvedBy` or `reviewer`, `approvedAt`, `owner`,
+`releaseTarget`, and release-ready `sourceConfidence` metadata before NEditor
+writes the package or prepares a publish payload. The UI now exposes source
+confidence in the Review panel and scaffolds `sourceConfidence: needs-review`
+for release/export metadata, so the field starts conservative and must be
+explicitly upgraded by a human reviewer.
+
+The 100-improvement audit now treats item 18 Approval metadata gate and item 79
+Distribution preflight as implementation-evidenced only when the stricter
+approval, source-confidence, and resolved-comment checks are present.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked export_command_tests --lib` | Pass | 37 export command tests passed, including the new blocker for distribution with `sourceConfidence: needs-review` and an unresolved comment. |
+| `pnpm run test:unit -- --runInBand` | Pass | 134 frontend unit tests passed, including export metadata checklist coverage for source confidence. |
+| `pnpm run check:cli` | Pass | 34 CLI tests passed and the debug `ned` binary rebuilt, including publish preflight blocking and 100-improvement audit assertions for items 18 and 79. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding the Review panel source-confidence field and agentic distribution text updates. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting the stricter external distribution gate. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after the export-readiness gate changes. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 72/100 implementation-evidenced items and 28 partial/external-proof items. Items 18 Approval metadata gate and 79 Distribution preflight are implementation-evidenced. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Improvement Audit Design Classifier Fix
 

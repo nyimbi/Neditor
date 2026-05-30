@@ -2602,7 +2602,11 @@ function distributionQualityGate(targets: ExportTarget[]): AgenticQualityGate {
     appliesTo: "distribution",
     label: "Distribution Readiness",
     detail: `Requested targets (${targets.join(", ")}) have approval metadata, export readiness, and artifact evidence requirements staged.`,
-    evidenceRequired: ["Status, approver or reviewer, approvedAt, owner, and releaseTarget metadata present", "Target artifacts or runbooks verified"],
+    evidenceRequired: [
+      "Status, approver or reviewer, approvedAt, owner, releaseTarget, and sourceConfidence metadata present",
+      "Review comments resolved before public handoff",
+      "Target artifacts or runbooks verified",
+    ],
   };
 }
 
@@ -2614,7 +2618,7 @@ function buildDistributionTargetPlans(plan: AgenticWorkflowPlan): AgenticDistrib
       label: profile.label,
       purpose: profile.purpose,
       preflightChecks: [
-        "Confirm approved or published status, approver or reviewer, approvedAt, owner, releaseTarget, and export metadata are present.",
+        "Confirm approved or published status, approver or reviewer, approvedAt, owner, releaseTarget, sourceConfidence, and export metadata are present.",
         "Run export readiness and resolve unresolved comments, AI review warnings, broken links, and missing assets.",
         ...profile.preflightChecks,
       ],

@@ -19,7 +19,7 @@ fn prepare_for_export_blocks_warning_cleanliness() {
 #[test]
 fn prepare_google_docs_live_import_returns_docx_payload_without_writing_files() {
     let preparation = prepare_google_docs_live_import(GoogleDocsLiveImportRequest {
-        text: "---\ntitle: Live Import Proof\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-28\nowner: Release\nreleaseTarget: Google Docs\n---\n# Live Import Proof\n\nReady for upload.".to_string(),
+        text: "---\ntitle: Live Import Proof\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-28\nowner: Release\nreleaseTarget: Google Docs\nsourceConfidence: verified\n---\n# Live Import Proof\n\nReady for upload.".to_string(),
         file_path: None,
         options: json!({ "includeManifest": true }),
     })
@@ -52,7 +52,7 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
     fs::create_dir_all(&exports).expect("create smoke exports");
     let root_doc = root.join("board-pack.md");
     let summary = chapters.join("summary.md");
-    let source = "---\ntitle: Native Workflow Smoke\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21T08:00:00Z\nowner: Release QA\nreleaseTarget: native export smoke\ntoc: true\n---\n# Native Workflow Smoke\n\n!include chapters/summary.md\n\n[TOC]\n\n```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\nmargin = profit / revenue\n```\n\nExpected margin: {{=margin | percent}}\n\nTable: Budget controls {#tbl:budget}\n| Metric | Value |\n| --- | ---: |\n| Revenue | {{=revenue | currency}} |\n| Cost | {{=cost | currency}} |\n| Profit | {{=profit | currency}} |\n\n```chart\ntype: bar\ntitle: Quarterly Revenue\ndata:\n  - quarter: Q1\n    revenue: 120\n  - quarter: Q2\n    revenue: 148\nx: quarter\ny: revenue\n```\n\n![Architecture](data:image/svg+xml;base64,PHN2Zy8+){#fig:architecture caption=\"Architecture diagram\"}\n\nSee {@tbl:budget} and {@fig:architecture}.\n".to_string();
+    let source = "---\ntitle: Native Workflow Smoke\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21T08:00:00Z\nowner: Release QA\nreleaseTarget: native export smoke\nsourceConfidence: verified\ntoc: true\n---\n# Native Workflow Smoke\n\n!include chapters/summary.md\n\n[TOC]\n\n```calc\nrevenue = 125000\ncost = 74000\nprofit = revenue - cost\nmargin = profit / revenue\n```\n\nExpected margin: {{=margin | percent}}\n\nTable: Budget controls {#tbl:budget}\n| Metric | Value |\n| --- | ---: |\n| Revenue | {{=revenue | currency}} |\n| Cost | {{=cost | currency}} |\n| Profit | {{=profit | currency}} |\n\n```chart\ntype: bar\ntitle: Quarterly Revenue\ndata:\n  - quarter: Q1\n    revenue: 120\n  - quarter: Q2\n    revenue: 148\nx: quarter\ny: revenue\n```\n\n![Architecture](data:image/svg+xml;base64,PHN2Zy8+){#fig:architecture caption=\"Architecture diagram\"}\n\nSee {@tbl:budget} and {@fig:architecture}.\n".to_string();
     fs::write(
         &summary,
         "## Executive Summary\n\nThe native workflow smoke uses real file operations and export commands.\n",
@@ -165,7 +165,7 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
 
 #[test]
 fn export_document_writes_blog_and_substack_publish_packages() {
-    let source = "---\ntitle: Board Notes\nsubtitle: Weekly operating summary\nslug: board-notes-weekly\nauthor: NEditor QA\ndate: 2026-05-21\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: executive newsletter\ntags:\n  - strategy\n  - operations\ncanonicalUrl: https://example.com/board-notes\n---\n# Board Notes\n\nA copy-ready post with **business** context.\n".to_string();
+    let source = "---\ntitle: Board Notes\nsubtitle: Weekly operating summary\nslug: board-notes-weekly\nauthor: NEditor QA\ndate: 2026-05-21\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: executive newsletter\nsourceConfidence: verified\ntags:\n  - strategy\n  - operations\ncanonicalUrl: https://example.com/board-notes\n---\n# Board Notes\n\nA copy-ready post with **business** context.\n".to_string();
 
     for target in ["blog", "substack"] {
         let unique = SystemTime::now()
@@ -222,7 +222,7 @@ fn export_document_writes_blog_and_substack_publish_packages() {
 
 #[test]
 fn export_document_applies_public_metadata_options_to_publish_packages() {
-    let source = "---\ntitle: Metadata Options\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: public site\ntags:\n  - launch\n---\n# Metadata Options\n\nPublic package body.\n".to_string();
+    let source = "---\ntitle: Metadata Options\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: public site\nsourceConfidence: verified\ntags:\n  - launch\n---\n# Metadata Options\n\nPublic package body.\n".to_string();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time should be after epoch")
@@ -266,7 +266,7 @@ fn export_document_applies_public_metadata_options_to_publish_packages() {
 
 #[test]
 fn export_document_writes_latex_and_google_docs_outputs() {
-    let source = "---\ntitle: Research Brief\nsubtitle: Import-ready evidence pack\nauthor: NEditor QA\ndate: 2026-05-21\nversion: 2.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Research Ops\nreleaseTarget: Google Docs review room\n---\n# Research Brief\n\nA **business** brief with a [source link](https://example.com/evidence).\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Review | Operations |\n\nSee [Table controls](#tbl:controls).\n\n$$\nROI = \\frac{Gain}{Cost}\n$$ {#eq:roi caption=\"Return on investment\"}\n".to_string();
+    let source = "---\ntitle: Research Brief\nsubtitle: Import-ready evidence pack\nauthor: NEditor QA\ndate: 2026-05-21\nversion: 2.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Research Ops\nreleaseTarget: Google Docs review room\nsourceConfidence: verified\n---\n# Research Brief\n\nA **business** brief with a [source link](https://example.com/evidence).\n\nTable: Controls {#tbl:controls}\n| Control | Owner |\n| --- | --- |\n| Review | Operations |\n\nSee [Table controls](#tbl:controls).\n\n$$\nROI = \\frac{Gain}{Cost}\n$$ {#eq:roi caption=\"Return on investment\"}\n".to_string();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time should be after epoch")
@@ -336,7 +336,7 @@ fn export_document_writes_latex_and_google_docs_outputs() {
 
 #[test]
 fn export_document_writes_epub_package() {
-    let source = "---\ntitle: Ebook Brief\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing\nreleaseTarget: EPUB readers\n---\n# Ebook Brief\n\nA portable **ebook** with a [source link](https://example.com).\n\n## Scoring\n\n$$ {#eq:score caption=\"Weighted score\"}\nScore = \\sum w_i x_i\n$$\n".to_string();
+    let source = "---\ntitle: Ebook Brief\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing\nreleaseTarget: EPUB readers\nsourceConfidence: verified\n---\n# Ebook Brief\n\nA portable **ebook** with a [source link](https://example.com).\n\n## Scoring\n\n$$ {#eq:score caption=\"Weighted score\"}\nScore = \\sum w_i x_i\n$$\n".to_string();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time should be after epoch")
@@ -841,7 +841,7 @@ fn export_document_blocks_target_extension_mismatches_before_writing() {
     let output = root.join("board-deck.pdf");
 
     let error = export_document(ExportRequest {
-        text: "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Release QA\nreleaseTarget: board deck\n---\n# Board Deck\n".to_string(),
+        text: "---\ntitle: Board Deck\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Release QA\nreleaseTarget: board deck\nsourceConfidence: verified\n---\n# Board Deck\n".to_string(),
         file_path: None,
         target: "pptx".to_string(),
         output_path: path_to_string(&output),
@@ -868,7 +868,7 @@ fn export_document_writes_optional_sidecar_manifest() {
     fs::create_dir_all(&root).expect("create export manifest dir");
     let output = root.join("ready.html");
     let source =
-            "---\ntitle: Manifest Ready\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-19\nowner: Release QA\nreleaseTarget: manifest smoke\nversion: 1.0.0\n---\n# Ready\n";
+            "---\ntitle: Manifest Ready\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-19\nowner: Release QA\nreleaseTarget: manifest smoke\nsourceConfidence: verified\nversion: 1.0.0\n---\n# Ready\n";
 
     let response = export_document(ExportRequest {
         text: source.to_string(),
@@ -1443,6 +1443,8 @@ fn prepare_for_export_reports_target_specific_release_metadata_blockers() {
             suggestion.contains("approvedBy or reviewer")
                 && suggestion.contains("owner")
                 && suggestion.contains("releaseTarget")
+                && suggestion.contains("sourceConfidence")
+                && suggestion.contains("resolve comments")
         }));
         assert!(diagnostic
             .related
@@ -1468,6 +1470,10 @@ fn prepare_for_export_reports_target_specific_release_metadata_blockers() {
             .related
             .iter()
             .any(|item| item == "missing:releaseTarget"));
+        assert!(diagnostic
+            .related
+            .iter()
+            .any(|item| item == "missing:sourceConfidence"));
         assert_eq!(report.manifest.readiness.error_count, 1);
         assert!(!report.manifest.readiness.ready);
     }
@@ -1483,7 +1489,7 @@ fn prepare_for_export_reports_target_specific_release_metadata_blockers() {
 
 #[test]
 fn prepare_for_export_accepts_case_insensitive_release_statuses() {
-    let source = "---\ntitle: Published Deck\nversion: 1.0.0\nstatus: PUBLISHED\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: board distribution\n---\n# Published Deck\n".to_string();
+    let source = "---\ntitle: Published Deck\nversion: 1.0.0\nstatus: PUBLISHED\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: board distribution\nsourceConfidence: verified\n---\n# Published Deck\n".to_string();
     let report = prepare_for_export(PrepareExportRequest {
         text: source,
         file_path: None,
@@ -1500,8 +1506,38 @@ fn prepare_for_export_accepts_case_insensitive_release_statuses() {
 }
 
 #[test]
+fn prepare_for_export_blocks_distribution_without_source_confidence_or_resolved_comments() {
+    let source = "---\ntitle: Commented Release\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: public site\nsourceConfidence: needs-review\n---\n# Commented Release\n\n<!-- comment: author: QA | Check the public claim. -->\n".to_string();
+    let report = prepare_for_export(PrepareExportRequest {
+        text: source,
+        file_path: None,
+        target: "blog".to_string(),
+        options: json!({ "warnOnDirtyGit": false }),
+    });
+
+    assert!(!report.ready, "{:#?}", report.diagnostics);
+    let diagnostic = report
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic
+                .message
+                .contains("requires release approval metadata")
+        })
+        .expect("release gate diagnostic");
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|item| item == "missing:sourceConfidence"));
+    assert!(diagnostic
+        .related
+        .iter()
+        .any(|item| item == "unresolvedComments:1"));
+}
+
+#[test]
 fn prepare_for_export_validates_public_distribution_metadata() {
-    let source = "---\ntitle: Public Metadata\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: public site\nsummary: Ready for public distribution.\ntags: strategy, operations\ncanonicalUrl: draft/public-metadata\nlanguage: en_US\n---\n# Public Metadata\n".to_string();
+    let source = "---\ntitle: Public Metadata\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: public site\nsourceConfidence: verified\nsummary: Ready for public distribution.\ntags: strategy, operations\ncanonicalUrl: draft/public-metadata\nlanguage: en_US\n---\n# Public Metadata\n".to_string();
     let report = prepare_for_export(PrepareExportRequest {
         text: source,
         file_path: None,
@@ -1530,7 +1566,7 @@ fn prepare_for_export_validates_public_distribution_metadata() {
 
 #[test]
 fn prepare_for_export_reports_public_distribution_metadata_warnings() {
-    let source = "---\ntitle: Publishing Metadata\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: executive newsletter\ncanonicalUrl: https://example.com/publishing-metadata\nlanguage: en-US\n---\n# Publishing Metadata\n".to_string();
+    let source = "---\ntitle: Publishing Metadata\nversion: 1.0.0\nstatus: approved\napprovedBy: QA\napprovedAt: 2026-05-21\nowner: Publishing Ops\nreleaseTarget: executive newsletter\nsourceConfidence: verified\ncanonicalUrl: https://example.com/publishing-metadata\nlanguage: en-US\n---\n# Publishing Metadata\n".to_string();
     let report = prepare_for_export(PrepareExportRequest {
         text: source,
         file_path: None,

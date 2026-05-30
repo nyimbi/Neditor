@@ -3426,6 +3426,10 @@
             Approved at
             <input :value="String(active.compile?.metadata.approvedAt || '')" @input="setFrontMatterField('approvedAt', inputValue($event))" @change="setFrontMatterField('approvedAt', inputValue($event))" />
           </label>
+          <label>
+            Source confidence
+            <input :value="String(active.compile?.metadata.sourceConfidence || active.compile?.metadata.source_confidence || '')" @input="setFrontMatterField('sourceConfidence', inputValue($event))" @change="setFrontMatterField('sourceConfidence', inputValue($event))" />
+          </label>
           <button type="button" @click="setApprovalTimestampNow">Set approval time</button>
           <label>
             New comment
@@ -21745,6 +21749,7 @@ function applyReleaseMetadataScaffold() {
   if (!frontMatterAnyScalar(nextText, ["releaseTarget"])) nextText = upsertFrontMatterField(nextText, "releaseTarget", store.exportTarget || "review package");
   if (!frontMatterAnyScalar(nextText, ["approvedBy", "reviewer"])) nextText = upsertFrontMatterField(nextText, "approvedBy", "TODO reviewer");
   if (!frontMatterAnyScalar(nextText, ["approvedAt"])) nextText = upsertFrontMatterField(nextText, "approvedAt", today);
+  if (!frontMatterAnyScalar(nextText, ["sourceConfidence", "source_confidence"])) nextText = upsertFrontMatterField(nextText, "sourceConfidence", "needs-review");
   store.updateText(nextText);
   store.statusMessage = "Prepared release metadata scaffold";
   void nextTick(() => syncEditorViewFromActiveDocument());
@@ -21786,6 +21791,7 @@ function applyExportMetadataScaffold() {
     if (!frontMatterAnyScalar(nextText, ["releaseTarget"])) nextText = upsertFrontMatterField(nextText, "releaseTarget", exportTargetLabels[target] || target);
     if (!frontMatterAnyScalar(nextText, ["approvedBy", "reviewer"])) nextText = upsertFrontMatterField(nextText, "approvedBy", "TODO reviewer");
     if (!frontMatterAnyScalar(nextText, ["approvedAt"])) nextText = upsertFrontMatterField(nextText, "approvedAt", today);
+    if (!frontMatterAnyScalar(nextText, ["sourceConfidence", "source_confidence"])) nextText = upsertFrontMatterField(nextText, "sourceConfidence", "needs-review");
   }
 
   if ((target === "html" || target === "blog" || target === "substack") && !frontMatterAnyScalar(nextText, ["description", "summary", "subtitle", "excerpt"])) {

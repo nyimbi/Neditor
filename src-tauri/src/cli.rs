@@ -8628,7 +8628,7 @@ fn improvement_evidence_signals(item: &ImprovementItem) -> Vec<String> {
 }
 
 fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool {
-    if matches!(item.number, 11 | 80) {
+    if matches!(item.number, 11 | 18 | 79 | 80) {
         return false;
     }
     let text = format!(

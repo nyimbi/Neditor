@@ -3415,6 +3415,13 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         .as_array()
         .expect("improvement items")
         .iter()
+        .any(|item| item["number"] == 18
+            && item["title"] == "Approval metadata gate"
+            && item["status"] == "implemented-evidence-present"));
+    assert!(report["items"]
+        .as_array()
+        .expect("improvement items")
+        .iter()
         .any(|item| item["number"] == 21 && item["title"] == "Native RFP ingestion"));
     assert!(report["items"]
         .as_array()
@@ -3429,6 +3436,13 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         .iter()
         .any(|item| item["number"] == 67
             && item["title"] == "Chart designer"
+            && item["status"] == "implemented-evidence-present"));
+    assert!(report["items"]
+        .as_array()
+        .expect("improvement items")
+        .iter()
+        .any(|item| item["number"] == 79
+            && item["title"] == "Distribution preflight"
             && item["status"] == "implemented-evidence-present"));
     assert!(report["items"]
         .as_array()
@@ -3909,6 +3923,19 @@ fn ned_cli_prepares_publish_payload_without_persisting_secrets() {
     let source = temp_markdown_path("publish");
     let output = source.with_extension("publish.json");
     fs::write(&source, super::sample_document()).expect("write source markdown");
+    let blocked = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "publish".to_string(),
+        source.to_string_lossy().to_string(),
+        "--target".to_string(),
+        "blog".to_string(),
+        "--endpoint".to_string(),
+        "https://cms.example.com/wp-json/wp/v2/posts".to_string(),
+    ])
+    .expect_err("publish should be blocked without approval metadata");
+    assert!(blocked.contains("Publish payload blocked by"));
+    assert!(blocked.contains("--allow-not-ready"));
+
     let args = vec![
         "ned".to_string(),
         "publish".to_string(),

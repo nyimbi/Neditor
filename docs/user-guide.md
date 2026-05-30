@@ -732,6 +732,15 @@ shows AI Export Assistance for target metadata, readiness diagnostics, and
 artifact evidence; accepted guidance can be collected as editable export
 readiness notes and inserted into the document as an audit handoff.
 
+External distribution targets such as Blog, Substack, Google Docs, EPUB, and
+HTML require release-grade metadata before NEditor writes or publishes the
+handoff package. Set `status` to `approved` or `published`, add `approvedBy` or
+`reviewer`, `approvedAt`, `owner`, `releaseTarget`, and a release-ready
+`sourceConfidence` value such as `verified`, then resolve every review comment.
+The Review panel and export metadata scaffold insert these fields with
+`sourceConfidence: needs-review` so the document remains blocked until a human
+explicitly upgrades the evidence state.
+
 From the terminal, run
 `ned quality report.md --markdown --output quality-review.md` when a reviewer,
 release manager, or automation job needs the same kind of deterministic QA

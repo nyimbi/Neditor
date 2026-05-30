@@ -5052,6 +5052,7 @@ test("export metadata checklist validates publishing and ebook handoff readiness
 
   const blogStatusById = new Map(blogChecklist.map((item) => [item.id, item.status]));
   equal(blogStatusById.get("release-approval"), "missing");
+  ok(blogChecklist.find((item) => item.id === "release-approval")?.detail.includes("sourceConfidence"));
   equal(blogStatusById.get("public-description"), "complete");
   equal(blogStatusById.get("canonical-url"), "invalid");
   equal(blogStatusById.get("publishing-tags"), "complete");
@@ -5088,6 +5089,7 @@ test("export metadata checklist validates publishing and ebook handoff readiness
       "releaseTarget: EPUB",
       "approvedBy: QA Lead",
       "approvedAt: 2026-05-26",
+      "sourceConfidence: verified",
       "author: Jane Doe",
       "language: pt-BR",
       "---",

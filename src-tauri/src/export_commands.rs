@@ -112,6 +112,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
     validate_target_specific_export_readiness(
         &request.target,
         &compile_response.metadata,
+        &compile_response.semantic,
         &mut diagnostics,
     );
     validate_captioned_business_objects(&compile_response.document_ast.blocks, &mut diagnostics);
@@ -248,6 +249,7 @@ pub(crate) fn prepare_for_export(request: PrepareExportRequest) -> ExportReadine
     validate_target_specific_export_readiness(
         &request.target,
         &response.metadata,
+        &response.semantic,
         &mut response.diagnostics,
     );
     validate_captioned_business_objects(&response.document_ast.blocks, &mut response.diagnostics);
@@ -307,6 +309,7 @@ pub(crate) fn prepare_google_docs_live_import(
     validate_target_specific_export_readiness(
         "google-docs",
         &response.metadata,
+        &response.semantic,
         &mut response.diagnostics,
     );
     validate_captioned_business_objects(&response.document_ast.blocks, &mut response.diagnostics);
@@ -986,6 +989,7 @@ fn expected_export_extension(target: &str) -> Option<&'static str> {
 fn validate_target_specific_export_readiness(
     target: &str,
     metadata: &Value,
+    semantic: &SemanticDocument,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) {
     validate_distribution_metadata(target, metadata, diagnostics);
@@ -1009,18 +1013,29 @@ fn validate_target_specific_export_readiness(
     let release_target_missing = metadata_string(metadata, "releaseTarget")
         .map(|value| value.trim().is_empty())
         .unwrap_or(true);
+    let source_confidence = metadata_string(metadata, "sourceConfidence")
+        .or_else(|| metadata_string(metadata, "source_confidence"))
+        .unwrap_or_default();
+    let source_confidence_missing = !source_confidence_is_release_ready(&source_confidence);
+    let unresolved_comment_count = semantic
+        .comments
+        .iter()
+        .filter(|comment| comment.state != "resolved")
+        .count();
     if !matches!(normalized_status.as_str(), "approved" | "published")
         || approval_reviewer_missing
         || approved_at_missing
         || owner_missing
         || release_target_missing
+        || source_confidence_missing
+        || unresolved_comment_count > 0
     {
         let mut diagnostic = diag(
             "error",
             &format!("{} export requires release approval metadata before writing.", target.to_ascii_uppercase()),
             None,
             None,
-            Some("Set status to approved or published and add approvedBy or reviewer, approvedAt, owner, and releaseTarget before distribution."),
+            Some("Set status to approved or published; add approvedBy or reviewer, approvedAt, owner, releaseTarget, and sourceConfidence; resolve comments before distribution."),
         );
         diagnostic.related.push(format!("target:{target}"));
         diagnostic.related.push(format!("status:{status}"));
@@ -1038,8 +1053,27 @@ fn validate_target_specific_export_readiness(
         if release_target_missing {
             diagnostic.related.push("missing:releaseTarget".to_string());
         }
+        if source_confidence_missing {
+            diagnostic
+                .related
+                .push("missing:sourceConfidence".to_string());
+        }
+        if unresolved_comment_count > 0 {
+            diagnostic
+                .related
+                .push(format!("unresolvedComments:{unresolved_comment_count}"));
+        }
         diagnostics.push(diagnostic);
     }
+}
+
+fn source_confidence_is_release_ready(value: &str) -> bool {
+    let normalized = value.trim().to_ascii_lowercase();
+    !normalized.is_empty()
+        && !matches!(
+            normalized.as_str(),
+            "todo" | "tbd" | "unknown" | "unverified" | "needs-review" | "needs review" | "draft"
+        )
 }
 
 fn validate_distribution_metadata(
