@@ -9791,6 +9791,7 @@ fn evidence_return_packet_markdown(report: &Value) -> String {
         "- Return only validator reports, screenshots needed for release evidence, signed review JSON, package artifacts, cask files, and command-output logs.".to_string(),
         "- Do not include secrets, customer documents, API keys, OAuth tokens, raw audio, private clipboard contents, or unrelated user files.".to_string(),
         "- Keep credentialed proof descriptive unless the validator schema explicitly requires a non-secret identifier.".to_string(),
+        "- GitHub Actions platform artifacts can be returned exactly as downloaded by `gh run download --name neditor-platform-evidence-win32-json --dir returned-evidence` and `gh run download --name neditor-platform-evidence-linux-json --dir returned-evidence`; ingest recognizes those artifact directory names without manual rearrangement.".to_string(),
         "".to_string(),
         "## Release Evidence Assignments".to_string(),
         "".to_string(),
@@ -9881,6 +9882,11 @@ fn evidence_return_packet_markdown(report: &Value) -> String {
         "".to_string(),
         "```text".to_string(),
         "returned-evidence/".to_string(),
+        "  neditor-platform-evidence-win32-json/.tmp/platform-evidence/external/win32/package-artifacts.json".to_string(),
+        "  neditor-platform-evidence-win32-json/.tmp/platform-evidence/external/win32/tauri-webdriver-report.json".to_string(),
+        "  neditor-platform-evidence-linux-json/.tmp/platform-evidence/external/linux/package-artifacts.json".to_string(),
+        "  neditor-platform-evidence-linux-json/.tmp/platform-evidence/external/linux/tauri-webdriver-report.json".to_string(),
+        "  # Equivalent normalized paths are also accepted:".to_string(),
         "  platform-evidence/external/win32/package-artifacts.json".to_string(),
         "  platform-evidence/external/win32/tauri-webdriver-report.json".to_string(),
         "  platform-evidence/external/linux/package-artifacts.json".to_string(),
@@ -9985,6 +9991,18 @@ fn evidence_return_candidates(returns: &[String]) -> Vec<String> {
             &mut candidates,
             returned.trim_start_matches(".tmp/").to_string(),
         );
+        if returned.contains(".tmp/platform-evidence/external/win32/") {
+            push_unique_string(
+                &mut candidates,
+                returned.replacen(".tmp/", "neditor-platform-evidence-win32-json/.tmp/", 1),
+            );
+        }
+        if returned.contains(".tmp/platform-evidence/external/linux/") {
+            push_unique_string(
+                &mut candidates,
+                returned.replacen(".tmp/", "neditor-platform-evidence-linux-json/.tmp/", 1),
+            );
+        }
         if let Some(name) = Path::new(returned)
             .file_name()
             .and_then(|name| name.to_str())

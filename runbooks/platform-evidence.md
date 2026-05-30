@@ -2,6 +2,23 @@
 
 Use this runbook for supported-host proof on Windows, Linux, and macOS.
 
+## GitHub Actions Path
+
+The fastest supported-host path is the release evidence workflow:
+
+```sh
+gh workflow run neditor-release-evidence.yml
+gh run download <run-id> --name neditor-platform-evidence-win32-json --dir returned-evidence
+gh run download <run-id> --name neditor-platform-evidence-linux-json --dir returned-evidence
+pnpm run ingest:evidence -- --source returned-evidence
+pnpm run check:platform-evidence
+pnpm run check:release-readiness
+```
+
+The ingest command accepts the downloaded artifact directories as-is. You do
+not need to flatten or rename `neditor-platform-evidence-win32-json` or
+`neditor-platform-evidence-linux-json`.
+
 ## Windows
 
 ```sh

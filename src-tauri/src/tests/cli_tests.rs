@@ -3480,6 +3480,8 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     );
     assert!(evidence_packet_markdown
         .contains("pnpm run ingest:evidence -- --source <returned-evidence-dir>"));
+    assert!(evidence_packet_markdown.contains("neditor-platform-evidence-win32-json"));
+    assert!(evidence_packet_markdown.contains("neditor-platform-evidence-linux-json"));
 
     let evidence_packet_json = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

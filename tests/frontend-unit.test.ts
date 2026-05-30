@@ -11122,6 +11122,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(homebrewPackaging.includes("materialization: materializationEvidence"));
   ok(evidenceIngest.includes("external-engine-sqlite"));
   ok(evidenceIngest.includes("platform/win32-package-artifacts.json"));
+  ok(evidenceIngest.includes("neditor-platform-evidence-win32-json/.tmp/platform-evidence/external/win32/package-artifacts.json"));
+  ok(evidenceIngest.includes("neditor-platform-evidence-linux-json/.tmp/platform-evidence/external/linux/tauri-webdriver-report.json"));
   ok(evidenceIngest.includes("ai-provider/provider-evidence.json"));
   ok(evidenceIngest.includes("ai-runtime/runtime-evidence.json"));
   ok(evidenceIngest.includes("security-review-signoff"));
@@ -11153,6 +11155,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCi.includes("pnpm tauri build --bundles ${{ matrix.bundles }}"));
   ok(releaseCi.includes(".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json"));
   ok(releaseCi.includes(".tmp/rendered-export-audit/**"));
+  const platformRunbook = readFileSync("runbooks/platform-evidence.md", "utf8");
+  ok(platformRunbook.includes("gh workflow run neditor-release-evidence.yml"));
+  ok(platformRunbook.includes("neditor-platform-evidence-win32-json"));
+  ok(platformRunbook.includes("neditor-platform-evidence-linux-json"));
+  ok(platformRunbook.includes("pnpm run ingest:evidence -- --source returned-evidence"));
   ok(releaseCi.includes(".tmp/accessibility/**"));
   ok(releaseWorkflow.includes("name: NEditor Release Evidence"));
   ok(releaseWorkflow.includes("workflow_dispatch:"));

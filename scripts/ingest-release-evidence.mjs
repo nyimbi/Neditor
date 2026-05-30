@@ -15,6 +15,10 @@ const validate = args.validate !== false && args["no-validate"] !== true && !dry
 
 const evidenceItems = [
   item("platform-win32-package", ".tmp/platform-evidence/external/win32/package-artifacts.json", "platform", [
+    "neditor-platform-evidence-win32-json/.tmp/platform-evidence/external/win32/package-artifacts.json",
+    "neditor-platform-evidence-win32-json/platform-evidence/external/win32/package-artifacts.json",
+    "neditor-platform-evidence-win32/.tmp/platform-evidence/external/win32/package-artifacts.json",
+    "neditor-platform-evidence-win32/platform-evidence/external/win32/package-artifacts.json",
     "platform-evidence/external/win32/package-artifacts.json",
     "platform/win32/package-artifacts.json",
     "platform/win32-package-artifacts.json",
@@ -22,6 +26,10 @@ const evidenceItems = [
     "win32-package-artifacts.json",
   ]),
   item("platform-win32-webdriver", ".tmp/platform-evidence/external/win32/tauri-webdriver-report.json", "platform", [
+    "neditor-platform-evidence-win32-json/.tmp/platform-evidence/external/win32/tauri-webdriver-report.json",
+    "neditor-platform-evidence-win32-json/platform-evidence/external/win32/tauri-webdriver-report.json",
+    "neditor-platform-evidence-win32/.tmp/platform-evidence/external/win32/tauri-webdriver-report.json",
+    "neditor-platform-evidence-win32/platform-evidence/external/win32/tauri-webdriver-report.json",
     "platform-evidence/external/win32/tauri-webdriver-report.json",
     "platform/win32/tauri-webdriver-report.json",
     "platform/win32-tauri-webdriver-report.json",
@@ -29,6 +37,10 @@ const evidenceItems = [
     "win32-tauri-webdriver-report.json",
   ]),
   item("platform-linux-package", ".tmp/platform-evidence/external/linux/package-artifacts.json", "platform", [
+    "neditor-platform-evidence-linux-json/.tmp/platform-evidence/external/linux/package-artifacts.json",
+    "neditor-platform-evidence-linux-json/platform-evidence/external/linux/package-artifacts.json",
+    "neditor-platform-evidence-linux/.tmp/platform-evidence/external/linux/package-artifacts.json",
+    "neditor-platform-evidence-linux/platform-evidence/external/linux/package-artifacts.json",
     "platform-evidence/external/linux/package-artifacts.json",
     "platform/linux/package-artifacts.json",
     "platform/linux-package-artifacts.json",
@@ -36,6 +48,10 @@ const evidenceItems = [
     "linux-package-artifacts.json",
   ]),
   item("platform-linux-webdriver", ".tmp/platform-evidence/external/linux/tauri-webdriver-report.json", "platform", [
+    "neditor-platform-evidence-linux-json/.tmp/platform-evidence/external/linux/tauri-webdriver-report.json",
+    "neditor-platform-evidence-linux-json/platform-evidence/external/linux/tauri-webdriver-report.json",
+    "neditor-platform-evidence-linux/.tmp/platform-evidence/external/linux/tauri-webdriver-report.json",
+    "neditor-platform-evidence-linux/platform-evidence/external/linux/tauri-webdriver-report.json",
     "platform-evidence/external/linux/tauri-webdriver-report.json",
     "platform/linux/tauri-webdriver-report.json",
     "platform/linux-tauri-webdriver-report.json",
