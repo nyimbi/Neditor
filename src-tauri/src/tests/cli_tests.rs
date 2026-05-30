@@ -2662,6 +2662,44 @@ fn ned_cli_reports_accessibility_qa_and_release_dashboard() {
 }
 
 #[test]
+fn ned_release_dashboard_distinguishes_provider_and_runtime_evidence() {
+    let accepted_provider = serde_json::json!({
+        "status": "accepted",
+        "summary": {
+            "acceptedEvidence": 1
+        }
+    });
+    let accepted_runtime = serde_json::json!({
+        "status": "accepted",
+        "summary": {
+            "acceptedEvidence": 1
+        }
+    });
+
+    let (lane, detail) = crate::cli::release_dashboard_provider_runtime_state_from_reports(
+        Some(&accepted_provider),
+        None,
+    );
+    assert_eq!(lane, "credentialed");
+    assert!(
+        detail.contains("AI provider endpoint evidence is accepted")
+            && detail.contains("runtime proof remains pending"),
+        "provider accepted/runtime pending detail should be specific: {detail}"
+    );
+
+    let (lane, detail) = crate::cli::release_dashboard_provider_runtime_state_from_reports(
+        Some(&accepted_provider),
+        Some(&accepted_runtime),
+    );
+    assert_eq!(lane, "complete");
+    assert!(
+        detail.contains("AI provider endpoint evidence")
+            && detail.contains("runtime proof are accepted"),
+        "complete provider/runtime detail should mention both evidence types: {detail}"
+    );
+}
+
+#[test]
 fn ned_cli_exposes_final_release_handoff_surfaces() {
     let ai_runtime = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

@@ -6703,8 +6703,11 @@ fn build_release_dashboard_report() -> Value {
     let summary = improvement_audit.get("summary").unwrap_or(&Value::Null);
     let open_improvements = number_field_u64(summary, "open");
     let accessibility = build_accessibility_qa_report(false);
+    let (provider_runtime_lane, provider_runtime_detail) =
+        release_dashboard_provider_runtime_state();
     let (homebrew_lane, homebrew_detail) = release_dashboard_homebrew_state();
-    let mut items = vec![
+    let mut items =
+        vec![
         release_dashboard_item(
             "implementation-roadmap",
             if open_improvements == 0 { "ready-to-send" } else { "blocked" },
@@ -6725,9 +6728,9 @@ fn build_release_dashboard_report() -> Value {
         ),
         release_dashboard_item(
             "provider-runtime",
-            "credentialed",
+            &provider_runtime_lane,
             "Provider-agnostic AI runtime",
-            "Requires credentialed/local provider runtime proof for OpenAI-compatible, Ollama, and governed local-agent routes.",
+            &provider_runtime_detail,
             "pnpm run check:ai-runtime && pnpm run check:ai-provider",
         ),
         release_dashboard_item(
@@ -6811,6 +6814,58 @@ fn build_release_dashboard_report() -> Value {
         ],
         "note": "The dashboard is intentionally conservative: it shows implementation, manual, credentialed, cross-platform, Homebrew, Google Docs, and ready-to-send lanes without hiding external release proof."
     })
+}
+
+fn release_dashboard_provider_runtime_state() -> (String, String) {
+    let provider_report = read_json_report(Path::new(".tmp/ai-provider-evidence/report.json")).ok();
+    let runtime_report = read_json_report(Path::new(".tmp/ai-runtime-evidence/report.json")).ok();
+    release_dashboard_provider_runtime_state_from_reports(
+        provider_report.as_ref(),
+        runtime_report.as_ref(),
+    )
+}
+
+pub(crate) fn release_dashboard_provider_runtime_state_from_reports(
+    provider_report: Option<&Value>,
+    runtime_report: Option<&Value>,
+) -> (String, String) {
+    let provider_accepted = release_dashboard_evidence_accepted(provider_report);
+    let runtime_accepted = release_dashboard_evidence_accepted(runtime_report);
+
+    match (provider_accepted, runtime_accepted) {
+        (true, true) => (
+            "complete".to_string(),
+            "AI provider endpoint evidence and Docs Live real-device runtime proof are accepted."
+                .to_string(),
+        ),
+        (true, false) => (
+            "credentialed".to_string(),
+            "AI provider endpoint evidence is accepted; Docs Live real-device microphone/clipboard runtime proof remains pending."
+                .to_string(),
+        ),
+        (false, true) => (
+            "credentialed".to_string(),
+            "Docs Live real-device runtime proof is accepted; live provider endpoint proof remains pending."
+                .to_string(),
+        ),
+        (false, false) => (
+            "credentialed".to_string(),
+            "Requires credentialed/local provider runtime proof for OpenAI-compatible, Ollama, and governed local-agent routes."
+                .to_string(),
+        ),
+    }
+}
+
+fn release_dashboard_evidence_accepted(report: Option<&Value>) -> bool {
+    let Some(report) = report else {
+        return false;
+    };
+    let status = readiness_string_field(report, "status").unwrap_or("unknown");
+    let accepted_evidence = report
+        .get("summary")
+        .map(|summary| number_field_u64(summary, "acceptedEvidence"))
+        .unwrap_or(0);
+    matches!(status, "accepted" | "ready") && accepted_evidence > 0
 }
 
 fn release_dashboard_homebrew_state() -> (String, String) {
