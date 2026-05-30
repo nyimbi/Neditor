@@ -47,6 +47,7 @@ const SUPPORTED_EXPORT_TARGETS: &[&str] = &[
 const STDOUT_EXPORT_TARGETS: &[&str] = &["html", "latex"];
 const BUSINESS_DOCUMENT_SOURCE: &str = include_str!("../../src/lib/businessDocuments.ts");
 const TRANSFORM_TEMPLATE_SOURCE: &str = include_str!("../../src/lib/transformTemplates.ts");
+const APP_SOURCE: &str = include_str!("../../src/App.vue");
 const IMPROVEMENTS_SOURCE: &str = include_str!("../../docs/100-improve.md");
 const IMPROVEMENT_EVIDENCE_SOURCE: &str = concat!(
     include_str!("../../docs/spec-completion-matrix.md"),
@@ -138,6 +139,11 @@ const CLI_COMMANDS: &[&str] = &[
     "voice",
     "voice-command",
     "dictate",
+    "accessibility",
+    "a11y",
+    "screen-reader-qa",
+    "release-dashboard",
+    "release-evidence-dashboard",
     "readiness",
     "release-readiness",
     "evidence",
@@ -645,6 +651,10 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "setup" | "config" | "configure" | "configurator" => run_setup_command(&args[2..]),
         "voice" | "voice-command" | "dictate" => run_voice_command(&args[2..], stdin_text),
+        "accessibility" | "a11y" | "screen-reader-qa" => run_accessibility_command(&args[2..]),
+        "release-dashboard" | "release-evidence-dashboard" => {
+            run_release_dashboard_command(&args[2..])
+        }
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
         "evidence" | "evidence-status" => run_evidence_command(&args[2..]),
         "evidence-packet" | "evidence-return-packet" | "release-evidence-packet" => {
@@ -6471,6 +6481,398 @@ fn voice_command_markdown(report: &Value) -> String {
     lines.join("\n")
 }
 
+fn run_accessibility_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut manual_signoff = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--markdown" | "--report" => {}
+            "--manual-signoff" | "--assistive-tech-reviewed" => manual_signoff = true,
+            value => return Err(format!("Unsupported accessibility option '{value}'")),
+        }
+        index += 1;
+    }
+    let report = build_accessibility_qa_report(manual_signoff);
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: accessibility_qa_markdown(&report),
+        exit_code: 0,
+    })
+}
+
+fn build_accessibility_qa_report(manual_signoff: bool) -> Value {
+    let items = vec![
+        accessibility_item(
+            "screen-reader-workbench-regions",
+            "Screen-reader workbench regions",
+            source_has_all(APP_SOURCE, &["aria-label=\"NEditor workbench\"", "aria-label=\"Document source editor\"", "aria-label=\"Document preview\""]),
+            "Expose source editor, preview, sidebars, and workbench regions with stable accessible labels.",
+        ),
+        accessibility_item(
+            "screen-reader-navigation",
+            "Screen-reader navigation",
+            source_has_all(APP_SOURCE, &["Open Accessibility QA", "screen-reader", "command palette"]),
+            "Verify outline, command palette, menus, and document landmarks with VoiceOver or another screen reader.",
+        ),
+        accessibility_item(
+            "toolbar-state",
+            "Toolbar state and help",
+            source_has_all(APP_SOURCE, &["toolbarDisplay", "toolbarCollapsedRows", "button-help"]),
+            "Expose toolbar display mode, collapsed toolbar state, and hover/focus help text.",
+        ),
+        accessibility_item(
+            "dialogs-focus",
+            "Dialogs and focus order",
+            source_has_all(APP_SOURCE, &["role=\"dialog\"", "aria-modal", "focus"]),
+            "Keep dialogs labelled, modal where appropriate, and able to return focus to the invoking control.",
+        ),
+        accessibility_item(
+            "status-messages",
+            "Status messages",
+            source_has_all(APP_SOURCE, &["statusMessage", "aria-live", "role=\"status\""]),
+            "Announce save, export, voice, release, and error status changes without stealing focus.",
+        ),
+        accessibility_item(
+            "keyboard-command-access",
+            "Keyboard command access",
+            source_has_all(APP_SOURCE, &["commandPalette", "keyboard", "shortcuts"]),
+            "Ensure every major workflow is reachable through menus, command palette, or keyboard controls.",
+        ),
+        accessibility_item(
+            "contrast-motion",
+            "Contrast and reduced motion",
+            source_has_all(APP_SOURCE, &["highContrast", "reducedMotion"]),
+            "Support long writing sessions with high-contrast and reduced-motion preferences.",
+        ),
+        json!({
+            "id": "manual-assistive-tech-signoff",
+            "label": "Manual screen-reader sign-off",
+            "status": if manual_signoff { "ready" } else { "needs-review" },
+            "lane": "manual",
+            "detail": if manual_signoff {
+                "Manual assistive-technology sign-off was declared for this packet."
+            } else {
+                "Release evidence still requires a human screen-reader pass with VoiceOver, NVDA, JAWS, or an approved assistive technology."
+            },
+            "action": "Run pnpm run check:a11y:manual with a completed reviewer sign-off before public release."
+        }),
+    ];
+    let counts = lane_status_counts(&items);
+    let blocked = *counts.get("blocked").unwrap_or(&0);
+    let needs_review = *counts.get("needs-review").unwrap_or(&0);
+    let status = if blocked > 0 {
+        "blocked"
+    } else if needs_review > 0 {
+        "needs-review"
+    } else {
+        "ready"
+    };
+    json!({
+        "schema": "neditor.ned-accessibility-qa.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "status": status,
+        "counts": counts,
+        "items": items,
+        "screenReaderQaMode": {
+            "enabledInApp": APP_SOURCE.contains("openAccessibilityQaPanel"),
+            "menuAndCommandPalette": source_has_all(APP_SOURCE, &["Open Accessibility QA", "Insert accessibility QA report"]),
+            "validates": [
+                "document navigation",
+                "accessible labels",
+                "toolbar state",
+                "dialogs and focus order",
+                "status messages",
+                "keyboard reachability",
+                "manual assistive-technology sign-off"
+            ]
+        },
+        "nextCommands": [
+            "pnpm run check:a11y",
+            "pnpm run check:a11y:runtime",
+            "pnpm run check:a11y:manual",
+            "ned accessibility --json"
+        ],
+        "note": "This packet proves the accessibility QA mode and checklist contract. Public release still requires current manual assistive-technology sign-off."
+    })
+}
+
+fn accessibility_item(id: &str, label: &str, ready: bool, detail: &str) -> Value {
+    json!({
+        "id": id,
+        "label": label,
+        "status": if ready { "ready" } else { "blocked" },
+        "lane": if ready { "complete" } else { "blocked" },
+        "detail": detail,
+        "action": if ready { "Keep this coverage current when UI regions or commands change." } else { "Restore this accessibility surface before release." }
+    })
+}
+
+fn source_has_all(source: &str, needles: &[&str]) -> bool {
+    needles.iter().all(|needle| source.contains(needle))
+}
+
+fn lane_status_counts(items: &[Value]) -> BTreeMap<String, u64> {
+    let mut counts = BTreeMap::new();
+    for item in items {
+        let status = readiness_string_field(item, "status").unwrap_or("unknown");
+        *counts.entry(status.to_string()).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn accessibility_qa_markdown(report: &Value) -> String {
+    let mut lines = vec![
+        "# NEditor Screen-Reader QA Mode".to_string(),
+        "".to_string(),
+        format!(
+            "Status: {}",
+            readiness_string_field(report, "status").unwrap_or("unknown")
+        ),
+        "".to_string(),
+        "| Check | Status | Detail | Action |".to_string(),
+        "| --- | --- | --- | --- |".to_string(),
+    ];
+    for item in readiness_array_field(report, "items") {
+        lines.push(format!(
+            "| {} | {} | {} | {} |",
+            markdown_cell(readiness_string_field(&item, "label").unwrap_or("")),
+            markdown_cell(readiness_string_field(&item, "status").unwrap_or("unknown")),
+            markdown_cell(readiness_string_field(&item, "detail").unwrap_or("")),
+            markdown_cell(readiness_string_field(&item, "action").unwrap_or("")),
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Next Commands".to_string(),
+        "".to_string(),
+    ]);
+    for command in readiness_array_field(report, "nextCommands") {
+        if let Some(command) = command.as_str() {
+            lines.push(format!("- `{}`", markdown_cell(command)));
+        }
+    }
+    lines.join("\n")
+}
+
+fn run_release_dashboard_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--markdown" | "--report" => {}
+            value => return Err(format!("Unsupported release-dashboard option '{value}'")),
+        }
+        index += 1;
+    }
+    let report = build_release_dashboard_report();
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: release_dashboard_markdown(&report),
+        exit_code: 0,
+    })
+}
+
+fn build_release_dashboard_report() -> Value {
+    let improvement_audit = build_improvements_audit_report();
+    let summary = improvement_audit.get("summary").unwrap_or(&Value::Null);
+    let open_improvements = number_field_u64(summary, "open");
+    let accessibility = build_accessibility_qa_report(false);
+    let mut items = vec![
+        release_dashboard_item(
+            "implementation-roadmap",
+            if open_improvements == 0 { "ready-to-send" } else { "blocked" },
+            "100 improvement implementation audit",
+            &format!("{open_improvements} improvement item(s) still require proof."),
+            "ned improvements --json",
+        ),
+        release_dashboard_item(
+            "accessibility-screen-reader",
+            if readiness_string_field(&accessibility, "status").unwrap_or("unknown") == "ready" {
+                "complete"
+            } else {
+                "manual"
+            },
+            "Accessibility and screen-reader evidence",
+            readiness_string_field(&accessibility, "status").unwrap_or("unknown"),
+            "ned accessibility --json && pnpm run check:a11y:manual",
+        ),
+        release_dashboard_item(
+            "provider-runtime",
+            "credentialed",
+            "Provider-agnostic AI runtime",
+            "Requires credentialed/local provider runtime proof for OpenAI-compatible, Ollama, and governed local-agent routes.",
+            "pnpm run check:ai-runtime && pnpm run check:ai-provider",
+        ),
+        release_dashboard_item(
+            "google-docs-import",
+            "credentialed",
+            "Google Docs import/readback",
+            "Requires live Google Drive upload/import/readback evidence with current credentials.",
+            "pnpm run check:google-docs-import",
+        ),
+        release_dashboard_item(
+            "homebrew-signing",
+            "credentialed",
+            "Homebrew, signing, and notarization",
+            "Requires signed/notarized macOS artifact, concrete cask SHA, and Homebrew audit evidence.",
+            "pnpm run check:homebrew && pnpm run check:release-signing",
+        ),
+        release_dashboard_item(
+            "platform-packaging",
+            "cross-platform",
+            "Windows/Linux package evidence",
+            "Requires supported-host package execution and current-source platform evidence.",
+            "pnpm run check:platform-evidence",
+        ),
+    ];
+    let has_open = open_improvements > 0
+        || items.iter().any(|item| {
+            !matches!(
+                readiness_string_field(item, "lane"),
+                Some("complete" | "ready-to-send")
+            )
+        });
+    items.push(release_dashboard_item(
+        "ready-to-send",
+        if has_open { "blocked" } else { "ready-to-send" },
+        "Ready to send release",
+        if has_open {
+            "Release remains blocked until credentialed, manual, platform, Homebrew, Google Docs, and AI runtime evidence are current."
+        } else {
+            "All release evidence lanes are complete and ready to send."
+        },
+        "pnpm run check:release-readiness",
+    ));
+    let counts = release_dashboard_lane_counts(&items);
+    let status = if *counts.get("blocked").unwrap_or(&0) > 0 {
+        "blocked"
+    } else if *counts.get("credentialed").unwrap_or(&0) > 0
+        || *counts.get("manual").unwrap_or(&0) > 0
+        || *counts.get("cross-platform").unwrap_or(&0) > 0
+    {
+        "needs-evidence"
+    } else {
+        "ready"
+    };
+    json!({
+        "schema": "neditor.ned-release-dashboard.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "status": status,
+        "counts": counts,
+        "productionReady": status == "ready",
+        "items": items,
+        "improvementAudit": {
+            "implementedEvidencePresent": number_field_u64(summary, "implementedEvidencePresent"),
+            "partialOrExternal": number_field_u64(summary, "partialOrExternal"),
+            "open": open_improvements,
+        },
+        "showsLanes": [
+            "complete",
+            "blocked",
+            "manual",
+            "credentialed",
+            "cross-platform",
+            "stale",
+            "ready-to-send"
+        ],
+        "nextCommands": [
+            "ned release-dashboard --json",
+            "ned improvements --json",
+            "ned accessibility --json",
+            "pnpm run collect:evidence-kit",
+            "pnpm run check:release-readiness"
+        ],
+        "note": "The dashboard is intentionally conservative: it shows implementation, manual, credentialed, cross-platform, Homebrew, Google Docs, and ready-to-send lanes without hiding external release proof."
+    })
+}
+
+fn release_dashboard_item(id: &str, lane: &str, label: &str, detail: &str, command: &str) -> Value {
+    json!({
+        "id": id,
+        "lane": lane,
+        "label": label,
+        "detail": detail,
+        "command": command,
+        "readyToSend": lane == "complete" || lane == "ready-to-send",
+    })
+}
+
+fn release_dashboard_lane_counts(items: &[Value]) -> BTreeMap<String, u64> {
+    let mut counts = BTreeMap::from([
+        ("complete".to_string(), 0),
+        ("blocked".to_string(), 0),
+        ("manual".to_string(), 0),
+        ("credentialed".to_string(), 0),
+        ("cross-platform".to_string(), 0),
+        ("stale".to_string(), 0),
+        ("ready-to-send".to_string(), 0),
+    ]);
+    for item in items {
+        let lane = readiness_string_field(item, "lane").unwrap_or("blocked");
+        *counts.entry(lane.to_string()).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn release_dashboard_markdown(report: &Value) -> String {
+    let mut lines = vec![
+        "# NEditor Release Evidence Dashboard".to_string(),
+        "".to_string(),
+        format!(
+            "Status: {}",
+            readiness_string_field(report, "status").unwrap_or("unknown")
+        ),
+        format!(
+            "Production ready: {}",
+            if report
+                .get("productionReady")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                "yes"
+            } else {
+                "no"
+            }
+        ),
+        "".to_string(),
+        "| Lane | Evidence | Detail | Command |".to_string(),
+        "| --- | --- | --- | --- |".to_string(),
+    ];
+    for item in readiness_array_field(report, "items") {
+        lines.push(format!(
+            "| {} | {} | {} | `{}` |",
+            markdown_cell(readiness_string_field(&item, "lane").unwrap_or("blocked")),
+            markdown_cell(readiness_string_field(&item, "label").unwrap_or("")),
+            markdown_cell(readiness_string_field(&item, "detail").unwrap_or("")),
+            markdown_cell(readiness_string_field(&item, "command").unwrap_or("")),
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Next Commands".to_string(),
+        "".to_string(),
+    ]);
+    for command in readiness_array_field(report, "nextCommands") {
+        if let Some(command) = command.as_str() {
+            lines.push(format!("- `{}`", markdown_cell(command)));
+        }
+    }
+    lines.join("\n")
+}
+
 fn run_completions_command(args: &[String]) -> Result<CliOutcome, String> {
     let shell = args
         .first()
@@ -9594,7 +9996,25 @@ fn improvement_evidence_signals(item: &ImprovementItem) -> Vec<String> {
 fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool {
     if matches!(
         item.number,
-        11 | 18 | 32 | 33 | 40 | 74 | 75 | 79 | 80 | 81 | 82 | 83 | 84 | 85 | 91 | 92 | 93 | 94
+        11 | 18
+            | 32
+            | 33
+            | 40
+            | 74
+            | 75
+            | 79
+            | 80
+            | 81
+            | 82
+            | 83
+            | 84
+            | 85
+            | 86
+            | 91
+            | 92
+            | 93
+            | 94
+            | 99
     ) {
         return false;
     }
@@ -17730,6 +18150,12 @@ _ned() {{
       voice|voice-command|dictate)
         COMPREPLY=( $(compgen -W "--text --transcript --document-type --type --context --selected-text --selection --json --markdown --report" -- "$cur") )
         ;;
+      accessibility|a11y|screen-reader-qa)
+        COMPREPLY=( $(compgen -W "--json --markdown --report --manual-signoff --assistive-tech-reviewed" -- "$cur") )
+        ;;
+      release-dashboard|release-evidence-dashboard)
+        COMPREPLY=( $(compgen -W "--json --markdown --report" -- "$cur") )
+        ;;
       readiness|release-readiness)
         COMPREPLY=( $(compgen -W "--json --strict --report --action-plan --plan --evidence-kit" -- "$cur") )
         ;;
@@ -17870,6 +18296,12 @@ _ned() {{
       ;;
     voice|voice-command|dictate)
       _arguments '*:dictated instruction:' '--text[dictated instruction text]:text:' '--transcript[alias for --text]:text:' '--document-type[target document type]:type:' '--type[alias for --document-type]:type:' '--context[extra context for Docs Live]:context:' '--selected-text[selected text for revision or read-aloud]:text:' '--selection[alias for --selected-text]:text:' '--json[print machine-readable JSON]' '--markdown[print Markdown voice command packet]' '--report[alias for --markdown]'
+      ;;
+    accessibility|a11y|screen-reader-qa)
+      _arguments '--json[print machine-readable JSON]' '--markdown[print Markdown screen-reader QA packet]' '--report[alias for --markdown]' '--manual-signoff[declare manual assistive-technology sign-off for this packet]' '--assistive-tech-reviewed[alias for --manual-signoff]'
+      ;;
+    release-dashboard|release-evidence-dashboard)
+      _arguments '--json[print machine-readable JSON]' '--markdown[print Markdown release evidence dashboard]' '--report[alias for --markdown]'
       ;;
     readiness|release-readiness)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when release gaps remain]' '--report[read a specific release-readiness report]:file:_files' '--action-plan[attach release evidence-kit work items for each gap]' '--plan[alias for --action-plan]' '--evidence-kit[read a release evidence-kit directory or manifest]:file:_files'
@@ -18104,6 +18536,22 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l markdown"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l report"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from accessibility a11y screen-reader-qa' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from accessibility a11y screen-reader-qa' -l markdown"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from accessibility a11y screen-reader-qa' -l report"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from accessibility a11y screen-reader-qa' -l manual-signoff"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from accessibility a11y screen-reader-qa' -l assistive-tech-reviewed"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from release-dashboard release-evidence-dashboard' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from release-dashboard release-evidence-dashboard' -l markdown"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from release-dashboard release-evidence-dashboard' -l report"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
@@ -19173,6 +19621,8 @@ fn help_text() -> String {
             .to_string(),
         "  ned improvements [--json] [--strict] [--output improvement-coverage.md]"
             .to_string(),
+        "  ned accessibility [--json|--markdown] [--manual-signoff]".to_string(),
+        "  ned release-dashboard [--json|--markdown]".to_string(),
         "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--spec-work-orders path] [--release-candidate-dir path] [--engine-report path] [--evidence-root .tmp] [--evidence-kit .tmp/release-evidence-kit] [--output support.json]"
             .to_string(),
         "  ned completions <bash|zsh|fish>".to_string(),

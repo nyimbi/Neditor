@@ -2562,6 +2562,92 @@ fn ned_cli_routes_voice_commands_to_creation_revision_and_read_aloud() {
 }
 
 #[test]
+fn ned_cli_reports_accessibility_qa_and_release_dashboard() {
+    let a11y = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "accessibility".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("accessibility json");
+    assert_eq!(a11y.exit_code, 0);
+    let a11y_report: serde_json::Value =
+        serde_json::from_str(&a11y.message).expect("accessibility report json");
+    assert_eq!(a11y_report["schema"], "neditor.ned-accessibility-qa.v1");
+    assert_eq!(a11y_report["screenReaderQaMode"]["enabledInApp"], true);
+    assert_eq!(a11y_report["status"], "needs-review");
+    assert!(a11y_report["items"]
+        .as_array()
+        .expect("accessibility items")
+        .iter()
+        .any(|item| item["id"] == "manual-assistive-tech-signoff"
+            && item["status"] == "needs-review"));
+    assert!(a11y_report["nextCommands"]
+        .as_array()
+        .expect("a11y next commands")
+        .iter()
+        .any(|command| command == "pnpm run check:a11y:manual"));
+
+    let a11y_markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "screen-reader-qa".to_string(),
+        "--markdown".to_string(),
+    ])
+    .expect("accessibility markdown");
+    assert!(a11y_markdown
+        .message
+        .contains("# NEditor Screen-Reader QA Mode"));
+
+    let dashboard = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "release-dashboard".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("release dashboard json");
+    assert_eq!(dashboard.exit_code, 0);
+    let dashboard_report: serde_json::Value =
+        serde_json::from_str(&dashboard.message).expect("release dashboard report json");
+    assert_eq!(
+        dashboard_report["schema"],
+        "neditor.ned-release-dashboard.v1"
+    );
+    assert_eq!(dashboard_report["productionReady"], false);
+    for lane in ["credentialed", "manual", "ready-to-send"] {
+        assert!(dashboard_report["showsLanes"]
+            .as_array()
+            .expect("shown lanes")
+            .iter()
+            .any(|item| item == lane));
+    }
+    for item_id in [
+        "provider-runtime",
+        "google-docs-import",
+        "homebrew-signing",
+        "ready-to-send",
+    ] {
+        assert!(dashboard_report["items"]
+            .as_array()
+            .expect("dashboard items")
+            .iter()
+            .any(|item| item["id"] == item_id));
+    }
+    assert!(dashboard_report["nextCommands"]
+        .as_array()
+        .expect("dashboard next commands")
+        .iter()
+        .any(|command| command == "ned accessibility --json"));
+
+    let dashboard_markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "release-evidence-dashboard".to_string(),
+        "--markdown".to_string(),
+    ])
+    .expect("release dashboard markdown");
+    assert!(dashboard_markdown
+        .message
+        .contains("# NEditor Release Evidence Dashboard"));
+}
+
+#[test]
 fn ned_cli_reads_release_readiness_reports_without_rerunning_checks() {
     let root = temp_workspace_path("readiness");
     fs::create_dir_all(&root).expect("create readiness root");
@@ -3650,6 +3736,7 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         (83, "Read selected text aloud"),
         (84, "Consent-gated TTS models"),
         (85, "Voice correction loop"),
+        (86, "Screen-reader QA mode"),
         (91, "Unified configurator"),
         (92, "Guided provider setup"),
         (93, "Ollama model picker"),
@@ -3658,6 +3745,7 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         (88, "Keyboard-first table editing"),
         (89, "High-contrast and reduced-motion modes"),
         (90, "Plain-language help overlays"),
+        (99, "Release evidence dashboard"),
     ] {
         assert!(report["items"]
             .as_array()
@@ -3667,10 +3755,7 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
                 && item["title"] == title
                 && item["status"] == "implemented-evidence-present"));
     }
-    for (number, title) in [
-        (73, "Google Docs import handoff"),
-        (86, "Screen-reader QA mode"),
-    ] {
+    for (number, title) in [(73, "Google Docs import handoff")] {
         assert!(report["items"]
             .as_array()
             .expect("improvement items")
@@ -3679,11 +3764,6 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
                 && item["title"] == title
                 && item["status"] == "partial-or-external-evidence"));
     }
-    assert!(report["items"]
-        .as_array()
-        .expect("improvement items")
-        .iter()
-        .any(|item| item["number"] == 99 && item["title"] == "Release evidence dashboard"));
     assert!(report["items"]
         .as_array()
         .expect("improvement items")

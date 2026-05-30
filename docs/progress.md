@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `b181beb Make
-  publishing handoffs target-specific`
+- Latest inspected committed baseline before this update: `1c87a74 Route
+  dictated document commands through ned`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,40 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Scriptable Accessibility And Release Dashboard
+
+Screen-reader QA and release evidence now have terminal evidence surfaces that
+mirror the in-app panels. `ned accessibility`, `ned a11y`, and
+`ned screen-reader-qa` emit a structured packet for workbench landmarks,
+source/preview regions, toolbar state/help, dialogs and focus order, status
+messages, keyboard command access, contrast, reduced motion, and manual
+assistive-technology sign-off. The packet stays in `needs-review` until a
+human reviewer explicitly supplies manual sign-off.
+
+`ned release-dashboard` and `ned release-evidence-dashboard` now generate a
+conservative release dashboard with implementation, accessibility, provider
+runtime, Google Docs import/readback, Homebrew/signing, platform packaging, and
+ready-to-send lanes. This closes the roadmap evidence surface for the
+screen-reader QA mode and release evidence dashboard without pretending that
+credentialed provider runtime, live Google Docs import, or Homebrew publication
+proof exists.
+
+This moves the conservative 100-improvement audit from 95/100 to 97/100
+implementation-evidenced items. The remaining 3 items are provider-agnostic AI
+runtime credentialed proof, Google Docs live import/readback proof, and final
+Homebrew release proof.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 38 CLI tests passed and the debug `ned` binary rebuilt; `ned_cli_reports_accessibility_qa_and_release_dashboard` verifies the new screen-reader QA packet, release-dashboard packet, Markdown output, visible external evidence lanes, and conservative production-ready status. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding explicit workbench, source editor, and document preview accessible landmarks. |
+| `src-tauri/target/debug/ned accessibility --json` | Pass with manual review pending | Direct smoke returned `neditor.ned-accessibility-qa.v1`, 7 ready checks, 1 `needs-review` manual assistive-technology sign-off, and enabled in-app screen-reader QA mode evidence. |
+| `src-tauri/target/debug/ned release-dashboard --json` | Pass with release blockers | Direct smoke returned `neditor.ned-release-dashboard.v1`, 97/100 implementation-evidenced items, blocked ready-to-send status, and credentialed/manual/cross-platform evidence lanes for remaining release proof. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 97/100 implementation-evidenced items and 3 partial/external-proof items: provider-agnostic AI runtime, Google Docs import handoff, and Homebrew release path. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting scriptable accessibility and release-dashboard packets. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after adding accessibility and release-dashboard CLI commands. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Scriptable Voice Command Packet
 

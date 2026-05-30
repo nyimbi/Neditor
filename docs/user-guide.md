@@ -1016,6 +1016,12 @@ smoke checks, Homebrew audit output, signing proof, and notarization proof must
 be backed by explicit evidence before the dashboard can mark a package ready to
 send.
 
+Use `ned release-dashboard --json` or `ned release-dashboard --markdown` to
+create the same release evidence dashboard from a terminal. The packet shows
+implementation, manual, credentialed, cross-platform, Homebrew, Google Docs,
+and ready-to-send lanes so release managers can see what is complete and what
+still depends on external proof.
+
 ## Accessibility QA
 
 Open **Settings** -> **Appearance** to review the in-app **Accessibility QA**
@@ -1028,6 +1034,12 @@ document is heading to external review. The panel can switch on high contrast,
 switch on reduced motion, and insert an **Accessibility QA Report** into the
 active Markdown document so a reviewer or release manager can see exactly what
 has been checked and what still requires manual screen-reader sign-off.
+
+Use `ned accessibility --json`, `ned accessibility --markdown`, or
+`ned screen-reader-qa --markdown` to generate a scriptable screen-reader QA
+packet. Add `--manual-signoff` only after a reviewer has completed the
+assistive-technology pass; until then the packet deliberately remains in
+`needs-review` status.
 
 ## Troubleshooting
 

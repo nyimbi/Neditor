@@ -433,6 +433,7 @@
       class="workspace"
       :class="[`mode-${store.mode}`, { 'workspace-writing-maximized': writingSpaceMaximized }]"
       :style="workspaceStyle"
+      aria-label="NEditor workbench"
       tabindex="-1"
     >
       <button
@@ -4663,7 +4664,7 @@
         </template>
       </aside>
 
-      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" aria-label="Markdown source" tabindex="-1">
+      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" aria-label="Document source editor" tabindex="-1">
         <div class="editor-split-grid" :data-split-source="store.splitSourcePanes ? 'true' : 'false'">
           <div ref="editorHost" class="editor-host editor-host-primary" aria-label="Primary Markdown source pane"></div>
           <div v-if="store.splitSourcePanes" ref="secondaryEditorHost" class="editor-host editor-host-secondary" aria-label="Secondary Markdown source pane"></div>
@@ -4690,7 +4691,7 @@
         v-show="store.mode !== 'source' && store.mode !== 'focus' && store.mode !== 'outline'"
         class="preview-pane"
         :data-preview-theme="store.previewTheme"
-        aria-label="Live preview"
+        aria-label="Document preview"
         tabindex="-1"
         @scroll="syncEditorScrollFromPreview"
       >
