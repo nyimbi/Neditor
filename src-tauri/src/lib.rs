@@ -547,6 +547,7 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .build()?;
 
     let help_menu = SubmenuBuilder::new(app, "Help")
+        .item(&menu_item(app, "neditor-start-workspace", "Start Workspace")?)
         .item(&menu_item(app, "neditor-open-help", "NEditor Help Center")?)
         .item(&menu_item(app, "neditor-guided-demo", "Guided Demo")?)
         .separator()

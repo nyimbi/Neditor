@@ -8931,6 +8931,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(tauriLib.includes("download_tts_model"));
   ok(tauriLib.includes("list_ollama_models"));
   ok(tauriLib.includes('"neditor-open-help", "NEditor Help Center"'));
+  ok(tauriLib.includes('"neditor-start-workspace", "Start Workspace"'));
   ok(tauriLib.includes('"neditor-open-deep-research",'));
   ok(tauriLib.includes('"neditor-open-agent-workspace",'));
   ok(tauriLib.includes('"neditor-ai-create-document",'));
@@ -8952,6 +8953,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('case "neditor-go-to-source-table"'));
   ok(app.includes('case "neditor-install-transform-handlers"'));
   ok(app.includes('case "neditor-open-help"'));
+  ok(app.includes('case "neditor-start-workspace"'));
   ok(app.includes('case "neditor-open-agent-workspace"'));
   ok(app.includes('case "neditor-run-qa-review"'));
   ok(app.includes('case "neditor-wizard-technical-textbook"'));
@@ -8978,6 +8980,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('value="layout"'));
   ok(store.includes('| "help"'));
   ok(store.includes('| "layout"'));
+  ok(app.includes('aria-label="Start Workspace cockpit"'));
+  ok(app.includes("startWorkspaceItems"));
+  ok(app.includes("startWorkspaceSummary"));
+  ok(app.includes("runStartWorkspaceAction"));
+  ok(app.includes("insertStartWorkspaceChecklist"));
+  ok(app.includes("NEditor Start Workspace Checklist"));
+  ok(app.includes("Open Start Workspace"));
+  ok(app.includes("Insert Start Workspace checklist"));
   ok(app.includes('store.sidebar === \'templates\''));
   ok(store.includes("toolbarTextSize: 10"));
   ok(store.includes("toolbarCollapsedRows: []"));

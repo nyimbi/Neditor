@@ -2875,13 +2875,40 @@
               </label>
             </div>
             <div class="help-quick-actions" aria-label="Popular help actions">
-              <button type="button" @click="openHelp('getting-started')">Start</button>
+              <button type="button" @click="openStartWorkspace()">Start Workspace</button>
               <button type="button" @click="openHelp('docs-live')">Docs Live</button>
               <button type="button" @click="openHelp('agent-lifecycle-governance')">AI Governance</button>
               <button type="button" @click="openGuidedDemo()">Guided demo</button>
               <button type="button" @click="openHelp('export-publishing')">Export</button>
               <button type="button" @click="openHelp('keyboard-shortcuts')">Shortcuts</button>
             </div>
+            <section class="start-workspace-cockpit" aria-label="Start Workspace cockpit">
+              <header>
+                <div>
+                  <strong>Start Workspace</strong>
+                  <span>{{ startWorkspaceSummary }}</span>
+                </div>
+                <button
+                  type="button"
+                  title="Insert the current onboarding checklist into the active document for review, delegation, or handoff"
+                  @click="insertStartWorkspaceChecklist"
+                >
+                  Insert checklist
+                </button>
+              </header>
+              <ol class="start-workspace-steps" aria-label="Workspace setup and creation steps">
+                <li v-for="item in startWorkspaceItems" :key="item.id" :class="{ complete: item.done }">
+                  <div>
+                    <strong>{{ item.label }}</strong>
+                    <span>{{ item.status }}</span>
+                    <small>{{ item.detail }}</small>
+                  </div>
+                  <button type="button" :disabled="item.disabled" :title="item.title" @click="runStartWorkspaceAction(item)">
+                    {{ item.actionLabel }}
+                  </button>
+                </li>
+              </ol>
+            </section>
             <section class="help-topic-list" role="list" aria-label="Help topics">
               <div v-for="topic in filteredHelpTopics" :key="topic.id" role="listitem">
                 <button
@@ -7360,6 +7387,20 @@ interface HelpTopic {
   keywords: string[];
 }
 
+type StartWorkspaceActionId = "identity" | "setup" | "wizard" | "docs-live" | "templates" | "demo" | "export" | "cli";
+
+interface StartWorkspaceItem {
+  id: StartWorkspaceActionId;
+  label: string;
+  status: string;
+  detail: string;
+  actionLabel: string;
+  title: string;
+  done: boolean;
+  disabled?: boolean;
+  run: () => unknown;
+}
+
 interface GuidedDemoStep {
   id: string;
   title: string;
@@ -9027,6 +9068,33 @@ const helpCategoryOptions: { id: HelpCategory; label: string }[] = [
 ];
 const helpTopics = computed<HelpTopic[]>(() => [
   {
+    id: "start-workspace",
+    title: "Start Workspace",
+    category: "basics",
+    summary: "Use one cockpit to set identity, configure AI, choose a document path, draft with Docs Live, reuse blocks, and prepare delivery.",
+    when: "Use this before creating an important business document, onboarding a new user, or checking whether the workspace is ready for production work.",
+    steps: [
+      "Fill the reusable business identity fields that appear in proposals, tenders, snippets, and cover pages.",
+      "Open setup to configure LLM access, Ollama endpoints, local agents, Google Docs, voice, transforms, export defaults, and CLI deployment.",
+      "Choose a wizard or template path for the business outcome before drafting prose.",
+      "Launch Docs Live when an outline or enough context exists for AI-assisted section-by-section drafting.",
+      "Run export readiness before delivery and insert the launch checklist when the document needs a visible handoff.",
+    ],
+    tips: [
+      "Start Workspace is a launcher, not a separate mode: every button routes to the real feature surface.",
+      "The readiness count is practical so non-technical users know the next valuable action.",
+      "Insert checklist creates a document-visible plan for managers, reviewers, or support staff.",
+    ],
+    actions: [
+      { label: "Open setup", run: () => openConfigurationSetup() },
+      { label: "Set identity", run: () => openBusinessProfile() },
+      { label: "Browse wizards", run: () => openDocumentWizardHub() },
+      { label: "Launch Docs Live", run: () => openDocsLive() },
+      { label: "Insert checklist", run: () => insertStartWorkspaceChecklist() },
+    ],
+    keywords: ["start", "onboarding", "setup", "workspace", "checklist", "identity", "wizard", "launch"],
+  },
+  {
     id: "ai-first-composition",
     title: "AI-first document creation",
     category: "writing",
@@ -9515,6 +9583,111 @@ const selectedHelpTopic = computed(() => {
   if (selected && filteredHelpTopics.value.includes(selected)) return selected;
   return filteredHelpTopics.value[0] || helpTopics.value[0] || null;
 });
+const startWorkspaceIdentityCoreFields = computed(() => {
+  const profile = store.businessProfile as BusinessProfile;
+  const keys: Array<keyof BusinessProfile> = ["fullName", "email", "companyName", "brandVoice"];
+  return keys.filter((key) => (profile[key] || "").trim()).length;
+});
+const startWorkspaceItems = computed<StartWorkspaceItem[]>(() => {
+  const setupItems = configurationSetupStatus.value.items;
+  const setupDoneCount = setupItems.filter((item) => item.done).length;
+  const currentText = active.value.text.trim();
+  const hasStarterContent = currentText.length > 80;
+  const hasOutline = /^#{1,4}\s+/m.test(currentText) || Boolean(active.value.compile?.semantic.outline.length);
+  const hasTemplates = businessDocumentTemplates.length + businessDocumentSnippets.length > 0;
+  const exportReady = Boolean(store.exportReadiness?.manifest || active.value.compile?.export_manifest);
+  const cliReady = Boolean(cliDeployPlan.value?.applied && cliDeployPlan.value?.pathReady);
+  return [
+    {
+      id: "identity",
+      label: "Business identity",
+      status: `${startWorkspaceIdentityCoreFields.value}/4 core fields`,
+      detail: "Reusable name, email, company, and brand voice values flow into proposals, letters, snippets, and wizards.",
+      actionLabel: "Set identity",
+      title: "Open reusable business identity values",
+      done: startWorkspaceIdentityCoreFields.value >= 3,
+      run: () => openBusinessProfile(),
+    },
+    {
+      id: "setup",
+      label: "AI and app setup",
+      status: `${setupDoneCount}/${setupItems.length} setup areas ready`,
+      detail: "Configure LLM access, Ollama endpoints, local agents, Google Docs, voice, transforms, and export defaults in one place.",
+      actionLabel: "Open setup",
+      title: "Open the consolidated setup wizard",
+      done: setupItems.length > 0 && setupDoneCount === setupItems.length,
+      run: () => openConfigurationSetup(),
+    },
+    {
+      id: "wizard",
+      label: "Choose a document path",
+      status: `${businessDocumentTemplates.length} wizard templates`,
+      detail: "Start from proposals, RFP responses, board memos, lesson plans, textbooks, novels, scripts, and other structured workflows.",
+      actionLabel: "Browse wizards",
+      title: "Open AI document creation wizards and business templates",
+      done: hasStarterContent || hasOutline,
+      run: () => openDocumentWizardHub(),
+    },
+    {
+      id: "docs-live",
+      label: "Draft with Docs Live",
+      status: hasOutline ? "Outline available" : "Needs outline or context",
+      detail: "Use voice or typed context to let Docs Live ask for missing facts, draft section by section, QA the output, and prepare review.",
+      actionLabel: "Launch Docs Live",
+      title: "Open the Docs Live voice-first AI drafting wizard",
+      done: hasOutline,
+      run: () => openDocsLive(),
+    },
+    {
+      id: "templates",
+      label: "Reusable blocks",
+      status: `${businessDocumentSnippets.length} snippets and ${hasTemplates ? "template library ready" : "no templates"}`,
+      detail: "Insert reusable business clauses, profile-aware snippets, calculation templates, tables, diagrams, and standard document parts.",
+      actionLabel: "Open templates",
+      title: "Open templates, snippets, transform templates, and document outline starters",
+      done: hasTemplates,
+      run: () => openTransformTemplates(),
+    },
+    {
+      id: "demo",
+      label: "Product walkthrough",
+      status: guidedDemoCompletionSummary.value,
+      detail: "Tour the real product surfaces for AI creation, outline planning, templates, lifecycle review, provider governance, and export.",
+      actionLabel: "Run demo",
+      title: "Start the interactive guided demo",
+      done: guidedDemoCompletedCount.value === guidedDemoSteps.value.length && guidedDemoSteps.value.length > 0,
+      run: () => openGuidedDemo(),
+    },
+    {
+      id: "export",
+      label: "Delivery readiness",
+      status: exportReady ? "Readiness manifest available" : "Run export checks",
+      detail: "Prepare HTML, PDF, DOCX, LaTeX, Google Docs, EPUB, blog, Substack, and Markdown bundle delivery from one export surface.",
+      actionLabel: "Prepare export",
+      title: "Open export readiness and run delivery checks",
+      done: exportReady,
+      run: () => {
+        store.sidebar = "exports";
+        void prepareForExport();
+      },
+    },
+    {
+      id: "cli",
+      label: "Install ned CLI",
+      status: cliReady ? "Global command ready" : cliDeployPlan.value?.message || "Check CLI deployment",
+      detail: "Deploy the packaged ned command so non-technical users and scripts can open, validate, and convert documents from Terminal.",
+      actionLabel: cliDeployBusy.value ? "Deploying" : "Deploy CLI",
+      title: "Deploy the packaged ned command globally",
+      done: cliReady,
+      disabled: cliDeployBusy.value,
+      run: () => void deployCliGlobally(),
+    },
+  ];
+});
+const startWorkspaceDoneCount = computed(() => startWorkspaceItems.value.filter((item) => item.done).length);
+const startWorkspaceSummary = computed(() =>
+  `${startWorkspaceDoneCount.value}/${startWorkspaceItems.value.length} launch areas ready for document creation, review, and delivery.`,
+);
 const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
   {
     id: "ai-create",
@@ -9787,6 +9960,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "ai-paste", label: "AI Paste", title: "Paste from AI chat", icon: "ai", run: () => openAiPaste() },
       { id: "comment", label: "Comment", title: "Insert review comment", icon: "comment", run: () => insertBlock(commentSnippet) },
       { id: "commands", label: "Commands", title: "Open command palette", icon: "commands", run: () => (commandPaletteOpen.value = true) },
+      { id: "start-workspace", label: "Start", title: "Open the Start Workspace onboarding cockpit", icon: "help", primary: true, run: () => openStartWorkspace() },
       { id: "help", label: "Help", title: "Open Help Center", icon: "help", run: () => openHelp() },
       { id: "demo", label: "Demo", title: "Start guided product demo", icon: "help", run: () => openGuidedDemo() },
     ],
@@ -10087,6 +10261,7 @@ const appMenus = computed<AppMenu[]>(() => [
         id: "learn",
         label: "Learn",
         items: [
+          { id: "start-workspace", label: "Start Workspace", help: "Open the onboarding cockpit for setup, identity, wizards, Docs Live, templates, export, and CLI deployment.", run: () => openStartWorkspace() },
           { id: "help-center", label: "NEditor Help Center", help: "Open searchable guidance.", run: () => openHelp() },
           { id: "demo", label: "Guided Demo", help: "Walk through NEditor capabilities.", run: () => openGuidedDemo() },
           { id: "getting-started", label: "Getting Started", help: "Learn the workbench basics.", run: () => openHelp("getting-started") },
@@ -10270,8 +10445,43 @@ function openHelp(topicId = "getting-started") {
   selectedHelpTopicId.value = topicId;
   store.statusMessage = "Opened Help Center";
 }
+function openStartWorkspace() {
+  openHelp("start-workspace");
+  store.statusMessage = "Opened Start Workspace";
+}
 function runHelpAction(action: HelpTopicAction) {
   void action.run();
+}
+function runStartWorkspaceAction(item: StartWorkspaceItem) {
+  if (item.disabled) return;
+  void item.run();
+}
+function startWorkspaceChecklistMarkdown() {
+  const generatedAt = new Date().toISOString();
+  const rows = startWorkspaceItems.value.map((item) =>
+    `| ${item.done ? "Yes" : "No"} | ${item.label.replace(/\|/g, "\\|")} | ${item.status.replace(/\|/g, "\\|")} | ${item.actionLabel.replace(/\|/g, "\\|")} |`,
+  );
+  return [
+    "## NEditor Start Workspace Checklist",
+    "",
+    `Generated: ${generatedAt}`,
+    `Readiness: ${startWorkspaceSummary.value}`,
+    "",
+    "| Ready | Area | Status | Next action |",
+    "|---|---|---|---|",
+    ...rows,
+    "",
+    "### Launch notes",
+    "- Fill reusable business identity before creating client-facing documents.",
+    "- Configure AI, voice, transforms, Google Docs, exports, and CLI access from the setup wizard.",
+    "- Use Docs Live or a document wizard for the first draft, then keep QA, citations, and export readiness visible.",
+    "",
+  ].join("\n");
+}
+function insertStartWorkspaceChecklist() {
+  insertBlock(startWorkspaceChecklistMarkdown());
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted Start Workspace checklist";
 }
 function currentEditorSelectionText() {
   const selection = editorView?.state.selection.main;
@@ -12835,6 +13045,8 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Insert latest Docs Live review packet", group: "AI", run: () => insertLatestDocsLiveReviewPacket() },
   { name: "Copy latest Docs Live review packet", group: "AI", run: () => void copyLatestDocsLiveReviewPacket() },
   { name: "Paste from AI chat", group: "AI", run: () => openAiPaste() },
+  { name: "Open Start Workspace", group: "Help", description: "Open setup, identity, wizards, Docs Live, templates, export, and CLI launch controls.", keywords: ["start", "onboarding", "setup", "launch"], run: () => openStartWorkspace() },
+  { name: "Insert Start Workspace checklist", group: "Help", description: "Insert the current onboarding and readiness checklist into the document.", keywords: ["start", "checklist", "readiness", "handoff"], run: () => insertStartWorkspaceChecklist() },
   { name: "Open Help Center", group: "Help", run: () => openHelp() },
   { name: "Start guided demo", group: "Help", run: () => openGuidedDemo() },
   { name: "Help: AI-first composition", group: "Help", run: () => openHelp("ai-first-composition") },
@@ -13475,6 +13687,9 @@ async function runNativeMenuCommand(command: string) {
       break;
     case "neditor-open-help":
       openHelp();
+      break;
+    case "neditor-start-workspace":
+      openStartWorkspace();
       break;
     case "neditor-guided-demo":
       openGuidedDemo();
@@ -21907,6 +22122,8 @@ select:hover {
 .app-shell[data-theme="dark"] .template-source,
 .app-shell[data-theme="dark"] .template-meta span,
 .app-shell[data-theme="dark"] .help-topic-button,
+.app-shell[data-theme="dark"] .start-workspace-cockpit,
+.app-shell[data-theme="dark"] .start-workspace-steps li,
 .app-shell[data-theme="dark"] .help-topic-header small,
 .app-shell[data-theme="dark"] .help-keywords span,
 .app-shell[data-theme="dark"] .guided-demo-progress,
@@ -21978,6 +22195,9 @@ select:hover {
 .app-shell[data-theme="dark"] .template-card-header small,
 .app-shell[data-theme="dark"] .template-fill-fields,
 .app-shell[data-theme="dark"] .help-topic-button small,
+.app-shell[data-theme="dark"] .start-workspace-cockpit header span,
+.app-shell[data-theme="dark"] .start-workspace-steps small,
+.app-shell[data-theme="dark"] .start-workspace-steps span,
 .app-shell[data-theme="dark"] .help-topic-header p,
 .app-shell[data-theme="dark"] .help-when,
 .app-shell[data-theme="dark"] .help-tips,
@@ -22065,6 +22285,11 @@ select:hover {
   background: #203247;
 }
 
+.app-shell[data-theme="dark"] .start-workspace-steps li.complete {
+  border-color: #3f7d5a;
+  background: #193323;
+}
+
 @media (prefers-color-scheme: dark) {
   .app-shell[data-theme="system"] {
     color: #e6edf5;
@@ -22130,6 +22355,8 @@ select:hover {
   .app-shell[data-theme="system"] .template-source,
   .app-shell[data-theme="system"] .template-meta span,
   .app-shell[data-theme="system"] .help-topic-button,
+  .app-shell[data-theme="system"] .start-workspace-cockpit,
+  .app-shell[data-theme="system"] .start-workspace-steps li,
   .app-shell[data-theme="system"] .help-topic-header small,
   .app-shell[data-theme="system"] .help-keywords span,
   .app-shell[data-theme="system"] .guided-demo-progress,
@@ -22201,6 +22428,9 @@ select:hover {
   .app-shell[data-theme="system"] .template-card-header small,
   .app-shell[data-theme="system"] .template-fill-fields,
   .app-shell[data-theme="system"] .help-topic-button small,
+  .app-shell[data-theme="system"] .start-workspace-cockpit header span,
+  .app-shell[data-theme="system"] .start-workspace-steps small,
+  .app-shell[data-theme="system"] .start-workspace-steps span,
   .app-shell[data-theme="system"] .help-topic-header p,
   .app-shell[data-theme="system"] .help-when,
   .app-shell[data-theme="system"] .help-tips,
@@ -22287,6 +22517,11 @@ select:hover {
   .app-shell[data-theme="system"] .guided-demo-steps .active button {
     background: #203247;
   }
+
+  .app-shell[data-theme="system"] .start-workspace-steps li.complete {
+    border-color: #3f7d5a;
+    background: #193323;
+  }
 }
 
 .app-shell[data-high-contrast="true"] {
@@ -22308,6 +22543,8 @@ select:hover {
 .app-shell[data-high-contrast="true"] .template-source,
 .app-shell[data-high-contrast="true"] .template-meta span,
 .app-shell[data-high-contrast="true"] .help-topic-button,
+.app-shell[data-high-contrast="true"] .start-workspace-cockpit,
+.app-shell[data-high-contrast="true"] .start-workspace-steps li,
 .app-shell[data-high-contrast="true"] .help-topic-header small,
 .app-shell[data-high-contrast="true"] .help-keywords span,
 .app-shell[data-high-contrast="true"] .guided-demo-progress,
@@ -25006,6 +25243,75 @@ select:hover {
 .help-action-row button {
   min-height: 28px;
   padding: 4px 8px;
+}
+
+.start-workspace-cockpit {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d8e0e8;
+  border-left: 3px solid #2f6f7e;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.start-workspace-cockpit header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.start-workspace-cockpit header div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.start-workspace-cockpit header span,
+.start-workspace-steps small,
+.start-workspace-steps span {
+  color: #526171;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.start-workspace-steps {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.start-workspace-steps li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #d8e0e8;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.start-workspace-steps li.complete {
+  border-color: #9fc5b3;
+  background: #f2faf6;
+}
+
+.start-workspace-steps li > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.start-workspace-steps button,
+.start-workspace-cockpit header button {
+  min-height: 28px;
+  padding: 4px 8px;
+  white-space: nowrap;
 }
 
 .help-topic-list {
