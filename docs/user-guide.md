@@ -696,6 +696,13 @@ NEditor is built for drafts that need evidence before publication.
   paths, validator commands, and closure commands to the active document. Add
   the suggestion to editable setup notes when a non-technical user needs a
   clear setup record before changing configuration.
+- Dictated instructions can be audited from the terminal with
+  `ned voice "create a board memo; client: Acme; make section 3 more formal; read selected text aloud" --json`.
+  The voice packet routes natural-language instructions to Docs Live, the
+  outline-first wizard, correction loops, read-aloud engines, publishing
+  preflight, or Deep Research. It also records placeholder signals, selected
+  text length, read-aloud engine support, and the consent gate for model-backed
+  TTS without storing provider credentials.
 - For Claude Code, Codex, OpenCode, and Google Antigravity profiles, use
   **Prepare local agent workspace** to write the governed prompt package under
   `.neditor/agent-handoffs` in the active document folder. NEditor reports the

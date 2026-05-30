@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `fe35df0 Make setup
-  state scriptable from ned`
+- Latest inspected committed baseline before this update: `b181beb Make
+  publishing handoffs target-specific`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,42 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Scriptable Voice Command Packet
+
+Voice-first workflows now have a terminal evidence surface in addition to the
+Docs Live in-app wizard. `ned voice`, `ned voice-command`, and `ned dictate`
+accept dictated or typed natural-language instructions and emit a
+redaction-safe packet in JSON or Markdown. The packet routes instructions to
+Docs Live, voice-first outline creation, section-by-section drafting,
+correction loops, read-aloud, publishing preflight, and Deep Research based on
+the transcript.
+
+The packet records inferred document type, placeholder signals such as
+`client: Acme`, outline-first drafting stages, requested correction edits,
+selected text length, QA passes, read-aloud engine support, and Supertonic/model
+download consent requirements. This gives support desks and release reviewers a
+repeatable way to prove voice-command routing, voice-first document creation,
+read-aloud handoff, model-download gating, and natural-language correction
+loops without requiring a microphone during automated checks.
+
+This moves the conservative 100-improvement audit from 90/100 to 95/100
+implementation-evidenced items. Items 81 Voice command interface, 82
+Voice-first document wizard, 83 Read selected text aloud, 84 Consent-gated TTS
+models, and 85 Voice correction loop now have executable CLI evidence. The
+remaining 5 items are provider/runtime proof, Google Docs live import readback,
+screen-reader QA sign-off mode, Homebrew release proof, and final release
+evidence dashboard closure.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 37 CLI tests passed and the debug `ned` binary rebuilt; `ned_cli_routes_voice_commands_to_creation_revision_and_read_aloud` verifies Docs Live route selection, board-memo inference, placeholder extraction, correction-loop edits, read-aloud routing, Supertonic consent text, and Markdown packet output. |
+| `pnpm run check` | Pass | Vue/TypeScript validation passed after adding the scriptable voice command packet. |
+| `src-tauri/target/debug/ned voice --text "Create a board memo; client: Acme; make section 3 more formal; read selected text aloud" --selected-text "Draft paragraph" --json` | Pass | Direct smoke returned `neditor.ned-voice-command.v1`, document type `board-decision-memo`, Docs Live/correction/read-aloud routes, selected-text length, read-aloud engines, and model-download consent guidance. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 95/100 implementation-evidenced items and 5 partial/external-proof items. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting the scriptable voice command packet. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after adding voice command routing. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Publishing Handoff Targets
 

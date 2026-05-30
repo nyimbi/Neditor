@@ -2499,6 +2499,69 @@ fn ned_cli_reports_unified_setup_packet() {
 }
 
 #[test]
+fn ned_cli_routes_voice_commands_to_creation_revision_and_read_aloud() {
+    let outcome = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "voice".to_string(),
+        "--text".to_string(),
+        "Create a board memo for the CFO; client: Acme; make section 3 more formal; read selected text aloud".to_string(),
+        "--selected-text".to_string(),
+        "This section needs work.".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("voice command json");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&outcome.message).expect("voice json");
+    assert_eq!(report["schema"], "neditor.ned-voice-command.v1");
+    assert_eq!(
+        report["documentWizard"]["documentType"],
+        "board-decision-memo"
+    );
+    assert!(report["documentWizard"]["outlineFirst"]
+        .as_bool()
+        .expect("outline first"));
+    assert!(report["documentWizard"]["placeholderSignals"]
+        .as_array()
+        .expect("placeholder signals")
+        .iter()
+        .any(|item| item["key"] == "client" && item["value"] == "Acme"));
+    for route_id in ["docs-live-wizard", "voice-correction-loop", "read-aloud"] {
+        assert!(report["routes"]
+            .as_array()
+            .expect("routes")
+            .iter()
+            .any(|route| route["id"] == route_id));
+    }
+    assert!(report["correctionLoop"]["requestedEdits"]
+        .as_array()
+        .expect("requested edits")
+        .contains(&serde_json::json!("tone-adjustment")));
+    assert_eq!(report["readAloud"]["supportsEngines"][2], "supertonic-cli");
+    assert!(report["readAloud"]["consentGate"]
+        .as_str()
+        .expect("consent gate")
+        .contains("explicit model download acknowledgement"));
+    assert!(!outcome.message.contains("API_KEY"));
+
+    let markdown = crate::cli::run_cli_with_args_and_stdin(
+        &[
+            "ned".to_string(),
+            "dictate".to_string(),
+            "-".to_string(),
+            "--document-type".to_string(),
+            "proposal".to_string(),
+            "--markdown".to_string(),
+        ],
+        Some("Draft a proposal outline, then humanize the executive summary."),
+    )
+    .expect("voice markdown");
+    assert!(markdown.message.contains("# NEditor Voice Command Packet"));
+    assert!(markdown.message.contains("## Voice-First Wizard"));
+    assert!(markdown.message.contains("## Correction Loop"));
+    assert!(markdown.message.contains("proposal"));
+}
+
+#[test]
 fn ned_cli_reads_release_readiness_reports_without_rerunning_checks() {
     let root = temp_workspace_path("readiness");
     fs::create_dir_all(&root).expect("create readiness root");
@@ -3582,6 +3645,11 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         (76, "LaTeX and PDF build path"),
         (77, "DOCX style mapping"),
         (78, "Markdown bundle export"),
+        (81, "Voice command interface"),
+        (82, "Voice-first document wizard"),
+        (83, "Read selected text aloud"),
+        (84, "Consent-gated TTS models"),
+        (85, "Voice correction loop"),
         (91, "Unified configurator"),
         (92, "Guided provider setup"),
         (93, "Ollama model picker"),
@@ -3601,8 +3669,7 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
     }
     for (number, title) in [
         (73, "Google Docs import handoff"),
-        (81, "Voice command interface"),
-        (83, "Read selected text aloud"),
+        (86, "Screen-reader QA mode"),
     ] {
         assert!(report["items"]
             .as_array()

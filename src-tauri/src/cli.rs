@@ -135,6 +135,9 @@ const CLI_COMMANDS: &[&str] = &[
     "config",
     "configure",
     "configurator",
+    "voice",
+    "voice-command",
+    "dictate",
     "readiness",
     "release-readiness",
     "evidence",
@@ -641,6 +644,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "setup" | "config" | "configure" | "configurator" => run_setup_command(&args[2..]),
+        "voice" | "voice-command" | "dictate" => run_voice_command(&args[2..], stdin_text),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
         "evidence" | "evidence-status" => run_evidence_command(&args[2..]),
         "evidence-packet" | "evidence-return-packet" | "release-evidence-packet" => {
@@ -6078,6 +6082,395 @@ fn setup_report_markdown(report: &Value) -> String {
     lines.join("\n")
 }
 
+fn run_voice_command(args: &[String], stdin_text: Option<&str>) -> Result<CliOutcome, String> {
+    let mut transcript_parts: Vec<String> = Vec::new();
+    let mut document_type: Option<String> = None;
+    let mut context = String::new();
+    let mut selected_text = String::new();
+    let mut json_output = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--text" | "--transcript" => {
+                index += 1;
+                transcript_parts.push(
+                    args.get(index)
+                        .ok_or_else(|| "--text requires dictated text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--document-type" | "--type" => {
+                index += 1;
+                document_type = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--document-type requires a document type".to_string())?
+                        .to_string(),
+                );
+            }
+            "--context" => {
+                index += 1;
+                context = args
+                    .get(index)
+                    .ok_or_else(|| "--context requires text".to_string())?
+                    .to_string();
+            }
+            "--selected-text" | "--selection" => {
+                index += 1;
+                selected_text = args
+                    .get(index)
+                    .ok_or_else(|| "--selected-text requires text".to_string())?
+                    .to_string();
+            }
+            "--json" => json_output = true,
+            "--markdown" | "--report" => {}
+            "-" => {
+                transcript_parts.push(
+                    stdin_text
+                        .ok_or_else(|| "Voice transcript '-' requires stdin text.".to_string())?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("Unsupported voice option '{value}'"));
+            }
+            value => transcript_parts.push(value.to_string()),
+        }
+        index += 1;
+    }
+    let transcript = transcript_parts.join(" ").trim().to_string();
+    if transcript.is_empty() {
+        return Err("Usage: ned voice \"dictated instruction\" [--document-type proposal] [--selected-text text] [--json|--markdown]".to_string());
+    }
+    let report = build_voice_command_report(
+        &transcript,
+        document_type.as_deref(),
+        &context,
+        &selected_text,
+    );
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: voice_command_markdown(&report),
+        exit_code: 0,
+    })
+}
+
+fn build_voice_command_report(
+    transcript: &str,
+    requested_document_type: Option<&str>,
+    context: &str,
+    selected_text: &str,
+) -> Value {
+    let normalized = transcript.to_ascii_lowercase();
+    let document_type = requested_document_type
+        .map(|value| voice_slug(value))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| infer_voice_document_type(&normalized));
+    let routes = voice_command_routes(&normalized, &document_type);
+    let correction_loop = voice_correction_loop(&normalized, selected_text);
+    json!({
+        "schema": "neditor.ned-voice-command.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "transcript": transcript,
+        "inputMode": "dictated-or-typed-natural-language",
+        "documentWizard": {
+            "documentType": document_type,
+            "context": context.trim(),
+            "outlineFirst": true,
+            "aiQuestionnaire": "Ask only missing high-value questions before drafting.",
+            "systematicDrafting": [
+                "Capture document type, outcome, audience, owner, deadline, and distribution target.",
+                "Extract placeholder values and reusable business profile facts.",
+                "Create or import an editable outline before prose.",
+                "Draft section by section with visible assumptions and evidence needs.",
+                "Run quality, humanization, compliance, and review-readiness passes."
+            ],
+            "placeholderSignals": voice_placeholder_signals(transcript),
+        },
+        "correctionLoop": correction_loop,
+        "routes": routes,
+        "readAloud": {
+            "selectedTextChars": selected_text.chars().count(),
+            "supportsEngines": ["browser", "macos-say", "supertonic-cli"],
+            "consentGate": "Supertonic and other model-backed engines require explicit model download acknowledgement with size and storage path before use.",
+            "nextCommand": "ned read-aloud - --engine macos-say --dry-run --json"
+        },
+        "accessibility": {
+            "keyboardReachable": true,
+            "screenReaderQaMode": "Use the in-app Accessibility QA panel plus pnpm run check:a11y and pnpm run check:a11y:manual for human sign-off evidence.",
+            "statusMessages": "Voice command packets expose routes, blockers, next commands, and review states as text."
+        },
+        "nextCommands": voice_next_commands(&normalized, &document_type),
+        "secretPolicy": "Voice packets must not include API keys, access tokens, or private model credentials."
+    })
+}
+
+fn infer_voice_document_type(normalized: &str) -> String {
+    for (needle, document_type) in [
+        ("rfp", "rfp-response"),
+        ("proposal", "proposal"),
+        ("tender", "tender"),
+        ("rfq", "rfq-response"),
+        ("novel", "novel"),
+        ("textbook", "technical-textbook"),
+        ("lesson", "lesson-plan"),
+        ("podcast", "podcast-script"),
+        ("movie", "movie-script"),
+        ("screenplay", "movie-script"),
+        ("board", "board-decision-memo"),
+        ("memo", "business-memo"),
+        ("blog", "blog-post"),
+        ("substack", "newsletter"),
+    ] {
+        if normalized.contains(needle) {
+            return document_type.to_string();
+        }
+    }
+    "business-document".to_string()
+}
+
+fn voice_command_routes(normalized: &str, document_type: &str) -> Vec<Value> {
+    let mut routes = Vec::new();
+    if voice_contains_any(
+        normalized,
+        &["create", "draft", "write", "compose", "outline", "document"],
+    ) {
+        routes.push(json!({
+            "id": "docs-live-wizard",
+            "label": "Docs Live voice-first document wizard",
+            "reason": "Dictation requests document creation, outline, or structured drafting.",
+            "command": format!("Open Docs Live with document type {document_type} and create the outline before drafting."),
+        }));
+    }
+    if voice_contains_any(
+        normalized,
+        &[
+            "make that",
+            "revise",
+            "edit",
+            "formal",
+            "expand",
+            "shorten",
+            "humanize",
+            "turn this into",
+            "rewrite",
+        ],
+    ) {
+        routes.push(json!({
+            "id": "voice-correction-loop",
+            "label": "Voice correction loop",
+            "reason": "Dictation requests a revision or transformation of existing text.",
+            "command": "Open AI revision with selected text, proposed edits, QA notes, and human acceptance required.",
+        }));
+    }
+    if voice_contains_any(
+        normalized,
+        &[
+            "read aloud",
+            "read selected",
+            "read this",
+            "speak",
+            "tts",
+            "aloud",
+        ],
+    ) {
+        routes.push(json!({
+            "id": "read-aloud",
+            "label": "Read selected text aloud",
+            "reason": "Dictation requests speech output.",
+            "command": "ned read-aloud - --engine macos-say --dry-run --json",
+        }));
+    }
+    if voice_contains_any(
+        normalized,
+        &["publish", "substack", "blog", "cms", "export"],
+    ) {
+        routes.push(json!({
+            "id": "publishing-handoff",
+            "label": "Publishing and export handoff",
+            "reason": "Dictation mentions distribution or publishing.",
+            "command": "Open target-aware export readiness and publishing preflight.",
+        }));
+    }
+    if voice_contains_any(
+        normalized,
+        &["research", "citation", "source", "bibliography"],
+    ) {
+        routes.push(json!({
+            "id": "deep-research",
+            "label": "Deep Research and citation source collection",
+            "reason": "Dictation asks for sources, evidence, or research.",
+            "command": "ned deep-research --topic <topic> --provider duckduckgo --pages 5 --output research-dossier.md",
+        }));
+    }
+    if routes.is_empty() {
+        routes.push(json!({
+            "id": "docs-live-wizard",
+            "label": "Docs Live voice-first document wizard",
+            "reason": "Fallback route for natural-language document instructions.",
+            "command": format!("Open Docs Live with document type {document_type}."),
+        }));
+    }
+    routes
+}
+
+fn voice_correction_loop(normalized: &str, selected_text: &str) -> Value {
+    let mut edits = Vec::new();
+    if voice_contains_any(normalized, &["formal", "executive", "board"]) {
+        edits.push("tone-adjustment");
+    }
+    if voice_contains_any(normalized, &["expand", "more detail", "elaborate"]) {
+        edits.push("expand-selection");
+    }
+    if voice_contains_any(normalized, &["shorten", "concise", "summarize"]) {
+        edits.push("condense-selection");
+    }
+    if voice_contains_any(normalized, &["humanize", "ai cruft", "less ai"]) {
+        edits.push("humanize-language");
+    }
+    if voice_contains_any(normalized, &["turn this into", "convert"]) {
+        edits.push("document-type-conversion");
+    }
+    json!({
+        "selectedTextChars": selected_text.chars().count(),
+        "requestedEdits": edits,
+        "requiresHumanAcceptance": true,
+        "qaPasses": ["meaning preserved", "tone fit", "evidence retained", "review metadata attached"],
+    })
+}
+
+fn voice_placeholder_signals(transcript: &str) -> Vec<Value> {
+    transcript
+        .split([',', ';', '\n'])
+        .filter_map(|part| {
+            let (key, value) = part.split_once(':')?;
+            let key = key.trim();
+            let value = value.trim();
+            if key.is_empty() || value.is_empty() || key.len() > 40 {
+                return None;
+            }
+            Some(json!({"key": voice_slug(key), "value": value}))
+        })
+        .collect()
+}
+
+fn voice_next_commands(normalized: &str, document_type: &str) -> Vec<String> {
+    let mut commands = vec![
+        format!("Open Docs Live and choose {document_type}"),
+        "Review the generated outline before drafting sections".to_string(),
+    ];
+    if voice_contains_any(
+        normalized,
+        &[
+            "read aloud",
+            "read selected",
+            "read this",
+            "speak",
+            "tts",
+            "aloud",
+        ],
+    ) {
+        commands.push("ned read-aloud - --engine macos-say --dry-run --json".to_string());
+        commands.push("ned read-aloud - --engine supertonic-cli --acknowledge-model-download --model-storage ~/.cache/supertonic/models --dry-run --json".to_string());
+    }
+    if voice_contains_any(
+        normalized,
+        &["publish", "substack", "blog", "cms", "export"],
+    ) {
+        commands.push("ned validate document.md --to blog --json".to_string());
+        commands.push("ned publish document.md --target blog --destination static-site-bundle --allow-not-ready --json".to_string());
+    }
+    commands
+}
+
+fn voice_contains_any(normalized: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| normalized.contains(needle))
+}
+
+fn voice_slug(value: &str) -> String {
+    let mut output = String::new();
+    let mut previous_dash = false;
+    for ch in value.trim().chars().flat_map(char::to_lowercase) {
+        if ch.is_ascii_alphanumeric() {
+            output.push(ch);
+            previous_dash = false;
+        } else if !previous_dash && !output.is_empty() {
+            output.push('-');
+            previous_dash = true;
+        }
+    }
+    output.trim_matches('-').to_string()
+}
+
+fn voice_command_markdown(report: &Value) -> String {
+    let wizard = report.get("documentWizard").unwrap_or(&Value::Null);
+    let correction = report.get("correctionLoop").unwrap_or(&Value::Null);
+    let mut lines = vec![
+        "# NEditor Voice Command Packet".to_string(),
+        "".to_string(),
+        format!(
+            "Transcript: {}",
+            markdown_cell(readiness_string_field(report, "transcript").unwrap_or(""))
+        ),
+        format!(
+            "Document type: {}",
+            readiness_string_field(wizard, "documentType").unwrap_or("business-document")
+        ),
+        "".to_string(),
+        "## Routes".to_string(),
+        "".to_string(),
+    ];
+    for route in readiness_array_field(report, "routes") {
+        lines.push(format!(
+            "- **{}**: {}",
+            markdown_cell(readiness_string_field(&route, "label").unwrap_or("Route")),
+            markdown_cell(readiness_string_field(&route, "reason").unwrap_or(""))
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Voice-First Wizard".to_string(),
+        "".to_string(),
+    ]);
+    for step in readiness_array_field(wizard, "systematicDrafting") {
+        if let Some(step) = step.as_str() {
+            lines.push(format!("- {step}"));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "## Correction Loop".to_string(),
+        "".to_string(),
+        format!(
+            "- Selected text chars: {}",
+            correction
+                .get("selectedTextChars")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+        ),
+    ]);
+    for edit in readiness_array_field(correction, "requestedEdits") {
+        if let Some(edit) = edit.as_str() {
+            lines.push(format!("- Requested edit: {edit}"));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "## Next Commands".to_string(),
+        "".to_string(),
+    ]);
+    for command in readiness_array_field(report, "nextCommands") {
+        if let Some(command) = command.as_str() {
+            lines.push(format!("- `{}`", markdown_cell(command)));
+        }
+    }
+    lines.join("\n")
+}
+
 fn run_completions_command(args: &[String]) -> Result<CliOutcome, String> {
     let shell = args
         .first()
@@ -9201,7 +9594,7 @@ fn improvement_evidence_signals(item: &ImprovementItem) -> Vec<String> {
 fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool {
     if matches!(
         item.number,
-        11 | 18 | 32 | 33 | 40 | 74 | 75 | 79 | 80 | 91 | 92 | 93 | 94
+        11 | 18 | 32 | 33 | 40 | 74 | 75 | 79 | 80 | 81 | 82 | 83 | 84 | 85 | 91 | 92 | 93 | 94
     ) {
         return false;
     }
@@ -17334,6 +17727,9 @@ _ned() {{
       setup|config|configure|configurator)
         COMPREPLY=( $(compgen -W "--json --markdown --report --platform --ollama-endpoint --ollama-url" -- "$cur") )
         ;;
+      voice|voice-command|dictate)
+        COMPREPLY=( $(compgen -W "--text --transcript --document-type --type --context --selected-text --selection --json --markdown --report" -- "$cur") )
+        ;;
       readiness|release-readiness)
         COMPREPLY=( $(compgen -W "--json --strict --report --action-plan --plan --evidence-kit" -- "$cur") )
         ;;
@@ -17471,6 +17867,9 @@ _ned() {{
       ;;
     setup|config|configure|configurator)
       _arguments '--json[print machine-readable JSON]' '--markdown[print Markdown setup packet]' '--report[alias for --markdown]' '--platform[show setup for another platform]:platform:($handler_platforms)' '--ollama-endpoint[Ollama chat or tags endpoint]:url:' '--ollama-url[alias for --ollama-endpoint]:url:'
+      ;;
+    voice|voice-command|dictate)
+      _arguments '*:dictated instruction:' '--text[dictated instruction text]:text:' '--transcript[alias for --text]:text:' '--document-type[target document type]:type:' '--type[alias for --document-type]:type:' '--context[extra context for Docs Live]:context:' '--selected-text[selected text for revision or read-aloud]:text:' '--selection[alias for --selected-text]:text:' '--json[print machine-readable JSON]' '--markdown[print Markdown voice command packet]' '--report[alias for --markdown]'
       ;;
     readiness|release-readiness)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when release gaps remain]' '--report[read a specific release-readiness report]:file:_files' '--action-plan[attach release evidence-kit work items for each gap]' '--plan[alias for --action-plan]' '--evidence-kit[read a release evidence-kit directory or manifest]:file:_files'
@@ -17685,6 +18084,26 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from setup config configure configurator' -l ollama-endpoint -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from setup config configure configurator' -l ollama-url -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l text -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l transcript -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l document-type -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l type -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l context -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l selected-text -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l selection -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l markdown"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from voice voice-command dictate' -l report"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l ids-only".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from templates' -l category -r".to_string(),
@@ -18745,6 +19164,7 @@ fn help_text() -> String {
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned setup [--json|--markdown] [--platform macos|windows|linux|manual] [--ollama-endpoint http://127.0.0.1:11434/api/chat]".to_string(),
+        "  ned voice \"dictated instruction\" [--document-type proposal] [--selected-text text] [--json|--markdown]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json] [--action-plan --evidence-kit .tmp/release-evidence-kit]"
             .to_string(),
         "  ned evidence [--json] [--strict] [--evidence-root .tmp]".to_string(),
