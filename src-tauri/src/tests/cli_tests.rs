@@ -974,6 +974,78 @@ fn ned_cli_manages_citation_source_library_from_terminal() {
 }
 
 #[test]
+fn ned_cli_generates_quality_review_recommendations() {
+    let source = temp_markdown_path("quality");
+    let long_paragraph = (0..130).map(|_| "review").collect::<Vec<_>>().join(" ");
+    fs::write(
+        &source,
+        format!(
+            "# Draft\n\nThis seamless world-class section needs evidence [@missing].\n\n{{{{clientName}}}}\n\n{long_paragraph}\n\n| A | B | C | D | E | F | G |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1 | 2 | 3 | 4 | 5 | 6 | 7 |\n\n<!-- comment: unresolved | author: reviewer | Resolve before release -->\n<!-- ai_assisted: status=needs-review | source=Docs Live | prompt=Draft section -->\n"
+        ),
+    )
+    .expect("write quality source");
+
+    let json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "quality".to_string(),
+        source.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("quality json");
+    assert_eq!(json.exit_code, 0);
+    let report: serde_json::Value = serde_json::from_str(&json.message).expect("quality json");
+    assert_eq!(report["schema"], "neditor.ned-quality.v1");
+    assert_eq!(report["status"], "needs-review");
+    assert!(report["summary"]["risk"].as_u64().expect("risk count") >= 4);
+    let ids = report["recommendations"]
+        .as_array()
+        .expect("recommendations")
+        .iter()
+        .map(|item| item["id"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+    for expected in [
+        "placeholders",
+        "citation-evidence",
+        "review-comments",
+        "ai-provenance",
+        "readability",
+        "humanization",
+        "layout-wide-tables",
+    ] {
+        assert!(
+            ids.contains(&expected),
+            "missing quality finding {expected}"
+        );
+    }
+
+    let output = source.with_file_name("quality-review.md");
+    let markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "qa".to_string(),
+        source.to_string_lossy().to_string(),
+        "--markdown".to_string(),
+        "--output".to_string(),
+        output.to_string_lossy().to_string(),
+    ])
+    .expect("quality markdown output");
+    assert_eq!(markdown.exit_code, 0);
+    assert!(markdown.message.contains("Wrote quality review"));
+    let quality_markdown = fs::read_to_string(&output).expect("quality markdown");
+    assert!(quality_markdown.contains("# NEditor Quality Review"));
+    assert!(quality_markdown.contains("Citation evidence"));
+    assert!(quality_markdown.contains("Review Gate"));
+
+    let strict = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "review".to_string(),
+        source.to_string_lossy().to_string(),
+        "--strict".to_string(),
+    ])
+    .expect("quality strict");
+    assert_eq!(strict.exit_code, 1);
+}
+
+#[test]
 fn ned_cli_lists_templates_and_targets_for_terminal_discovery() {
     let templates = crate::cli::run_cli_with_args(&["ned".to_string(), "templates".to_string()])
         .expect("templates list");
@@ -3055,6 +3127,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("evidence-packet"));
     assert!(bash.message.contains("sources"));
     assert!(bash.message.contains("--download-url"));
+    assert!(bash.message.contains("quality"));
+    assert!(bash.message.contains("--report"));
     assert!(bash.message.contains("snippets"));
     assert!(bash.message.contains("--markdown"));
     assert!(bash.message.contains("--title"));
@@ -3105,6 +3179,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--get"));
     assert!(zsh.message.contains("citation-sources"));
     assert!(zsh.message.contains("--provider[search provider]"));
+    assert!(zsh.message.contains("quality\\:quality"));
+    assert!(zsh
+        .message
+        .contains("--markdown[print Markdown reviewer handoff]"));
     assert!(zsh.message.contains("--endpoint"));
     assert!(zsh.message.contains("--allow-not-ready"));
     assert!(zsh.message.contains("--matrix-output"));
@@ -3131,6 +3209,9 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("release-evidence-packet"));
     assert!(fish.message.contains("citation-sources"));
     assert!(fish.message.contains("download-url"));
+    assert!(fish
+        .message
+        .contains("__fish_seen_subcommand_from quality qa review"));
     assert!(fish.message.contains("-l title"));
     assert!(fish.message.contains("snippets"));
     assert!(fish.message.contains("ids-only"));
@@ -3684,6 +3765,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned new"));
     assert!(outcome.message.contains("ned inspect"));
     assert!(outcome.message.contains("ned validate"));
+    assert!(outcome.message.contains("ned quality"));
     assert!(outcome.message.contains("ned templates"));
     assert!(outcome.message.contains("ned snippets"));
     assert!(outcome.message.contains("ned targets"));

@@ -6201,6 +6201,27 @@ handoffs.
 | `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting `ned sources`. |
 | `git diff --check` | Pass | No whitespace errors are present in the CLI citation source-vault slice. |
 
+## 2026-05-30 CLI Quality Review
+
+`ned quality` now gives headless access to deterministic document QA and
+quality-improvement recommendations. It compiles the document, inspects
+diagnostics, placeholders, citation evidence, citation TODOs, unresolved review
+comments, AI provenance, document identity, heading structure, long paragraphs,
+generic AI phrasing, wide tables, and multi-column layout reset risks, then
+prints text, Markdown, or JSON. `--output` writes a reviewer handoff and
+`--strict` makes risk/improvement findings fail automation.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_generates_quality_review_recommendations --lib` | Pass | Focused CLI fixture proves JSON/Markdown quality reports for placeholders, citation gaps, unresolved comments, AI provenance, long paragraphs, generic phrasing, wide-table layout risk, and strict failure behavior. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_generates_shell_completions_without_external_dependencies --lib` | Pass | Shell completions expose `quality`, `qa`, `review`, Markdown report, output, strict, JSON, and compile-option flags. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_help_names_supported_conversion_targets --lib` | Pass | CLI help now names `ned quality <file.md|->` as a first-class review command. |
+| `pnpm run check:cli` | Pass | 29 CLI tests passed and the debug `ned` binary built after adding `ned quality`. |
+| `src-tauri/target/debug/ned quality examples/showcase/neditor-capability-showcase.md --markdown --output /private/tmp/neditor-quality-review-smoke.md` | Pass | Direct smoke wrote a Markdown quality review with compiler diagnostics, placeholders, citation TODOs, unresolved comments, and AI provenance findings. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed after the quality-review CLI updates. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting `ned quality`. |
+| `git diff --check` | Pass | No whitespace errors are present in the CLI quality-review slice. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

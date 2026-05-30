@@ -707,6 +707,15 @@ shows AI Export Assistance for target metadata, readiness diagnostics, and
 artifact evidence; accepted guidance can be collected as editable export
 readiness notes and inserted into the document as an audit handoff.
 
+From the terminal, run
+`ned quality report.md --markdown --output quality-review.md` when a reviewer,
+release manager, or automation job needs the same kind of deterministic QA
+handoff outside the app. The report checks compiler diagnostics, unresolved
+placeholders, citation evidence, citation TODOs, review comments, AI provenance,
+document identity, heading structure, long paragraphs, generic AI phrasing,
+wide tables, and multi-column layout reset risks. Add `--json` for automation
+or `--strict` when risks and improvements should fail the command.
+
 Use **Print Preview** from the document toolbar, View menu, command palette, or
 Export panel when page geometry matters. The preview estimates page count,
 word count, page breaks, section breaks, paper size, orientation, margins, and

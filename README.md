@@ -107,6 +107,7 @@ ned new response.md --template rfp-response --title "RFP Response"
 ned rfp-response buyer-rfp.pdf --output response.md --matrix-output compliance.md
 ned sources --document research-report.md --query "market evidence" --provider duckduckgo
 ned sources --document research-report.md --audit --output source-audit.md
+ned quality board-paper.md --markdown --output quality-review.md
 ned convert board-paper.md --to pdf,docx,html --output-dir exports
 ned readiness --json
 ned support-bundle --workspace . --output support.json
