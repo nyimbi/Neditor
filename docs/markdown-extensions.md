@@ -693,6 +693,12 @@ standard bar charts. Business charts also accept `subtitle`, `source`,
 `background`, and `showValues: false` for board-ready scorecards and compact
 exports without hand-editing SVG.
 
+The Templates sidebar includes a Chart Designer for non-technical authors. It
+creates the same `chart` fence from fields for chart type, title, subtitle,
+source, category field, value field, target, value suffix, palette, and data.
+Authors can also select a Markdown table, choose "Use selected table", and
+NEditor converts the first two columns into chart data before insertion.
+
 External engines are disabled until trusted. See
 [External transform setup](external-transforms.md) for Graphviz, D2, PlantUML,
 Pikchr, and SQLite setup.

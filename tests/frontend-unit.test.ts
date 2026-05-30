@@ -68,6 +68,12 @@ import {
 } from "../src/lib/brandKitPresets.js";
 import { calloutPresetById, calloutPresetMarkdown, calloutPresets } from "../src/lib/calloutPresets.js";
 import {
+  chartDesignerDefaultDraft,
+  chartDesignerDraftFromMarkdownTable,
+  chartDesignerKindOptions,
+  chartDesignerMarkdown,
+} from "../src/lib/chartDesigner.js";
+import {
   acceptExternalRootConflictState,
   applyExternalRootReloadState,
   applyRootConflictMergeState,
@@ -7700,6 +7706,40 @@ test("transform template library covers reusable calculations and custom templat
   ok(assistance.some((item) => item.contextSignals.includes("Category: Business")));
 });
 
+test("chart designer creates board-ready chart blocks from fields and markdown tables", () => {
+  ok(chartDesignerKindOptions.some((option) => option.id === "scorecard" && option.bestFor.includes("board packs")));
+  const scorecard = chartDesignerDefaultDraft("scorecard");
+  const markdown = chartDesignerMarkdown(scorecard);
+  ok(markdown.startsWith("```chart\n"));
+  ok(markdown.includes("type: bar"));
+  ok(markdown.includes('title: "Executive pipeline coverage"'));
+  ok(markdown.includes('source: "CRM export, May 2026"'));
+  ok(markdown.includes("target: 85"));
+  ok(markdown.includes('targetLabel: "Board plan"'));
+  ok(markdown.includes("palette:"));
+  ok(markdown.includes("x: segment"));
+  ok(markdown.includes("y: coverage"));
+
+  const tableDraft = chartDesignerDraftFromMarkdownTable(
+    [
+      "| Region | Pipeline Coverage |",
+      "| --- | ---: |",
+      "| East | 112 |",
+      "| West | 78 |",
+    ].join("\n"),
+    chartDesignerDefaultDraft("horizontal-bar"),
+  );
+  if (!tableDraft) throw new Error("expected table draft");
+  equal(tableDraft.xField, "Region");
+  equal(tableDraft.yField, "Pipeline Coverage");
+  const tableMarkdown = chartDesignerMarkdown(tableDraft);
+  ok(tableMarkdown.includes("type: horizontal-bar"));
+  ok(tableMarkdown.includes("region: \"East\""));
+  ok(tableMarkdown.includes("pipeline_coverage: 112"));
+  ok(tableMarkdown.includes("x: region"));
+  ok(tableMarkdown.includes("y: pipeline_coverage"));
+});
+
 test("custom transform template state helpers save replace and delete templates", () => {
   const existing = {
     id: "custom-margin",
@@ -7927,6 +7967,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('label: "Callout"'));
   ok(app.includes('label: "Business Callout"'));
   ok(app.includes('title: "Business callouts"'));
+  ok(app.includes('aria-label="Chart designer"'));
+  ok(app.includes("chartDesignerKindOptions"));
+  ok(app.includes("chartDesignerPreviewMarkdown"));
+  ok(app.includes("loadSelectedTableIntoChartDesigner"));
+  ok(app.includes('label: "Chart"'));
+  ok(app.includes('label: "Chart Designer"'));
+  ok(app.includes("Open chart designer"));
   ok(app.includes('aria-label="Document evidence and approval review"'));
   ok(app.includes("reviewEvidenceRun"));
   ok(app.includes("refreshReviewEvidenceSnapshot"));

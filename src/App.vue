@@ -1607,6 +1607,73 @@
               </article>
             </div>
           </section>
+          <section class="business-template-hub chart-designer" aria-label="Chart designer">
+            <header>
+              <div>
+                <strong>Chart designer</strong>
+                <span>Create board-ready chart blocks from a few fields or from a selected Markdown table.</span>
+              </div>
+              <button type="button" title="Insert the designed chart block into the active document" @click="insertDesignedChart">Insert chart</button>
+            </header>
+            <div class="chart-designer-grid">
+              <label>
+                Chart type
+                <select v-model="chartDesignerDraft.kind" @change="resetChartDesignerForType(chartDesignerDraft.kind)">
+                  <option v-for="kind in chartDesignerKindOptions" :key="kind.id" :value="kind.id">{{ kind.label }}</option>
+                </select>
+              </label>
+              <label>
+                Title
+                <input v-model="chartDesignerDraft.title" placeholder="Executive pipeline coverage" />
+              </label>
+              <label>
+                Subtitle
+                <input v-model="chartDesignerDraft.subtitle" placeholder="Weighted qualified pipeline by segment" />
+              </label>
+              <label>
+                Source note
+                <input v-model="chartDesignerDraft.source" placeholder="CRM export, May 2026" />
+              </label>
+              <label>
+                Category field
+                <input v-model="chartDesignerDraft.xField" placeholder="Segment" />
+              </label>
+              <label>
+                Value field
+                <input v-model="chartDesignerDraft.yField" placeholder="Coverage" />
+              </label>
+              <label>
+                Target value
+                <input v-model="chartDesignerDraft.target" placeholder="85" />
+              </label>
+              <label>
+                Target label
+                <input v-model="chartDesignerDraft.targetLabel" placeholder="Board plan" />
+              </label>
+              <label>
+                Value suffix
+                <input v-model="chartDesignerDraft.valueSuffix" placeholder="%" />
+              </label>
+              <label><input v-model="chartDesignerDraft.showValues" type="checkbox" /> Show value labels</label>
+            </div>
+            <label>
+              Chart data
+              <textarea v-model="chartDesignerDraft.dataText" rows="5" aria-label="Chart designer data" placeholder="Segment, Coverage&#10;Enterprise, 112&#10;Mid-market, 78"></textarea>
+            </label>
+            <label>
+              Palette
+              <textarea v-model="chartDesignerDraft.paletteText" rows="3" aria-label="Chart designer palette" placeholder="#2563eb&#10;#16a34a&#10;#f59e0b"></textarea>
+            </label>
+            <div class="template-actions">
+              <button type="button" title="Load sample data for the selected chart type" @click="resetChartDesignerForType(chartDesignerDraft.kind)">Reset sample</button>
+              <button type="button" title="Convert the selected or current Markdown table into chart data" @click="loadSelectedTableIntoChartDesigner">Use selected table</button>
+              <button type="button" title="Insert the designed chart block into the active document" @click="insertDesignedChart">Insert chart</button>
+            </div>
+            <details>
+              <summary>Generated chart Markdown</summary>
+              <pre>{{ chartDesignerPreviewMarkdown }}</pre>
+            </details>
+          </section>
           <section class="business-template-hub" aria-label="Versioned reusable clauses">
             <header>
               <div>
@@ -6487,6 +6554,14 @@ import {
 } from "./lib/brandKitPresets";
 import { calloutPresetById, calloutPresetMarkdown, calloutPresets, type CalloutPreset } from "./lib/calloutPresets";
 import {
+  chartDesignerDefaultDraft,
+  chartDesignerDraftFromMarkdownTable,
+  chartDesignerKindOptions,
+  chartDesignerMarkdown,
+  type ChartDesignerDraft,
+  type ChartDesignerKind,
+} from "./lib/chartDesigner";
+import {
   commandSearchText,
   compactCommandKeywords,
   joinCommandDescription,
@@ -7502,6 +7577,7 @@ const templateTransform = ref("all");
 const transformTemplateAssistanceNotes = ref("");
 const customTemplateDraft = ref<CustomTransformTemplate>(blankCustomTransformTemplate());
 const editingCustomTemplateId = ref("");
+const chartDesignerDraft = ref<ChartDesignerDraft>(chartDesignerDefaultDraft("bar"));
 const selectedCalloutPresetId = ref(calloutPresets[0]?.id || "decision");
 const businessProfileOpen = ref(false);
 const businessProfileDraft = ref<BusinessProfile>(normalizeBusinessProfile({}));
@@ -7776,6 +7852,7 @@ type ToolbarIconName =
   | "include"
   | "table"
   | "figure"
+  | "chart"
   | "calc"
   | "templates"
   | "equation"
@@ -7877,6 +7954,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   include: ["M5 4h9l5 5v11H5z", "M14 4v5h5", "M8 12h8", "M8 16h5"],
   table: ["M4 5h16v14H4z", "M4 10h16", "M4 15h16", "M10 5v14", "M15 5v14"],
   figure: ["M4 5h16v14H4z", "M8 13l3-3 3 4 2-2 4 5", "M8 8h.01"],
+  chart: ["M4 19h16", "M7 16V9", "M12 16V5", "M17 16v-4", "M5 5v14"],
   calc: ["M7 4h10v16H7z", "M10 8h4", "M10 12h1", "M14 12h1", "M10 16h1", "M14 16h1"],
   templates: ["M4 5h7v6H4z", "M13 5h7v6h-7z", "M4 13h7v6H4z", "M13 13h7v6h-7z"],
   equation: ["M4 8h16", "M4 16h16", "M8 12h8"],
@@ -8176,6 +8254,7 @@ const exportProfileSummary = computed(() => {
 const selectedBrandKitPreset = computed(() => brandKitPresetById(selectedBrandKitPresetId.value) || brandKitPresets[0] || null);
 const currentBrandKitPreviewRows = computed(() => buildBrandKitPreviewRows(store.brandProfileDefaults, store.exportDefaults));
 const selectedCalloutPreset = computed(() => calloutPresetById(selectedCalloutPresetId.value) || calloutPresets[0] || null);
+const chartDesignerPreviewMarkdown = computed(() => chartDesignerMarkdown(chartDesignerDraft.value));
 const previewDocumentStyle = computed(() => ({
   fontFamily: store.previewFont,
   fontSize: `${clampUiFontSize(store.previewFontSize)}px`,
@@ -10420,6 +10499,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "table", label: "Table", title: "Insert table", icon: "table", run: () => insertBlock(tableSnippet) },
       { id: "edit-table", label: "Edit Table", title: "Load the Markdown table at the cursor or selection into the visual table editor", icon: "table", primary: true, run: () => loadTableAtCursor() },
       { id: "figure", label: "Figure", title: "Insert figure", icon: "figure", run: () => insertFigureSnippet() },
+      { id: "chart", label: "Chart", title: "Open the chart designer for business-ready visual data blocks", icon: "chart", primary: true, run: () => openChartDesigner() },
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
       { id: "callout", label: "Callout", title: "Insert a decision, risk, evidence, warning, recommendation, assumption, action, or note callout", icon: "comment", primary: true, run: () => insertSelectedCalloutPreset() },
@@ -10633,6 +10713,8 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "export-table-csv", label: "Export Table as CSV", help: "Export the current table draft or selected Markdown table to CSV.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("csv") },
           { id: "export-table-xlsx", label: "Export Table as XLSX", help: "Export the current table draft or selected Markdown table to XLSX.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("xlsx") },
           { id: "figure", label: "Figure", help: "Insert a figure scaffold.", run: () => insertFigureSnippet() },
+          { id: "chart-designer", label: "Chart Designer", help: "Create a business chart block from fields, palette, targets, or a selected Markdown table.", run: () => openChartDesigner() },
+          { id: "insert-designed-chart", label: "Insert Designed Chart", help: "Insert the current chart designer block into the active document.", run: () => insertDesignedChart() },
           { id: "calc", label: "Calculation", help: "Insert a calculation block.", run: () => insertBlock(calcSnippet) },
           { id: "callout", label: "Business Callout", help: "Insert a styled decision, risk, evidence, warning, recommendation, assumption, action, or note box.", run: () => insertSelectedCalloutPreset() },
           ...calloutPresets.map((preset) => ({
@@ -13701,6 +13783,27 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     },
   },
   { name: "Open transform templates", group: "Transforms", run: () => openTransformTemplates() },
+  {
+    name: "Open chart designer",
+    group: "Transforms",
+    description: "Create board-ready chart blocks with titles, data, targets, source notes, palettes, and selected Markdown table import.",
+    keywords: ["chart", "graph", "business chart", "kpi", "scorecard", "table to chart"],
+    run: () => openChartDesigner(),
+  },
+  {
+    name: "Insert designed chart",
+    group: "Transforms",
+    description: "Insert the current chart designer block into the active document.",
+    keywords: ["chart", "insert chart", "visual data", "scorecard"],
+    run: () => insertDesignedChart(),
+  },
+  {
+    name: "Load selected table into chart designer",
+    group: "Transforms",
+    description: "Convert the selected or current Markdown table into chart designer data.",
+    keywords: ["chart", "table", "selected table", "markdown table", "visual data"],
+    run: () => loadSelectedTableIntoChartDesigner(),
+  },
   {
     name: "Configure Google Docs sign-in",
     group: "Settings",
@@ -18495,6 +18598,50 @@ function openTransformTemplates() {
   void nextTick(() => {
     workspacePane.value?.focus();
   });
+}
+
+function openChartDesigner() {
+  store.sidebar = "templates";
+  templateTransform.value = "chart";
+  void nextTick(() => {
+    document.querySelector<HTMLElement>('[aria-label="Chart designer"]')?.focus();
+  });
+  store.statusMessage = "Opened chart designer";
+}
+
+function resetChartDesignerForType(kind: ChartDesignerKind) {
+  chartDesignerDraft.value = chartDesignerDefaultDraft(kind);
+  store.statusMessage = `Loaded ${chartDesignerKindOptions.find((option) => option.id === kind)?.label || "chart"} sample`;
+}
+
+function currentMarkdownTableSourceForChart() {
+  const selected = currentEditorSelectionText();
+  if (selected.trim()) return selected;
+  if (!editorView) return "";
+  const lineNumber = editorView.state.doc.lineAt(editorView.state.selection.main.from).number;
+  const table = markdownTables.value.find((candidate) => candidate.startLine <= lineNumber && candidate.endLine >= lineNumber);
+  if (!table) return "";
+  const lines = active.value.text.split(/\r?\n/);
+  const start = Math.max(0, (table.captionLine || table.startLine) - 1);
+  return lines.slice(start, table.endLine).join("\n");
+}
+
+function loadSelectedTableIntoChartDesigner() {
+  const source = currentMarkdownTableSourceForChart();
+  const draft = chartDesignerDraftFromMarkdownTable(source, chartDesignerDraft.value);
+  if (!draft) {
+    store.statusMessage = "Select a Markdown table or place the cursor inside one before loading chart data";
+    return;
+  }
+  chartDesignerDraft.value = draft;
+  store.sidebar = "templates";
+  store.statusMessage = "Loaded Markdown table into chart designer";
+}
+
+function insertDesignedChart() {
+  insertBlock(chartDesignerPreviewMarkdown.value);
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted designed chart block";
 }
 
 function openLayoutAdvisor() {
@@ -25889,6 +26036,33 @@ select:hover {
   background: #fffafa;
 }
 
+.chart-designer {
+  border-left-color: #246064;
+  background: #f7fcfc;
+}
+
+.chart-designer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 8px;
+}
+
+.chart-designer textarea,
+.chart-designer input,
+.chart-designer select {
+  width: 100%;
+}
+
+.chart-designer pre {
+  max-height: 260px;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+  white-space: pre-wrap;
+}
+
 .callout-selector {
   display: grid;
   grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
@@ -25955,6 +26129,7 @@ select:hover {
 }
 
 .app-shell[data-theme="dark"] .callout-palette,
+.app-shell[data-theme="dark"] .chart-designer,
 .app-shell[data-theme="dark"] .callout-card {
   border-color: #34465a;
   background: #1b2736;
@@ -25970,8 +26145,14 @@ select:hover {
   background: #111821;
 }
 
+.app-shell[data-theme="dark"] .chart-designer pre {
+  border-color: #34465a;
+  background: #111821;
+}
+
 @media (prefers-color-scheme: dark) {
   .app-shell[data-theme="system"] .callout-palette,
+  .app-shell[data-theme="system"] .chart-designer,
   .app-shell[data-theme="system"] .callout-card {
     border-color: #34465a;
     background: #1b2736;
@@ -25983,6 +26164,11 @@ select:hover {
   }
 
   .app-shell[data-theme="system"] .callout-card pre {
+    border-color: #34465a;
+    background: #111821;
+  }
+
+  .app-shell[data-theme="system"] .chart-designer pre {
     border-color: #34465a;
     background: #111821;
   }
