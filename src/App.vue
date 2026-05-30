@@ -11251,6 +11251,21 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
     },
   },
   {
+    id: "deep-research",
+    title: "Research with local evidence",
+    mode: "Deep Research and source vault",
+    summary: "Use search providers, downloaded source files, local-library reuse, and bibliography handoffs to ground a document.",
+    detail: "Source Search and Deep Research can search DuckDuckGo, SearXNG, Tavily, or the saved local source library attached to the document. The workflow preserves downloaded files, citation keys, source audits, conflict reviews, and review packets.",
+    points: [
+      "Open Source Search & Deep Research from References.",
+      "Switch between web providers and Local source library when evidence has already been downloaded.",
+      "Insert the research audit packet before accepting claims from a generated report.",
+    ],
+    showcaseFocus: "Use the showcase citations and source-vault metadata to demonstrate that research outputs stay attached to the document instead of becoming loose browser tabs.",
+    evidence: ["Local source library provider", "Downloaded source audit", "Deep Research audit packet", "Bibliography and citation index"],
+    run: () => openDeepResearch(active.value.compile?.semantic.title || active.value.title),
+  },
+  {
     id: "outline",
     title: "Plan the structure",
     mode: "Outline-first work",
@@ -11314,6 +11329,39 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
     },
   },
   {
+    id: "claim-evidence",
+    title: "Map claims to sources",
+    mode: "Evidence review",
+    summary: "Extract factual claims and connect them to saved citation-source evidence before approval.",
+    detail: "Evidence and approval review builds a claim inventory, counts citation TODOs, checks approval metadata, and now suggests saved source-library matches. The inserted matrix makes each citation recommendation reviewable before it enters the document body.",
+    points: [
+      "Refresh Evidence and approval review in the Review sidebar.",
+      "Inspect suggested source matches for each numbered, dated, quoted, causal, or commitment claim.",
+      "Insert the claim-source matrix as a reviewer handoff before finalizing citations.",
+    ],
+    showcaseFocus: "Use the showcase claims, citations, and source-vault rows to demonstrate how review moves from unsupported statements to traceable evidence.",
+    evidence: ["Claim inventory", "Claim-source evidence matrix", "Citation TODO audit", "Approval metadata blockers"],
+    run: () => {
+      store.sidebar = "review";
+      refreshReviewEvidenceSnapshot();
+    },
+  },
+  {
+    id: "publishing-preflight",
+    title: "Preflight publishing",
+    mode: "Publishing governance",
+    summary: "Prepare blog, Substack, WordPress, Ghost, or webhook publishing without leaking secrets or skipping dry-run checks.",
+    detail: "Publishing handoff creates a target-specific payload, then preflight checks endpoint safety, metadata, dry-run state, content format, secret handling, and target workflow risks before anything is sent.",
+    points: [
+      "Open the publishing handoff from Export.",
+      "Keep dry run enabled while reviewing payload and metadata.",
+      "Insert the publishing preflight audit before sending content outside NEditor.",
+    ],
+    showcaseFocus: "Use the showcase release metadata and publishing tags to explain why external distribution needs target-specific proof.",
+    evidence: ["Publishing request preview", "Preflight blockers and warnings", "Dry-run guard", "Secret handling checklist"],
+    run: () => openPublishingHandoff(),
+  },
+  {
     id: "export",
     title: "Prepare delivery",
     mode: "Export readiness",
@@ -11331,6 +11379,21 @@ const guidedDemoSteps = computed<GuidedDemoStep[]>(() => [
       void prepareForExport();
     },
   },
+  {
+    id: "setup-delivery",
+    title: "Finish setup and delivery",
+    mode: "Configuration and CLI",
+    summary: "Centralize identity, provider access, voice, transforms, Google auth, templates, CLI deployment, default reader setup, and support evidence.",
+    detail: "The Configuration Center and setup wizard collect the operational pieces non-technical users need: reusable business identity, AI providers, Ollama models, transform handlers, Google sign-in, read-aloud engines, the global ned CLI, default Markdown reader guidance, and release evidence.",
+    points: [
+      "Open Configuration Center and review setup readiness.",
+      "Deploy the CLI only from the guarded Deploy CLI flow.",
+      "Generate support and release evidence when a user needs help or a package is approaching distribution.",
+    ],
+    showcaseFocus: "Close the tour by showing how setup choices make the showcase repeatable for real business documents and release artifacts.",
+    evidence: ["Configuration readiness", "Deploy CLI status", "Default Markdown reader setup", "Support bundle and release evidence"],
+    run: () => openConfigurationSetup(),
+  },
 ]);
 const currentDemoStep = computed(() => guidedDemoSteps.value[guidedDemoStepIndex.value] || guidedDemoSteps.value[0] || null);
 const guidedDemoCompletedCount = computed(() => guidedDemoSteps.value.filter((step) => store.guidedDemoCompletedStepIds.includes(step.id)).length);
@@ -11338,7 +11401,7 @@ const guidedDemoCompletionPercent = computed(() =>
   guidedDemoSteps.value.length ? Math.round((guidedDemoCompletedCount.value / guidedDemoSteps.value.length) * 100) : 0,
 );
 const guidedDemoCompletionSummary = computed(() =>
-  `${guidedDemoCompletedCount.value}/${guidedDemoSteps.value.length} demo capabilities completed: showcase document, AI creation, playbooks, lifecycle tasks, provider governance, outline, composition, templates, review, and export.`,
+  `${guidedDemoCompletedCount.value}/${guidedDemoSteps.value.length} demo capabilities completed: showcase document, AI creation, playbooks, lifecycle tasks, provider governance, deep research, outline, composition, templates, review, claim evidence, publishing preflight, export, and setup.`,
 );
 function businessTemplateById(id: BusinessDocumentTemplate["id"]) {
   return businessDocumentTemplates.find((template) => template.id === id) || businessDocumentTemplates[0];
@@ -14619,6 +14682,9 @@ function showcaseFallbackMarkdown(error: unknown) {
     "| Beautiful business documents | Tables, equations, figures, callouts, covers, and layout controls |",
     "| Evidence governance | Citations, downloaded sources, comments, change notes, and AI provenance |",
     "| Distribution | Export readiness, visual QA, release evidence, and target-specific handoffs |",
+    "| Deep research | Local source library search, bibliography population, source conflict review, and audit packets |",
+    "| Claim review | Claim-source evidence matrix, citation TODOs, and approval metadata blockers |",
+    "| Product setup | Configuration Center, Deploy CLI, default Markdown reader guidance, and support bundle |",
     "",
     "## Equation",
     "",
@@ -14659,6 +14725,9 @@ function guidedDemoChecklistMarkdown() {
     "- Open the packaged NEditor Capability Showcase before starting the tour.",
     "- Complete every step before onboarding a team to AI-first document creation.",
     "- Confirm provider outputs remain needs-review until a human accepts them.",
+    "- Confirm local source-library and claim-source matrix suggestions are reviewed before citations are accepted.",
+    "- Confirm publishing preflight stays in dry-run mode until endpoint, metadata, and authorization are approved.",
+    "- Confirm setup and CLI deployment are complete before using NEditor in a team rollout.",
     "- Confirm export readiness is run before distributing external deliverables.",
     "",
   ].join("\n");

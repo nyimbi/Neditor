@@ -243,10 +243,11 @@ images, citations, includes, AI provenance, review comments, release metadata,
 and export settings. Then open **Help > Guided Demo**. Each demo step now points
 to evidence in the showcase so business users can practice routing tasks,
 inserting briefs, copying handoffs, building provider packages, governing AI
-output, reviewing citations, and preparing exports against a real document
-instead of a blank page. Trainers can mark steps complete, reset locally
-persisted progress, or insert/copy the generated Markdown checklist as
-onboarding evidence.
+output, reusing local source libraries, mapping claims to saved source
+evidence, preflighting publishing targets, completing setup, and preparing
+exports against a real document instead of a blank page. Trainers can mark
+steps complete, reset locally persisted progress, or insert/copy the generated
+Markdown checklist as onboarding evidence.
 
 Use **AI Create** when the next action is clearly to create a first draft. It
 opens Docs Live with an intent-first workflow: document type, outline, spoken or
