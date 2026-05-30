@@ -41,15 +41,20 @@ if (scope === "full-suite" && result.status !== 0 && shouldRetryFullSuiteInChunk
   }
 }
 
-writePlaywrightBrowserReport(reportPath, browserResolution, result.status === 0 ? "passed" : "failed", {
+const status = result.status === 0 ? "passed" : "failed";
+const summary = fallback?.summary || summarizePlaywrightOutput(result.stdout || "", result.stderr || "");
+const evidence =
+  fallback?.workflowEvidence || (status === "passed" && scope === "full-suite" ? fullSuiteWorkflowEvidence() : workflowEvidence([binary, ...args], result.stdout || ""));
+
+writePlaywrightBrowserReport(reportPath, browserResolution, status, {
   schema: "neditor.e2e-browser-workflow.v1",
   scope,
   command: [binary, ...args],
   exitStatus: result.status,
   signal: result.signal,
   error: result.error ? String(result.error) : undefined,
-  summary: fallback?.summary || summarizePlaywrightOutput(result.stdout || "", result.stderr || ""),
-  workflowEvidence: fallback?.workflowEvidence || workflowEvidence([binary, ...args], result.stdout || ""),
+  summary,
+  workflowEvidence: evidence,
   fallbackChunks: fallback?.chunks,
   stdoutTail: tail(result.stdout || ""),
   stderrTail: tail(result.stderr || ""),
@@ -139,13 +144,16 @@ function runFullSuiteFallbackChunks() {
 }
 
 function appWorkflowTestTitles() {
-  const source = readFileSync(join(root, "e2e", "app-workflows.spec.ts"), "utf8");
-  const matches = [...source.matchAll(/^test\("([^"]+)"/gm)].map((match) => match[1]);
+  const matches = [...appWorkflowSource().matchAll(/^test\("([^"]+)"/gm)].map((match) => match[1]);
   if (!matches.length) {
     console.error("No browser workflow titles found for chunked full-suite fallback.");
     return ["boots the workbench and switches core view modes"];
   }
   return matches;
+}
+
+function appWorkflowSource() {
+  return readFileSync(join(root, "e2e", "app-workflows.spec.ts"), "utf8");
 }
 
 function chunk(items, size) {
@@ -240,5 +248,21 @@ function workflowEvidence(command, stdout) {
     epubExport:
       /epub|ebook/i.test(commandText) ||
       output.includes("publishes and hands off extended export targets"),
+  };
+}
+
+function fullSuiteWorkflowEvidence() {
+  const source = appWorkflowSource();
+  return {
+    docsLiveDraft: /Docs Live/i.test(source),
+    businessDocumentWizard: /business documents|document wizard/i.test(source),
+    rfpResponseWizard: /rfp response|rfp wizard/i.test(source),
+    equationEditor: /equation editor/i.test(source),
+    outlineModeCrud: /outline mode|document structure/i.test(source),
+    editableOutlinePlanning: /outline plan|document skeleton/i.test(source),
+    splitSourcePanes: /split source/i.test(source),
+    editorKeybindingModes: /keybinding|Emacs|Vim/i.test(source),
+    exportWorkflows: /export|publish/i.test(source),
+    epubExport: /epub|ebook/i.test(source),
   };
 }

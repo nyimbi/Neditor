@@ -14,6 +14,22 @@ const listOnly = Boolean(args.list);
 const validate = args.validate !== false && args["no-validate"] !== true && !dryRun;
 
 const evidenceItems = [
+  item("browser-environment", ".tmp/e2e-environment/report.json", "browser", [
+    "neditor-browser-workflow-evidence/.tmp/e2e-environment/report.json",
+    "neditor-browser-workflow-evidence/e2e-environment/report.json",
+    "browser/.tmp/e2e-environment/report.json",
+    "browser/e2e-environment/report.json",
+    "e2e-environment/report.json",
+    "browser-environment-report.json",
+  ]),
+  item("browser-workflows", ".tmp/e2e-browser/report.json", "browser", [
+    "neditor-browser-workflow-evidence/.tmp/e2e-browser/report.json",
+    "neditor-browser-workflow-evidence/e2e-browser/report.json",
+    "browser/.tmp/e2e-browser/report.json",
+    "browser/e2e-browser/report.json",
+    "e2e-browser/report.json",
+    "browser-workflow-report.json",
+  ]),
   item("platform-win32-package", ".tmp/platform-evidence/external/win32/package-artifacts.json", "platform", [
     "neditor-platform-evidence-win32-json/.tmp/platform-evidence/external/win32/package-artifacts.json",
     "neditor-platform-evidence-win32-json/platform-evidence/external/win32/package-artifacts.json",
