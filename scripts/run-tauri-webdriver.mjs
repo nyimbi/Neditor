@@ -65,8 +65,9 @@ let tauriDriver = null;
 
 const controlByLabelScript = `function controlByLabel(labelText, selector) {
   const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
-  const label = [...document.querySelectorAll('label')].find((item) => normalized(item.textContent || '').includes(labelText));
-  const control = label?.querySelector(selector);
+  const control = [...document.querySelectorAll('label')]
+    .map((item) => ({ label: item, text: normalized(item.textContent || ''), control: item.querySelector(selector) }))
+    .find((item) => item.text.includes(labelText) && item.control)?.control;
   if (!control) throw new Error('Missing control for ' + labelText);
   return control;
 }`;
@@ -408,8 +409,9 @@ async function setTransformTemplateFilters(session, { category, transform, searc
     `
       const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
       const controlByLabel = (labelText, selector) => {
-        const label = [...document.querySelectorAll('label')].find((item) => normalized(item.textContent || '').includes(labelText));
-        return label?.querySelector(selector) || null;
+        return [...document.querySelectorAll('label')]
+          .map((item) => ({ text: normalized(item.textContent || ''), control: item.querySelector(selector) }))
+          .find((item) => item.text.includes(labelText) && item.control)?.control || null;
       };
       const category = controlByLabel('Category', 'select');
       const transform = controlByLabel('Transform', 'select');
