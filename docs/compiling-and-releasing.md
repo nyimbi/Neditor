@@ -466,6 +466,70 @@ optional tool output, and writes
 `.tmp/security-review/external/security-review.json`. Return that JSON through
 the release evidence kit or ingest it into the release checkout.
 
+## Rendered Export Human Signoff Evidence
+
+The rendered-export release gate requires a reviewer to open the primary export
+artifacts and every generated review-case artifact in native or browser viewers.
+Generate the audit bundle and strict signoff template first:
+
+```sh
+pnpm run test:rendered-exports
+```
+
+After the reviewer has collected native-viewer screenshots, notes, or ticket
+references, package the signoff:
+
+```sh
+pnpm run collect:rendered-exports:manual -- \
+  --reviewer-name "Reviewer Name" \
+  --reviewer-platform "macOS 15.5" \
+  --native-viewer "Preview" \
+  --native-viewer "Microsoft Word" \
+  --evidence-reference /path/to/rendered-export-review-artifacts \
+  --notes "Reviewed primary and review-case export artifacts with no blockers."
+NEDITOR_RENDERED_EXPORT_SIGNOFF=.tmp/rendered-export-audit/external/visual-review-signoff.json \
+  pnpm run test:rendered-exports -- --validate-signoff-only
+```
+
+The collector requires a clean Git tree and uses
+`.tmp/rendered-export-audit/visual-review-signoff.template.json` so artifact
+paths, hashes, source commit, and current app version stay aligned.
+
+## Accessibility Human Signoff Evidence
+
+The accessibility release gate requires real assistive-technology review across
+screen-reader navigation, keyboard-only operation, native shell traversal, and
+export artifact review. Generate the strict template after static and runtime
+accessibility checks:
+
+```sh
+pnpm run check:a11y
+pnpm run check:a11y:runtime
+pnpm run check:a11y:manual
+```
+
+After the reviewer has completed the assistive-technology sessions and collected
+artifact references, package the signoff:
+
+```sh
+pnpm run collect:a11y:manual -- \
+  --reviewer-name "Reviewer Name" \
+  --platform-version "macOS 15.5" \
+  --platform-device "MacBook Pro" \
+  --assistive-technology "VoiceOver" \
+  --assistive-technology-version "macOS 15.5" \
+  --browser-or-webview "Tauri WebView" \
+  --browser-or-webview-version "WebKit 620" \
+  --evidence-reference /path/to/accessibility-review-artifacts \
+  --notes "Reviewed screen-reader, keyboard, native shell, and export artifact workflows with no blockers."
+NEDITOR_ACCESSIBILITY_SIGNOFF=.tmp/accessibility/external/manual-review-signoff.json \
+  pnpm run check:a11y:manual
+```
+
+The collector requires a clean Git tree and uses the generated
+`.tmp/accessibility/manual-review-template.json` so prerequisite report hashes,
+source commit, and current app version stay aligned.
+
 ## Table Editor Human Signoff Evidence
 
 The table-editor release gate requires a named human review of source-to-grid,

@@ -194,7 +194,7 @@ const runbooks = [
     commands: [
       "pnpm run test:rendered-exports",
       "Review every primary and review-case artifact in native/browser viewers.",
-      "Fill templates/rendered-export/visual-review-signoff.template.json.",
+      "Run pnpm run collect:rendered-exports:manual -- --template templates/rendered-export/visual-review-signoff.template.json --reviewer-name \"Reviewer Name\" --reviewer-platform \"OS Version\" --native-viewer \"Preview\" --native-viewer \"Microsoft Word\" --evidence-reference /path/to/rendered-export-review-artifacts --notes \"Reviewed primary and review-case export artifacts with no blockers.\".",
       "NEDITOR_RENDERED_EXPORT_SIGNOFF=/path/to/completed-signoff.json pnpm run test:rendered-exports -- --validate-signoff-only",
     ],
     returns: ["completed visual-review-signoff JSON", ".tmp/rendered-export-audit/visual-review-summary.json"],
@@ -266,7 +266,7 @@ const runbooks = [
       "pnpm run check:a11y:runtime",
       "pnpm run check:a11y:manual",
       "Perform screen-reader, keyboard-only, native-shell, and export-artifact sessions.",
-      "Fill templates/accessibility/manual-review-template.json.",
+      "Run pnpm run collect:a11y:manual -- --template templates/accessibility/manual-review-template.json --reviewer-name \"Reviewer Name\" --platform-version \"OS Version\" --platform-device \"Device\" --assistive-technology \"VoiceOver\" --assistive-technology-version \"AT Version\" --browser-or-webview \"Tauri WebView\" --browser-or-webview-version \"WebView Version\" --evidence-reference /path/to/accessibility-review-artifacts --notes \"Reviewed screen-reader, keyboard, native shell, and export artifact workflows with no blockers.\".",
       "NEDITOR_ACCESSIBILITY_SIGNOFF=/path/to/completed-signoff.json pnpm run check:a11y:manual",
     ],
     returns: ["completed accessibility manual-review signoff JSON", ".tmp/accessibility/runtime-report.json"],

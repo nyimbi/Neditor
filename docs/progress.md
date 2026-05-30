@@ -28,6 +28,29 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-30 Accessibility And Rendered Export Signoff Collectors
+
+NEditor now has collectors for two more human release gates.
+`pnpm run collect:a11y:manual` packages real assistive-technology reviewer
+evidence into `neditor.accessibility.manual-signoff.v1`, and
+`pnpm run collect:rendered-exports:manual` packages real native-viewer export
+review evidence into `neditor.rendered-export.visual-signoff.v1`.
+
+These collectors do not perform the reviews. They require a clean Git tree,
+read the generated validator templates, preserve current source and artifact
+identity, fill only passing sessions/checklists/artifacts, and emit files that
+the existing manual validators can check.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/collect-accessibility-manual-signoff.mjs` | Pass | Accessibility collector syntax is valid after adding reviewer, platform, assistive-technology, browser/WebView, session, checklist, and validation guidance fields. |
+| `node --check scripts/collect-rendered-export-signoff.mjs` | Pass | Rendered-export collector syntax is valid after adding reviewer, native-viewer, primary-artifact, review-case, checklist, and acceptance packaging. |
+| `pnpm run collect:a11y:manual -- --help` | Pass | Help output documents template, output, reviewer, platform, assistive-technology, WebView, duration, evidence, notes, and environment-variable inputs. |
+| `pnpm run collect:rendered-exports:manual -- --help` | Pass | Help output documents audit directory, template, output, reviewer, platform, native-viewer, evidence, notes, and environment-variable inputs. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including package script coverage and evidence-kit runbook wiring for both collectors. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked after adding signoff collector release instructions. |
+| `git diff --check` | Pass | No whitespace errors are present in this accessibility/rendered-export signoff workflow slice. |
+
 ## 2026-05-30 Table Editor Manual Signoff Collector
 
 NEditor now has a collector for the table-editor human signoff gate.

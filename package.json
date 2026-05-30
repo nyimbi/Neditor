@@ -42,6 +42,8 @@
     "collect:engine-evidence": "node scripts/check-external-engines.mjs --write-evidence",
     "collect:platform-evidence": "node scripts/collect-platform-evidence.mjs",
     "collect:performance-profile": "node scripts/collect-performance-profile-evidence.mjs",
+    "collect:a11y:manual": "node scripts/collect-accessibility-manual-signoff.mjs",
+    "collect:rendered-exports:manual": "node scripts/collect-rendered-export-signoff.mjs",
     "collect:evidence-kit": "node scripts/collect-release-evidence-kit.mjs",
     "collect:release-signing": "node scripts/collect-release-signing-evidence.mjs",
     "collect:security-review": "node scripts/collect-security-review-evidence.mjs",
