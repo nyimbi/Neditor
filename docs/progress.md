@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `a470774 Require source
-  confidence before distribution`
+- Latest inspected committed baseline before this update: `49333d8 Count local
+  capabilities from local evidence`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,29 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Deep Research Audit Packet
+
+The terminal Deep Research workflow now emits a complete reviewer handoff
+instead of only a draft dossier. `ned deep-research` includes a supported search
+provider matrix for DuckDuckGo, SearXNG, Tavily, and the document-associated
+local source library; binds the run to the active document's source vault when
+`--document` is supplied; returns the current source-library state in JSON; and
+adds a Research Audit Packet with run settings, provider choices, query log,
+source-vault location, manifest path, local source verification counts, and
+reviewer sign-off checks.
+
+This closes local implementation gaps for search provider choices, source
+document vault handoff, and research audit packets while keeping live provider,
+network, credentialed, and manual review evidence conservative.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 34 CLI tests passed and the debug `ned` binary rebuilt; `ned_cli_creates_deep_research_dossiers_from_terminal` now verifies provider matrix JSON, source-library JSON, audit packet JSON, Source Vault State Markdown, Research Audit Packet Markdown, and the document-associated `.neditor-sources` path. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting the terminal Deep Research audit packet. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after adding the Deep Research packet and source-vault evidence. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 84/100 implementation-evidenced items and 16 partial/external-proof items. Items 32 Search provider choices, 33 Source document vault, and 40 Research audit packet are implementation-evidenced. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 Local Capability Audit Classifier Fix
 

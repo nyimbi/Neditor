@@ -560,7 +560,10 @@ Research and business documents can keep reference metadata near the source.
   dossier with a page-budget table and section-by-section draft queue. Add
   `--document report.md --save-sources` to download returned source files into
   the document vault, or choose `--provider local-library` to build from
-  already saved sources without a live web search.
+  already saved sources without a live web search. The generated dossier now
+  includes the supported provider matrix, Source Vault State, and Research
+  Audit Packet; `--json` also returns those fields as `supportedSearchProviders`,
+  `sourceLibrary`, and `auditPacket` for automation.
 - In **Review**, refresh **Evidence and approval review** to extract candidate
   claims, then use **Insert claim-source matrix** to map those claims to saved
   source-library citations. The matrix shows match scores, reasons, local file

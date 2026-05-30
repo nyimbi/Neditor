@@ -4590,19 +4590,43 @@ fn run_deep_research_command(args: &[String]) -> Result<CliOutcome, String> {
         }));
     }
 
+    let source_library_report = if let Some(path) = document_path.as_deref() {
+        Some(
+            serde_json::to_value(list_citation_sources(CitationSourceLibraryRequest {
+                document_path: path.to_string(),
+            })?)
+            .map_err(|err| err.to_string())?,
+        )
+    } else {
+        None
+    };
+
     let settings = json!({
         "topic": topic,
         "documentType": document_type,
         "audience": audience,
         "searchProvider": provider,
+        "supportedSearchProviders": deep_research_supported_provider_rows(),
         "targetPages": target_pages,
         "targetWords": target_pages * 500,
         "iterations": iterations,
         "resultsPerIteration": results_per_iteration,
-        "documentPath": document_path,
+        "documentPath": document_path.clone(),
         "saveSources": save_sources,
     });
-    let markdown = deep_research_cli_markdown(&settings, &iteration_reports, &saved_sources);
+    let audit_packet = deep_research_cli_audit_packet_markdown(
+        &settings,
+        &iteration_reports,
+        &saved_sources,
+        source_library_report.as_ref(),
+    );
+    let markdown = deep_research_cli_markdown(
+        &settings,
+        &iteration_reports,
+        &saved_sources,
+        source_library_report.as_ref(),
+        &audit_packet,
+    );
     if let Some(path) = output_path.as_deref() {
         write_cli_markdown_output(path, &markdown)?;
     }
@@ -4615,6 +4639,8 @@ fn run_deep_research_command(args: &[String]) -> Result<CliOutcome, String> {
                 "settings": settings,
                 "iterations": iteration_reports,
                 "savedSources": saved_sources,
+                "sourceLibrary": source_library_report,
+                "auditPacket": audit_packet,
                 "markdown": markdown,
             }))
             .map_err(|err| err.to_string())?,
@@ -4815,6 +4841,8 @@ fn deep_research_cli_markdown(
     settings: &Value,
     iterations: &[Value],
     saved_sources: &[Value],
+    source_library_report: Option<&Value>,
+    audit_packet: &str,
 ) -> String {
     let topic = readiness_string_field(settings, "topic").unwrap_or("Deep Research");
     let document_type =
@@ -4998,6 +5026,17 @@ fn deep_research_cli_markdown(
     lines.push("```".to_string());
     lines.extend([
         "".to_string(),
+        "## Source Vault State".to_string(),
+        "".to_string(),
+    ]);
+    if let Some(report) = source_library_report {
+        lines.push(citation_source_library_audit_markdown(report));
+    } else {
+        lines.push("No document-associated source vault was supplied. Re-run with `--document <doc.md>` to bind downloaded source files to a document.".to_string());
+    }
+    lines.extend(["".to_string(), audit_packet.trim().to_string()]);
+    lines.extend([
+        "".to_string(),
         "## Quality Assurance & Review Handoff".to_string(),
         "".to_string(),
         "- Verify every cited claim against downloaded source documents, not just search snippets.".to_string(),
@@ -5006,6 +5045,133 @@ fn deep_research_cli_markdown(
         "- Run `ned quality <doc.md> --markdown --output quality-review.md` before export.".to_string(),
     ]);
     lines.join("\n")
+}
+
+fn deep_research_cli_audit_packet_markdown(
+    settings: &Value,
+    iterations: &[Value],
+    saved_sources: &[Value],
+    source_library_report: Option<&Value>,
+) -> String {
+    let topic = readiness_string_field(settings, "topic").unwrap_or("Deep Research");
+    let provider = readiness_string_field(settings, "searchProvider").unwrap_or("duckduckgo");
+    let target_pages = number_field_u64(settings, "targetPages");
+    let target_words = number_field_u64(settings, "targetWords");
+    let results = iterations
+        .iter()
+        .flat_map(|iteration| readiness_array_field(iteration, "results"))
+        .collect::<Vec<_>>();
+    let source_library_sources = source_library_report
+        .map(|report| readiness_array_field(report, "sources"))
+        .unwrap_or_default();
+    let source_vault_dir = source_library_report
+        .and_then(|report| readiness_string_field(report, "associated_dir"))
+        .unwrap_or("not bound to a document");
+    let source_manifest = source_library_report
+        .and_then(|report| readiness_string_field(report, "manifest_path"))
+        .unwrap_or("not available");
+    let verified_sources = source_library_sources
+        .iter()
+        .filter(|source| citation_source_file_status(source) == "verified")
+        .count();
+    let mut lines = vec![
+        "## Research Audit Packet".to_string(),
+        "".to_string(),
+        "| Field | Value |".to_string(),
+        "| --- | --- |".to_string(),
+        format!("| Topic | {} |", markdown_cell(topic)),
+        format!("| Active search provider | {} |", markdown_cell(provider)),
+        format!("| Target pages | {target_pages} |"),
+        format!("| Target words | {target_words} |"),
+        format!("| Search iterations | {} |", iterations.len()),
+        format!("| Source candidates | {} |", results.len()),
+        format!("| Saved during this run | {} |", saved_sources.len()),
+        format!(
+            "| Source vault directory | {} |",
+            markdown_cell(source_vault_dir)
+        ),
+        format!("| Source manifest | {} |", markdown_cell(source_manifest)),
+        format!(
+            "| Verified local source files | {verified_sources}/{} |",
+            source_library_sources.len()
+        ),
+        "".to_string(),
+        "### Search Provider Choices".to_string(),
+        "".to_string(),
+        "| Provider | Use when | Required setup |".to_string(),
+        "| --- | --- | --- |".to_string(),
+    ];
+    for provider_row in deep_research_supported_provider_rows() {
+        lines.push(format!(
+            "| {} | {} | {} |",
+            markdown_cell(readiness_string_field(&provider_row, "provider").unwrap_or("provider")),
+            markdown_cell(
+                readiness_string_field(&provider_row, "useWhen").unwrap_or("source search")
+            ),
+            markdown_cell(readiness_string_field(&provider_row, "requiredSetup").unwrap_or("none")),
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "### Search Query Log".to_string(),
+        "".to_string(),
+        "| Iteration | Provider | Query | Results | Gaps |".to_string(),
+        "| ---: | --- | --- | ---: | --- |".to_string(),
+    ]);
+    if iterations.is_empty() {
+        lines.push(
+            "| - | - | No search iterations recorded | 0 | Run Deep Research before review |"
+                .to_string(),
+        );
+    } else {
+        for iteration in iterations {
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} |",
+                number_field_u64(iteration, "index"),
+                markdown_cell(readiness_string_field(iteration, "provider").unwrap_or(provider)),
+                markdown_cell(readiness_string_field(iteration, "query").unwrap_or("")),
+                readiness_array_field(iteration, "results").len(),
+                markdown_cell(&string_array_field(iteration, "gaps").join("; ")),
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "### Source Vault Checklist".to_string(),
+        "".to_string(),
+        "- [ ] Every cited source has a local file or a documented reason it cannot be downloaded.".to_string(),
+        "- [ ] Every local source file exists and its SHA-256 hash matches the manifest.".to_string(),
+        "- [ ] Every source used in prose appears in the bibliography and source citation index.".to_string(),
+        "- [ ] Reviewer has opened the source files, not just search snippets, before approval.".to_string(),
+        "- [ ] Search provider, query, source fit score, local path, and review action are preserved in the final handoff.".to_string(),
+        "".to_string(),
+    ]);
+    lines.join("\n")
+}
+
+fn deep_research_supported_provider_rows() -> Vec<Value> {
+    vec![
+        json!({
+            "provider": "duckduckgo",
+            "useWhen": "general web source discovery with no API key",
+            "requiredSetup": "network access only"
+        }),
+        json!({
+            "provider": "searxng",
+            "useWhen": "self-hosted or private metasearch source discovery",
+            "requiredSetup": "--searxng-url pointing at the trusted instance"
+        }),
+        json!({
+            "provider": "tavily",
+            "useWhen": "API-backed research search with account-level controls",
+            "requiredSetup": "--tavily-api-key or configured secret environment"
+        }),
+        json!({
+            "provider": "local-library",
+            "useWhen": "reuse downloaded document-associated source files",
+            "requiredSetup": "--document <doc.md> with a .neditor-sources manifest"
+        }),
+    ]
 }
 
 fn deep_research_section_plan(target_pages: usize) -> Vec<String> {
@@ -8628,7 +8794,7 @@ fn improvement_evidence_signals(item: &ImprovementItem) -> Vec<String> {
 }
 
 fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool {
-    if matches!(item.number, 11 | 18 | 79 | 80) {
+    if matches!(item.number, 11 | 18 | 32 | 33 | 40 | 79 | 80) {
         return false;
     }
     let text = format!(

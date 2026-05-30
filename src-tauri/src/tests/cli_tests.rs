@@ -1333,6 +1333,34 @@ fn ned_cli_creates_deep_research_dossiers_from_terminal() {
     assert_eq!(report["settings"]["topic"], "climate procurement evidence");
     assert_eq!(report["settings"]["searchProvider"], "local-library");
     assert_eq!(report["settings"]["targetPages"], 12);
+    assert!(report["settings"]["supportedSearchProviders"]
+        .as_array()
+        .expect("supported search providers")
+        .iter()
+        .any(|provider| provider["provider"] == "searxng"
+            && provider["requiredSetup"]
+                .as_str()
+                .expect("searxng setup")
+                .contains("--searxng-url")));
+    assert_eq!(
+        report["sourceLibrary"]["sources"]
+            .as_array()
+            .expect("source library sources")
+            .len(),
+        1
+    );
+    assert!(report["auditPacket"]
+        .as_str()
+        .expect("audit packet")
+        .contains("## Research Audit Packet"));
+    assert!(report["auditPacket"]
+        .as_str()
+        .expect("audit packet")
+        .contains("### Search Provider Choices"));
+    assert!(report["auditPacket"]
+        .as_str()
+        .expect("audit packet")
+        .contains("Source vault directory"));
     assert_eq!(
         report["iterations"].as_array().expect("iterations").len(),
         2
@@ -1360,6 +1388,10 @@ fn ned_cli_creates_deep_research_dossiers_from_terminal() {
     assert!(markdown.contains("## Source Quality Review"));
     assert!(markdown.contains("## Source Citation Index"));
     assert!(markdown.contains("## Deep Research Evidence Log"));
+    assert!(markdown.contains("## Source Vault State"));
+    assert!(markdown.contains("## Research Audit Packet"));
+    assert!(markdown.contains("### Search Provider Choices"));
+    assert!(markdown.contains("proposal.neditor-sources"));
     assert!(markdown.contains("@climate-procurement-evidence"));
     assert!(markdown.contains("```bibliography"));
 
@@ -3423,6 +3455,19 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         .expect("improvement items")
         .iter()
         .any(|item| item["number"] == 21 && item["title"] == "Native RFP ingestion"));
+    for (number, title) in [
+        (32, "Search provider choices"),
+        (33, "Source document vault"),
+        (40, "Research audit packet"),
+    ] {
+        assert!(report["items"]
+            .as_array()
+            .expect("improvement items")
+            .iter()
+            .any(|item| item["number"] == number
+                && item["title"] == title
+                && item["status"] == "implemented-evidence-present"));
+    }
     assert!(report["items"]
         .as_array()
         .expect("improvement items")
