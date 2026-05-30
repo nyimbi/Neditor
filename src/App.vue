@@ -4163,6 +4163,7 @@
             <div class="support-bundle-actions">
               <button type="button" :disabled="supportBundleBusy" title="Choose where to write the support bundle JSON" @click="saveSupportBundle">Save JSON</button>
               <button type="button" :disabled="!supportBundleReport" title="Insert a redaction-safe setup, release, and spec-closure handoff into the active document" @click="insertSupportBundleHandoff">Insert handoff</button>
+              <button type="button" :disabled="!supportBundleManualReviewWorkOrders.length" title="Insert reviewer-ready manual sign-off templates for spec-closure work orders" @click="insertManualReviewSignoffKit">Insert manual review kit</button>
               <span>{{ supportBundleStatus || "The bundle contains setup status and evidence summaries, not document content or secrets." }}</span>
             </div>
             <dl v-if="supportBundleReport" class="transform-installer-summary">
@@ -4352,6 +4353,7 @@
               <div class="support-bundle-actions">
                 <button type="button" :disabled="supportBundleBusy" @click="saveSupportBundle">Save JSON</button>
                 <button type="button" :disabled="!supportBundleReport" @click="insertSupportBundleHandoff">Insert handoff</button>
+                <button type="button" :disabled="!supportBundleManualReviewWorkOrders.length" @click="insertManualReviewSignoffKit">Insert manual review kit</button>
                 <button type="button" @click="openConfigurationSetup('support')">Open support setup wizard</button>
                 <span>{{ supportBundleStatus || "The bundle contains setup status and evidence summaries, not document content or secrets." }}</span>
               </div>
@@ -5118,6 +5120,7 @@
                 <button type="button" :disabled="supportBundleBusy" @click="previewSupportBundle">Preview support bundle</button>
                 <button type="button" :disabled="supportBundleBusy" @click="saveSupportBundle">Save support JSON</button>
                 <button type="button" :disabled="!supportBundleReport" @click="insertSupportBundleHandoff">Insert support handoff</button>
+                <button type="button" :disabled="!supportBundleManualReviewWorkOrders.length" @click="insertManualReviewSignoffKit">Insert review kit</button>
               </div>
               <p class="sidebar-hint">The support bundle includes setup status, command paths, release evidence summaries, spec work orders, and transform health, but not active document content or stored secrets.</p>
             </section>
@@ -7576,7 +7579,7 @@ import {
   templatePackSummaryRows,
   type NeditorTemplatePack,
 } from "./lib/templatePacks";
-import { supportBundleHandoffMarkdown } from "./lib/supportBundleHandoff";
+import { supportBundleHandoffMarkdown, supportBundleManualReviewKitMarkdown } from "./lib/supportBundleHandoff";
 import {
   buildTtsModelDownloadPlan,
   formatTtsRuntimeSummary,
@@ -8230,6 +8233,9 @@ const supportBundleRecommendationGroups = computed<SupportBundleRecommendationGr
   }
   return groups.filter((group) => group.items.length);
 });
+const supportBundleManualReviewWorkOrders = computed(() =>
+  (supportBundleReport.value?.specActionPlan?.workOrders || []).filter((order) => order.classification === "manual-review"),
+);
 const guidedDemoStepIndex = ref(0);
 const ttsBusy = ref(false);
 const ttsInspectionBusy = ref(false);
@@ -22115,6 +22121,19 @@ function insertSupportBundleHandoff() {
   store.sidebar = "settings";
   selectedConfigurationSection.value = "support";
   store.statusMessage = "Inserted support and release handoff";
+}
+
+function insertManualReviewSignoffKit() {
+  if (!supportBundleReport.value || !supportBundleManualReviewWorkOrders.value.length) {
+    supportBundleStatus.value = "Preview the support bundle before inserting manual review sign-off templates";
+    return;
+  }
+  flushEditorTextToStore();
+  insertBlock(supportBundleManualReviewKitMarkdown(supportBundleReport.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "settings";
+  selectedConfigurationSection.value = "support";
+  store.statusMessage = `Inserted ${supportBundleManualReviewWorkOrders.value.length} manual review sign-off template${supportBundleManualReviewWorkOrders.value.length === 1 ? "" : "s"}`;
 }
 
 async function createSupportBundleFromSettings(writeToFile: boolean) {

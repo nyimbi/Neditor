@@ -45,6 +45,7 @@ export interface SupportBundleHandoffReport {
     status?: string;
     releaseable?: boolean;
     sourceCurrent?: boolean;
+    currentSourceCommit?: string;
     candidateDir?: string;
     manifestPath?: string;
     checkReportPath?: string;
@@ -106,6 +107,51 @@ export interface SupportBundleSpecWorkOrder {
   validatorCommands?: string[];
   ingestCommand?: string;
   matrixClosureCommand?: string;
+}
+
+export function supportBundleManualReviewKitMarkdown(report: SupportBundleHandoffReport, generatedAt = new Date().toISOString()) {
+  const manualOrders = (report.specActionPlan?.workOrders || []).filter((order) => order.classification === "manual-review");
+  const sourceCommit = report.releaseCandidate?.currentSourceCommit || "<current git commit>";
+  const appVersion = "<package.json version>";
+  return [
+    "## Manual Review Sign-Off Kit",
+    "",
+    `Generated: ${generatedAt}`,
+    `Workspace: ${report.workspace || "current workspace"}`,
+    `Manual review work orders: ${manualOrders.length}`,
+    "",
+    "Use this kit with `pnpm run check:manual-review`. Complete one sign-off JSON file per work order, keep artifacts beside the sign-off, then ingest the returned evidence with `pnpm run ingest:evidence -- --source <returned-evidence-dir>`.",
+    "",
+    "### Assignment Index",
+    "",
+    "| Work order | Spec area | Reviewer owner | Return path | Validators |",
+    "| --- | --- | --- | --- | --- |",
+    ...(manualOrders.length
+      ? manualOrders.map((order) => `| ${cell(order.id || "manual-review")} | ${cell([order.specSection, order.requirementArea].filter(Boolean).join(" / ") || "Manual review")} | ${cell(order.owner || "Named manual reviewer")} | ${cell((order.returns || [`.tmp/manual-review/${order.id || "<work-order-id>"}/signoff.json`]).join("; "))} | ${cell((order.validatorCommands || []).join("; ") || "pnpm run check:manual-review")} |`)
+      : ["| - | No manual-review work orders | - | - | - |"]),
+    "",
+    "### Reviewer Instructions",
+    "",
+    "- Confirm `git status --short` is clean before signing.",
+    "- Run the validator commands listed for the assigned work order.",
+    "- Capture screenshots, exported files, native-viewer proof, or screen-reader notes under the returned `artifacts/` folder.",
+    "- Mark every checklist item as `pass` or `exception`; exceptions need a non-release-blocking rationale.",
+    "- Keep `unresolvedBlockers` empty before returning evidence.",
+    "- Do not include secrets, customer documents, API keys, raw audio, or private clipboard contents.",
+    "",
+    "### Sign-Off Templates",
+    "",
+    ...(manualOrders.length
+      ? manualOrders.flatMap((order) => manualReviewTemplateSection(order, sourceCommit, appVersion))
+      : ["No manual-review sign-off templates are required for the current support bundle.", ""]),
+    "### Closure Commands",
+    "",
+    "- `pnpm run check:manual-review`",
+    "- `pnpm run ingest:evidence -- --source <returned-evidence-dir>`",
+    "- `pnpm run check:release-readiness`",
+    "- `pnpm run check:spec-completion`",
+    "",
+  ].join("\n");
 }
 
 export function supportBundleHandoffMarkdown(report: SupportBundleHandoffReport, generatedAt = new Date().toISOString()) {
@@ -188,6 +234,85 @@ export function supportBundleHandoffMarkdown(report: SupportBundleHandoffReport,
     ...(privacyNotes.length ? privacyNotes.map((item) => `- ${item}`) : ["- Review the generated support bundle before sharing outside the organization."]),
     "",
   ].filter((line) => line !== undefined).join("\n");
+}
+
+function manualReviewTemplateSection(order: SupportBundleSpecWorkOrder, sourceCommit: string, appVersion: string) {
+  const workOrderId = order.id || "manual-review-work-order";
+  const checklist = [
+    {
+      id: "workflow-observed",
+      label: `Exercise and observe: ${[order.specSection, order.requirementArea].filter(Boolean).join(" / ") || workOrderId}`,
+      status: "pass",
+      evidence: "artifacts/screenshot-or-export-proof.png",
+      notes: "",
+    },
+    {
+      id: "artifact-evidence",
+      label: "Attach screenshots, exported files, native-viewer proof, or screen-reader notes as appropriate.",
+      status: "pass",
+      evidence: "artifacts/screenshot-or-export-proof.png",
+      notes: "",
+    },
+    {
+      id: "no-release-blockers",
+      label: "Confirm no unresolved release blocker remains for this work order.",
+      status: "pass",
+      evidence: "artifacts/validator-output.txt",
+      notes: "",
+    },
+    ...(order.validatorCommands || []).map((command, index) => ({
+      id: `validator-${String(index + 1).padStart(2, "0")}`,
+      label: `Validator command passed: ${command}`,
+      status: "pass",
+      evidence: "artifacts/validator-output.txt",
+      notes: "",
+    })),
+  ];
+  const template = {
+    schema: "neditor.manual-review.signoff.v1",
+    workOrderId,
+    requirement: [order.specSection, order.requirementArea].filter(Boolean).join(" / ") || workOrderId,
+    appVersion,
+    sourceCommit,
+    sourceTreeClean: true,
+    reviewer: {
+      name: "",
+      role: "",
+      organization: "",
+    },
+    reviewedAt: generatedIsoPlaceholder(),
+    platform: {
+      os: "",
+      arch: "",
+      version: "",
+      device: "",
+    },
+    appBuild: {
+      kind: "packaged-release-or-current-local-app",
+      path: "",
+      hash: "",
+    },
+    artifacts: ["artifacts/screenshot-or-export-proof.png", "artifacts/validator-output.txt"],
+    checklist,
+    unresolvedBlockers: [],
+    notes: order.remainingGap || "",
+  };
+  return [
+    `#### ${workOrderId}`,
+    "",
+    `Owner: ${order.owner || "Named manual reviewer"}`,
+    `Spec area: ${[order.specSection, order.requirementArea].filter(Boolean).join(" / ") || "Manual review"}`,
+    `Return path: ${(order.returns || [`.tmp/manual-review/${workOrderId}/signoff.json`]).join(", ")}`,
+    "",
+    "```json",
+    JSON.stringify(template, null, 2),
+    "```",
+    "",
+  ];
+}
+
+function generatedIsoPlaceholder() {
+  return "YYYY-MM-DDTHH:mm:ss.sssZ";
 }
 
 function runbookText(runbooks: SupportBundleReleaseWorkItem["runbooks"]) {

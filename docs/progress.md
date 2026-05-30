@@ -6126,6 +6126,22 @@ release managers without opening raw JSON.
 | `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including support-bundle handoff Markdown coverage and UI exposure guards. |
 | `git diff --check` | Pass | The support-bundle handoff slice has no whitespace errors. |
 
+## 2026-05-30 Manual Review Sign-Off Kit
+
+Manual-review spec work orders are now easier to assign from inside NEditor.
+After previewing a support bundle, users can insert a **Manual Review
+Sign-Off Kit** that filters spec work orders to the `manual-review`
+classification, lists reviewer owners, return paths, validator commands, and
+adds JSON sign-off templates with checklist items and artifact paths. This
+does not replace human review, but it removes the gap where reviewers had to
+open generated JSON or terminal output to discover the required sign-off shape.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue type checking passed after adding the manual review kit action to the support-bundle surfaces. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including manual review kit Markdown generation and UI exposure guards. |
+| `git diff --check` | Pass | The manual review kit slice has no whitespace errors. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

@@ -649,7 +649,10 @@ NEditor is built for drafts that need evidence before publication.
   bundle, use **Insert handoff** to add a redaction-safe support and release
   handoff to the active document with recommendations, release assignments,
   spec-closure work orders, release-candidate status, next commands, and
-  privacy notes. Add the suggestion to editable setup notes when a
+  privacy notes. If the bundle includes manual-review spec work orders, use
+  **Insert manual review kit** to add reviewer-ready sign-off templates,
+  expected artifact paths, validator commands, and closure commands to the
+  active document. Add the suggestion to editable setup notes when a
   non-technical user needs a clear setup record before changing configuration.
 - For Claude Code, Codex, OpenCode, and Google Antigravity profiles, use
   **Prepare local agent workspace** to write the governed prompt package under

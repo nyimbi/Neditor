@@ -283,7 +283,7 @@ import {
   releaseReadinessAuditMarkdown,
 } from "../src/lib/releaseReadiness.js";
 import { buildReleaseEvidenceDashboard, buildReleaseEvidenceWorkOrders, releaseEvidenceDashboardMarkdown, releaseEvidenceWorkOrdersMarkdown } from "../src/lib/releaseEvidenceDashboard.js";
-import { supportBundleHandoffMarkdown } from "../src/lib/supportBundleHandoff.js";
+import { supportBundleHandoffMarkdown, supportBundleManualReviewKitMarkdown } from "../src/lib/supportBundleHandoff.js";
 import {
   applyTransformProbeFailureState,
   applyTransformProbeSuccessState,
@@ -4851,97 +4851,118 @@ test("release evidence dashboard separates blockers, stale evidence, credentials
 });
 
 test("support bundle handoff summarizes setup release and spec assignments", () => {
-  const markdown = supportBundleHandoffMarkdown(
-    {
-      workspace: "/workspace/demo",
-      writtenTo: "/workspace/demo/support.json",
-      privacy: {
-        documentContentIncluded: false,
-        secretsIncluded: false,
-        note: "Share with internal IT and release managers.",
-      },
-      doctor: {
-        status: "needs-attention",
-        warnings: ["Workspace scaffold missing"],
-        workspaceScaffold: { status: "missing", recommended_command: "ned init . --json" },
-      },
-      releaseReadiness: {
-        status: "current-host-ready-with-external-gaps",
-        releaseReady: false,
-        evidenceGaps: ["Windows package proof", "Google Docs readback"],
-        failures: [],
-      },
-      releaseActionPlan: {
-        status: "ready",
-        readyToSendCount: 1,
-        workItems: [
-          {
-            id: "release-windows-package",
-            detail: "Collect Windows installer smoke evidence.",
-            runbooks: [{ title: "Platform evidence", path: "runbooks/platform-evidence.md" }],
-            returns: [".tmp/platform-evidence/windows.json"],
-            validatorCommands: ["pnpm run check:platform-evidence"],
-            ingestCommand: "pnpm run collect:evidence-kit",
-            finalReadinessCommand: "pnpm run check:release-readiness",
-            readyToSend: true,
-          },
-        ],
-      },
-      specCompletion: {
-        status: "partial-with-release-risks",
-        summary: { openRows: 3, totalRows: 120, completeRows: 117 },
-      },
-      specActionPlan: {
-        status: "ready",
-        readyToSendCount: 1,
-        workOrders: [
-          {
-            id: "spec-google-docs",
-            owner: "Integration owner",
-            specSection: "Export",
-            requirementArea: "Google Docs import handoff",
-            classification: "credentialed evidence",
-            remainingGap: "Attach authorized upload and readback proof.",
-            runbooks: ["runbooks/external-evidence.md"],
-            validatorCommands: ["pnpm run check:google-docs-import"],
-            matrixClosureCommand: "pnpm run check:spec-completion",
-            readyToSend: false,
-          },
-        ],
-      },
-      releaseCandidate: {
-        status: "current",
-        releaseable: true,
-        sourceCurrent: true,
-        candidateDir: ".tmp/release-candidate",
-        summary: { artifacts: 13, evidenceGaps: 2, checkStatus: "passed" },
-        issues: ["External credentialed proof still pending"],
-        nextSteps: ["pnpm run release:local"],
-      },
-      engineProbe: {
-        status: "needs-attention",
-        summary: { installed: 5, missingLocal: 1, incompatible: 0 },
-      },
-      evidenceReportSummary: {
-        ready: 4,
-        attention: 2,
-        missing: 1,
-        failed: 0,
-      },
-      recommendations: ["Assign Windows package evidence to the platform release owner."],
+  const report = {
+    workspace: "/workspace/demo",
+    writtenTo: "/workspace/demo/support.json",
+    privacy: {
+      documentContentIncluded: false,
+      secretsIncluded: false,
+      note: "Share with internal IT and release managers.",
     },
-    "2026-05-30T00:00:00.000Z",
-  );
+    doctor: {
+      status: "needs-attention",
+      warnings: ["Workspace scaffold missing"],
+      workspaceScaffold: { status: "missing", recommended_command: "ned init . --json" },
+    },
+    releaseReadiness: {
+      status: "current-host-ready-with-external-gaps",
+      releaseReady: false,
+      evidenceGaps: ["Windows package proof", "Google Docs readback"],
+      failures: [],
+    },
+    releaseActionPlan: {
+      status: "ready",
+      readyToSendCount: 1,
+      workItems: [
+        {
+          id: "release-windows-package",
+          detail: "Collect Windows installer smoke evidence.",
+          runbooks: [{ title: "Platform evidence", path: "runbooks/platform-evidence.md" }],
+          returns: [".tmp/platform-evidence/windows.json"],
+          validatorCommands: ["pnpm run check:platform-evidence"],
+          ingestCommand: "pnpm run collect:evidence-kit",
+          finalReadinessCommand: "pnpm run check:release-readiness",
+          readyToSend: true,
+        },
+      ],
+    },
+    specCompletion: {
+      status: "partial-with-release-risks",
+      summary: { openRows: 3, totalRows: 120, completeRows: 117 },
+    },
+    specActionPlan: {
+      status: "ready",
+      readyToSendCount: 1,
+      workOrders: [
+        {
+          id: "spec-google-docs",
+          owner: "Integration owner",
+          specSection: "Export",
+          requirementArea: "Google Docs import handoff",
+          classification: "credentialed evidence",
+          remainingGap: "Attach authorized upload and readback proof.",
+          runbooks: ["runbooks/external-evidence.md"],
+          validatorCommands: ["pnpm run check:google-docs-import"],
+          matrixClosureCommand: "pnpm run check:spec-completion",
+          readyToSend: false,
+        },
+        {
+          id: "001-manual-review-layout",
+          owner: "Named manual reviewer",
+          specSection: "9.15 Advanced layout",
+          requirementArea: "Columns, breaks, headers, and footers",
+          classification: "manual-review",
+          remainingGap: "Attach native-viewer layout review proof.",
+          runbooks: ["runbooks/manual-review.md"],
+          returns: [".tmp/manual-review/001-manual-review-layout/signoff.json"],
+          validatorCommands: ["pnpm run test:rendered-exports", "pnpm run check:manual-review"],
+          matrixClosureCommand: "pnpm run check:spec-completion",
+          readyToSend: true,
+        },
+      ],
+    },
+    releaseCandidate: {
+      status: "current",
+      releaseable: true,
+      sourceCurrent: true,
+      currentSourceCommit: "abc123",
+      candidateDir: ".tmp/release-candidate",
+      summary: { artifacts: 13, evidenceGaps: 2, checkStatus: "passed" },
+      issues: ["External credentialed proof still pending"],
+      nextSteps: ["pnpm run release:local"],
+    },
+    engineProbe: {
+      status: "needs-attention",
+      summary: { installed: 5, missingLocal: 1, incompatible: 0 },
+    },
+    evidenceReportSummary: {
+      ready: 4,
+      attention: 2,
+      missing: 1,
+      failed: 0,
+    },
+    recommendations: ["Assign Windows package evidence to the platform release owner."],
+  };
+  const markdown = supportBundleHandoffMarkdown(report, "2026-05-30T00:00:00.000Z");
 
   ok(markdown.includes("## NEditor Support And Release Handoff"));
   ok(markdown.includes("| Release action plan | ready | 1/1 work item(s) ready to send |"));
-  ok(markdown.includes("| Spec closure | ready | 3 open spec row(s), 1/1 work order(s) ready |"));
+  ok(markdown.includes("| Spec closure | ready | 3 open spec row(s), 1/2 work order(s) ready |"));
   ok(markdown.includes("release-windows-package"));
   ok(markdown.includes("Integration owner"));
   ok(markdown.includes("runbooks/platform-evidence.md"));
   ok(markdown.includes("`pnpm run check:release-readiness`"));
   ok(markdown.includes("Document content is excluded."));
   ok(markdown.includes("Stored secrets are excluded."));
+
+  const manualKit = supportBundleManualReviewKitMarkdown(report, "2026-05-30T00:00:00.000Z");
+  ok(manualKit.includes("## Manual Review Sign-Off Kit"));
+  ok(manualKit.includes("Manual review work orders: 1"));
+  ok(manualKit.includes("001-manual-review-layout"));
+  ok(manualKit.includes("neditor.manual-review.signoff.v1"));
+  ok(manualKit.includes("\"sourceCommit\": \"abc123\""));
+  ok(manualKit.includes("pnpm run ingest:evidence -- --source <returned-evidence-dir>"));
+  ok(manualKit.includes("artifacts/screenshot-or-export-proof.png"));
 });
 
 test("export metadata checklist validates publishing and ebook handoff readiness", () => {
@@ -10030,9 +10051,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Support bundle"));
   ok(app.includes("redaction-safe setup and release-readiness handoff"));
   ok(app.includes("supportBundleHandoffMarkdown"));
+  ok(app.includes("supportBundleManualReviewKitMarkdown"));
   ok(app.includes("insertSupportBundleHandoff"));
+  ok(app.includes("insertManualReviewSignoffKit"));
   ok(app.includes("Insert handoff"));
   ok(app.includes("Insert support handoff"));
+  ok(app.includes("Insert manual review kit"));
+  ok(app.includes("Insert review kit"));
+  ok(app.includes("supportBundleManualReviewWorkOrders"));
   ok(app.includes("supportBundleRecommendationGroups"));
   ok(app.includes("supportBundleRecommendationBucket"));
   ok(app.includes('aria-label="Support bundle recommendations"'));
