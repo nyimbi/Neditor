@@ -41,7 +41,9 @@ if (!skipEvidence) {
     run("pnpm", ["run", "prepare:sidecars"]);
     // Cargo builds binaries, but only the Tauri bundler materializes app resources such as examples/showcase.
     if (!skipBuild) buildTauriAppBundle();
-    // DMG/app prerequisite probes should run after the current app bundle has been materialized.
+    // Bundle materialization can refresh target/release/neditor, so smoke the native command after it.
+    run("pnpm", ["run", "test:desktop-smoke"]);
+    // DMG/app prerequisite probes should run after the current app bundle and command smoke have been materialized.
     run("pnpm", ["run", "test:desktop-bundle"]);
   }
   runReadinessBootstrap();
@@ -199,7 +201,6 @@ function refreshPrerequisiteEvidence() {
     ["pnpm", ["run", "check:tables:manual"]],
     ["pnpm", ["run", "check:a11y:manual"]],
     ["pnpm", ["run", "test:desktop-dmg"]],
-    ["pnpm", ["run", "test:desktop-smoke"]],
   ];
   if (refreshBrowserEvidence) {
     commands.push(["pnpm", ["run", "check:a11y:runtime"]], ["pnpm", ["run", "test:performance-audit"]]);
