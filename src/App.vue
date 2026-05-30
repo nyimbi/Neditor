@@ -1864,6 +1864,74 @@
               </button>
             </div>
           </section>
+          <section class="template-pack-manager" aria-label="Template pack marketplace">
+            <header>
+              <div>
+                <h3>Template pack marketplace</h3>
+                <span>Package filtered templates into a portable pack with metadata, placeholders, examples, outline rules, and usage guidance.</span>
+              </div>
+              <button type="button" @click="copyCurrentTemplatePack">Copy pack</button>
+            </header>
+            <div class="template-pack-fields">
+              <label>
+                Pack name
+                <input v-model="templatePackName" />
+              </label>
+              <label>
+                Publisher
+                <input v-model="templatePackPublisher" placeholder="Company or author" />
+              </label>
+              <label>
+                Version
+                <input v-model="templatePackVersion" />
+              </label>
+              <label>
+                License
+                <input v-model="templatePackLicense" />
+              </label>
+            </div>
+            <label>
+              Summary
+              <input v-model="templatePackSummary" placeholder="Portable pack for proposals, board papers, or research reports" />
+            </label>
+            <label>
+              Tags
+              <input v-model="templatePackTags" placeholder="proposal, board, research" />
+            </label>
+            <label>
+              Usage guidance
+              <textarea v-model="templatePackUsageGuidance" rows="4" aria-label="Template pack usage guidance"></textarea>
+            </label>
+            <div class="template-pack-counts" aria-label="Current template pack contents">
+              <span v-for="row in currentTemplatePackRows" :key="row.label">
+                <strong>{{ row.value }}</strong>
+                {{ row.label }}
+              </span>
+            </div>
+            <details>
+              <summary>Preview pack JSON</summary>
+              <pre>{{ currentTemplatePackJson }}</pre>
+            </details>
+            <div class="template-actions">
+              <button type="button" @click="insertCurrentTemplatePackManifest">Insert manifest</button>
+              <button type="button" @click="copyCurrentTemplatePack">Copy pack JSON</button>
+            </div>
+            <label>
+              Install pasted pack
+              <textarea v-model="templatePackImportText" rows="6" aria-label="Template pack import JSON" placeholder="{ &quot;schema&quot;: &quot;neditor.template-pack.v1&quot;, ... }"></textarea>
+            </label>
+            <div v-if="importedTemplatePack" class="template-pack-counts" aria-label="Imported template pack contents">
+              <span v-for="row in importedTemplatePackRows" :key="`import-${row.label}`">
+                <strong>{{ row.value }}</strong>
+                {{ row.label }}
+              </span>
+            </div>
+            <p v-if="templatePackStatus" class="sidebar-hint">{{ templatePackStatus }}</p>
+            <div class="template-actions">
+              <button type="button" :disabled="!importedTemplatePack" @click="installPastedTemplatePack">Install reusable items</button>
+              <button type="button" :disabled="!importedTemplatePack" @click="insertImportedTemplatePackManifest">Insert imported manifest</button>
+            </div>
+          </section>
         </template>
 
         <template v-else-if="store.sidebar === 'references'">
@@ -6893,6 +6961,14 @@ import {
   type TransformTemplate,
 } from "./lib/transformTemplates";
 import {
+  buildTemplatePack,
+  installTemplatePackState,
+  parseTemplatePackJson,
+  templatePackJson,
+  templatePackSummaryRows,
+  type NeditorTemplatePack,
+} from "./lib/templatePacks";
+import {
   buildTtsModelDownloadPlan,
   formatTtsRuntimeSummary,
   formatTtsSetupSummary,
@@ -7663,6 +7739,15 @@ const templateTransform = ref("all");
 const transformTemplateAssistanceNotes = ref("");
 const customTemplateDraft = ref<CustomTransformTemplate>(blankCustomTransformTemplate());
 const editingCustomTemplateId = ref("");
+const templatePackName = ref("Client delivery template pack");
+const templatePackPublisher = ref("");
+const templatePackVersion = ref("1.0.0");
+const templatePackLicense = ref("Workspace use");
+const templatePackSummary = ref("");
+const templatePackTags = ref("business, reusable, neditor");
+const templatePackUsageGuidance = ref("Review placeholders before inserting.\nDuplicate built-ins before customizing.\nRun export readiness after applying pack templates.");
+const templatePackImportText = ref("");
+const templatePackStatus = ref("");
 const chartDesignerDraft = ref<ChartDesignerDraft>(chartDesignerDefaultDraft("bar"));
 const selectedCalloutPresetId = ref(calloutPresets[0]?.id || "decision");
 const businessProfileOpen = ref(false);
@@ -9446,6 +9531,28 @@ const allTransformTemplates = computed<TransformTemplate[]>(() => [
   ...builtinTransformTemplates,
   ...store.customTransformTemplates.map((template) => ({ ...template, source: "custom" as const })),
 ]);
+const currentTemplatePack = computed<NeditorTemplatePack>(() =>
+  buildTemplatePack({
+    name: templatePackName.value,
+    publisher: templatePackPublisher.value || store.businessProfile.companyName || store.businessProfile.fullName || "Local workspace",
+    version: templatePackVersion.value,
+    license: templatePackLicense.value,
+    summary: templatePackSummary.value,
+    tags: templatePackTags.value,
+    usageGuidance: templatePackUsageGuidance.value,
+    outlineRules: ["Keep outline headings in document order.", "Preserve proposal and RFP compliance sections when present.", "Run Docs Live section drafting only after the outline is approved."],
+    examples: ["Board pack starter", "Proposal response pack", "Research report pack"],
+    businessTemplates: filteredBusinessTemplates.value.slice(0, 12),
+    snippets: filteredBusinessSnippets.value.slice(0, 16),
+    outlines: filteredDocumentOutlineTemplates.value.slice(0, 12),
+    transforms: filteredTransformTemplates.value.slice(0, 20),
+    latexTemplates: store.customLatexTemplates,
+  }),
+);
+const currentTemplatePackJson = computed(() => templatePackJson(currentTemplatePack.value));
+const currentTemplatePackRows = computed(() => templatePackSummaryRows(currentTemplatePack.value));
+const importedTemplatePack = computed(() => parseTemplatePackJson(templatePackImportText.value));
+const importedTemplatePackRows = computed(() => (importedTemplatePack.value ? templatePackSummaryRows(importedTemplatePack.value) : []));
 const transformTemplateCategoryOptions = computed(() =>
   [...new Set([...transformTemplateCategories, ...store.customTransformTemplates.map((template) => template.category).filter(Boolean)])].sort(),
 );
@@ -10612,6 +10719,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "chart", label: "Chart", title: "Open the chart designer for business-ready visual data blocks", icon: "chart", primary: true, run: () => openChartDesigner() },
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
+      { id: "template-pack", label: "Packs", title: "Open the template pack marketplace to copy, import, and install portable packs", icon: "templates", run: () => openTemplatePackManager() },
       { id: "callout", label: "Callout", title: "Insert a decision, risk, evidence, warning, recommendation, assumption, action, or note callout", icon: "comment", primary: true, run: () => insertSelectedCalloutPreset() },
       { id: "layout-advisor", label: "Layout", title: "Open the Layout Advisor for columns, wide sections, gutters, and export-safe flow", icon: "layout", run: () => openLayoutAdvisor() },
       { id: "cover-builder", label: "Cover", title: "Open the professional cover builder", icon: "layout", primary: true, run: () => openLayoutAdvisor() },
@@ -10846,6 +10954,8 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "layout-advisor", label: "Open Layout Advisor", help: "Review column, wide-table, gutter, and section-reset choices before export.", run: () => openLayoutAdvisor() },
           { id: "toc", label: "Table of Contents", help: "Insert a generated TOC marker.", run: () => insertBlock(tocSnippet) },
           { id: "templates", label: "Transform Templates", help: "Open reusable calc, chart, diagram, data, and API templates.", run: () => openTransformTemplates() },
+          { id: "template-packs", label: "Template Packs", help: "Copy, inspect, paste, and install portable NEditor template packs.", run: () => openTemplatePackManager() },
+          { id: "insert-template-pack-manifest", label: "Insert Template Pack Manifest", help: "Insert the current portable template pack manifest into the document.", run: () => insertCurrentTemplatePackManifest() },
           { id: "sql-transform", label: "SQL Transform", help: "Insert a trusted read-only SQL transform scaffold for database-backed Markdown tables.", run: () => insertSqlTransformTemplate() },
           { id: "install-transform-handlers", label: "Install Transform Handlers", help: "Open the configurator workflow that downloads and installs Graphviz, D2, PlantUML, Pikchr, and SQLite handlers.", run: () => openTransformInstaller() },
           { id: "include-document", label: "Include Document", help: "Open the References sidebar builder for inserting another Markdown document into this one.", run: () => openIncludeBuilder() },
@@ -13983,6 +14093,27 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     },
   },
   { name: "Open transform templates", group: "Transforms", run: () => openTransformTemplates() },
+  {
+    name: "Open template pack marketplace",
+    group: "Templates",
+    description: "Copy, inspect, paste, and install portable NEditor template packs with metadata, placeholders, outline rules, examples, and usage guidance.",
+    keywords: ["template pack", "marketplace", "portable templates", "install templates", "share templates"],
+    run: () => openTemplatePackManager(),
+  },
+  {
+    name: "Copy current template pack",
+    group: "Templates",
+    description: "Copy the current filtered templates as a portable neditor.template-pack.v1 JSON package.",
+    keywords: ["template pack", "copy pack", "export templates", "marketplace"],
+    run: () => copyCurrentTemplatePack(),
+  },
+  {
+    name: "Insert template pack manifest",
+    group: "Templates",
+    description: "Insert the current template pack manifest and usage guidance into the document.",
+    keywords: ["template pack", "manifest", "usage guidance", "placeholders"],
+    run: () => insertCurrentTemplatePackManifest(),
+  },
   {
     name: "Open chart designer",
     group: "Transforms",
@@ -18800,6 +18931,14 @@ function openTransformTemplates() {
   });
 }
 
+function openTemplatePackManager() {
+  store.sidebar = "templates";
+  void nextTick(() => {
+    document.querySelector<HTMLElement>('[aria-label="Template pack marketplace"]')?.focus();
+  });
+  store.statusMessage = "Opened template pack marketplace";
+}
+
 function openChartDesigner() {
   store.sidebar = "templates";
   templateTransform.value = "chart";
@@ -18938,6 +19077,76 @@ function insertTransformTemplateAssistanceNotes() {
 function insertTransformTemplate(template: TransformTemplate) {
   insertBlock(transformTemplateMarkdown(template));
   store.statusMessage = `Inserted ${template.name} template`;
+}
+
+function templatePackManifestMarkdown(pack: NeditorTemplatePack) {
+  return [
+    `## Template Pack: ${pack.metadata.name}`,
+    "",
+    `Publisher: ${pack.metadata.publisher}`,
+    `Version: ${pack.metadata.version}`,
+    `License: ${pack.metadata.license}`,
+    `Summary: ${pack.metadata.summary}`,
+    "",
+    "| Asset | Count |",
+    "| --- | ---: |",
+    ...templatePackSummaryRows(pack).map((row) => `| ${row.label} | ${row.value} |`),
+    "",
+    "### Usage Guidance",
+    "",
+    ...(pack.metadata.usageGuidance.length ? pack.metadata.usageGuidance.map((item) => `- ${item}`) : ["- Review placeholders, outline rules, and export readiness before delivery."]),
+    "",
+    "### Outline Rules",
+    "",
+    ...(pack.metadata.outlineRules.length ? pack.metadata.outlineRules.map((item) => `- ${item}`) : ["- Preserve heading order and review gates."]),
+    "",
+    "### Placeholders",
+    "",
+    pack.metadata.placeholders.length ? pack.metadata.placeholders.map((item) => `- \`{{${item}}}\``).join("\n") : "_No placeholders detected._",
+    "",
+  ].join("\n");
+}
+
+function insertCurrentTemplatePackManifest() {
+  insertBlock(templatePackManifestMarkdown(currentTemplatePack.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted current template pack manifest";
+}
+
+function insertImportedTemplatePackManifest() {
+  if (!importedTemplatePack.value) return;
+  insertBlock(templatePackManifestMarkdown(importedTemplatePack.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = "Inserted imported template pack manifest";
+}
+
+async function copyCurrentTemplatePack() {
+  await navigator.clipboard?.writeText(currentTemplatePackJson.value);
+  templatePackStatus.value = `Copied ${currentTemplatePack.value.metadata.name} template pack JSON`;
+  store.statusMessage = templatePackStatus.value;
+}
+
+async function installPastedTemplatePack() {
+  const pack = importedTemplatePack.value;
+  if (!pack) {
+    templatePackStatus.value = "Paste a valid neditor.template-pack.v1 JSON package before installing";
+    store.statusMessage = templatePackStatus.value;
+    return;
+  }
+  const result = installTemplatePackState({
+    existingOutlines: store.customDocumentOutlineTemplates,
+    existingTransforms: store.customTransformTemplates,
+    existingLatexTemplates: store.customLatexTemplates,
+    pack,
+  });
+  const existingOutlineIds = new Set(store.customDocumentOutlineTemplates.map((template) => template.id));
+  const existingTransformIds = new Set(store.customTransformTemplates.map((template) => template.id));
+  const existingLatexIds = new Set(store.customLatexTemplates.map((template) => template.id));
+  for (const template of pack.outlines.filter((template) => !existingOutlineIds.has(template.id))) await store.saveCustomDocumentOutlineTemplate(template);
+  for (const template of pack.transforms.filter((template) => !existingTransformIds.has(template.id))) await store.saveCustomTransformTemplate(template);
+  for (const template of pack.latexTemplates.filter((template) => !existingLatexIds.has(template.id))) store.saveCustomLatexTemplate(template);
+  templatePackStatus.value = `Installed ${result.added.outlines} outline(s), ${result.added.transforms} transform template(s), and ${result.added.latexTemplates} LaTeX template(s) from ${pack.metadata.name}. Business templates and snippets are preserved in the pack manifest.`;
+  store.statusMessage = templatePackStatus.value;
 }
 
 function openBusinessProfile() {
@@ -23242,8 +23451,10 @@ select:hover {
 .app-shell[data-theme="dark"] .tab-group-header,
 .app-shell[data-theme="dark"] .command-group,
 .app-shell[data-theme="dark"] .template-card,
+.app-shell[data-theme="dark"] .template-pack-manager,
 .app-shell[data-theme="dark"] .template-source,
 .app-shell[data-theme="dark"] .template-meta span,
+.app-shell[data-theme="dark"] .template-pack-counts span,
 .app-shell[data-theme="dark"] .help-topic-button,
 .app-shell[data-theme="dark"] .start-workspace-cockpit,
 .app-shell[data-theme="dark"] .start-workspace-steps li,
@@ -23482,8 +23693,10 @@ select:hover {
   .app-shell[data-theme="system"] .tab-group-header,
   .app-shell[data-theme="system"] .command-group,
   .app-shell[data-theme="system"] .template-card,
+  .app-shell[data-theme="system"] .template-pack-manager,
   .app-shell[data-theme="system"] .template-source,
   .app-shell[data-theme="system"] .template-meta span,
+  .app-shell[data-theme="system"] .template-pack-counts span,
   .app-shell[data-theme="system"] .help-topic-button,
   .app-shell[data-theme="system"] .start-workspace-cockpit,
   .app-shell[data-theme="system"] .start-workspace-steps li,
@@ -25997,7 +26210,8 @@ select:hover {
 }
 
 .template-filters,
-.custom-template-editor {
+.custom-template-editor,
+.template-pack-manager {
   display: grid;
   gap: 8px;
   margin-bottom: 12px;
@@ -26023,6 +26237,49 @@ select:hover {
   align-items: start;
   justify-content: space-between;
   gap: 10px;
+}
+
+.template-pack-manager {
+  padding: 10px;
+  border: 1px solid #c9d2dc;
+  border-left: 3px solid #6857a8;
+  border-radius: 7px;
+  background: #fbfaff;
+}
+
+.template-pack-manager header,
+.template-pack-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.template-pack-manager header div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.template-pack-manager header span {
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.template-pack-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+.template-pack-counts span {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+  font-size: 12px;
 }
 
 .transform-template-assistance header div {

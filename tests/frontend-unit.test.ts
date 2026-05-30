@@ -261,6 +261,14 @@ import {
   transformTemplateFillFields,
   transformTemplateMarkdown,
 } from "../src/lib/transformTemplates.js";
+import {
+  buildTemplatePack,
+  installTemplatePackState,
+  parseTemplatePackJson,
+  templatePackJson,
+  templatePackSchema,
+  templatePackSummaryRows,
+} from "../src/lib/templatePacks.js";
 import { applyPersistedUiPreferences, type UiPreferencesState } from "../src/lib/uiPreferences.js";
 import {
   buildConfigurationCenterSections,
@@ -7799,6 +7807,65 @@ test("custom transform template state helpers save replace and delete templates"
   deepEqual(missingDelete.templates, deleted.templates);
 });
 
+test("template packs serialize portable marketplace metadata and install reusable items", () => {
+  const pack = buildTemplatePack({
+    name: "Proposal acceleration pack",
+    publisher: "Example Strategy",
+    version: "2.1.0",
+    license: "Internal use",
+    tags: ["proposal", "rfp"],
+    usageGuidance: ["Replace placeholders before drafting.", "Run export readiness before sending."],
+    outlineRules: ["Compliance table stays before table of contents."],
+    examples: ["RFP response"],
+    businessTemplates: [businessDocumentTemplates.find((template) => template.id === "proposal")!],
+    snippets: [businessDocumentSnippets[0]],
+    outlines: [builtInDocumentOutlineTemplates[0]],
+    transforms: [builtinTransformTemplates.find((template) => template.id === "calc-business-roi")!],
+    latexTemplates: [
+      {
+        id: "example-proposal-tex",
+        name: "Example proposal TeX",
+        summary: "Proposal house style",
+        documentClass: "article",
+        classOptions: "11pt",
+        packages: ["booktabs"],
+        geometry: "margin=1in",
+        hypersetup: "colorlinks=true",
+        header: "% Proposal header for {{client}}",
+        chapterStyle: false,
+        bestFor: ["Proposals"],
+        sourcePath: "templates/proposal.tex",
+      },
+    ],
+  });
+  equal(pack.schema, templatePackSchema);
+  equal(pack.metadata.publisher, "Example Strategy");
+  ok(pack.metadata.placeholders.includes("client"));
+  ok(pack.metadata.usageGuidance[0].includes("Replace placeholders"));
+  ok(templatePackSummaryRows(pack).some((row) => row.label === "Transform templates" && row.value === "1"));
+
+  const parsed = parseTemplatePackJson(templatePackJson(pack));
+  if (!parsed) throw new Error("expected parsed template pack");
+  equal(parsed.metadata.name, "Proposal acceleration pack");
+  equal(parsed.transforms[0].id, "calc-business-roi");
+
+  const firstInstall = installTemplatePackState({
+    existingOutlines: [],
+    existingTransforms: [],
+    existingLatexTemplates: [],
+    pack: parsed,
+  });
+  deepEqual(firstInstall.added, { outlines: 1, transforms: 1, latexTemplates: 1 });
+  const secondInstall = installTemplatePackState({
+    existingOutlines: firstInstall.outlines,
+    existingTransforms: firstInstall.transforms,
+    existingLatexTemplates: firstInstall.latexTemplates,
+    pack: parsed,
+  });
+  deepEqual(secondInstall.added, { outlines: 0, transforms: 0, latexTemplates: 0 });
+  equal(parseTemplatePackJson("{ bad json"), null);
+});
+
 test("document include helpers normalize targets and format supported directives", () => {
   equal(normalizeIncludeTarget(" ./chapters\\intro.md "), "chapters/intro.md");
   equal(normalizeIncludeTarget('"appendices/financials.md"'), "appendices/financials.md");
@@ -8009,6 +8076,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('label: "Chart"'));
   ok(app.includes('label: "Chart Designer"'));
   ok(app.includes("Open chart designer"));
+  ok(app.includes('aria-label="Template pack marketplace"'));
+  ok(app.includes("currentTemplatePack"));
+  ok(app.includes("templatePackJson"));
+  ok(app.includes("installPastedTemplatePack"));
+  ok(app.includes("Open template pack marketplace"));
+  ok(app.includes("Insert Template Pack Manifest"));
+  ok(app.includes('label: "Packs"'));
   ok(app.includes('aria-label="Document evidence and approval review"'));
   ok(app.includes("reviewEvidenceRun"));
   ok(app.includes("refreshReviewEvidenceSnapshot"));

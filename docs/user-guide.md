@@ -296,6 +296,16 @@ document context, replace sample values with sourced inputs, preview and verify
 the result, and write a reviewer handoff note when the transform supports a
 financial, scientific, compliance, or client-facing claim.
 
+Use **Template pack marketplace** in the same panel to package filtered
+business templates, snippets, outlines, transform templates, and company LaTeX
+profiles into a portable `neditor.template-pack.v1` JSON file. Packs include
+publisher metadata, version, license, tags, placeholder inventory, examples,
+outline rules, and usage guidance so another workspace can inspect the pack
+before installing it. Pasted packs install reusable outlines, transform
+templates, and LaTeX templates into the local workspace library; business
+templates and snippets remain preserved in the pack manifest for review and
+copy-forward use.
+
 ## Product Boundaries
 
 NEditor is a local-first desktop workbench for document files. It does not
