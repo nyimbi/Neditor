@@ -2819,6 +2819,50 @@
             </ul>
             <p v-else class="sidebar-hint">No print-flow warnings from the approximate preview model.</p>
           </section>
+          <section class="export-visual-qa-dashboard" :data-status="exportVisualQaDashboard.status" aria-label="Export visual QA dashboard">
+            <header>
+              <div>
+                <h3>Visual QA</h3>
+                <span>{{ exportVisualQaDashboard.summary }}</span>
+              </div>
+              <strong>{{ exportVisualQaDashboard.status }}</strong>
+            </header>
+            <div class="export-visual-qa-metrics" aria-label="Export visual QA status counts">
+              <span><strong>{{ exportVisualQaDashboard.counts.ready }}</strong> ready</span>
+              <span><strong>{{ exportVisualQaDashboard.counts["needs-review"] }}</strong> review</span>
+              <span><strong>{{ exportVisualQaDashboard.counts.blocked }}</strong> blocked</span>
+              <span><strong>{{ exportVisualQaDashboard.counts["not-run"] }}</strong> not run</span>
+            </div>
+            <article class="export-visual-qa-current" :data-status="exportVisualQaCurrentRow.status">
+              <strong>{{ exportVisualQaCurrentRow.label }}</strong>
+              <p>{{ exportVisualQaCurrentRow.nextAction }}</p>
+              <small>{{ exportVisualQaCurrentRow.evidence.join(" | ") || exportVisualQaCurrentRow.blockers.join(" | ") || "No current output proof yet." }}</small>
+            </article>
+            <details>
+              <summary>Target evidence</summary>
+              <article
+                v-for="row in exportVisualQaDashboard.rows"
+                :key="row.target"
+                class="export-visual-qa-row"
+                :data-status="row.status"
+              >
+                <header>
+                  <strong>{{ row.label }}</strong>
+                  <span>{{ row.status }}</span>
+                </header>
+                <p>{{ row.nextAction }}</p>
+                <ul v-if="row.blockers.length">
+                  <li v-for="blocker in row.blockers" :key="blocker">{{ blocker }}</li>
+                </ul>
+                <small>{{ row.evidence.join(" | ") || row.checks.slice(0, 2).join(" | ") }}</small>
+              </article>
+            </details>
+            <div class="reference-actions">
+              <button type="button" :disabled="store.exportBusy" title="Run target-aware export readiness before judging the selected output target" @click="prepareForExport">Run readiness</button>
+              <button type="button" title="Insert this export visual QA dashboard into the Markdown document for reviewer handoff" @click="insertExportVisualQaReport">Insert QA report</button>
+              <button type="button" title="Show approximate page geometry, pagination, margins, columns, and print-flow warnings" @click="togglePrintPreview(true)">Show print preview</button>
+            </div>
+          </section>
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Include comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
@@ -6998,6 +7042,7 @@ import {
   type ExportMetadataChecklistItem,
   type ExportStepAssistance,
 } from "./lib/exportMetadataChecklist";
+import { buildExportVisualQaDashboard, exportVisualQaMarkdown } from "./lib/exportVisualQa";
 import {
   buildPublishingHandoff,
   buildPublishingRequestPreview,
@@ -8910,6 +8955,46 @@ const exportStepAssistance = computed(() =>
     notes: exportReadinessNotes.value,
   }),
 );
+const exportVisualQaDashboard = computed(() => {
+  const compile = active.value.compile;
+  const manifest = store.exportReadiness?.manifest || compile?.export_manifest || null;
+  const manifestReadiness = manifest?.readiness || null;
+  const readiness = store.exportReadiness
+    ? {
+        ready: store.exportReadiness.ready,
+        error_count: store.exportReadiness.error_count,
+        warning_count: store.exportReadiness.warning_count,
+        info_count: store.exportReadiness.info_count,
+      }
+    : manifestReadiness
+      ? {
+          ready: Boolean(manifestReadiness.ready),
+          error_count: manifestReadiness.error_count || 0,
+          warning_count: manifestReadiness.warning_count || 0,
+          info_count: manifestReadiness.info_count || 0,
+        }
+      : null;
+  return buildExportVisualQaDashboard({
+    currentTarget: store.exportTarget,
+    manifest,
+    readiness,
+    diagnostics: [...(compile?.diagnostics || []), ...(store.exportReadiness?.diagnostics || [])],
+    printPreview: printPreviewReport.value,
+    outlineCount: compile?.semantic.outline.length || 0,
+    bibliographyCount: compile?.bibliography.length || 0,
+    citationCount: compile?.semantic.citation_references.length || 0,
+    figureCount: compile?.semantic.figures || 0,
+    tableCount: compile?.semantic.tables || 0,
+    equationCount: compile?.semantic.equations || 0,
+    transformCount: compile?.transform_artifacts.length || 0,
+    includeCount: compile?.include_graph.length || 0,
+    metadata: compile?.metadata || {},
+  });
+});
+const exportVisualQaCurrentRow = computed(() => {
+  const dashboard = exportVisualQaDashboard.value;
+  return dashboard.rows.find((row) => row.target === store.exportTarget) || dashboard.rows[0]!;
+});
 const exportPreviewSummary = computed(() => {
   const manifest = store.exportReadiness?.manifest || active.value.compile?.export_manifest;
   const readiness = store.exportReadiness;
@@ -10791,6 +10876,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "export-html", label: "HTML Export", title: "Export standalone HTML", icon: "html", run: () => exportDocumentAs("html") },
       { id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package", icon: "epub", run: () => exportDocumentAs("epub") },
       { id: "print-preview", label: "Print Preview", title: "Show approximate pagination, margins, columns, page breaks, and print-flow warnings", icon: "layout", run: () => togglePrintPreview(true) },
+      { id: "visual-qa", label: "Visual QA", title: "Open target-by-target export visual QA evidence and next actions", icon: "snapshot", primary: true, run: () => openExportVisualQaDashboard() },
       { id: "publish", label: "Publish", title: "Open blog, Substack, or CMS publishing handoff", icon: "export", primary: true, run: () => openPublishingHandoff() },
       { id: "export", label: "Export", title: "Export document", icon: "export", disabled: store.exportBusy, run: () => exportDocument() },
     ],
@@ -10928,6 +11014,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "qa-review", label: "QA Review", title: "Run quality assurance and improvement recommendations", icon: "comment", primary: true, run: () => runQualityReview() },
       { id: "qa-report", label: "QA Report", title: "Insert the quality improvement report", icon: "comment", run: () => insertQualityImprovementReport() },
       { id: "evidence-review", label: "Evidence", title: "Refresh claim inventory, approval metadata gate, and reviewer-agent evidence review", icon: "comment", primary: true, run: () => refreshReviewEvidenceSnapshot() },
+      { id: "visual-qa-report", label: "Visual QA", title: "Insert export visual QA evidence for reviewers", icon: "snapshot", run: () => insertExportVisualQaReport() },
       { id: "qa-agent", label: "Improve", title: "Open an AI agent quality-improvement workflow", icon: "agent", run: () => openQualityAgent() },
       { id: "release-ready", label: "Release", title: "Prepare release metadata", icon: "snapshot", run: () => applyReleaseMetadataScaffold() },
       { id: "release-audit", label: "Audit", title: "Insert release readiness audit", icon: "snapshot", run: () => insertReleaseReadinessAudit() },
@@ -11185,6 +11272,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "qa-report", label: "Insert QA Report", help: "Insert the current recommendations as a review artifact.", run: () => insertQualityImprovementReport() },
           { id: "evidence-review", label: "Refresh Evidence Review", help: "Build a claim inventory, approval gate, and reviewer-agent evidence snapshot.", run: () => refreshReviewEvidenceSnapshot() },
           { id: "evidence-audit", label: "Insert Evidence Audit", help: "Insert the current evidence and approval review snapshot as a Markdown audit.", disabled: !activeReviewEvidenceRun.value, run: () => insertReviewEvidenceAudit() },
+          { id: "visual-export-qa", label: "Insert Export Visual QA", help: "Insert target-specific visual QA and export evidence as a reviewer handoff.", run: () => insertExportVisualQaReport() },
           { id: "qa-agent", label: "Improve with Agent", help: "Open an agent workflow seeded with current QA findings.", run: () => openQualityAgent() },
           { id: "review-readiness", label: "Review Readiness", help: "Open the Review sidebar and AI Control Center.", run: () => runAgentPlanReview() },
           { id: "release-metadata", label: "Prepare Release Metadata", help: "Scaffold status, version, owner, target, and approvals.", run: () => applyReleaseMetadataScaffold() },
@@ -11214,6 +11302,8 @@ const appMenus = computed<AppMenu[]>(() => [
         items: [
           { id: "prepare", label: "Prepare for Export", help: "Run target-aware readiness validation.", run: () => prepareForExport() },
           { id: "metadata", label: "Prepare Metadata", help: "Scaffold target-specific distribution metadata.", run: () => applyExportMetadataScaffold() },
+          { id: "visual-qa", label: "Open Visual QA Dashboard", help: "Inspect target-by-target visual QA status, readiness proof, output evidence, and next actions.", run: () => openExportVisualQaDashboard() },
+          { id: "visual-qa-report", label: "Insert Visual QA Report", help: "Insert the current export visual QA dashboard as a Markdown handoff for reviewers.", run: () => insertExportVisualQaReport() },
           { id: "export-current", label: "Export Selected Target", help: "Export using the selected target and settings.", disabled: store.exportBusy, run: () => exportDocument() },
           { id: "profiles", label: "Export Profiles", help: "Open saved export profiles.", run: () => { store.mode = "export"; store.sidebar = "exports"; } },
           { id: "brand-kit", label: "Brand Kit Presets", help: "Apply coherent brand, layout, cover, watermark, and export defaults.", run: () => openBrandKitManager() },
@@ -14043,6 +14133,20 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Rename document", group: "File", run: () => void renameDocument() },
   { name: "Duplicate document", group: "File", run: () => void duplicateDocument() },
   { name: "Prepare for export", group: "Export", run: () => void prepareForExport() },
+  {
+    name: "Open export visual QA dashboard",
+    group: "Export",
+    description: "Inspect target-by-target visual QA status, readiness proof, output evidence, print-flow warnings, and next actions.",
+    keywords: ["visual qa", "export proof", "rendered export", "review", "signoff", "delivery evidence"],
+    run: () => openExportVisualQaDashboard(),
+  },
+  {
+    name: "Insert export visual QA report",
+    group: "Export",
+    description: "Insert the current visual QA dashboard as a Markdown handoff for reviewers.",
+    keywords: ["visual qa", "qa report", "export evidence", "review handoff", "signoff"],
+    run: () => insertExportVisualQaReport(),
+  },
   { name: "Open publishing handoff", group: "Export", keywords: ["publish", "blog", "substack", "webhook", "wordpress", "ghost", "cms"], run: () => openPublishingHandoff() },
   { name: "Prepare publishing packet", group: "Export", keywords: ["publish", "payload", "cms", "webhook", "substack"], run: () => void preparePublishingHandoff() },
   { name: "Copy publishing payload", group: "Export", keywords: ["publish", "json", "webhook", "cms"], run: () => void copyPublishingPayload() },
@@ -14222,6 +14326,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Add review comment", group: "Review", run: () => (store.sidebar = "review") },
   { name: "Run QA recommendations", group: "Quality", description: "Scan the current document for quality assurance and quality improvement recommendations.", keywords: ["quality assurance", "quality improvement", "qa", "recommendations"], run: () => runQualityReview() },
   { name: "Insert QA improvement report", group: "Quality", description: "Insert a Markdown report of the current quality recommendations.", keywords: ["quality report", "qa report", "review"], run: () => insertQualityImprovementReport() },
+  { name: "Insert export visual QA review report", group: "Quality", description: "Insert target-specific visual QA, readiness, manifest, and output evidence.", keywords: ["visual qa", "export qa", "output proof", "delivery review"], run: () => insertExportVisualQaReport() },
   { name: "Refresh evidence and approval review", group: "Quality", description: "Build a claim inventory, approval metadata gate, unresolved comment queue, and reviewer-agent action list.", keywords: ["claim inventory", "evidence", "approval gate", "citation", "reviewer"], run: () => refreshReviewEvidenceSnapshot() },
   { name: "Insert evidence and approval audit", group: "Quality", description: "Insert the current claim inventory and approval gate review as Markdown.", keywords: ["evidence audit", "approval audit", "claim inventory"], run: () => insertReviewEvidenceAudit() },
   { name: "Improve document with agent", group: "Quality", description: "Open an AI agent workflow seeded with current QA findings.", keywords: ["improve", "humanize", "quality", "agent"], run: () => openQualityAgent() },
@@ -20614,6 +20719,20 @@ function insertExportReadinessNotes() {
   store.statusMessage = "Inserted export readiness notes";
 }
 
+function openExportVisualQaDashboard() {
+  store.mode = "export";
+  store.sidebar = "exports";
+  store.statusMessage = `Export visual QA: ${exportVisualQaDashboard.value.summary}`;
+}
+
+function insertExportVisualQaReport() {
+  flushEditorTextToStore();
+  insertBlock(exportVisualQaMarkdown(exportVisualQaDashboard.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "exports";
+  store.statusMessage = "Inserted export visual QA report";
+}
+
 function enableFrontMatterToc() {
   setFrontMatterField("toc", "true");
   store.statusMessage = "Enabled front matter table of contents";
@@ -26239,6 +26358,124 @@ select:hover {
   color: #526171;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.export-visual-qa-dashboard {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #c8d2df;
+  border-left: 3px solid #4575b4;
+  border-radius: 7px;
+  background: #f8fbff;
+}
+
+.export-visual-qa-dashboard[data-status="ready"] {
+  border-left-color: #2f855a;
+}
+
+.export-visual-qa-dashboard[data-status="needs-review"] {
+  border-left-color: #c68a1a;
+}
+
+.export-visual-qa-dashboard[data-status="blocked"] {
+  border-left-color: #b42318;
+}
+
+.export-visual-qa-dashboard header,
+.export-visual-qa-row header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.export-visual-qa-dashboard header div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.export-visual-qa-dashboard h3,
+.export-visual-qa-dashboard p,
+.export-visual-qa-dashboard ul {
+  margin: 0;
+}
+
+.export-visual-qa-dashboard header span,
+.export-visual-qa-dashboard small,
+.export-visual-qa-dashboard ul {
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.export-visual-qa-dashboard > header > strong,
+.export-visual-qa-row header span {
+  justify-self: end;
+  padding: 3px 7px;
+  border: 1px solid #c8d2df;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.export-visual-qa-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
+}
+
+.export-visual-qa-metrics span,
+.export-visual-qa-current,
+.export-visual-qa-row {
+  padding: 7px 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.export-visual-qa-current,
+.export-visual-qa-row {
+  display: grid;
+  gap: 4px;
+}
+
+.export-visual-qa-current[data-status="ready"],
+.export-visual-qa-row[data-status="ready"] {
+  border-left: 3px solid #2f855a;
+}
+
+.export-visual-qa-current[data-status="needs-review"],
+.export-visual-qa-row[data-status="needs-review"] {
+  border-left: 3px solid #c68a1a;
+}
+
+.export-visual-qa-current[data-status="blocked"],
+.export-visual-qa-row[data-status="blocked"] {
+  border-left: 3px solid #b42318;
+}
+
+.export-visual-qa-current[data-status="not-run"],
+.export-visual-qa-row[data-status="not-run"] {
+  border-left: 3px solid #7b8794;
+}
+
+.export-visual-qa-dashboard details {
+  display: grid;
+  gap: 6px;
+}
+
+.export-visual-qa-dashboard details[open] {
+  gap: 8px;
+}
+
+.export-visual-qa-dashboard summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .publishing-handoff-panel {

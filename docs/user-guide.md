@@ -617,6 +617,14 @@ column flow. It also warns about wide portrait tables, long documents without
 explicit page breaks, and multi-column layouts that need final PDF or DOCX
 review before distribution.
 
+The Export panel includes an **Export Visual QA Dashboard** that turns current
+readiness, manifest, diagnostics, print-preview, asset, include, transform, and
+output-proof signals into target-by-target status rows. Use it before external
+handoff to see which targets are ready, blocked, still need visual review, or
+have not been run. The same dashboard can be inserted into the document as a
+Markdown reviewer handoff from the Export menu, Quality menu, command palette,
+or the dashboard itself.
+
 ## Transform Engines
 
 NEditor uses native Rust renderers or static fallbacks where practical.

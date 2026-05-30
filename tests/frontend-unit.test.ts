@@ -176,6 +176,7 @@ import {
   exportMetadataChecklistHelp,
   formatExportMetadataChecklistSummary,
 } from "../src/lib/exportMetadataChecklist.js";
+import { buildExportVisualQaDashboard, exportVisualQaMarkdown } from "../src/lib/exportVisualQa.js";
 import {
   workspaceLatexTemplateLibraryJson,
   workspaceLatexTemplateLibraryPath,
@@ -4674,6 +4675,81 @@ test("export metadata checklist validates publishing and ebook handoff readiness
   ok(epubChecklist.some((item) => item.id === "epub-outline" && item.detail.includes("4 heading entries")));
 });
 
+test("export visual QA dashboard summarizes readiness and output evidence", () => {
+  const blocked = buildExportVisualQaDashboard(
+    {
+      currentTarget: "pdf",
+      manifest: {
+        export_target: "pdf",
+        source_hash: "abc123",
+        included_files: ["report.md"],
+        media_files: ["figure.png"],
+        transform_artifacts: [{ id: "chart" }],
+      },
+      readiness: { ready: false, error_count: 1, warning_count: 1, info_count: 0 },
+      diagnostics: [{ severity: "error", message: "Missing image" }],
+      printPreview: {
+        pageSize: "Letter",
+        orientation: "portrait",
+        margins: "normal",
+        columns: 1,
+        estimatedPages: 12,
+        wordCount: 4400,
+        pageBreaks: 2,
+        sectionBreaks: [],
+        summary: "12 pages, portrait Letter, business margins",
+        warnings: ["A wide table may overflow portrait PDF pages."],
+      },
+      outlineCount: 8,
+      figureCount: 2,
+      tableCount: 4,
+      equationCount: 1,
+      transformCount: 1,
+    },
+    "2026-05-30T00:00:00.000Z",
+  );
+
+  equal(blocked.status, "blocked");
+  equal(blocked.rows.find((row) => row.target === "pdf")?.status, "blocked");
+  ok(blocked.rows.find((row) => row.target === "pdf")?.blockers.some((blocker) => blocker.includes("readiness error")));
+  const blockedMarkdown = exportVisualQaMarkdown(blocked);
+  ok(blockedMarkdown.includes("## Export Visual QA Dashboard"));
+  ok(blockedMarkdown.includes("| PDF | blocked |"));
+  ok(blockedMarkdown.includes("Source hash: abc123"));
+
+  const ready = buildExportVisualQaDashboard(
+    {
+      currentTarget: "html",
+      manifest: {
+        export_target: "html",
+        output_path: "dist/report.html",
+        output_hash: "sha256:abc",
+        source_hash: "def456",
+        included_files: ["report.md"],
+        media_files: [],
+        transform_artifacts: [],
+      },
+      readiness: { ready: true, error_count: 0, warning_count: 0, info_count: 1 },
+      printPreview: {
+        pageSize: "Letter",
+        orientation: "portrait",
+        margins: "normal",
+        columns: 1,
+        estimatedPages: 4,
+        wordCount: 1500,
+        pageBreaks: 0,
+        sectionBreaks: [],
+        summary: "4 pages, portrait Letter, business margins",
+        warnings: [],
+      },
+    },
+    "2026-05-30T00:00:00.000Z",
+  );
+
+  equal(ready.rows.find((row) => row.target === "html")?.status, "ready");
+  ok(exportVisualQaMarkdown(ready).includes("Archive output proof and reviewer sign-off."));
+});
+
 test("publishing workflow builds endpoint payloads without persisting secrets", () => {
   const normalizedProfiles = normalizePublishingDestinationProfiles([
     {
@@ -8158,8 +8234,17 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Professional cover builder"'));
   ok(app.includes('aria-label="Print preview summary"'));
   ok(app.includes('aria-label="Print preview controls"'));
+  ok(app.includes('aria-label="Export visual QA dashboard"'));
   ok(app.includes("printPreviewEnabled"));
   ok(app.includes("printPreviewReport"));
+  ok(app.includes("exportVisualQaDashboard"));
+  ok(app.includes("exportVisualQaCurrentRow"));
+  ok(app.includes("insertExportVisualQaReport"));
+  ok(app.includes("openExportVisualQaDashboard"));
+  ok(app.includes("Open Visual QA Dashboard"));
+  ok(app.includes("Insert Visual QA Report"));
+  ok(app.includes("Open export visual QA dashboard"));
+  ok(app.includes("Insert export visual QA report"));
   ok(app.includes("togglePrintPreview"));
   ok(app.includes('label: "Print Preview"'));
   ok(app.includes("Show print preview"));
