@@ -4931,6 +4931,34 @@ test("support bundle handoff summarizes setup release and spec assignments", () 
       issues: ["External credentialed proof still pending"],
       nextSteps: ["pnpm run release:local"],
     },
+    improvementAudit: {
+      productionReady: false,
+      total: 100,
+      summary: {
+        implementedEvidencePresent: 61,
+        partialOrExternal: 31,
+        needsImplementationEvidence: 8,
+        open: 39,
+      },
+      items: [
+        {
+          number: 31,
+          category: "Deep Research And Citations",
+          title: "Deep research workspace",
+          status: "implemented-evidence-present",
+          lane: "implementation-review",
+          nextAction: "Keep evidence current.",
+        },
+        {
+          number: 83,
+          category: "Voice, TTS, And Accessibility",
+          title: "Read selected text aloud",
+          status: "partial-or-external-evidence",
+          lane: "external-or-manual-proof",
+          nextAction: "Attach real-device TTS evidence.",
+        },
+      ],
+    },
     engineProbe: {
       status: "needs-attention",
       summary: { installed: 5, missingLocal: 1, incompatible: 0 },
@@ -4968,6 +4996,9 @@ test("support bundle handoff summarizes setup release and spec assignments", () 
   ok(markdown.includes("## NEditor Support And Release Handoff"));
   ok(markdown.includes("| Release action plan | ready | 1/1 work item(s) ready to send |"));
   ok(markdown.includes("| Spec closure | ready | 3 open spec row(s), 1/2 work order(s) ready |"));
+  ok(markdown.includes("| 100 improvements | open | 61/100 evidenced, 39 open item(s) |"));
+  ok(markdown.includes("### 100 Improvements Coverage"));
+  ok(markdown.includes("#83 Read selected text aloud"));
   ok(markdown.includes("release-windows-package"));
   ok(markdown.includes("Integration owner"));
   ok(markdown.includes("runbooks/platform-evidence.md"));
@@ -9851,6 +9882,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Support and diagnostics configuration"'));
   ok(app.includes('aria-label="Configurator support bundle"'));
   ok(app.includes('aria-label="Configurator support bundle recommendations"'));
+  ok(app.includes('aria-label="100 improvements coverage"'));
+  ok(app.includes('aria-label="Configurator 100 improvements coverage"'));
+  ok(app.includes("ned improvements --json"));
+  ok(app.includes("ned improvements --output improvement-coverage.md"));
   ok(app.includes("Open support setup wizard"));
   ok(app.includes("openConfigurationSetup('release')"));
   ok(app.includes("LLM access defaults"));

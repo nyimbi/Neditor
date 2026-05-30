@@ -113,6 +113,7 @@ ned convert board-paper.md --to pdf,docx,html --output-dir exports
 ned readiness --json
 ned support-bundle --workspace . --output support.json
 ned evidence-packet --output release-evidence-return-packet.md
+ned improvements --output improvement-coverage.md
 ```
 
 Inside the app, use **File -> Deploy CLI Globally** to make `ned` available

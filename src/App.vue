@@ -4218,6 +4218,13 @@
                 </dd>
               </div>
               <div>
+                <dt>100 improvements</dt>
+                <dd>
+                  {{ supportBundleReport.improvementAudit?.summary?.implementedEvidencePresent || 0 }}/{{ supportBundleReport.improvementAudit?.total || 0 }} evidenced,
+                  {{ supportBundleReport.improvementAudit?.summary?.open || 0 }} open
+                </dd>
+              </div>
+              <div>
                 <dt>Output</dt>
                 <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
               </div>
@@ -4273,6 +4280,23 @@
                   {{ supportBundleReport.releaseCandidate.summary?.checkStatus || "missing" }} checker,
                   {{ supportBundleReport.releaseCandidate.summary?.evidenceGaps || 0 }} evidence gap(s)
                 </small>
+              </article>
+            </section>
+            <section v-if="supportBundleReport?.improvementAudit" class="support-bundle-action-plan" aria-label="100 improvements coverage">
+              <h5>100 improvements coverage</h5>
+              <article>
+                <strong>{{ supportBundleReport.improvementAudit.productionReady ? "production-ready" : "open roadmap work" }}</strong>
+                <span>
+                  {{ supportBundleReport.improvementAudit.summary?.implementedEvidencePresent || 0 }} evidenced,
+                  {{ supportBundleReport.improvementAudit.summary?.partialOrExternal || 0 }} partial/external,
+                  {{ supportBundleReport.improvementAudit.summary?.needsImplementationEvidence || 0 }} need implementation evidence
+                </span>
+                <small>Use <code>ned improvements --output improvement-coverage.md</code> for the full item-by-item audit.</small>
+              </article>
+              <article v-for="item in (supportBundleReport.improvementAudit.items || []).filter((entry) => entry.status !== 'implemented-evidence-present').slice(0, 5)" :key="item.number">
+                <strong>#{{ item.number }} {{ item.title }}</strong>
+                <span>{{ item.status }} | {{ item.lane }}</span>
+                <small>{{ item.nextAction }}</small>
               </article>
             </section>
           </section>
@@ -4377,6 +4401,13 @@
                   <dd>{{ supportBundleReport.recommendations?.length || 0 }}</dd>
                 </div>
                 <div>
+                  <dt>100 improvements</dt>
+                  <dd>
+                    {{ supportBundleReport.improvementAudit?.summary?.implementedEvidencePresent || 0 }}/{{ supportBundleReport.improvementAudit?.total || 0 }} evidenced,
+                    {{ supportBundleReport.improvementAudit?.summary?.open || 0 }} open
+                  </dd>
+                </div>
+                <div>
                   <dt>Output</dt>
                   <dd>{{ supportBundleReport.writtenTo || "preview only" }}</dd>
                 </div>
@@ -4390,6 +4421,18 @@
                   <ul>
                     <li v-for="recommendation in group.items" :key="recommendation">{{ recommendation }}</li>
                   </ul>
+                </article>
+              </section>
+              <section v-if="supportBundleReport?.improvementAudit" class="support-bundle-action-plan" aria-label="Configurator 100 improvements coverage">
+                <h5>100 improvements coverage</h5>
+                <article>
+                  <strong>{{ supportBundleReport.improvementAudit.productionReady ? "production-ready" : "not complete" }}</strong>
+                  <span>
+                    {{ supportBundleReport.improvementAudit.summary?.implementedEvidencePresent || 0 }} evidenced,
+                    {{ supportBundleReport.improvementAudit.summary?.partialOrExternal || 0 }} partial/external,
+                    {{ supportBundleReport.improvementAudit.summary?.needsImplementationEvidence || 0 }} need implementation evidence
+                  </span>
+                  <small>Run <code>ned improvements --json</code> or save the full Markdown audit for item-level closure work.</small>
                 </article>
               </section>
               <p class="sidebar-hint">Use this support artifact when a non-technical user needs help configuring NEditor, validating release readiness, or handing setup evidence to internal IT without sharing document content or secrets.</p>
@@ -5111,6 +5154,13 @@
                     {{ supportBundleReport.evidenceReportSummary?.ready || 0 }} ready,
                     {{ supportBundleReport.evidenceReportSummary?.attention || 0 }} attention,
                     {{ supportBundleReport.evidenceReportSummary?.missing || 0 }} missing
+                  </dd>
+                </div>
+                <div>
+                  <dt>100 improvements</dt>
+                  <dd>
+                    {{ supportBundleReport.improvementAudit?.summary?.implementedEvidencePresent || 0 }}/{{ supportBundleReport.improvementAudit?.total || 0 }} evidenced,
+                    {{ supportBundleReport.improvementAudit?.summary?.open || 0 }} open
                   </dd>
                 </div>
                 <div>
@@ -7953,6 +8003,24 @@ type SupportBundleReport = {
     };
     issues?: string[];
     nextSteps?: string[];
+  };
+  improvementAudit?: {
+    productionReady?: boolean;
+    total?: number;
+    summary?: {
+      implementedEvidencePresent?: number;
+      partialOrExternal?: number;
+      needsImplementationEvidence?: number;
+      open?: number;
+    };
+    items?: Array<{
+      number?: number;
+      category?: string;
+      title?: string;
+      status?: string;
+      lane?: string;
+      nextAction?: string;
+    }>;
   };
   specCompletion?: {
     status?: string;

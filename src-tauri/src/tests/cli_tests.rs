@@ -2698,6 +2698,18 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
     assert_eq!(bundle["releaseCandidate"]["releaseable"], false);
     assert_eq!(bundle["releaseCandidate"]["summary"]["artifacts"], 2);
     assert_eq!(bundle["releaseCandidate"]["summary"]["evidenceGaps"], 1);
+    assert_eq!(
+        bundle["improvementAudit"]["schema"],
+        "neditor.100-improvements-audit.v1"
+    );
+    assert_eq!(bundle["improvementAudit"]["total"], 100);
+    assert_eq!(bundle["improvementAudit"]["productionReady"], false);
+    assert!(
+        bundle["improvementAudit"]["summary"]["open"]
+            .as_u64()
+            .expect("open improvement count")
+            > 0
+    );
     assert_eq!(bundle["engineProbe"]["status"], "complete");
     assert_eq!(bundle["engineProbe"]["summary"]["installed"], 3);
     assert_eq!(
@@ -2744,6 +2756,13 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         .any(|recommendation| recommendation
             .as_str()
             .is_some_and(|value| value.contains("Assign 2 spec-completion work order"))));
+    assert!(bundle["recommendations"]
+        .as_array()
+        .expect("recommendations")
+        .iter()
+        .any(|recommendation| recommendation
+            .as_str()
+            .is_some_and(|value| value.contains("100-improvement roadmap"))));
 
     let readiness_gap_path = root.join("readiness-with-gap.json");
     fs::write(
@@ -3173,6 +3192,60 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
 }
 
 #[test]
+fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
+    let output = temp_markdown_path("improvement-coverage");
+    let json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "improvements".to_string(),
+        "--json".to_string(),
+        "--output".to_string(),
+        output.to_string_lossy().to_string(),
+    ])
+    .expect("improvements json");
+    assert_eq!(json.exit_code, 0);
+    let report: serde_json::Value =
+        serde_json::from_str(&json.message).expect("improvements report json");
+    assert_eq!(report["schema"], "neditor.100-improvements-audit.v1");
+    assert_eq!(report["source"], "docs/100-improve.md");
+    assert_eq!(report["total"], 100);
+    assert_eq!(report["productionReady"], false);
+    assert!(
+        report["summary"]["implementedEvidencePresent"]
+            .as_u64()
+            .expect("implemented count")
+            > 0
+    );
+    assert!(report["summary"]["open"].as_u64().expect("open count") > 0);
+    assert!(report["items"]
+        .as_array()
+        .expect("improvement items")
+        .iter()
+        .any(|item| item["number"] == 21 && item["title"] == "Native RFP ingestion"));
+    assert!(report["items"]
+        .as_array()
+        .expect("improvement items")
+        .iter()
+        .any(|item| item["number"] == 99 && item["title"] == "Release evidence dashboard"));
+
+    let markdown = fs::read_to_string(&output).expect("improvements markdown");
+    assert!(markdown.contains("# NEditor 100 Improvements Coverage Audit"));
+    assert!(markdown.contains("## Category Summary"));
+    assert!(markdown.contains("## Improvement Work Orders"));
+    assert!(markdown.contains("Native RFP ingestion"));
+
+    let strict = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "improvements".to_string(),
+        "--strict".to_string(),
+    ])
+    .expect("strict improvements");
+    assert_eq!(strict.exit_code, 1);
+    assert!(strict
+        .message
+        .contains("NEditor 100 Improvements Coverage Audit"));
+}
+
+#[test]
 fn ned_cli_summarizes_release_evidence_reports() {
     let root = temp_workspace_path("evidence-status");
     let evidence_root = root.join("evidence");
@@ -3337,6 +3410,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("readiness"));
     assert!(bash.message.contains("evidence"));
     assert!(bash.message.contains("evidence-packet"));
+    assert!(bash.message.contains("improvements"));
     assert!(bash.message.contains("sources"));
     assert!(bash.message.contains("--download-url"));
     assert!(bash.message.contains("deep-research"));
@@ -3363,6 +3437,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("--matrix --checklist"));
     assert!(bash.message.contains("--proposal-outline"));
     assert!(bash.message.contains("--validator"));
+    assert!(bash.message.contains("improvement-audit"));
     assert!(bash.message.contains("deploy-cli"));
     assert!(bash.message.contains("--target-dir"));
     assert!(bash.message.contains("markdown-bundle"));
@@ -3384,6 +3459,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--engine-report"));
     assert!(zsh.message.contains("--evidence-root"));
     assert!(zsh.message.contains("evidence-return-packet"));
+    assert!(zsh.message.contains("roadmap\\:roadmap"));
     assert!(zsh
         .message
         .contains("'--output[write Markdown packet]:file:_files'"));
@@ -3418,6 +3494,9 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh
         .message
         .contains("--coverage[print requirement coverage validator Markdown]"));
+    assert!(zsh
+        .message
+        .contains("--strict[fail until all 100 improvement items are evidenced]"));
     assert!(zsh.message.contains("deploy-cli"));
     assert!(zsh.message.contains("--target-dir"));
 
@@ -3435,6 +3514,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("evidence"));
     assert!(fish.message.contains("evidence-packet"));
     assert!(fish.message.contains("release-evidence-packet"));
+    assert!(fish.message.contains("improvement-audit"));
     assert!(fish.message.contains("citation-sources"));
     assert!(fish.message.contains("download-url"));
     assert!(fish.message.contains("deep-research"));
@@ -3456,6 +3536,9 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("-l checklist"));
     assert!(fish.message.contains("-l proposal-outline"));
     assert!(fish.message.contains("-l validator"));
+    assert!(fish
+        .message
+        .contains("__fish_seen_subcommand_from improvements improvement-audit roadmap"));
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("publish"));
@@ -4007,6 +4090,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned readiness"));
     assert!(outcome.message.contains("ned evidence"));
     assert!(outcome.message.contains("ned evidence-packet"));
+    assert!(outcome.message.contains("ned improvements"));
     assert!(outcome.message.contains("ned sources --document"));
     assert!(outcome.message.contains("ned deep-research"));
     assert!(outcome.message.contains("ned support-bundle"));

@@ -46,6 +46,16 @@ const SUPPORTED_EXPORT_TARGETS: &[&str] = &[
 const STDOUT_EXPORT_TARGETS: &[&str] = &["html", "latex"];
 const BUSINESS_DOCUMENT_SOURCE: &str = include_str!("../../src/lib/businessDocuments.ts");
 const TRANSFORM_TEMPLATE_SOURCE: &str = include_str!("../../src/lib/transformTemplates.ts");
+const IMPROVEMENTS_SOURCE: &str = include_str!("../../docs/100-improve.md");
+const IMPROVEMENT_EVIDENCE_SOURCE: &str = concat!(
+    include_str!("../../docs/spec-completion-matrix.md"),
+    "\n",
+    include_str!("../../docs/progress.md"),
+    "\n",
+    include_str!("../../docs/user-guide.md"),
+    "\n",
+    include_str!("../../README.md")
+);
 const NEW_DOCUMENT_TEMPLATES: &[&str] = &[
     "blank",
     "proposal",
@@ -127,6 +137,9 @@ const CLI_COMMANDS: &[&str] = &[
     "release-evidence-packet",
     "release-candidate",
     "candidate",
+    "improvements",
+    "improvement-audit",
+    "roadmap",
     "support",
     "support-bundle",
     "completions",
@@ -591,6 +604,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
             run_evidence_packet_command(&args[2..])
         }
         "release-candidate" | "candidate" => run_release_candidate_command(&args[2..]),
+        "improvements" | "improvement-audit" | "roadmap" => run_improvements_command(&args[2..]),
         "support" | "support-bundle" => run_support_bundle_command(&args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
         "default-reader" => run_default_reader_command(&args[2..]),
@@ -5293,6 +5307,63 @@ fn run_evidence_command(args: &[String]) -> Result<CliOutcome, String> {
     })
 }
 
+fn run_improvements_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut strict = false;
+    let mut output_path: Option<PathBuf> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--markdown" => {}
+            "--strict" => strict = true,
+            "--output" | "-o" => {
+                index += 1;
+                output_path =
+                    Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--output requires a Markdown output path".to_string()
+                    })?));
+            }
+            value => return Err(format!("Unsupported improvements option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let report = build_improvements_audit_report();
+    let complete = report
+        .get("productionReady")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let markdown = improvements_audit_markdown(&report);
+    if let Some(path) = output_path.as_deref() {
+        write_cli_markdown_output(path, &markdown)?;
+    }
+    let exit_code = if strict && !complete { 1 } else { 0 };
+
+    if json_output {
+        let mut report = report;
+        if let Some(path) = output_path.as_deref() {
+            report["outputPath"] = json!(path_to_display(path));
+        }
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code,
+        });
+    }
+
+    Ok(CliOutcome {
+        message: if let Some(path) = output_path.as_deref() {
+            format!(
+                "Wrote improvement coverage audit: {}",
+                path_to_display(path)
+            )
+        } else {
+            markdown
+        },
+        exit_code,
+    })
+}
+
 fn run_evidence_packet_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut json_output = false;
     let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -6287,6 +6358,7 @@ fn build_support_bundle_report(
     let action_plan = readiness_action_plan(evidence_kit_path, &readiness_gaps);
     let spec_action_plan = spec_completion_action_plan(spec_work_orders_path, &spec_completion);
     let release_candidate = release_candidate_status(release_candidate_dir);
+    let improvement_audit = build_improvements_audit_report();
     let recommendations = support_bundle_recommendations(
         &doctor,
         &readiness,
@@ -6294,6 +6366,7 @@ fn build_support_bundle_report(
         &action_plan,
         &spec_action_plan,
         &release_candidate,
+        &improvement_audit,
         &engine_probe,
         &evidence_report_summary,
     );
@@ -6330,6 +6403,7 @@ fn build_support_bundle_report(
         },
         "specActionPlan": spec_action_plan,
         "releaseCandidate": release_candidate,
+        "improvementAudit": improvement_audit,
         "engineProbe": {
             "reportPath": path_to_display(engine_report_path),
             "status": readiness_string_field(&engine_probe, "status").unwrap_or("unknown"),
@@ -6363,6 +6437,7 @@ fn support_bundle_recommendations(
     release_action_plan: &Value,
     spec_action_plan: &Value,
     release_candidate: &Value,
+    improvement_audit: &Value,
     engine_probe: &Value,
     evidence_report_summary: &Value,
 ) -> Vec<String> {
@@ -6427,6 +6502,19 @@ fn support_bundle_recommendations(
         recommendations.push(format!(
             "Resolve {} release-candidate issue(s) before distribution.",
             candidate_issues.len()
+        ));
+    }
+    if !improvement_audit
+        .get("productionReady")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        let open = improvement_audit
+            .get("summary")
+            .map(|summary| number_field_u64(summary, "open"))
+            .unwrap_or(0);
+        recommendations.push(format!(
+            "Review {open} open 100-improvement roadmap item(s) before claiming the platform is fully complete."
         ));
     }
     if readiness_string_field(engine_probe, "status").unwrap_or("unknown") == "missing" {
@@ -6655,6 +6743,15 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
         .and_then(|summary| summary.get("artifacts"))
         .and_then(Value::as_u64)
         .unwrap_or(0);
+    let improvement_audit = report.get("improvementAudit").unwrap_or(&Value::Null);
+    let improvement_summary = improvement_audit.get("summary").unwrap_or(&Value::Null);
+    let improvement_open = number_field_u64(improvement_summary, "open");
+    let improvement_implemented =
+        number_field_u64(improvement_summary, "implementedEvidencePresent");
+    let improvement_total = improvement_audit
+        .get("total")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
     let evidence_gaps = readiness_array_field(readiness, "evidenceGaps").len();
     let failures = readiness_array_field(readiness, "failures").len();
     let recommendations = readiness_array_field(report, "recommendations")
@@ -6685,6 +6782,7 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
             "Release candidate: {release_candidate_status} (releaseable: {}, artifacts: {release_candidate_artifacts})",
             if release_candidate_releaseable { "yes" } else { "no" }
         ),
+        format!("100 improvements: {improvement_implemented}/{improvement_total} evidenced, {improvement_open} open"),
         "Privacy: no document content or secrets included".to_string(),
     ];
     if let Some(path) = written_to {
@@ -7501,6 +7599,320 @@ fn release_candidate_text_report(report: &Value) -> String {
         lines.push(format!("  - {command}"));
     }
     lines.join("\n")
+}
+
+fn build_improvements_audit_report() -> Value {
+    let items = parse_improvement_items(IMPROVEMENTS_SOURCE);
+    let evidence_text = IMPROVEMENT_EVIDENCE_SOURCE.to_ascii_lowercase();
+    let audited_items = items
+        .iter()
+        .map(|item| improvement_audit_row(item, &evidence_text))
+        .collect::<Vec<_>>();
+    let mut status_counts: BTreeMap<String, u64> = BTreeMap::new();
+    let mut category_counts: BTreeMap<String, Value> = BTreeMap::new();
+    for item in &audited_items {
+        let status = readiness_string_field(item, "status").unwrap_or("unknown");
+        *status_counts.entry(status.to_string()).or_insert(0) += 1;
+        let category = readiness_string_field(item, "category").unwrap_or("Uncategorized");
+        let entry = category_counts
+            .entry(category.to_string())
+            .or_insert_with(|| {
+                json!({
+                    "total": 0,
+                    "implementedEvidencePresent": 0,
+                    "partialOrExternal": 0,
+                    "needsImplementationEvidence": 0
+                })
+            });
+        if let Value::Object(fields) = entry {
+            increment_json_u64(fields, "total");
+            match status {
+                "implemented-evidence-present" => {
+                    increment_json_u64(fields, "implementedEvidencePresent")
+                }
+                "partial-or-external-evidence" => increment_json_u64(fields, "partialOrExternal"),
+                _ => increment_json_u64(fields, "needsImplementationEvidence"),
+            }
+        }
+    }
+    let implemented = *status_counts
+        .get("implemented-evidence-present")
+        .unwrap_or(&0);
+    let partial = *status_counts
+        .get("partial-or-external-evidence")
+        .unwrap_or(&0);
+    let missing = *status_counts
+        .get("needs-implementation-evidence")
+        .unwrap_or(&0);
+    let production_ready = items.len() == implemented as usize;
+    json!({
+        "schema": "neditor.100-improvements-audit.v1",
+        "generatedAtUnixSeconds": unix_timestamp_seconds(),
+        "source": "docs/100-improve.md",
+        "total": items.len(),
+        "productionReady": production_ready,
+        "summary": {
+            "implementedEvidencePresent": implemented,
+            "partialOrExternal": partial,
+            "needsImplementationEvidence": missing,
+            "open": partial + missing,
+        },
+        "categorySummary": category_counts,
+        "items": audited_items,
+        "nextCommands": [
+            "ned improvements --json",
+            "ned improvements --output improvement-coverage.md",
+            "pnpm run check:spec-completion",
+            "pnpm run check:release-readiness"
+        ],
+        "note": "This audit is intentionally conservative. It turns docs/100-improve.md into an actionable product coverage checklist, but it does not replace requirement-specific tests, platform evidence, credentialed proof, or human sign-off."
+    })
+}
+
+#[derive(Debug)]
+struct ImprovementItem {
+    number: u16,
+    title: String,
+    description: String,
+    category: String,
+}
+
+fn parse_improvement_items(source: &str) -> Vec<ImprovementItem> {
+    let mut category = "Uncategorized".to_string();
+    let mut items = Vec::new();
+    let mut current: Option<ImprovementItem> = None;
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if let Some(next_category) = trimmed.strip_prefix("## ") {
+            if let Some(item) = current.take() {
+                items.push(item);
+            }
+            category = next_category.trim().to_string();
+            continue;
+        }
+        if let Some((number, title, description)) = parse_improvement_start_line(trimmed) {
+            if let Some(item) = current.take() {
+                items.push(item);
+            }
+            current = Some(ImprovementItem {
+                number,
+                title,
+                description,
+                category: category.clone(),
+            });
+        } else if let Some(item) = current.as_mut() {
+            if !trimmed.is_empty() && !trimmed.starts_with('#') {
+                if !item.description.is_empty() {
+                    item.description.push(' ');
+                }
+                item.description.push_str(trimmed);
+            }
+        }
+    }
+    if let Some(item) = current {
+        items.push(item);
+    }
+    items
+        .into_iter()
+        .filter(|item| item.number >= 1 && item.number <= 100)
+        .collect()
+}
+
+fn parse_improvement_start_line(line: &str) -> Option<(u16, String, String)> {
+    let (number_text, rest) = line.split_once(". ")?;
+    let number = number_text.parse::<u16>().ok()?;
+    let rest = rest.strip_prefix("**")?;
+    let (title, after_title) = rest.split_once("**")?;
+    let description = after_title
+        .trim_start()
+        .strip_prefix(':')
+        .unwrap_or(after_title.trim_start())
+        .trim()
+        .to_string();
+    Some((number, title.trim().to_string(), description))
+}
+
+fn improvement_audit_row(item: &ImprovementItem, evidence_text: &str) -> Value {
+    let signals = improvement_evidence_signals(item);
+    let matched_signals = signals
+        .iter()
+        .filter(|signal| evidence_text.contains(&signal.to_ascii_lowercase()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let external = improvement_needs_external_or_manual_evidence(item);
+    let status = if matched_signals.len() >= 2 && !external {
+        "implemented-evidence-present"
+    } else if !matched_signals.is_empty() || external {
+        "partial-or-external-evidence"
+    } else {
+        "needs-implementation-evidence"
+    };
+    let lane = if external {
+        "external-or-manual-proof"
+    } else if matched_signals.len() >= 2 {
+        "implementation-review"
+    } else {
+        "product-implementation"
+    };
+    json!({
+        "number": item.number,
+        "category": item.category,
+        "title": item.title,
+        "description": item.description,
+        "status": status,
+        "lane": lane,
+        "matchedSignals": matched_signals,
+        "nextAction": improvement_next_action(item, status, external),
+    })
+}
+
+fn improvement_evidence_signals(item: &ImprovementItem) -> Vec<String> {
+    let mut signals = Vec::new();
+    for phrase in [
+        item.title.as_str(),
+        item.category.as_str(),
+        item.description.as_str(),
+    ] {
+        for token in phrase
+            .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
+            .map(|token| token.trim().to_ascii_lowercase())
+            .filter(|token| token.len() >= 5)
+            .filter(|token| {
+                !matches!(
+                    token.as_str(),
+                    "document"
+                        | "documents"
+                        | "support"
+                        | "provide"
+                        | "create"
+                        | "export"
+                        | "review"
+                        | "workflow"
+                        | "source"
+                        | "local"
+                        | "before"
+                        | "after"
+                        | "users"
+                        | "business"
+                )
+            })
+        {
+            if !signals.iter().any(|existing| existing == &token) {
+                signals.push(token);
+            }
+        }
+    }
+    signals
+}
+
+fn improvement_needs_external_or_manual_evidence(item: &ImprovementItem) -> bool {
+    let text = format!(
+        "{} {} {}",
+        item.category.to_ascii_lowercase(),
+        item.title.to_ascii_lowercase(),
+        item.description.to_ascii_lowercase()
+    );
+    [
+        "google docs",
+        "homebrew",
+        "sign",
+        "notar",
+        "windows",
+        "linux",
+        "cross-platform",
+        "credential",
+        "screen-reader",
+        "manual",
+        "voice",
+        "tts",
+        "publishing",
+        "external",
+        "download",
+        "cloud",
+        "provider",
+    ]
+    .iter()
+    .any(|needle| text.contains(needle))
+}
+
+fn improvement_next_action(item: &ImprovementItem, status: &str, external: bool) -> String {
+    if status == "implemented-evidence-present" {
+        return "Keep tests, docs, UI/CLI exposure, and release evidence current when this capability changes.".to_string();
+    }
+    if external {
+        return "Attach current credentialed, supported-host, manual-review, or distribution evidence before marking this item release-ready.".to_string();
+    }
+    format!(
+        "Implement or strengthen user-facing {} capability, add focused tests, document the workflow, and update the spec/progress evidence.",
+        item.category.to_ascii_lowercase()
+    )
+}
+
+fn improvements_audit_markdown(report: &Value) -> String {
+    let summary = report.get("summary").unwrap_or(&Value::Null);
+    let total = report.get("total").and_then(Value::as_u64).unwrap_or(0);
+    let production_ready = report
+        .get("productionReady")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let mut lines = vec![
+        "# NEditor 100 Improvements Coverage Audit".to_string(),
+        "".to_string(),
+        format!("Source: {}", readiness_string_field(report, "source").unwrap_or("docs/100-improve.md")),
+        format!("Total improvements: {total}"),
+        format!("Production ready: {}", if production_ready { "yes" } else { "no" }),
+        format!(
+            "Summary: {} implemented evidence present, {} partial/external, {} need implementation evidence, {} open",
+            number_field_u64(summary, "implementedEvidencePresent"),
+            number_field_u64(summary, "partialOrExternal"),
+            number_field_u64(summary, "needsImplementationEvidence"),
+            number_field_u64(summary, "open"),
+        ),
+        "".to_string(),
+        "> This audit is conservative. It makes the 100-item roadmap actionable, but it does not replace targeted tests, platform evidence, credentialed proof, or human sign-off.".to_string(),
+        "".to_string(),
+        "## Category Summary".to_string(),
+        "".to_string(),
+        "| Category | Total | Implemented evidence | Partial/external | Needs evidence |".to_string(),
+        "| --- | ---: | ---: | ---: | ---: |".to_string(),
+    ];
+    if let Some(categories) = report.get("categorySummary").and_then(Value::as_object) {
+        for (category, counts) in categories {
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} |",
+                markdown_cell(category),
+                number_field_u64(counts, "total"),
+                number_field_u64(counts, "implementedEvidencePresent"),
+                number_field_u64(counts, "partialOrExternal"),
+                number_field_u64(counts, "needsImplementationEvidence"),
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "## Improvement Work Orders".to_string(),
+        "".to_string(),
+        "| # | Category | Status | Lane | Improvement | Next action |".to_string(),
+        "| ---: | --- | --- | --- | --- | --- |".to_string(),
+    ]);
+    for item in readiness_array_field(report, "items") {
+        let number = item.get("number").and_then(Value::as_u64).unwrap_or(0);
+        lines.push(format!(
+            "| {number} | {} | {} | {} | {} | {} |",
+            markdown_cell(readiness_string_field(&item, "category").unwrap_or("")),
+            markdown_cell(readiness_string_field(&item, "status").unwrap_or("unknown")),
+            markdown_cell(readiness_string_field(&item, "lane").unwrap_or("unknown")),
+            markdown_cell(readiness_string_field(&item, "title").unwrap_or("Untitled")),
+            markdown_cell(readiness_string_field(&item, "nextAction").unwrap_or("Review item.")),
+        ));
+    }
+    lines.push("".to_string());
+    lines.join("\n")
+}
+
+fn increment_json_u64(fields: &mut serde_json::Map<String, Value>, key: &str) {
+    let next = fields.get(key).and_then(Value::as_u64).unwrap_or(0) + 1;
+    fields.insert(key.to_string(), json!(next));
 }
 
 fn support_bundle_open_spec_rows(report: &Value, limit: usize) -> Vec<Value> {
@@ -14716,6 +15128,9 @@ _ned() {{
       release-candidate|candidate)
         COMPREPLY=( $(compgen -W "--json --strict --candidate-dir --dir" -- "$cur") )
         ;;
+      improvements|improvement-audit|roadmap)
+        COMPREPLY=( $(compgen -W "--json --markdown --strict --output" -- "$cur") )
+        ;;
       support|support-bundle)
         COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --spec-work-orders --release-candidate-dir --engine-report --evidence-root --evidence-kit --output" -- "$cur") )
         ;;
@@ -14840,6 +15255,9 @@ _ned() {{
       ;;
     release-candidate|candidate)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when candidate is not checked and final-releaseable]' '--candidate-dir[read a release-candidate directory]:directory:_files -/' '--dir[alias for --candidate-dir]:directory:_files -/'
+      ;;
+    improvements|improvement-audit|roadmap)
+      _arguments '--json[print machine-readable JSON]' '--markdown[print Markdown audit]' '--strict[fail until all 100 improvement items are evidenced]' '--output[write improvement coverage Markdown]:file:_files'
       ;;
     support|support-bundle)
       _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--spec-work-orders[attach spec-completion work orders]:file:_files' '--release-candidate-dir[attach release-candidate status]:directory:_files -/' '--engine-report[attach a specific transform engine probe report]:file:_files' '--evidence-root[attach standard release evidence reports from a .tmp-style root]:directory:_files -/' '--evidence-kit[attach release evidence-kit work items]:file:_files' '--output[write support bundle JSON]:file:_files'
@@ -15151,6 +15569,14 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from release-candidate candidate' -l candidate-dir -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from release-candidate candidate' -l dir -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from improvements improvement-audit roadmap' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from improvements improvement-audit roadmap' -l markdown"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from improvements improvement-audit roadmap' -l strict"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from improvements improvement-audit roadmap' -l output -s o -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from support support-bundle' -l json"
             .to_string(),
@@ -15988,6 +16414,8 @@ fn help_text() -> String {
         "  ned evidence [--json] [--strict] [--evidence-root .tmp]".to_string(),
         "  ned evidence-packet [--output release-evidence.md] [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--spec-work-orders path] [--evidence-root .tmp] [--evidence-kit .tmp/release-evidence-kit]".to_string(),
         "  ned release-candidate [--json] [--strict] [--candidate-dir .tmp/release-candidate]"
+            .to_string(),
+        "  ned improvements [--json] [--strict] [--output improvement-coverage.md]"
             .to_string(),
         "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--spec-work-orders path] [--release-candidate-dir path] [--engine-report path] [--evidence-root .tmp] [--evidence-kit .tmp/release-evidence-kit] [--output support.json]"
             .to_string(),

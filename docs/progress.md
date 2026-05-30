@@ -6294,6 +6294,32 @@ verification tasks are complete enough for export or submission review.
 | `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting standalone RFP coverage validation. |
 | `git diff --check` | Pass | No whitespace errors are present in the CLI RFP coverage slice. |
 
+## 2026-05-30 100-Improvement Coverage Audit
+
+`docs/100-improve.md` is now wired into an executable product audit instead of
+remaining a static aspirational list. `ned improvements` parses the 100
+numbered improvements, compares each item against current implementation and
+evidence text, and emits a conservative coverage report with category counts,
+item statuses, evidence lanes, and next actions. `--json` returns a
+machine-readable report, `--output improvement-coverage.md` writes the
+Markdown audit, and `--strict` fails until all 100 items are evidenced.
+
+Support bundles now include the same `improvementAudit` object and
+recommendation, and the Configuration Center support panels surface the
+100-improvement summary and open examples. Release managers can now see the
+gap between broad product ambition and evidenced production readiness without
+manually cross-reading the roadmap, spec matrix, progress log, and README.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 31 CLI tests passed and rebuilt the debug `ned` binary, including `ned_cli_audits_100_improvements_as_actionable_work_orders`, support-bundle `improvementAudit`, completions, and help coverage. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including support-handoff and Configuration Center 100-improvement coverage guards. |
+| `pnpm run check` | Pass | Vue typecheck passed after adding support-bundle improvement audit UI fields. |
+| `src-tauri/target/debug/ned improvements --json` | Pass | Direct smoke returned schema `neditor.100-improvements-audit.v1`, total `100`, `productionReady: false`, 65 implemented-evidence items, and 35 open partial/external items. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed after the 100-improvement CLI audit updates. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting `ned improvements`. |
+| `git diff --check` | Pass | No whitespace errors are present in the 100-improvement audit slice. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

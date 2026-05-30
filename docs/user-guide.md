@@ -939,6 +939,14 @@ Markdown packet that combines release work items, spec/manual work orders,
 recognized ingest paths, validator commands, redaction rules, and final closure
 commands.
 
+Use `ned improvements --output improvement-coverage.md` to turn
+`docs/100-improve.md` into a conservative item-by-item coverage audit. The same
+100-improvement summary appears in support bundles and the Configuration
+Center support panels, so release managers can see how many product promises
+have implementation evidence, how many still depend on external/manual proof,
+and which items still need implementation evidence before anyone claims the
+platform is complete.
+
 NEditor stays conservative: credentialed integrations, cross-platform package
 smoke checks, Homebrew audit output, signing proof, and notarization proof must
 be backed by explicit evidence before the dashboard can mark a package ready to
