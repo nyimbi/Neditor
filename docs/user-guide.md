@@ -704,6 +704,10 @@ NEditor is built for drafts that need evidence before publication.
   checklist first, evaluator planning prompt second, and score-aware proposal
   outline third. Use `ned analyze-rfp - --outline` to print that packet from
   pasted or piped RFP text.
+  Add `--coverage-output coverage.md`, or use `ned analyze-rfp - --coverage`,
+  to produce a requirement coverage validator that checks mandatory rows,
+  disqualification traps, evidence ownership, attachments, annexes, language
+  obligations, placeholders, and final verification tasks before export.
   The RFP wizard also shows AI step assistance for source intake, requirement
   analysis, buyer intent, response drafting, evidence QA, and handoff; accepting
   a suggestion puts the answer, rationale, and context signals into editable

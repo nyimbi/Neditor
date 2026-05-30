@@ -4776,6 +4776,7 @@ fn run_rfp_response_command(
     let mut matrix_output: Option<PathBuf> = None;
     let mut checklist_output: Option<PathBuf> = None;
     let mut outline_output: Option<PathBuf> = None;
+    let mut coverage_output: Option<PathBuf> = None;
     let mut workspace = PathBuf::from(".");
     let mut context_notes = String::new();
     let mut json_output = false;
@@ -4783,6 +4784,7 @@ fn run_rfp_response_command(
     let mut matrix_only = false;
     let mut checklist_only = false;
     let mut outline_only = false;
+    let mut coverage_only = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -4828,6 +4830,12 @@ fn run_rfp_response_command(
                     "--outline-output requires a Markdown output path".to_string()
                 })?));
             }
+            "--coverage-output" | "--validator-output" => {
+                index += 1;
+                coverage_output = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--coverage-output requires a Markdown output path".to_string()
+                })?));
+            }
             "--workspace" | "-w" => {
                 index += 1;
                 workspace = PathBuf::from(
@@ -4847,6 +4855,7 @@ fn run_rfp_response_command(
             "--matrix" => matrix_only = true,
             "--checklist" => checklist_only = true,
             "--outline" | "--proposal-outline" => outline_only = true,
+            "--coverage" | "--validator" => coverage_only = true,
             "-" => {
                 if source.is_some() {
                     return Err("Only one RFP source can be analyzed at a time.".to_string());
@@ -4869,18 +4878,18 @@ fn run_rfp_response_command(
     if url.is_some() && source.is_none() {
         source = url.clone();
     }
-    let terminal_only_modes = [matrix_only, checklist_only, outline_only]
+    let terminal_only_modes = [matrix_only, checklist_only, outline_only, coverage_only]
         .into_iter()
         .filter(|enabled| *enabled)
         .count();
     if terminal_only_modes > 1 {
         return Err(
-            "Choose only one terminal-only RFP output mode: --matrix, --checklist, or --outline."
+            "Choose only one terminal-only RFP output mode: --matrix, --checklist, --outline, or --coverage."
                 .to_string(),
         );
     }
     let source = source.ok_or_else(|| {
-        "Usage: ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--outline-output outline.md] [--json|--markdown|--matrix|--checklist|--outline]"
+        "Usage: ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--outline-output outline.md] [--coverage-output coverage.md] [--json|--markdown|--matrix|--checklist|--outline|--coverage]"
             .to_string()
     })?;
     let inferred_type =
@@ -4918,6 +4927,7 @@ fn run_rfp_response_command(
     let matrix_markdown = rfp_cli_compliance_matrix_markdown(&analysis);
     let checklist_markdown = rfp_cli_compliance_checklist_markdown(&analysis);
     let outline_markdown = rfp_cli_outline_packet_markdown(&analysis, &context_notes);
+    let coverage_markdown = rfp_cli_coverage_validator_markdown(&analysis);
     let response_markdown = rfp_cli_response_markdown(&analysis, &profile, &context_notes);
 
     if let Some(path) = output.as_ref() {
@@ -4932,6 +4942,9 @@ fn run_rfp_response_command(
     if let Some(path) = outline_output.as_ref() {
         write_cli_markdown_output(path, &outline_markdown)?;
     }
+    if let Some(path) = coverage_output.as_ref() {
+        write_cli_markdown_output(path, &coverage_markdown)?;
+    }
 
     if json_output {
         return Ok(CliOutcome {
@@ -4942,6 +4955,7 @@ fn run_rfp_response_command(
                 "complianceMatrixMarkdown": matrix_markdown,
                 "complianceChecklistMarkdown": checklist_markdown,
                 "proposalOutlineMarkdown": outline_markdown,
+                "coverageValidatorMarkdown": coverage_markdown,
                 "profileApplied": profile_applied,
                 "profilePath": path_to_display(&profile_path),
                 "outputs": {
@@ -4949,6 +4963,7 @@ fn run_rfp_response_command(
                     "matrix": matrix_output.as_ref().map(|path| path_to_display(path)),
                     "checklist": checklist_output.as_ref().map(|path| path_to_display(path)),
                     "outline": outline_output.as_ref().map(|path| path_to_display(path)),
+                    "coverage": coverage_output.as_ref().map(|path| path_to_display(path)),
                 },
             }))
             .map_err(|err| err.to_string())?,
@@ -4973,6 +4988,12 @@ fn run_rfp_response_command(
             exit_code: 0,
         });
     }
+    if coverage_only {
+        return Ok(CliOutcome {
+            message: coverage_markdown,
+            exit_code: 0,
+        });
+    }
     if markdown_output || output.is_none() {
         return Ok(CliOutcome {
             message: response_markdown,
@@ -4991,6 +5012,7 @@ fn run_rfp_response_command(
                 matrix_output.as_ref(),
                 checklist_output.as_ref(),
                 outline_output.as_ref(),
+                coverage_output.as_ref(),
             )
         ),
         exit_code: 0,
@@ -5001,6 +5023,7 @@ fn rfp_cli_output_suffix(
     matrix_output: Option<&PathBuf>,
     checklist_output: Option<&PathBuf>,
     outline_output: Option<&PathBuf>,
+    coverage_output: Option<&PathBuf>,
 ) -> String {
     let mut outputs = Vec::new();
     if let Some(path) = matrix_output {
@@ -5011,6 +5034,9 @@ fn rfp_cli_output_suffix(
     }
     if let Some(path) = outline_output {
         outputs.push(format!("outline to {}", path.display()));
+    }
+    if let Some(path) = coverage_output {
+        outputs.push(format!("coverage to {}", path.display()));
     }
     if outputs.is_empty() {
         String::new()
@@ -12527,6 +12553,198 @@ fn rfp_cli_outline_packet_markdown(analysis: &RfpCliAnalysis, context_notes: &st
     .join("\n\n")
 }
 
+fn rfp_cli_coverage_validator_markdown(analysis: &RfpCliAnalysis) -> String {
+    let mandatory_rows = analysis
+        .compliance_rows
+        .iter()
+        .filter(|row| row.disqualification_risk || row.requirement_type == "MANDATORY")
+        .collect::<Vec<_>>();
+    let critical_checklist = analysis
+        .compliance_checklist
+        .iter()
+        .filter(|item| item.risk == "critical")
+        .collect::<Vec<_>>();
+    let rows_needing_evidence = analysis
+        .compliance_rows
+        .iter()
+        .filter(|row| row.compliance_status.contains("Needs"))
+        .count();
+    let ready_for_submission = analysis.verification_summary.all_requirements_mapped
+        && rows_needing_evidence == 0
+        && analysis.placeholder_risks.is_empty()
+        && critical_checklist.is_empty();
+    let mut lines = vec![
+        "## RFP Requirement Coverage Validator".to_string(),
+        "".to_string(),
+        format!("Source: {}", analysis.source.title),
+        format!("Source type: {}", analysis.source.kind.to_uppercase()),
+        format!(
+            "Coverage status: {}",
+            if ready_for_submission {
+                "ready-for-final-review"
+            } else {
+                "needs-evidence-review"
+            }
+        ),
+        "".to_string(),
+        "| Check | Result | Evidence |".to_string(),
+        "| --- | --- | --- |".to_string(),
+        format!(
+            "| Requirements mapped | {} | {} requirement(s), {} compliance row(s) |",
+            if analysis.verification_summary.all_requirements_mapped {
+                "pass"
+            } else {
+                "review"
+            },
+            analysis.verification_summary.total_requirements,
+            analysis.verification_summary.compliance_rows,
+        ),
+        format!(
+            "| Evidence ownership | {} | {} row(s) still need evidence or reviewer sign-off |",
+            if rows_needing_evidence == 0 {
+                "pass"
+            } else {
+                "review"
+            },
+            rows_needing_evidence,
+        ),
+        format!(
+            "| Critical disqualifiers | {} | {} critical checklist item(s) |",
+            if critical_checklist.is_empty() {
+                "pass"
+            } else {
+                "blocker"
+            },
+            critical_checklist.len(),
+        ),
+        format!(
+            "| Mandatory attachments | {} | {} attachment hint(s) detected |",
+            if analysis.mandatory_attachments.is_empty() {
+                "manual-review"
+            } else {
+                "tracked"
+            },
+            analysis.mandatory_attachments.len(),
+        ),
+        format!(
+            "| Annex references | {} | {} annex reference(s) detected |",
+            if analysis.annex_references.is_empty() {
+                "manual-review"
+            } else {
+                "tracked"
+            },
+            analysis.annex_references.len(),
+        ),
+        format!(
+            "| Language obligations | {} | {} bilingual/language signal(s) detected |",
+            if analysis.bilingual_requirements.is_empty() {
+                "manual-review"
+            } else {
+                "tracked"
+            },
+            analysis.bilingual_requirements.len(),
+        ),
+        format!(
+            "| Placeholder traps | {} | {} placeholder/readiness trap(s) detected |",
+            if analysis.placeholder_risks.is_empty() {
+                "pass"
+            } else {
+                "blocker"
+            },
+            analysis.placeholder_risks.len(),
+        ),
+        "".to_string(),
+        "### Mandatory and Disqualification Coverage".to_string(),
+        "".to_string(),
+        "| ID | Type | Risk | Requirement | Response section | Evidence owner | Verification |"
+            .to_string(),
+        "| --- | --- | --- | --- | --- | --- | --- |".to_string(),
+    ];
+    if mandatory_rows.is_empty() {
+        lines.push("| - | Manual review | review | No mandatory or disqualification rows detected by rules. | Compliance review | Bid Owner | Manually inspect must/shall/required/rejected language. |".to_string());
+    } else {
+        for row in mandatory_rows {
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} | {} | {} |",
+                table_cell(&row.id),
+                table_cell(&row.requirement_type),
+                if row.disqualification_risk {
+                    "critical"
+                } else {
+                    "high"
+                },
+                table_cell(&row.requirement),
+                table_cell(&row.response_section),
+                table_cell(&row.owner),
+                table_cell(&row.verification),
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "### Attachment and Annex Coverage".to_string(),
+        "".to_string(),
+        "| Item | Coverage action | Owner |".to_string(),
+        "| --- | --- | --- |".to_string(),
+    ]);
+    if analysis.mandatory_attachments.is_empty() && analysis.annex_references.is_empty() {
+        lines.push("| Manual attachment review | Inspect source RFP for forms, declarations, CVs, certificates, financials, signatures, and schedules. | Bid Coordinator |".to_string());
+    } else {
+        for item in &analysis.mandatory_attachments {
+            lines.push(format!(
+                "| {} | Confirm complete, signed where required, current, and included in submission package. | Bid Coordinator |",
+                table_cell(item),
+            ));
+        }
+        for annex in &analysis.annex_references {
+            lines.push(format!(
+                "| {} | Locate annex, confirm required format/signature, and map to response bundle. | Bid Coordinator |",
+                table_cell(&annex.requirement),
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "### Language and Placeholder Coverage".to_string(),
+        "".to_string(),
+        "| Signal | Coverage action | Owner |".to_string(),
+        "| --- | --- | --- |".to_string(),
+    ]);
+    if analysis.bilingual_requirements.is_empty() && analysis.placeholder_risks.is_empty() {
+        lines.push("| Manual language and placeholder review | Confirm language obligations and search the response for TBD, placeholder, pending, and unfinished values. | Bid Owner |".to_string());
+    } else {
+        for item in &analysis.bilingual_requirements {
+            lines.push(format!(
+                "| {} | Confirm staffing, workshops, materials, review, and deliverables cover the language obligation. | Delivery Lead |",
+                table_cell(item),
+            ));
+        }
+        for item in &analysis.placeholder_risks {
+            lines.push(format!(
+                "| {} | Replace or explicitly escalate unfinished values before final packaging. | Bid Owner |",
+                table_cell(item),
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "### Verification Checklist".to_string(),
+        "".to_string(),
+    ]);
+    for item in &analysis.verification_summary.checklist {
+        lines.push(format!("- [ ] {item}"));
+    }
+    lines.extend([
+        "- [ ] Confirm every critical checklist item has a named owner and attached proof."
+            .to_string(),
+        "- [ ] Confirm every response section cited in the matrix exists in the final proposal."
+            .to_string(),
+        "- [ ] Re-run this validator after final edits and before export or submission."
+            .to_string(),
+    ]);
+    lines.join("\n")
+}
+
 fn rfp_cli_response_markdown(
     analysis: &RfpCliAnalysis,
     profile: &BusinessProfile,
@@ -14481,7 +14699,7 @@ _ned() {{
         COMPREPLY=( $(compgen -W "--json --topic --query --document-type --type --audience --provider --document --file --path --searxng-url --tavily-api-key --pages --target-pages --iterations --results --results-per-iteration --save-sources --output" -- "$cur") )
         ;;
       rfp|rfp-response|analyze-rfp)
-        COMPREPLY=( $(compgen -W "--source-type --kind --url --output --matrix-output --checklist-output --outline-output --proposal-outline-output --workspace --context --notes --json --markdown --matrix --checklist --outline --proposal-outline" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--source-type --kind --url --output --matrix-output --checklist-output --outline-output --proposal-outline-output --coverage-output --validator-output --workspace --context --notes --json --markdown --matrix --checklist --outline --proposal-outline --coverage --validator" -- "$cur") )
         ;;
       handlers|transform-handlers)
         COMPREPLY=( $(compgen -W "--json --commands-only --platform" -- "$cur") )
@@ -14603,7 +14821,7 @@ _ned() {{
       _arguments '--json[print machine-readable JSON]' '--topic[research topic]:topic:' '--query[alias for --topic]:topic:' '--document-type[report type]:type:' '--type[alias for --document-type]:type:' '--audience[target readers]:audience:' '--provider[search provider]:provider:(duckduckgo searxng tavily local-library)' '--document[Markdown document whose source vault should be used]:file:_files -g "*.md"' '--file[alias for --document]:file:_files -g "*.md"' '--path[alias for --document]:file:_files -g "*.md"' '--searxng-url[SearXNG base URL]:url:' '--tavily-api-key[Tavily API key for this run]:key:' '--pages[target pages 1-200]:number:' '--target-pages[alias for --pages]:number:' '--iterations[search loops 1-5]:number:' '--results[results per loop]:number:' '--results-per-iteration[alias for --results]:number:' '--save-sources[download returned sources into the document vault]' '--output[write Deep Research Markdown dossier]:file:_files'
       ;;
     rfp|rfp-response|analyze-rfp)
-      _arguments '*:RFP source:_files' '--source-type[source type]:kind:(markdown pdf docx url)' '--kind[source type alias]:kind:(markdown pdf docx url)' '--url[fetch public RFP URL]:url:' '--output[write response Markdown]:file:_files' '--matrix-output[write compliance matrix Markdown]:file:_files' '--checklist-output[write compliance checklist Markdown]:file:_files' '--outline-output[write compliance checklist and proposal outline Markdown]:file:_files' '--proposal-outline-output[alias for --outline-output]:file:_files' '--workspace[workspace containing .neditor]:directory:_files -/' '--context[response guidance]:notes:' '--notes[response guidance alias]:notes:' '--json[print machine-readable JSON]' '--markdown[print response Markdown]' '--matrix[print compliance matrix Markdown]' '--checklist[print compliance checklist Markdown]' '--outline[print compliance checklist and proposal outline Markdown]' '--proposal-outline[alias for --outline]'
+      _arguments '*:RFP source:_files' '--source-type[source type]:kind:(markdown pdf docx url)' '--kind[source type alias]:kind:(markdown pdf docx url)' '--url[fetch public RFP URL]:url:' '--output[write response Markdown]:file:_files' '--matrix-output[write compliance matrix Markdown]:file:_files' '--checklist-output[write compliance checklist Markdown]:file:_files' '--outline-output[write compliance checklist and proposal outline Markdown]:file:_files' '--proposal-outline-output[alias for --outline-output]:file:_files' '--coverage-output[write requirement coverage validator Markdown]:file:_files' '--validator-output[alias for --coverage-output]:file:_files' '--workspace[workspace containing .neditor]:directory:_files -/' '--context[response guidance]:notes:' '--notes[response guidance alias]:notes:' '--json[print machine-readable JSON]' '--markdown[print response Markdown]' '--matrix[print compliance matrix Markdown]' '--checklist[print compliance checklist Markdown]' '--outline[print compliance checklist and proposal outline Markdown]' '--proposal-outline[alias for --outline]' '--coverage[print requirement coverage validator Markdown]' '--validator[alias for --coverage]'
       ;;
     targets)
       _arguments '--json[print machine-readable JSON]'
@@ -14871,6 +15089,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l checklist-output -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l outline-output -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l proposal-outline-output -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l coverage-output -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l validator-output -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l workspace -s w -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l context -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l notes -r".to_string(),
@@ -14880,6 +15100,8 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l checklist".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l outline".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l proposal-outline".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l coverage".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l validator".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l json"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from handlers transform-handlers' -l commands-only"
@@ -15758,7 +15980,7 @@ fn help_text() -> String {
         "  ned sources --document report.md --download-url https://example.com/source.pdf --title \"Source title\" [--citation-key key] [--bibliography]".to_string(),
         "  ned deep-research --topic \"market evidence\" [--provider duckduckgo|searxng|tavily|local-library] [--pages 20] [--output research-dossier.md] [--json]".to_string(),
         "  ned deep-research --topic \"market evidence\" --document report.md --save-sources --output research-dossier.md".to_string(),
-        "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--outline-output outline.md] [--json|--markdown|--matrix|--checklist|--outline]".to_string(),
+        "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--outline-output outline.md] [--coverage-output coverage.md] [--json|--markdown|--matrix|--checklist|--outline|--coverage]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json] [--action-plan --evidence-kit .tmp/release-evidence-kit]"

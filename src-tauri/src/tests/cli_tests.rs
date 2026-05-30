@@ -397,6 +397,7 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     let matrix = temp_markdown_path("customer-support-rfp-matrix");
     let checklist = temp_markdown_path("customer-support-rfp-checklist");
     let outline = temp_markdown_path("customer-support-rfp-outline");
+    let coverage = temp_markdown_path("customer-support-rfp-coverage");
     let outcome = crate::cli::run_cli_with_args(&[
         "ned".to_string(),
         "rfp-response".to_string(),
@@ -413,6 +414,8 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
         checklist.to_string_lossy().to_string(),
         "--outline-output".to_string(),
         outline.to_string_lossy().to_string(),
+        "--coverage-output".to_string(),
+        coverage.to_string_lossy().to_string(),
         "--json".to_string(),
     ])
     .expect("rfp response json");
@@ -585,6 +588,14 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
         .as_str()
         .expect("outline output")
         .ends_with(".md"));
+    assert!(report["outputs"]["coverage"]
+        .as_str()
+        .expect("coverage output")
+        .ends_with(".md"));
+    assert!(report["coverageValidatorMarkdown"]
+        .as_str()
+        .expect("coverage markdown")
+        .contains("## RFP Requirement Coverage Validator"));
     assert!(report["proposalOutlineMarkdown"]
         .as_str()
         .expect("outline markdown")
@@ -692,6 +703,17 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     );
     assert!(outline_text.contains("### 2. Scoring Scheme and Page Allocation"));
     assert!(outline_text.contains("### 3. Mandatory Pass/Fail Gates"));
+    let coverage_text = fs::read_to_string(&coverage).expect("coverage markdown");
+    assert!(coverage_text.contains("## RFP Requirement Coverage Validator"));
+    assert!(coverage_text.contains("Coverage status: needs-evidence-review"));
+    assert!(coverage_text.contains("### Mandatory and Disqualification Coverage"));
+    assert!(coverage_text.contains("bid bond certificate"));
+    assert!(coverage_text.contains("### Attachment and Annex Coverage"));
+    assert!(coverage_text.contains("Annex A"));
+    assert!(coverage_text.contains("### Language and Placeholder Coverage"));
+    assert!(coverage_text.contains("bilingual EN/FR"));
+    assert!(coverage_text.contains("TBD"));
+    assert!(coverage_text.contains("### Verification Checklist"));
 
     let stdin_matrix = crate::cli::run_cli_with_args_and_stdin(
         &[
@@ -741,6 +763,25 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     assert!(stdin_outline.message.contains("## Proposal Outline"));
     assert!(stdin_outline.message.contains("methodology"));
     assert!(stdin_outline.message.contains("Annex B"));
+
+    let stdin_coverage = crate::cli::run_cli_with_args_and_stdin(
+        &[
+            "ned".to_string(),
+            "analyze-rfp".to_string(),
+            "-".to_string(),
+            "--coverage".to_string(),
+        ],
+        Some("Vendor must submit Annex B signed declaration. Failure to submit the bid bond will be rejected."),
+    )
+    .expect("stdin rfp coverage");
+    assert!(stdin_coverage
+        .message
+        .contains("## RFP Requirement Coverage Validator"));
+    assert!(stdin_coverage
+        .message
+        .contains("Mandatory and Disqualification Coverage"));
+    assert!(stdin_coverage.message.contains("Annex B"));
+    assert!(stdin_coverage.message.contains("bid bond"));
 }
 
 #[test]
@@ -3318,8 +3359,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("--matrix-output"));
     assert!(bash.message.contains("--checklist-output"));
     assert!(bash.message.contains("--outline-output"));
+    assert!(bash.message.contains("--coverage-output"));
     assert!(bash.message.contains("--matrix --checklist"));
     assert!(bash.message.contains("--proposal-outline"));
+    assert!(bash.message.contains("--validator"));
     assert!(bash.message.contains("deploy-cli"));
     assert!(bash.message.contains("--target-dir"));
     assert!(bash.message.contains("markdown-bundle"));
@@ -3371,6 +3414,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh
         .message
         .contains("--outline[print compliance checklist and proposal outline Markdown]"));
+    assert!(zsh.message.contains("--coverage-output"));
+    assert!(zsh
+        .message
+        .contains("--coverage[print requirement coverage validator Markdown]"));
     assert!(zsh.message.contains("deploy-cli"));
     assert!(zsh.message.contains("--target-dir"));
 
@@ -3405,8 +3452,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("matrix-output"));
     assert!(fish.message.contains("checklist-output"));
     assert!(fish.message.contains("outline-output"));
+    assert!(fish.message.contains("coverage-output"));
     assert!(fish.message.contains("-l checklist"));
     assert!(fish.message.contains("-l proposal-outline"));
+    assert!(fish.message.contains("-l validator"));
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("publish"));
@@ -3973,6 +4022,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("or all"));
     assert!(outcome.message.contains("rfp-response"));
     assert!(outcome.message.contains("--outline-output outline.md"));
+    assert!(outcome.message.contains("--coverage-output coverage.md"));
 }
 
 fn temp_markdown_path(label: &str) -> std::path::PathBuf {

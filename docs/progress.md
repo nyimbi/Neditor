@@ -6273,6 +6273,27 @@ before drafting the full proposal.
 | `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting standalone RFP outline packets. |
 | `git diff --check` | Pass | No whitespace errors are present in the CLI RFP outline slice. |
 
+## 2026-05-30 CLI RFP Coverage Validator
+
+`ned rfp-response` and `ned analyze-rfp` now produce a standalone requirement
+coverage validator. `--coverage-output` writes a review packet and `--coverage`
+prints the same validator to stdout for piped RFP text. The packet checks
+whether extracted requirements are mapped, evidence ownership is still open,
+critical disqualifiers exist, mandatory attachments and annexes are tracked,
+language obligations are surfaced, placeholder traps remain, and final
+verification tasks are complete enough for export or submission review.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_analyzes_rfp_sources_and_writes_response --lib` | Pass | Focused CLI fixture proves `--coverage-output`, JSON `coverageValidatorMarkdown`, coverage status, mandatory/disqualification coverage, attachment/annex coverage, language/placeholder coverage, verification checklist, and stdin `--coverage` output. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_generates_shell_completions_without_external_dependencies --lib` | Pass | Bash, zsh, and fish completions expose `--coverage-output`, `--validator-output`, `--coverage`, and `--validator` for RFP analysis commands. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_help_names_supported_conversion_targets --lib` | Pass | CLI help now advertises RFP coverage output alongside response, matrix, checklist, and outline outputs. |
+| `pnpm run check:cli` | Pass | 30 CLI tests passed and rebuilt the debug `ned` binary after adding coverage validator outputs. |
+| `printf ... \| src-tauri/target/debug/ned analyze-rfp - --coverage` | Pass | Direct smoke printed coverage status, mapped requirements, evidence ownership, critical disqualifiers, attachment/annex coverage, language/placeholder coverage, and verification tasks from piped RFP text. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed after the RFP coverage CLI updates. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting standalone RFP coverage validation. |
+| `git diff --check` | Pass | No whitespace errors are present in the CLI RFP coverage slice. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
