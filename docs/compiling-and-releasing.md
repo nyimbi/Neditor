@@ -559,6 +559,39 @@ The collector requires a clean Git tree and uses the generated
 `.tmp/table-editor/manual-review-template.json` so prerequisite report hashes,
 source commit, and current app version stay aligned.
 
+## Spec Manual Review Work-Order Evidence
+
+The spec-completion matrix generates one strict template for each manual-review
+work order. Generate the current templates and assignment dashboard first:
+
+```sh
+pnpm run check:spec-completion
+pnpm run check:manual-review
+```
+
+After a reviewer completes an assigned workflow and returns screenshots,
+native-viewer exports, screen recordings, or validator output, package one
+work-order signoff:
+
+```sh
+pnpm run collect:manual-review -- \
+  --work-order-id 001-manual-review-example \
+  --reviewer-name "Reviewer Name" \
+  --platform-version "macOS 15.5" \
+  --platform-device "MacBook Pro" \
+  --artifact-file /path/to/screenshot-or-export-proof.png \
+  --validator-output-file /path/to/validator-output.txt \
+  --notes "Reviewed the assigned workflow and found no release blockers."
+pnpm run check:manual-review
+```
+
+Use `manual-review/assignments.csv` in the release evidence kit to assign
+reviewers. The collector copies real evidence files into
+`.tmp/manual-review/external/<work-order-id>/artifacts/`, writes
+`signoff.json`, requires a clean Git tree, and preserves the current app
+version, source commit, work-order details, acceptance criteria, and validator
+commands from the generated template.
+
 ## Homebrew Release
 
 Use a cask, not a formula. The template lives at

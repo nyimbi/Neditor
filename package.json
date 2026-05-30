@@ -45,6 +45,7 @@
     "collect:a11y:manual": "node scripts/collect-accessibility-manual-signoff.mjs",
     "collect:rendered-exports:manual": "node scripts/collect-rendered-export-signoff.mjs",
     "collect:evidence-kit": "node scripts/collect-release-evidence-kit.mjs",
+    "collect:manual-review": "node scripts/collect-manual-review-signoff.mjs",
     "collect:release-signing": "node scripts/collect-release-signing-evidence.mjs",
     "collect:security-review": "node scripts/collect-security-review-evidence.mjs",
     "collect:tables:manual": "node scripts/collect-table-editor-manual-signoff.mjs",

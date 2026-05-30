@@ -10583,6 +10583,7 @@ test("local verification scripts expose local baseline checks", () => {
   const securityReviewCollector = readFileSync("scripts/collect-security-review-evidence.mjs", "utf8");
   const specCompletion = readFileSync("scripts/check-spec-completion-matrix.mjs", "utf8");
   const manualReviewEvidence = readFileSync("scripts/check-manual-review-evidence.mjs", "utf8");
+  const manualReviewCollector = readFileSync("scripts/collect-manual-review-signoff.mjs", "utf8");
   const accessibilitySignoffCollector = readFileSync("scripts/collect-accessibility-manual-signoff.mjs", "utf8");
   const renderedExportSignoffCollector = readFileSync("scripts/collect-rendered-export-signoff.mjs", "utf8");
   const tableEditorSignoffCollector = readFileSync("scripts/collect-table-editor-manual-signoff.mjs", "utf8");
@@ -10640,6 +10641,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["collect:a11y:manual"], "node scripts/collect-accessibility-manual-signoff.mjs");
   equal(scripts["collect:rendered-exports:manual"], "node scripts/collect-rendered-export-signoff.mjs");
   equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
+  equal(scripts["collect:manual-review"], "node scripts/collect-manual-review-signoff.mjs");
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
   equal(scripts["collect:security-review"], "node scripts/collect-security-review-evidence.mjs");
   equal(scripts["collect:tables:manual"], "node scripts/collect-table-editor-manual-signoff.mjs");
@@ -10809,6 +10811,14 @@ test("local verification scripts expose local baseline checks", () => {
   ok(manualReviewEvidence.includes("acceptanceCriteria"));
   ok(manualReviewEvidence.includes("validatorCommands"));
   ok(manualReviewEvidence.includes("current-source-identity"));
+  ok(manualReviewCollector.includes("neditor.manual-review.signoff.v1"));
+  ok(manualReviewCollector.includes("NEDITOR_MANUAL_REVIEW_WORK_ORDER_ID"));
+  ok(manualReviewCollector.includes("NEDITOR_MANUAL_REVIEW_ARTIFACT_FILES"));
+  ok(manualReviewCollector.includes("Manual review signoff must be collected from a clean Git tree"));
+  ok(manualReviewCollector.includes("At least one real evidence file is required"));
+  ok(manualReviewCollector.includes("Validate it with: pnpm run check:manual-review"));
+  ok(manualReviewCollector.includes("unresolvedBlockers: []"));
+  ok(manualReviewCollector.includes("copyArtifactFile"));
   ok(accessibilitySignoffCollector.includes("neditor.accessibility.manual-signoff.v1"));
   ok(accessibilitySignoffCollector.includes("NEDITOR_ACCESSIBILITY_SIGNOFF_TEMPLATE"));
   ok(accessibilitySignoffCollector.includes("NEDITOR_ACCESSIBILITY_REVIEWER_NAME"));
@@ -10963,6 +10973,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("manual-review/dashboard.html"));
   ok(evidenceKitCollector.includes("manual-review/assignments.csv"));
   ok(evidenceKitCollector.includes("manual-review-templates-missing"));
+  ok(evidenceKitCollector.includes("collect:manual-review"));
   ok(evidenceKitCollector.includes("pikchr.template.json"));
   ok(evidenceKitCollector.includes("sqlite.template.json"));
   ok(evidenceKitCollector.includes("NEDITOR_TEST_SQLITE3"));

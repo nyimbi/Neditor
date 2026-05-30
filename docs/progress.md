@@ -28,6 +28,27 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-30 Spec Manual Review Signoff Collector
+
+NEditor now has a collector for the 33 spec manual-review work orders generated
+by the spec-completion matrix. `pnpm run collect:manual-review` reads a
+work-order template, requires named reviewer/platform details, copies real
+review artifacts beside the signoff, fills the checklist as passing, and emits
+`neditor.manual-review.signoff.v1` evidence for `pnpm run check:manual-review`.
+
+This does not perform manual review. It refuses to run on a dirty Git tree,
+requires real artifact files, preserves current source/app/work-order identity
+from the template, and keeps unresolved blockers empty only when a reviewer has
+provided evidence and notes for the assigned workflow.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/collect-manual-review-signoff.mjs` | Pass | Collector syntax is valid after adding template reading, work-order routing, reviewer/platform metadata, artifact copying, checklist packaging, and validation guidance. |
+| `pnpm run collect:manual-review -- --help` | Pass | Help output documents work-order, template, output, reviewer, platform, app build, artifact, validator output, notes, and environment-variable inputs. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including package script coverage, collector contract checks, and evidence-kit runbook wiring. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked after adding spec manual-review collector release instructions. |
+| `git diff --check` | Pass | No whitespace errors are present in this manual-review signoff workflow slice. |
+
 ## 2026-05-30 Runtime Accessibility Region Repair
 
 The runtime accessibility audit now finds the primary source and preview panes
