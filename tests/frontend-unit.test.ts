@@ -33,6 +33,8 @@ import {
   deepResearchEvidenceConflictMarkdown,
   deepResearchExpansionPrompt,
   deepResearchReviewPackageMarkdown,
+  deepResearchSourceQualityMarkdown,
+  deepResearchSourceQualityReviewItems,
   fallbackResearchDraft,
   deepResearchQualityAuditMarkdown,
   deepResearchQualityPrompt,
@@ -6640,6 +6642,34 @@ test("Deep Research ranks stronger citation source candidates first", () => {
     "AI procurement controls",
   );
   equal(weak.label, "weak");
+
+  const qualityItems = deepResearchSourceQualityReviewItems([
+    {
+      index: 1,
+      query: "AI procurement controls policy evidence",
+      summary: "Source review.",
+      gaps: [],
+      results: ranked,
+    },
+  ]);
+  equal(qualityItems.length, 2);
+  equal(qualityItems[0].fitLabel, "weak");
+  ok(qualityItems[0].reviewAction.includes("Avoid citing"));
+  ok(qualityItems.some((item) => item.fitLabel === "strong" && item.fitReasons.some((reason) => reason.includes("government source domain"))));
+  const qualityMarkdown = deepResearchSourceQualityMarkdown([
+    {
+      index: 1,
+      query: "AI procurement controls policy evidence",
+      summary: "Source review.",
+      gaps: [],
+      results: ranked,
+    },
+  ]);
+  ok(qualityMarkdown.includes("## Deep Research Source Quality Review"));
+  ok(qualityMarkdown.includes("### Fit Bands"));
+  ok(qualityMarkdown.includes("### Source Review Queue"));
+  ok(qualityMarkdown.includes("Avoid citing unless a reviewer confirms"));
+  ok(qualityMarkdown.includes("AI procurement controls policy evidence"));
 });
 
 test("citation source library audit captures evidence metadata", () => {
@@ -9278,6 +9308,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="AI command route suggestions"'));
   ok(app.includes("Docs Live"));
   ok(app.includes("Deep Research"));
+  ok(app.includes('aria-label="Deep research source quality review"'));
+  ok(app.includes("deepResearchSourceQualityItems"));
+  ok(app.includes("deepResearchSourceQualitySummary"));
+  ok(app.includes("insertDeepResearchSourceQualityReview"));
+  ok(app.includes("Insert source quality"));
+  ok(app.includes("AI: Insert deep research source quality review"));
   ok(app.includes('aria-label="Deep research evidence conflict review"'));
   ok(app.includes("deepResearchEvidenceConflicts"));
   ok(app.includes("deepResearchConflictSummary"));

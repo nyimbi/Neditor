@@ -20,6 +20,18 @@ export interface DeepResearchSourceFit {
   reasons: string[];
 }
 
+export interface DeepResearchSourceQualityReviewItem {
+  iteration: number;
+  query: string;
+  title: string;
+  url: string;
+  source: string;
+  fitScore: number;
+  fitLabel: string;
+  fitReasons: string[];
+  reviewAction: string;
+}
+
 export interface DeepResearchEvidenceConflict {
   id: string;
   topic: string;
@@ -642,6 +654,59 @@ export function assessDeepResearchSource(source: DeepResearchSource, query: stri
   };
 }
 
+export function deepResearchSourceQualityReviewItems(iterations: DeepResearchIteration[]): DeepResearchSourceQualityReviewItem[] {
+  return iterations.flatMap((iteration) =>
+    iteration.results.map((source) => {
+      const fit = source.fitScore === undefined || !source.fitLabel
+        ? assessDeepResearchSource(source, iteration.query)
+        : {
+            score: source.fitScore,
+            label: source.fitLabel,
+            reasons: source.fitReasons?.length ? source.fitReasons : ["review source before citing"],
+          };
+      return {
+        iteration: iteration.index,
+        query: iteration.query,
+        title: source.title,
+        url: source.url,
+        source: source.source,
+        fitScore: fit.score,
+        fitLabel: fit.label,
+        fitReasons: fit.reasons,
+        reviewAction: sourceQualityReviewAction(fit.label),
+      };
+    }),
+  ).sort((left, right) => left.fitScore - right.fitScore || left.iteration - right.iteration || left.title.localeCompare(right.title));
+}
+
+export function deepResearchSourceQualityMarkdown(iterations: DeepResearchIteration[]) {
+  const items = deepResearchSourceQualityReviewItems(iterations);
+  const summaryRows = deepResearchSourceQualityRows(iterations);
+  const weakOrReview = items.filter((item) => item.fitLabel === "weak" || item.fitLabel === "review").length;
+  return [
+    "## Deep Research Source Quality Review",
+    "",
+    items.length
+      ? `${items.length} source candidate(s) reviewed; ${weakOrReview} require extra caution before citation.`
+      : "No source candidates are available yet. Run Deep Research before inserting the source quality review.",
+    "",
+    "### Fit Bands",
+    "",
+    "| Fit band | Sources | Review meaning |",
+    "| --- | ---: | --- |",
+    ...summaryRows.map((row) => `| ${row.label} | ${row.count} | ${tableCell(row.guidance)} |`),
+    "",
+    "### Source Review Queue",
+    "",
+    "| Iteration | Fit | Score | Source | Why it was scored this way | Review action |",
+    "| ---: | --- | ---: | --- | --- | --- |",
+    ...(items.length
+      ? items.map((item) => `| ${item.iteration} | ${tableCell(item.fitLabel)} | ${item.fitScore} | ${markdownLink(tableCell(item.title), item.url)} (${tableCell(item.source)}) | ${tableCell(item.fitReasons.join("; "))} | ${tableCell(item.reviewAction)} |`)
+      : ["| - | none | 0 | No source candidates | Run Deep Research | Re-run source search, then review every candidate before citing. |"]),
+    "",
+  ].join("\n");
+}
+
 function deepResearchEvidenceConflictMarkdownFromConflicts(conflicts: DeepResearchEvidenceConflict[]) {
   if (!conflicts.length) {
     return [
@@ -682,6 +747,13 @@ function deepResearchSourceQualityRows(iterations: DeepResearchIteration[]) {
     { label: "review", count: counts.get("review") || 0, guidance: "Weakly matched or context-limited sources; use cautiously." },
     { label: "weak", count: counts.get("weak") || 0, guidance: "Low-confidence sources; avoid relying on them without corroboration." },
   ];
+}
+
+function sourceQualityReviewAction(label: string) {
+  if (label === "strong") return "Open the saved source, verify the cited claim, then prefer it for high-value evidence.";
+  if (label === "good") return "Use after normal source review and match the claim to the exact passage.";
+  if (label === "review") return "Corroborate with a stronger independent source before relying on this claim.";
+  return "Avoid citing unless a reviewer confirms the source is authoritative and directly relevant.";
 }
 
 export function parseReflection(markdown: string) {

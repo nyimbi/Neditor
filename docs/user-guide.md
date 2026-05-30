@@ -531,6 +531,9 @@ Research and business documents can keep reference metadata near the source.
 - Use **Insert conflict review** in Source Search & Deep Research to add a
   source-disagreement table before accepting contested findings or exporting a
   research report.
+- Use **Insert source quality** to add a source review queue with fit scores,
+  ranking reasons, and recommended citation actions for every Deep Research
+  source candidate before relying on generated claims.
 - Use **Insert audit packet** to add one reviewer handoff containing run
   settings, search queries, source-quality bands, conflict review, generated
   bibliography records, citation index state, saved-source audit, and a final

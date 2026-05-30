@@ -2250,12 +2250,19 @@
               <button type="button" :disabled="!deepResearchDraft" @click="insertDeepResearchDraft">Insert draft</button>
               <button type="button" :disabled="!deepResearchDraft" @click="openDeepResearchDraftAsDocument">Open as document</button>
               <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchLog">Insert research log</button>
+              <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchSourceQualityReview">Insert source quality</button>
               <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchConflictReview">Insert conflict review</button>
               <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchAuditPacket">Insert audit packet</button>
             </div>
             <p class="sidebar-hint">
               {{ deepResearchStatus || "Deep research plans queries, searches, reflects on gaps, writes, and iterates expansion passes until it reaches the requested page count or the provider stops adding useful length." }}
             </p>
+            <section v-if="deepResearchIterations.length" class="snapshot-row" aria-label="Deep research source quality review">
+              <p>{{ deepResearchSourceQualitySummary }}</p>
+              <small v-for="item in deepResearchSourceQualityItems.slice(0, 6)" :key="`${item.iteration}-${item.url}`">
+                {{ item.fitLabel }} | {{ item.fitScore }}/100 | {{ item.title }} | {{ item.reviewAction }}
+              </small>
+            </section>
             <section v-if="deepResearchIterations.length" class="snapshot-row" aria-label="Deep research evidence conflict review">
               <p>{{ deepResearchConflictSummary }}</p>
               <small v-for="conflict in deepResearchEvidenceConflicts.slice(0, 4)" :key="conflict.id">
@@ -7274,6 +7281,8 @@ import {
   deepResearchQualityPrompt,
   deepResearchReflectionPrompt,
   deepResearchReviewPackageMarkdown,
+  deepResearchSourceQualityMarkdown,
+  deepResearchSourceQualityReviewItems,
   detectDeepResearchEvidenceConflicts,
   estimateMarkdownPages,
   expansionPassBudget,
@@ -7288,6 +7297,7 @@ import {
   type DeepResearchIteration,
   type DeepResearchSearchProvider,
   type DeepResearchSource,
+  type DeepResearchSourceQualityReviewItem,
 } from "./lib/deepResearch";
 import {
   citationTodoAuditMarkdown,
@@ -8074,6 +8084,13 @@ const deepResearchLengthSummary = computed(() => {
   return `About ${targetWordCount(settings).toLocaleString()} words; up to ${passCount} expansion pass${passCount === 1 ? "" : "es"}.`;
 });
 const deepResearchEvidenceConflicts = computed(() => detectDeepResearchEvidenceConflicts(deepResearchIterations.value));
+const deepResearchSourceQualityItems = computed<DeepResearchSourceQualityReviewItem[]>(() => deepResearchSourceQualityReviewItems(deepResearchIterations.value));
+const deepResearchSourceQualitySummary = computed(() => {
+  if (!deepResearchSourceQualityItems.value.length) return "Source quality review appears after the first research loop.";
+  const caution = deepResearchSourceQualityItems.value.filter((item) => item.fitLabel === "weak" || item.fitLabel === "review").length;
+  const strong = deepResearchSourceQualityItems.value.filter((item) => item.fitLabel === "strong").length;
+  return `${deepResearchSourceQualityItems.value.length} source candidate${deepResearchSourceQualityItems.value.length === 1 ? "" : "s"} scored; ${strong} strong, ${caution} need extra caution before citation.`;
+});
 const deepResearchConflictSummary = computed(() => {
   const count = deepResearchEvidenceConflicts.value.length;
   if (!deepResearchIterations.value.length) return "Conflict review appears after the first research loop.";
@@ -11778,6 +11795,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "ai-create", label: "AI Create Document", help: "Open Docs Live as a document creation wizard.", run: () => startAiDocumentCreation() },
           { id: "docs-live", label: "Docs Live", help: "Dictate and structure a draft with context and placeholders.", run: () => openDocsLive() },
           { id: "deep-research", label: "Deep Research", help: "Search sources and generate a sourced report from a 1-page brief to a 200-page report.", run: () => openDeepResearch() },
+          { id: "deep-research-source-quality", label: "Insert Research Source Quality", help: "Insert a fit-score review queue for every Deep Research source candidate.", disabled: !deepResearchIterations.value.length, run: () => insertDeepResearchSourceQualityReview() },
           { id: "deep-research-conflicts", label: "Insert Research Conflicts", help: "Insert a conflict-review table for Deep Research sources that appear to disagree.", disabled: !deepResearchIterations.value.length, run: () => insertDeepResearchConflictReview() },
           { id: "deep-research-audit", label: "Insert Research Audit", help: "Insert the full Deep Research audit packet with queries, source quality, conflicts, bibliography, and source library state.", disabled: !deepResearchIterations.value.length, run: () => insertDeepResearchAuditPacket() },
           { id: "agent", label: "AI Agent Workspace", help: "Plan, revise, review, and distribute with governed agent workflows.", run: () => openAgentWorkspace() },
@@ -13445,6 +13463,11 @@ function insertDeepResearchLog() {
   insertBlock(`\n## Deep Research Log\n\n${log}\n`);
 }
 
+function insertDeepResearchSourceQualityReview() {
+  insertBlock(deepResearchSourceQualityMarkdown(deepResearchIterations.value));
+  store.statusMessage = `Inserted Deep Research source quality review for ${deepResearchSourceQualityItems.value.length} source candidate${deepResearchSourceQualityItems.value.length === 1 ? "" : "s"}`;
+}
+
 function insertDeepResearchConflictReview() {
   insertBlock(deepResearchEvidenceConflictMarkdown(deepResearchIterations.value));
   store.statusMessage = `Inserted Deep Research conflict review with ${deepResearchEvidenceConflicts.value.length} possible conflict${deepResearchEvidenceConflicts.value.length === 1 ? "" : "s"}`;
@@ -14957,6 +14980,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     description: "Insert a review table for source snippets that appear to disagree.",
     keywords: ["deep research", "evidence conflict", "source disagreement", "citation review"],
     run: () => insertDeepResearchConflictReview(),
+  },
+  {
+    name: "AI: Insert deep research source quality review",
+    group: "AI",
+    description: "Insert fit scores, source-quality reasons, and citation review actions for every Deep Research source candidate.",
+    keywords: ["deep research", "source quality", "fit score", "citation quality", "evidence strength"],
+    run: () => insertDeepResearchSourceQualityReview(),
   },
   {
     name: "AI: Insert deep research audit packet",
