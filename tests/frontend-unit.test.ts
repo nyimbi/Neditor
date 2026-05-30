@@ -83,6 +83,7 @@ import {
   workspaceOutlineLibraryPath,
   buildBusinessWizardStepAssistance,
   buildRfpWizardStepAssistance,
+  auditVersionedClauses,
   fillBusinessTemplate,
   businessSnippetMarkdown,
   businessTemplateMarkdown,
@@ -93,6 +94,8 @@ import {
   rfpProposalOutlineBullets,
   rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
+  versionedBusinessClauses,
+  versionedClauseMarkdown,
 } from "../src/lib/businessDocuments.js";
 import {
   citationTodoAuditMarkdown,
@@ -3594,6 +3597,14 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(snippet.includes("Jane Doe"));
   ok(snippet.includes("Acme Advisory"));
   ok(snippet.includes("https://acme.example"));
+  const confidentiality = versionedBusinessClauses.find((clause) => clause.id === "standard-confidentiality")!;
+  ok(confidentiality);
+  const clauseMarkdown = versionedClauseMarkdown(confidentiality, profile);
+  ok(clauseMarkdown.includes("clause:standard-confidentiality version=2026.05 status=current"));
+  ok(clauseMarkdown.includes("Globex"));
+  equal(auditVersionedClauses(clauseMarkdown).find((item) => item.id === "standard-confidentiality")?.status, "current");
+  equal(auditVersionedClauses("legacy confidentiality clause").find((item) => item.id === "standard-confidentiality")?.status, "stale");
+  equal(auditVersionedClauses("# Draft").find((item) => item.id === "standard-confidentiality")?.status, "missing");
   const dottedSnippet = fillBusinessTemplate(
     [
       "Prepared by {{profile.owner}}",
@@ -7911,10 +7922,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("equationEditorTemplates"));
   ok(app.includes("Open equation editor"));
   ok(app.includes('aria-label="Reusable document parts"'));
+  ok(app.includes('aria-label="Versioned reusable clauses"'));
   ok(app.includes('aria-label="Business identity setup"'));
   ok(app.includes("businessProfileFields"));
   ok(app.includes("businessDocumentTemplates"));
   ok(app.includes("businessDocumentSnippets"));
+  ok(app.includes("versionedBusinessClauses"));
+  ok(app.includes("versionedClauseAuditSummary"));
+  ok(app.includes("insertVersionedClause"));
   ok(app.includes("startBusinessDocumentWizard"));
   ok(app.includes("openAgentWorkspaceForBusinessTemplate"));
   ok(businessDocs.includes("Claude Code"));

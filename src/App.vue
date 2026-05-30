@@ -1576,6 +1576,33 @@
               </article>
             </div>
           </section>
+          <section class="business-template-hub" aria-label="Versioned reusable clauses">
+            <header>
+              <div>
+                <strong>Versioned clauses</strong>
+                <span>Insert approved language and detect stale clauses before sending client-facing work.</span>
+              </div>
+              <small>{{ versionedClauseAuditSummary }}</small>
+            </header>
+            <div class="snippet-list" role="list" aria-label="Approved reusable clauses">
+              <article v-for="clause in versionedBusinessClauses" :key="clause.id" class="snippet-card" role="listitem">
+                <div>
+                  <strong>{{ clause.label }}</strong>
+                  <small>{{ clause.kind }} | v{{ clause.currentVersion }} | {{ clause.summary }}</small>
+                </div>
+                <button type="button" :title="`Insert ${clause.label} version ${clause.currentVersion}`" @click="insertVersionedClause(clause)">Insert current</button>
+              </article>
+            </div>
+            <div class="snippet-list" role="list" aria-label="Versioned clause audit">
+              <article v-for="item in versionedClauseAuditItems" :key="item.id" class="snippet-card" :data-status="item.status" role="listitem">
+                <div>
+                  <strong>{{ item.label }}</strong>
+                  <small>{{ item.status }} | current v{{ item.currentVersion }} | {{ item.detail }}</small>
+                </div>
+                <button v-if="item.line" type="button" title="Go to the detected clause marker" @click="goToSourceTarget({ line: item.line })">Go</button>
+              </article>
+            </div>
+          </section>
           <h3>Calculation and transform templates</h3>
           <section class="template-filters" aria-label="Transform template filters">
             <label>
@@ -6408,6 +6435,7 @@ import {
   agenticCliIntegrations,
   analyzeRfpSource,
   aiDocumentWizardSteps,
+  auditVersionedClauses,
   blankCustomDocumentOutlineTemplate,
   builtInDocumentOutlineTemplates,
   businessDocumentSnippets,
@@ -6425,6 +6453,8 @@ import {
   rfpProposalOutlineBullets,
   rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
+  versionedBusinessClauses,
+  versionedClauseMarkdown,
   type BusinessDocumentSnippet,
   type BusinessDocumentTemplate,
   type BusinessProfile,
@@ -6433,6 +6463,7 @@ import {
   type RfpAnalysis,
   type RfpWizardStepAssistance,
   type RfpSourceKind,
+  type VersionedBusinessClause,
 } from "./lib/businessDocuments";
 import {
   buildDocsLiveDraft,
@@ -9117,6 +9148,13 @@ const filteredBusinessSnippets = computed(() => {
     return [snippet.label, snippet.kind, snippet.summary, snippet.body].join(" ").toLowerCase().includes(query);
   });
 });
+const versionedClauseAuditItems = computed(() => auditVersionedClauses(active.value.text));
+const versionedClauseAuditSummary = computed(() => {
+  const stale = versionedClauseAuditItems.value.filter((item) => item.status === "stale").length;
+  const missing = versionedClauseAuditItems.value.filter((item) => item.status === "missing").length;
+  const current = versionedClauseAuditItems.value.filter((item) => item.status === "current").length;
+  return `${current} current | ${stale} stale | ${missing} missing`;
+});
 const businessProfileCompletion = computed(() => {
   const completed = businessProfileFields.filter((field) => store.businessProfile[field.key]?.trim()).length;
   return `${completed}/${businessProfileFields.length} fields`;
@@ -10423,12 +10461,20 @@ const appMenus = computed<AppMenu[]>(() => [
       {
         id: "parts",
         label: "Reusable parts",
-        items: businessDocumentSnippets.map((snippet) => ({
-          id: `part-${snippet.id}`,
-          label: snippet.label,
-          help: snippet.summary,
-          run: () => insertBusinessSnippet(snippet),
-        })),
+        items: [
+          ...businessDocumentSnippets.map((snippet) => ({
+            id: `part-${snippet.id}`,
+            label: snippet.label,
+            help: snippet.summary,
+            run: () => insertBusinessSnippet(snippet),
+          })),
+          ...versionedBusinessClauses.map((clause) => ({
+            id: `clause-${clause.id}`,
+            label: `${clause.label} v${clause.currentVersion}`,
+            help: clause.summary,
+            run: () => insertVersionedClause(clause),
+          })),
+        ],
       },
     ],
   },
@@ -13465,6 +13511,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     description: snippet.summary,
     keywords: [snippet.kind, snippet.id],
     run: () => insertBusinessSnippet(snippet),
+  })),
+  ...versionedBusinessClauses.map((clause) => ({
+    name: `Insert current clause: ${clause.label}`,
+    group: "Templates",
+    description: `${clause.summary} Current version ${clause.currentVersion}.`,
+    keywords: [clause.kind, clause.id, "clause", clause.currentVersion],
+    run: () => insertVersionedClause(clause),
   })),
   { name: "Insert code fence", group: "Snippet", run: () => insertBlock(codeFenceSnippet) },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
@@ -18381,6 +18434,12 @@ function businessWizardStepAssistance(template: BusinessDocumentTemplate) {
 function insertBusinessSnippet(snippet: BusinessDocumentSnippet) {
   insertBlock(businessSnippetMarkdown(snippet, store.businessProfile));
   store.statusMessage = `Inserted ${snippet.label} document part`;
+}
+
+function insertVersionedClause(clause: VersionedBusinessClause) {
+  insertBlock(versionedClauseMarkdown(clause, store.businessProfile));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.statusMessage = `Inserted ${clause.label} v${clause.currentVersion}`;
 }
 
 function startBusinessDocumentWizard(template: BusinessDocumentTemplate) {

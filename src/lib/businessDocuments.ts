@@ -95,6 +95,25 @@ export interface BusinessDocumentSnippet {
   body: string;
 }
 
+export interface VersionedBusinessClause {
+  id: string;
+  label: string;
+  kind: BusinessSnippetKind;
+  currentVersion: string;
+  summary: string;
+  body: string;
+  staleMarkers: string[];
+}
+
+export interface VersionedClauseAuditItem {
+  id: string;
+  label: string;
+  currentVersion: string;
+  status: "current" | "stale" | "missing";
+  line: number;
+  detail: string;
+}
+
 export interface AiDocumentWizardStep {
   id: string;
   label: string;
@@ -1007,6 +1026,98 @@ export const businessDocumentSnippets: BusinessDocumentSnippet[] = [
     ].join("\n"),
   },
 ];
+
+export const versionedBusinessClauses: VersionedBusinessClause[] = [
+  {
+    id: "standard-confidentiality",
+    label: "Standard confidentiality",
+    kind: "governance",
+    currentVersion: "2026.05",
+    summary: "Proposal and delivery confidentiality language for client-facing drafts.",
+    staleMarkers: ["clause:standard-confidentiality version=2025", "legacy confidentiality clause"],
+    body: [
+      "<!-- clause:standard-confidentiality version=2026.05 status=current -->",
+      "## Confidentiality",
+      "",
+      "This document is confidential and intended only for {{defaultClientName}} and authorized reviewers. It may not be copied, forwarded, published, or relied on outside the agreed review process without written approval from {{companyName}}.",
+    ].join("\n"),
+  },
+  {
+    id: "proposal-validity",
+    label: "Proposal validity",
+    kind: "proposal",
+    currentVersion: "2026.05",
+    summary: "Commercial validity and assumption language for proposals and tenders.",
+    staleMarkers: ["clause:proposal-validity version=2025", "pricing valid for 90 days unless withdrawn"],
+    body: [
+      "<!-- clause:proposal-validity version=2026.05 status=current -->",
+      "## Proposal Validity",
+      "",
+      "This proposal remains valid until {{valid_until}} and is subject to the assumptions, exclusions, approval gates, and evidence dependencies stated in this document.",
+    ].join("\n"),
+  },
+  {
+    id: "ai-review-disclosure",
+    label: "AI review disclosure",
+    kind: "review",
+    currentVersion: "2026.05",
+    summary: "Human-review language for AI-assisted business documents.",
+    staleMarkers: ["clause:ai-review-disclosure version=2025", "AI generated and may contain errors"],
+    body: [
+      "<!-- clause:ai-review-disclosure version=2026.05 status=current -->",
+      "## AI-Assisted Drafting Disclosure",
+      "",
+      "Portions of this document may have been drafted or revised with AI assistance. {{companyName}} remains responsible for human review, source verification, unresolved placeholders, and final approval before distribution.",
+    ].join("\n"),
+  },
+];
+
+export function versionedClauseMarkdown(clause: VersionedBusinessClause, profile: Partial<BusinessProfile> = {}) {
+  return `${fillBusinessTemplate(clause.body, profile).trimEnd()}\n`;
+}
+
+export function auditVersionedClauses(markdown: string, clauses: VersionedBusinessClause[] = versionedBusinessClauses): VersionedClauseAuditItem[] {
+  const lines = markdown.split(/\r?\n/);
+  return clauses.map((clause) => {
+    const currentPattern = new RegExp(`clause:${escapeRegExp(clause.id)}\\s+version=${escapeRegExp(clause.currentVersion)}\\b`, "i");
+    const currentIndex = lines.findIndex((line) => currentPattern.test(line));
+    if (currentIndex >= 0) {
+      return {
+        id: clause.id,
+        label: clause.label,
+        currentVersion: clause.currentVersion,
+        status: "current",
+        line: currentIndex + 1,
+        detail: `Current ${clause.currentVersion} clause is present.`,
+      };
+    }
+    for (const marker of clause.staleMarkers) {
+      const staleIndex = lines.findIndex((line) => line.toLowerCase().includes(marker.toLowerCase()));
+      if (staleIndex >= 0) {
+        return {
+          id: clause.id,
+          label: clause.label,
+          currentVersion: clause.currentVersion,
+          status: "stale",
+          line: staleIndex + 1,
+          detail: `Stale marker found: ${marker}`,
+        };
+      }
+    }
+    return {
+      id: clause.id,
+      label: clause.label,
+      currentVersion: clause.currentVersion,
+      status: "missing",
+      line: 0,
+      detail: "Current approved clause not found in document.",
+    };
+  });
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 export const aiDocumentWizardSteps: AiDocumentWizardStep[] = [
   {
