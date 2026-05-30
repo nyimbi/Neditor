@@ -1921,7 +1921,7 @@ test("boots the workbench and switches core view modes", async ({ page }) => {
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("review");
   await expect(page.getByRole("region", { name: "Markdown source" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Live preview" })).toBeVisible();
-  await expect(page.locator(".sidebar").getByRole("heading", { name: "Review" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByRole("heading", { level: 2, name: "Review" })).toBeVisible();
 
   await page.getByLabel("View mode").selectOption("presentation");
   await expect(page.getByLabel("Sidebar panel")).toHaveValue("outline");
