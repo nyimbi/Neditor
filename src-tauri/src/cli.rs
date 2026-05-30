@@ -1,4 +1,8 @@
 use crate::{
+    citation_discovery::{
+        download_citation_source, list_citation_sources, search_citation_sources,
+        CitationDownloadRequest, CitationSearchRequest, CitationSourceLibraryRequest,
+    },
     compile_with_options,
     export_commands::{
         export_document, prepare_for_export, ExportReadinessReport, ExportRequest,
@@ -98,6 +102,10 @@ const CLI_COMMANDS: &[&str] = &[
     "xforms",
     "profile",
     "business-profile",
+    "sources",
+    "source-library",
+    "citations",
+    "citation-sources",
     "rfp",
     "rfp-response",
     "analyze-rfp",
@@ -543,6 +551,9 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "snippets" | "parts" => run_snippets_command(&args[2..]),
         "transform-templates" | "xforms" => run_transform_templates_command(&args[2..]),
         "profile" | "business-profile" => run_profile_command(&args[2..]),
+        "sources" | "source-library" | "citations" | "citation-sources" => {
+            run_sources_command(&args[2..])
+        }
         "rfp" | "rfp-response" | "analyze-rfp" => run_rfp_response_command(&args[2..], stdin_text),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
@@ -3244,6 +3255,293 @@ fn run_profile_command(args: &[String]) -> Result<CliOutcome, String> {
             dry_run,
             &profile,
         ),
+        exit_code: 0,
+    })
+}
+
+fn run_sources_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut audit_markdown = false;
+    let mut bibliography_only = false;
+    let mut document_path: Option<String> = None;
+    let mut query: Option<String> = None;
+    let mut provider: Option<String> = None;
+    let mut searxng_url: Option<String> = None;
+    let mut tavily_api_key: Option<String> = None;
+    let mut limit: Option<usize> = None;
+    let mut download_url: Option<String> = None;
+    let mut title: Option<String> = None;
+    let mut snippet: Option<String> = None;
+    let mut source: Option<String> = None;
+    let mut citation_key: Option<String> = None;
+    let mut fit_score: Option<u8> = None;
+    let mut fit_label: Option<String> = None;
+    let mut fit_reasons: Vec<String> = Vec::new();
+    let mut force_refresh = false;
+    let mut output_path: Option<PathBuf> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--audit" | "--markdown" => audit_markdown = true,
+            "--bibliography" | "--bib" => bibliography_only = true,
+            "--document" | "--file" | "--path" => {
+                index += 1;
+                document_path = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--document requires a Markdown document path".to_string())?
+                        .to_string(),
+                );
+            }
+            "--query" | "--search" => {
+                index += 1;
+                query = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--query requires search text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--provider" => {
+                index += 1;
+                provider = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            "--provider requires duckduckgo, searxng, tavily, or local-library"
+                                .to_string()
+                        })?
+                        .to_string(),
+                );
+            }
+            "--searxng-url" => {
+                index += 1;
+                searxng_url = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--searxng-url requires a URL".to_string())?
+                        .to_string(),
+                );
+            }
+            "--tavily-api-key" => {
+                index += 1;
+                tavily_api_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--tavily-api-key requires an API key".to_string())?
+                        .to_string(),
+                );
+            }
+            "--limit" => {
+                index += 1;
+                limit = Some(parse_sources_limit(args.get(index).ok_or_else(|| {
+                    "--limit requires a number from 1 to 20".to_string()
+                })?)?);
+            }
+            "--download-url" | "--url" => {
+                index += 1;
+                download_url = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            "--download-url requires an http:// or https:// URL".to_string()
+                        })?
+                        .to_string(),
+                );
+            }
+            "--title" => {
+                index += 1;
+                title = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--title requires source title text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--snippet" => {
+                index += 1;
+                snippet = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--snippet requires source snippet text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--source" => {
+                index += 1;
+                source = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--source requires provider/source label text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--citation-key" | "--key" => {
+                index += 1;
+                citation_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--citation-key requires a citation key".to_string())?
+                        .to_string(),
+                );
+            }
+            "--fit-score" => {
+                index += 1;
+                fit_score = Some(parse_sources_fit_score(args.get(index).ok_or_else(
+                    || "--fit-score requires a number from 0 to 100".to_string(),
+                )?)?);
+            }
+            "--fit-label" => {
+                index += 1;
+                fit_label = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--fit-label requires review label text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--fit-reason" => {
+                index += 1;
+                fit_reasons.push(
+                    args.get(index)
+                        .ok_or_else(|| "--fit-reason requires review reason text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--force-refresh" | "--force" => force_refresh = true,
+            "--output" | "-o" => {
+                index += 1;
+                output_path =
+                    Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--output requires a Markdown file path".to_string()
+                    })?));
+            }
+            value => return Err(format!("Unsupported sources option '{value}'")),
+        }
+        index += 1;
+    }
+
+    if let Some(url) = download_url {
+        let document_path = document_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+            .ok_or_else(|| "--document is required when downloading citation sources.".to_string())?
+            .to_string();
+        let response = download_citation_source(CitationDownloadRequest {
+            document_path,
+            url,
+            title,
+            snippet,
+            source,
+            citation_key,
+            fit_score,
+            fit_label,
+            fit_reasons: if fit_reasons.is_empty() {
+                None
+            } else {
+                Some(fit_reasons)
+            },
+            force_refresh: Some(force_refresh),
+        })?;
+        let report = serde_json::to_value(&response).map_err(|err| err.to_string())?;
+        let markdown = if bibliography_only {
+            readiness_string_field(&report, "bibliography_stub")
+                .unwrap_or("")
+                .to_string()
+        } else {
+            citation_download_text_report(&report)
+        };
+        if let Some(path) = output_path.as_deref() {
+            write_cli_markdown_output(path, &markdown)?;
+        }
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-citation-source-download.v1",
+                    "outputPath": output_path.as_deref().map(path_to_display),
+                    "download": response,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: if let Some(path) = output_path.as_deref() {
+                format!("Wrote citation source output: {}", path_to_display(path))
+            } else {
+                markdown
+            },
+            exit_code: 0,
+        });
+    }
+
+    if let Some(query) = query {
+        let response = search_citation_sources(CitationSearchRequest {
+            query,
+            provider,
+            searxng_url,
+            tavily_api_key,
+            limit,
+            document_path,
+        })?;
+        let report = serde_json::to_value(&response).map_err(|err| err.to_string())?;
+        let markdown = citation_search_markdown(&report);
+        if let Some(path) = output_path.as_deref() {
+            write_cli_markdown_output(path, &markdown)?;
+        }
+        if json_output {
+            return Ok(CliOutcome {
+                message: serde_json::to_string_pretty(&json!({
+                    "schema": "neditor.ned-citation-source-search.v1",
+                    "outputPath": output_path.as_deref().map(path_to_display),
+                    "search": response,
+                }))
+                .map_err(|err| err.to_string())?,
+                exit_code: 0,
+            });
+        }
+        return Ok(CliOutcome {
+            message: if let Some(path) = output_path.as_deref() {
+                format!(
+                    "Wrote citation source search results: {}",
+                    path_to_display(path)
+                )
+            } else {
+                markdown
+            },
+            exit_code: 0,
+        });
+    }
+
+    let document_path = document_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .ok_or_else(|| {
+            "--document is required when listing the citation source library.".to_string()
+        })?
+        .to_string();
+    let response = list_citation_sources(CitationSourceLibraryRequest { document_path })?;
+    let report = serde_json::to_value(&response).map_err(|err| err.to_string())?;
+    let markdown = if audit_markdown {
+        citation_source_library_audit_markdown(&report)
+    } else {
+        citation_source_library_text_report(&report)
+    };
+    if let Some(path) = output_path.as_deref() {
+        write_cli_markdown_output(path, &markdown)?;
+    }
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-citation-source-library.v1",
+                "outputPath": output_path.as_deref().map(path_to_display),
+                "library": response,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: if let Some(path) = output_path.as_deref() {
+            format!(
+                "Wrote citation source library output: {}",
+                path_to_display(path)
+            )
+        } else {
+            markdown
+        },
         exit_code: 0,
     })
 }
@@ -9287,6 +9585,253 @@ fn business_profile_text_report(
     .join("\n")
 }
 
+fn parse_sources_limit(value: &str) -> Result<usize, String> {
+    value
+        .parse::<usize>()
+        .map(|number| number.clamp(1, 20))
+        .map_err(|_| "--limit must be a number from 1 to 20".to_string())
+}
+
+fn parse_sources_fit_score(value: &str) -> Result<u8, String> {
+    value
+        .parse::<u8>()
+        .map(|number| number.min(100))
+        .map_err(|_| "--fit-score must be a number from 0 to 100".to_string())
+}
+
+fn citation_source_library_text_report(report: &Value) -> String {
+    let associated_dir =
+        readiness_string_field(report, "associated_dir").unwrap_or("not available");
+    let manifest_path = readiness_string_field(report, "manifest_path").unwrap_or("not available");
+    let sources = readiness_array_field(report, "sources");
+    let mut lines = vec![
+        "NEditor citation source library".to_string(),
+        format!("Associated source directory: {associated_dir}"),
+        format!("Manifest: {manifest_path}"),
+        format!("Saved sources: {}", sources.len()),
+    ];
+    if sources.is_empty() {
+        lines.push(
+            "No saved citation sources yet. Use `ned sources --document file.md --query \"topic\"` to search or `--download-url` to save a source.".to_string(),
+        );
+    } else {
+        lines.push("".to_string());
+        for source in sources.iter().take(20) {
+            let key = readiness_string_field(source, "citation_key").unwrap_or("source");
+            let title = readiness_string_field(source, "title").unwrap_or("Untitled source");
+            let relative_path = readiness_string_field(source, "relative_path")
+                .or_else(|| readiness_string_field(source, "path"))
+                .unwrap_or("missing path");
+            let status = citation_source_file_status(source);
+            let fit = source
+                .get("fit_score")
+                .and_then(Value::as_u64)
+                .map(|score| {
+                    format!(
+                        "{score}/100 {}",
+                        readiness_string_field(source, "fit_label").unwrap_or("")
+                    )
+                    .trim()
+                    .to_string()
+                })
+                .unwrap_or_else(|| "not scored".to_string());
+            lines.push(format!("- @{key}: {title}"));
+            lines.push(format!("  Path: {relative_path}"));
+            lines.push(format!("  Status: {status}; fit: {fit}"));
+        }
+        if sources.len() > 20 {
+            lines.push(format!(
+                "... {} more source(s) omitted.",
+                sources.len() - 20
+            ));
+        }
+    }
+    lines.join("\n")
+}
+
+fn citation_source_library_audit_markdown(report: &Value) -> String {
+    let associated_dir =
+        readiness_string_field(report, "associated_dir").unwrap_or("not available");
+    let manifest_path = readiness_string_field(report, "manifest_path").unwrap_or("not available");
+    let sources = readiness_array_field(report, "sources");
+    let mut lines = vec![
+        "## Source Library Audit".to_string(),
+        "".to_string(),
+        format!(
+            "Associated source directory: `{}`",
+            markdown_cell(associated_dir)
+        ),
+        format!("Manifest: `{}`", markdown_cell(manifest_path)),
+        format!("Saved sources: {}", sources.len()),
+        "".to_string(),
+    ];
+    if sources.is_empty() {
+        lines.push(
+            "No saved citation sources are currently associated with this document.".to_string(),
+        );
+        return lines.join("\n");
+    }
+    lines.extend([
+        "| Citation key | Title | Fit | Local file | SHA-256 prefix | Review notes | URL |"
+            .to_string(),
+        "| --- | --- | --- | --- | --- | --- | --- |".to_string(),
+    ]);
+    for source in &sources {
+        let key = readiness_string_field(source, "citation_key").unwrap_or("source");
+        let title = readiness_string_field(source, "title").unwrap_or("Untitled source");
+        let fit = source
+            .get("fit_score")
+            .and_then(Value::as_u64)
+            .map(|score| {
+                format!(
+                    "{score}/100 {}",
+                    readiness_string_field(source, "fit_label").unwrap_or("")
+                )
+                .trim()
+                .to_string()
+            })
+            .unwrap_or_else(|| "not scored".to_string());
+        let local_path = readiness_string_field(source, "relative_path")
+            .or_else(|| readiness_string_field(source, "path"))
+            .unwrap_or("");
+        let local_status = citation_source_file_status(source);
+        let hash = readiness_string_field(source, "sha256")
+            .map(|value| value.chars().take(16).collect::<String>())
+            .unwrap_or_default();
+        let review_notes = citation_source_review_notes(source);
+        let url = readiness_string_field(source, "url").unwrap_or("");
+        lines.push(format!(
+            "| @{} | {} | {} | {} | {} | {} | {} |",
+            markdown_cell(key),
+            markdown_cell(title),
+            markdown_cell(&fit),
+            markdown_cell(&format!("{local_status}: {local_path}")),
+            markdown_cell(&hash),
+            markdown_cell(&review_notes),
+            markdown_cell(url),
+        ));
+    }
+    lines.join("\n")
+}
+
+fn citation_search_markdown(report: &Value) -> String {
+    let query = readiness_string_field(report, "query").unwrap_or("");
+    let provider = readiness_string_field(report, "provider").unwrap_or("unknown");
+    let associated_dir = readiness_string_field(report, "associated_dir").unwrap_or("");
+    let results = readiness_array_field(report, "results");
+    let mut lines = vec![
+        "# Citation Source Search".to_string(),
+        "".to_string(),
+        format!("Query: {query}"),
+        format!("Provider: {provider}"),
+    ];
+    if !associated_dir.is_empty() {
+        lines.push(format!("Associated source directory: `{associated_dir}`"));
+    }
+    lines.extend([
+        "".to_string(),
+        "| # | Title | Source | Snippet | URL |".to_string(),
+        "| ---: | --- | --- | --- | --- |".to_string(),
+    ]);
+    if results.is_empty() {
+        lines.push(
+            "| - | No citation source candidates found | - | Try another provider or query | - |"
+                .to_string(),
+        );
+    } else {
+        for (index, item) in results.iter().enumerate() {
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} |",
+                index + 1,
+                markdown_cell(readiness_string_field(item, "title").unwrap_or("Untitled source")),
+                markdown_cell(readiness_string_field(item, "source").unwrap_or("unknown")),
+                markdown_cell(readiness_string_field(item, "snippet").unwrap_or("")),
+                markdown_cell(readiness_string_field(item, "url").unwrap_or("")),
+            ));
+        }
+    }
+    lines.join("\n")
+}
+
+fn citation_download_text_report(report: &Value) -> String {
+    let key = readiness_string_field(report, "citation_key").unwrap_or("source");
+    let relative_path = readiness_string_field(report, "relative_path").unwrap_or("unknown path");
+    let source_dir = readiness_string_field(report, "source_dir").unwrap_or("unknown source dir");
+    let manifest_path =
+        readiness_string_field(report, "manifest_path").unwrap_or("unknown manifest");
+    let bytes = report.get("bytes").and_then(Value::as_u64).unwrap_or(0);
+    let reused = report
+        .get("reused")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let sha = readiness_string_field(report, "sha256").unwrap_or("");
+    let mut lines = vec![
+        "NEditor citation source saved".to_string(),
+        format!("Citation key: @{key}"),
+        format!("Local source: {relative_path}"),
+        format!("Source directory: {source_dir}"),
+        format!("Manifest: {manifest_path}"),
+        format!("Bytes: {bytes}"),
+        format!("SHA-256: {sha}"),
+        format!(
+            "Reused existing source: {}",
+            if reused { "yes" } else { "no" }
+        ),
+    ];
+    if let Some(stub) = readiness_string_field(report, "bibliography_stub") {
+        lines.extend([
+            "".to_string(),
+            "Bibliography stub:".to_string(),
+            "".to_string(),
+            stub.trim().to_string(),
+        ]);
+    }
+    lines.join("\n")
+}
+
+fn citation_source_file_status(source: &Value) -> String {
+    match (
+        source.get("file_exists").and_then(Value::as_bool),
+        source.get("hash_matches").and_then(Value::as_bool),
+    ) {
+        (Some(false), _) => "missing".to_string(),
+        (Some(true), Some(false)) => "modified".to_string(),
+        (Some(true), Some(true)) => "verified".to_string(),
+        (Some(true), None) => "present".to_string(),
+        _ => "not checked".to_string(),
+    }
+}
+
+fn citation_source_review_notes(source: &Value) -> String {
+    let mut notes = Vec::new();
+    if let Some(value) = readiness_string_field(source, "source") {
+        notes.push(format!("provider: {value}"));
+    }
+    if let Some(value) = readiness_string_field(source, "media_type") {
+        notes.push(format!("type: {value}"));
+    }
+    if let Some(value) = readiness_string_field(source, "downloaded_at") {
+        notes.push(format!("downloaded: {value}"));
+    }
+    if let Some(value) = readiness_string_field(source, "current_sha256") {
+        notes.push(format!(
+            "current sha256: {}",
+            value.chars().take(16).collect::<String>()
+        ));
+    }
+    if let Some(value) = source.get("current_bytes").and_then(Value::as_u64) {
+        notes.push(format!("current bytes: {value}"));
+    }
+    for reason in string_array_field(source, "fit_reasons") {
+        push_unique_string(&mut notes, reason);
+    }
+    if notes.is_empty() {
+        "No review notes".to_string()
+    } else {
+        notes.join("; ")
+    }
+}
+
 fn append_cli_block(existing: &str, value: &str) -> String {
     if existing.trim().is_empty() {
         value.trim().to_string()
@@ -12664,6 +13209,9 @@ _ned() {{
       profile|business-profile)
         COMPREPLY=( $(compgen -W "--workspace --set --get --fields --init --force --dry-run --json --markdown --placeholders --placeholder-text" -- "$cur") )
         ;;
+      sources|source-library|citations|citation-sources)
+        COMPREPLY=( $(compgen -W "--json --audit --markdown --bibliography --bib --document --file --path --query --search --provider --searxng-url --tavily-api-key --limit --download-url --url --title --snippet --source --citation-key --key --fit-score --fit-label --fit-reason --force-refresh --force --output" -- "$cur") )
+        ;;
       rfp|rfp-response|analyze-rfp)
         COMPREPLY=( $(compgen -W "--source-type --kind --url --output --matrix-output --checklist-output --workspace --context --notes --json --markdown --matrix --checklist" -- "$cur") )
         ;;
@@ -12776,6 +13324,9 @@ _ned() {{
       ;;
     profile|business-profile)
       _arguments '--workspace[workspace containing .neditor]:directory:_files -/' '--set[set profile field key=value]:assignment:' '--get[print one profile field]:field:' '--fields[list supported profile fields and aliases]' '--init[create profile file]' '--force[replace existing profile when initializing]' '--dry-run[preview write]' '--json[print machine-readable JSON]' '--markdown[print reusable identity block]' '--placeholders[print Docs Live placeholder values]' '--placeholder-text[alias for --placeholders]'
+      ;;
+    sources|source-library|citations|citation-sources)
+      _arguments '--json[print machine-readable JSON]' '--audit[print source-library audit Markdown]' '--markdown[alias for --audit]' '--bibliography[print only downloaded bibliography stub]' '--bib[alias for --bibliography]' '--document[Markdown document whose associated source vault should be used]:file:_files -g "*.md"' '--file[alias for --document]:file:_files -g "*.md"' '--path[alias for --document]:file:_files -g "*.md"' '--query[search citation sources]:query:' '--search[alias for --query]:query:' '--provider[search provider]:provider:(duckduckgo searxng tavily local-library)' '--searxng-url[SearXNG base URL]:url:' '--tavily-api-key[Tavily API key for this run]:key:' '--limit[result limit]:number:' '--download-url[download and save this source URL]:url:' '--url[alias for --download-url]:url:' '--title[source title]:title:' '--snippet[source snippet]:snippet:' '--source[source/provider label]:source:' '--citation-key[citation key]:key:' '--key[alias for --citation-key]:key:' '--fit-score[source fit score 0-100]:number:' '--fit-label[source fit label]:label:' '--fit-reason[source fit reason]:reason:' '--force-refresh[redownload an existing URL]' '--force[alias for --force-refresh]' '--output[write Markdown output]:file:_files'
       ;;
     rfp|rfp-response|analyze-rfp)
       _arguments '*:RFP source:_files' '--source-type[source type]:kind:(markdown pdf docx url)' '--kind[source type alias]:kind:(markdown pdf docx url)' '--url[fetch public RFP URL]:url:' '--output[write response Markdown]:file:_files' '--matrix-output[write compliance matrix Markdown]:file:_files' '--checklist-output[write compliance checklist Markdown]:file:_files' '--workspace[workspace containing .neditor]:directory:_files -/' '--context[response guidance]:notes:' '--notes[response guidance alias]:notes:' '--json[print machine-readable JSON]' '--markdown[print response Markdown]' '--matrix[print compliance matrix Markdown]' '--checklist[print compliance checklist Markdown]'
@@ -12992,6 +13543,33 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l markdown".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l placeholders".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from profile business-profile' -l placeholder-text".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l json".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l audit".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l markdown".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l bibliography".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l bib".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l document -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l file -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l path -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l query -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l search -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l provider -a 'duckduckgo searxng tavily local-library'".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l searxng-url -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l tavily-api-key -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l limit -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l download-url -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l url -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l title -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l snippet -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l source -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l citation-key -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l key -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l fit-score -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l fit-label -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l fit-reason -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l force-refresh".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l force".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l output -s o -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l source-type -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l kind -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l url -r".to_string(),
@@ -13538,6 +14116,9 @@ fn help_text() -> String {
         "  ned snippets [--json] [--kind procurement] [--query risk] [--ids-only] [--markdown id] [--workspace . --fill-profile]".to_string(),
         "  ned transform-templates [--json] [--category Business] [--transform calc] [--query ROI] [--ids-only] [--markdown id]".to_string(),
         "  ned profile [--workspace path] [--init] [--set fullName=...] [--get field|--fields] [--json|--markdown|--placeholders]".to_string(),
+        "  ned sources --document report.md [--audit|--json]".to_string(),
+        "  ned sources --document report.md --query \"market evidence\" [--provider duckduckgo|searxng|tavily|local-library] [--output sources.md]".to_string(),
+        "  ned sources --document report.md --download-url https://example.com/source.pdf --title \"Source title\" [--citation-key key] [--bibliography]".to_string(),
         "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--json|--markdown|--matrix|--checklist]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),

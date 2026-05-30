@@ -537,6 +537,14 @@ Research and business documents can keep reference metadata near the source.
   current document. It ranks saved sources by title, snippet, path, provider
   metadata, and readable local file content without sending a search request to
   the web.
+- From the terminal, use
+  `ned sources --document report.md --query "market evidence"` to search
+  DuckDuckGo, SearXNG, Tavily, or the local source library; use
+  `ned sources --document report.md --download-url https://example.com/source.pdf`
+  to save a source into the document-associated source vault; and use
+  `ned sources --document report.md --audit --output source-audit.md` to
+  create a reviewer-ready audit of saved files, hashes, citation keys, source
+  quality notes, and missing or modified local evidence.
 - In **Review**, refresh **Evidence and approval review** to extract candidate
   claims, then use **Insert claim-source matrix** to map those claims to saved
   source-library citations. The matrix shows match scores, reasons, local file

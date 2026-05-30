@@ -6180,6 +6180,27 @@ automation, with shell-completion and help-text coverage.
 | `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting the CLI packet. |
 | `git diff --check` | Pass | No whitespace errors are present in the CLI evidence-packet slice. |
 
+## 2026-05-30 CLI Citation Source Vault
+
+`ned sources` now exposes document-associated citation source libraries from
+the terminal. Users can list saved sources, generate source audit Markdown,
+search DuckDuckGo/SearXNG/Tavily/local-library providers, and download a source
+URL into the same `<document>.neditor-sources` vault used by the GUI. The
+command reports citation keys, saved paths, hashes, file-integrity status,
+source-quality notes, and bibliography stubs for headless research and reviewer
+handoffs.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_manages_citation_source_library_from_terminal --lib` | Pass | Focused CLI fixture proves `ned sources --document`, `--audit --output`, local-library search JSON, file-integrity reporting, and missing-document errors. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_generates_shell_completions_without_external_dependencies --lib` | Pass | Shell completions expose `sources`, `citation-sources`, provider selection, download URL, document path, audit, bibliography, and output flags. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_help_names_supported_conversion_targets --lib` | Pass | CLI help now shows list, search, and download examples for citation source vault operations. |
+| `pnpm run check:cli` | Pass | 28 CLI tests passed and the debug `ned` binary built after adding source-vault commands. |
+| `src-tauri/target/debug/ned sources --document examples/research-report.md --audit --output /private/tmp/neditor-source-audit-smoke.md` | Pass | Direct smoke wrote source audit Markdown with the document-associated source directory and manifest path. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed after the source-vault CLI updates. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting `ned sources`. |
+| `git diff --check` | Pass | No whitespace errors are present in the CLI citation source-vault slice. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
