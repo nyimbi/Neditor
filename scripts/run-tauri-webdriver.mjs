@@ -163,6 +163,11 @@ try {
   report.status = "passed";
   writeReport();
   console.log("Tauri WebDriver smoke passed against the built NEditor desktop binary.");
+} catch (error) {
+  report.status = "failed";
+  report.error = error instanceof Error ? error.message : String(error);
+  writeReport();
+  throw error;
 } finally {
   tauriDriver?.kill();
 }
@@ -289,33 +294,24 @@ async function assertModeSwitchAndCommandPalette(session) {
 
 async function assertTransformTemplateWorkflow(session) {
   await showSidebar(session, "templates", ["Category", "Transform", "Search"]);
+  await setTransformTemplateFilters(session, { category: "Science", transform: "calc", search: "dose" });
   const inserted = await waitForValue(
     session,
     `
-      const controlByLabel = ${controlByLabelScript};
       const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
-      const setSelect = (labelText, value) => {
-        const select = controlByLabel(labelText, 'select');
-        select.value = value;
-        select.dispatchEvent(new Event('input', { bubbles: true }));
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      };
-      const setSearch = (value) => {
-        const search = controlByLabel('Search', 'input');
-        search.value = value;
-        search.dispatchEvent(new Event('input', { bubbles: true }));
-        search.dispatchEvent(new Event('change', { bubbles: true }));
-      };
       const templateCard = (text) => [...document.querySelectorAll('article.template-card')].find((card) => normalized(card.textContent).includes(text));
       const clickButton = (card, label) => {
         const button = [...card.querySelectorAll('button')].find((item) => normalized(item.textContent) === label);
         if (!button) throw new Error('Missing ' + label + ' button for ' + normalized(card.textContent));
         button.click();
       };
+      const openPreview = (card) => {
+        const summary = [...card.querySelectorAll('summary')].find((item) => normalized(item.textContent) === 'Preview');
+        if (!summary) return { ok: false, reason: 'missing-preview-summary', card: normalized(card.textContent) };
+        if (!summary.parentElement?.open) summary.click();
+        return { ok: true };
+      };
 
-      setSelect('Category', 'Science');
-      setSelect('Transform', 'calc');
-      setSearch('dose');
       const dose = templateCard('Dose by weight');
       if (!dose) {
         return {
@@ -325,13 +321,36 @@ async function assertTransformTemplateWorkflow(session) {
         };
       }
       const fill = normalized(dose.querySelector('[aria-label="Template fill values"]')?.textContent || '');
-      clickButton(dose, 'Preview');
+      const previewStep = openPreview(dose);
+      if (!previewStep.ok) return { inserted: false, ...previewStep };
       const preview = normalized(dose.querySelector('pre')?.textContent || '');
       clickButton(dose, 'Insert');
+      return {
+        inserted: true,
+        doseFillFields: fill,
+        dosePreview: preview,
+        status: document.querySelector('.status-bar')?.textContent || '',
+      };
+    `,
+    (value) =>
+      value?.inserted === true &&
+      String(value?.doseFillFields || "").includes("weight_kg") &&
+      String(value?.doseFillFields || "").includes("tablet_strength_mg") &&
+      String(value?.dosePreview || "").includes("total_dose_mg"),
+    "packaged calc template insertion",
+  );
 
-      setSelect('Category', 'Charts');
-      setSelect('Transform', 'chart');
-      setSearch('kpi');
+  await setTransformTemplateFilters(session, { category: "Charts", transform: "chart", search: "kpi" });
+  const chartInserted = await waitForValue(
+    session,
+    `
+      const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const templateCard = (text) => [...document.querySelectorAll('article.template-card')].find((card) => normalized(card.textContent).includes(text));
+      const clickButton = (card, label) => {
+        const button = [...card.querySelectorAll('button')].find((item) => normalized(item.textContent) === label);
+        if (!button) throw new Error('Missing ' + label + ' button for ' + normalized(card.textContent));
+        button.click();
+      };
       const chart = templateCard('KPI bar chart');
       if (!chart) {
         return {
@@ -343,20 +362,15 @@ async function assertTransformTemplateWorkflow(session) {
       clickButton(chart, 'Insert');
       return {
         inserted: true,
-        doseFillFields: fill,
-        dosePreview: preview,
         chartMeta: normalized(chart.textContent || ''),
         status: document.querySelector('.status-bar')?.textContent || '',
       };
     `,
     (value) =>
       value?.inserted === true &&
-      String(value?.doseFillFields || "").includes("weight_kg") &&
-      String(value?.doseFillFields || "").includes("tablet_strength_mg") &&
-      String(value?.dosePreview || "").includes("total_dose_mg") &&
       String(value?.chartMeta || "").includes("Charts") &&
       String(value?.chartMeta || "").includes("chart"),
-    "packaged transform template insertion",
+    "packaged chart template insertion",
   );
   const rendered = await waitForValue(
     session,
@@ -379,13 +393,53 @@ async function assertTransformTemplateWorkflow(session) {
   report.transformTemplateArtifacts = {
     doseFillFields: inserted.doseFillFields,
     dosePreviewHasTotalDose: String(inserted.dosePreview || "").includes("total_dose_mg"),
-    chartMeta: inserted.chartMeta,
+    chartMeta: chartInserted.chartMeta,
     sourceHasCalcTemplate: String(rendered.editor || "").includes("weight_kg = 72"),
     sourceHasChartTemplate: String(rendered.editor || "").includes("title: Quarterly KPI plan"),
     previewHasDoseResult: String(rendered.preview || "").includes("Total dose"),
     status: rendered.status,
   };
   recordAssertion("desktop WebDriver inserts calc and chart templates from packaged templates panel");
+}
+
+async function setTransformTemplateFilters(session, { category, transform, search }) {
+  await waitForValue(
+    session,
+    `
+      const normalized = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+      const controlByLabel = (labelText, selector) => {
+        const label = [...document.querySelectorAll('label')].find((item) => normalized(item.textContent || '').includes(labelText));
+        return label?.querySelector(selector) || null;
+      };
+      const category = controlByLabel('Category', 'select');
+      const transform = controlByLabel('Transform', 'select');
+      const search = controlByLabel('Search', 'input');
+      if (!category || !transform || !search) {
+        return {
+          ready: false,
+          reason: 'missing-template-filter-control',
+          labels: [...document.querySelectorAll('label')].map((label) => normalized(label.textContent || '')).slice(0, 20),
+        };
+      }
+      category.value = ${JSON.stringify(category)};
+      category.dispatchEvent(new Event('input', { bubbles: true }));
+      category.dispatchEvent(new Event('change', { bubbles: true }));
+      transform.value = ${JSON.stringify(transform)};
+      transform.dispatchEvent(new Event('input', { bubbles: true }));
+      transform.dispatchEvent(new Event('change', { bubbles: true }));
+      search.value = ${JSON.stringify(search)};
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      search.dispatchEvent(new Event('change', { bubbles: true }));
+      return {
+        ready: true,
+        category: category.value,
+        transform: transform.value,
+        search: search.value,
+      };
+    `,
+    (value) => value?.ready === true && value.category === category && value.transform === transform && value.search === search,
+    `transform template filters ${category}/${transform}/${search}`,
+  );
 }
 
 async function assertOutlineModeWorkflow(session) {
