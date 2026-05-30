@@ -253,8 +253,11 @@ or public URL sources. The command imports the source, extracts stated
 requirements, stated and implied buyer intent, capabilities, timelines, budget
 hints, evaluation criteria, mandatory attachments, risks, and verification
 questions, then writes a full response draft and/or compliance matrix with JSON
-automation output that reports whether the saved business profile was applied
-and which workspace profile path supplied it. Generated RFP responses put a
+automation output that includes structured `complianceChecklist` rows for
+pass/fail gates, scored criteria, attachments, annexes, bilingual obligations,
+placeholder traps, owners, verification methods, and references. The JSON also
+reports whether the saved business profile was applied and which workspace
+profile path supplied it. Generated RFP responses put a
 compliance checklist directly after the cover/front matter and before `[TOC]`,
 then add an evaluator-driven proposal planning prompt, proposal outline, and
 section drafts for methodology, team, sustainability, risk, QA, validation, and

@@ -426,6 +426,19 @@ struct RfpCliComplianceRow {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct RfpCliComplianceChecklistItem {
+    id: String,
+    section: String,
+    risk: String,
+    requirement: String,
+    verification: String,
+    owner: String,
+    reference: String,
+    source_line: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RfpCliVerificationSummary {
     total_requirements: usize,
     compliance_rows: usize,
@@ -458,6 +471,7 @@ struct RfpCliAnalysis {
     source: RfpCliSource,
     requirements: Vec<RfpCliRequirement>,
     compliance_rows: Vec<RfpCliComplianceRow>,
+    compliance_checklist: Vec<RfpCliComplianceChecklistItem>,
     verification_summary: RfpCliVerificationSummary,
     capabilities: Vec<String>,
     stated_intent: Vec<String>,
@@ -8997,6 +9011,14 @@ fn analyze_rfp_text(
         .iter()
         .map(|requirement| build_rfp_compliance_row(requirement, profile))
         .collect::<Vec<_>>();
+    let compliance_checklist = build_rfp_cli_compliance_checklist(
+        &compliance_rows,
+        &mandatory_attachments,
+        &scoring_weights,
+        &annex_references,
+        &bilingual_requirements,
+        &placeholder_risks,
+    );
     let rows_needing_evidence = compliance_rows
         .iter()
         .filter(|row| row.evidence_needed.contains("Attach"))
@@ -9055,6 +9077,7 @@ fn analyze_rfp_text(
         },
         requirements,
         compliance_rows,
+        compliance_checklist,
         verification_summary,
         capabilities,
         stated_intent,
@@ -9839,6 +9862,180 @@ fn build_rfp_compliance_row(
     }
 }
 
+fn build_rfp_cli_compliance_checklist(
+    compliance_rows: &[RfpCliComplianceRow],
+    mandatory_attachments: &[String],
+    scoring_weights: &[RfpCliScoringWeight],
+    annex_references: &[RfpCliAnnexReference],
+    bilingual_requirements: &[String],
+    placeholder_risks: &[String],
+) -> Vec<RfpCliComplianceChecklistItem> {
+    let mut rows = Vec::<RfpCliComplianceChecklistItem>::new();
+    let mut seen = Vec::<String>::new();
+
+    for row in compliance_rows {
+        let section = if row.disqualification_risk {
+            "Critical disqualification traps"
+        } else {
+            row.response_section.as_str()
+        };
+        let risk = if row.disqualification_risk {
+            "critical"
+        } else if row.compliance_status.contains("Needs") || row.requirement_type != "REQUIREMENT" {
+            "high"
+        } else {
+            "standard"
+        };
+        push_rfp_cli_checklist_item(
+            &mut rows,
+            &mut seen,
+            section,
+            risk,
+            row.requirement.clone(),
+            row.verification.clone(),
+            row.owner.clone(),
+            format!("Source line {}", row.source_line),
+            row.source_line,
+        );
+    }
+
+    for attachment in mandatory_attachments {
+        push_rfp_cli_checklist_item(
+            &mut rows,
+            &mut seen,
+            "Document checklist - attachments required",
+            if contains_any(
+                &attachment.to_ascii_lowercase(),
+                &[
+                    "will be rejected",
+                    "automatic",
+                    "disqualif",
+                    "failure to",
+                    "must",
+                    "shall",
+                    "required",
+                    "mandatory",
+                ],
+            ) {
+                "critical"
+            } else {
+                "high"
+            },
+            format!("Include and verify mandatory attachment: {attachment}"),
+            "Confirm the named attachment is complete, signed where required, current, and included in the final submission package.".to_string(),
+            "Bid Coordinator".to_string(),
+            "Attachment / annex scan".to_string(),
+            0,
+        );
+    }
+
+    for item in scoring_weights {
+        push_rfp_cli_checklist_item(
+            &mut rows,
+            &mut seen,
+            "Scored criteria and win themes",
+            "high",
+            format!(
+                "Address scored criterion \"{}\" worth {}.",
+                item.criterion,
+                rfp_cli_scoring_weight_display(item)
+            ),
+            "Mirror this criterion in the executive response, section heading, proof point, and reviewer scoring check.".to_string(),
+            "Bid Manager".to_string(),
+            format!("Source line {}", item.source_line),
+            item.source_line,
+        );
+    }
+
+    for annex in annex_references {
+        push_rfp_cli_checklist_item(
+            &mut rows,
+            &mut seen,
+            "Annex references",
+            "high",
+            annex.requirement.clone(),
+            format!(
+                "Locate {}, confirm required format/signature, and include it in the response bundle.",
+                annex.annex
+            ),
+            "Bid Coordinator".to_string(),
+            format!("Source line {}", annex.source_line),
+            annex.source_line,
+        );
+    }
+
+    for requirement in bilingual_requirements {
+        push_rfp_cli_checklist_item(
+            &mut rows,
+            &mut seen,
+            "Bilingual / language obligations",
+            "high",
+            requirement.clone(),
+            "Confirm staffing, training materials, workshops, and deliverables cover the language obligation.".to_string(),
+            "Delivery Lead".to_string(),
+            "Language requirement scan".to_string(),
+            0,
+        );
+    }
+
+    for placeholder in placeholder_risks {
+        push_rfp_cli_checklist_item(
+            &mut rows,
+            &mut seen,
+            "Placeholder and response-readiness traps",
+            "high",
+            format!("Resolve non-final placeholder language before submission: {placeholder}"),
+            "Search the response for TBD, placeholder, pending, and similar markers; replace or explicitly escalate before final packaging.".to_string(),
+            "Bid Owner".to_string(),
+            "Placeholder scan".to_string(),
+            0,
+        );
+    }
+
+    rows
+}
+
+fn push_rfp_cli_checklist_item(
+    rows: &mut Vec<RfpCliComplianceChecklistItem>,
+    seen: &mut Vec<String>,
+    section: &str,
+    risk: &str,
+    requirement: String,
+    verification: String,
+    owner: String,
+    reference: String,
+    source_line: usize,
+) {
+    let key = format!("{section}|{requirement}|{reference}")
+        .to_ascii_lowercase()
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '|' {
+                ch
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if key.is_empty() || seen.iter().any(|value| value == &key) {
+        return;
+    }
+    seen.push(key);
+    rows.push(RfpCliComplianceChecklistItem {
+        id: format!("RFP-CHECK-{:03}", rows.len() + 1),
+        section: section.to_string(),
+        risk: risk.to_string(),
+        requirement,
+        verification,
+        owner,
+        reference,
+        source_line,
+    });
+}
+
 fn rfp_verification_checklist(
     requirements: usize,
     rows_needing_evidence: usize,
@@ -10297,17 +10494,17 @@ fn rfp_cli_compliance_checklist_markdown(analysis: &RfpCliAnalysis) -> String {
         "".to_string(),
     ];
     let critical_rows = analysis
-        .compliance_rows
+        .compliance_checklist
         .iter()
-        .filter(|row| row.disqualification_risk)
+        .filter(|row| row.risk == "critical")
         .collect::<Vec<_>>();
     if critical_rows.is_empty() {
         lines.push("- [ ] No explicit automatic-exclusion wording detected; reviewer must still inspect the source RFP.".to_string());
     } else {
         for row in critical_rows {
             lines.push(format!(
-                "- [ ] **{}:** {} (source line {}) - {}",
-                row.id, row.requirement, row.source_line, row.verification
+                "- [ ] **{}:** {} ({}) - {}",
+                row.id, row.requirement, row.reference, row.verification
             ));
         }
     }
@@ -10319,57 +10516,21 @@ fn rfp_cli_compliance_checklist_markdown(analysis: &RfpCliAnalysis) -> String {
             .to_string(),
         "| --- | --- | --- | --- | --- | --- | --- |".to_string(),
     ]);
-    if analysis.compliance_rows.is_empty() {
+    if analysis.compliance_checklist.is_empty() {
         lines.push("| RFP-CHECK-001 | Intake | high | Import or paste the full RFP source. | Re-run RFP analysis and confirm all sections, annexes, and tables were captured. | Bid Owner | RFP source |".to_string());
     } else {
-        for row in &analysis.compliance_rows {
+        for row in &analysis.compliance_checklist {
             lines.push(format!(
-                "| {} | {} | {} | {} | {} | {} | Source line {} |",
-                table_cell(&row.id.replace("RFP-REQ", "RFP-CHECK")),
-                table_cell(&row.response_section),
-                if row.disqualification_risk {
-                    "critical"
-                } else if row.compliance_status.contains("Needs") {
-                    "high"
-                } else {
-                    "standard"
-                },
+                "| {} | {} | {} | {} | {} | {} | {} |",
+                table_cell(&row.id),
+                table_cell(&row.section),
+                table_cell(&row.risk),
                 table_cell(&row.requirement),
                 table_cell(&row.verification),
                 table_cell(&row.owner),
-                row.source_line,
+                table_cell(&row.reference),
             ));
         }
-    }
-    for (index, attachment) in analysis.mandatory_attachments.iter().enumerate() {
-        lines.push(format!(
-            "| RFP-CHECK-A{:02} | Document checklist - attachments required | high | Include and verify mandatory attachment: {} | Confirm complete, signed where required, current, and included in the final package. | Bid Coordinator | Attachment scan |",
-            index + 1,
-            table_cell(attachment),
-        ));
-    }
-    for (index, annex) in analysis.annex_references.iter().enumerate() {
-        lines.push(format!(
-            "| RFP-CHECK-X{:02} | Annex references | high | {} | Locate {}, confirm required format/signature, and include it in the response bundle. | Bid Coordinator | Source line {} |",
-            index + 1,
-            table_cell(&annex.requirement),
-            table_cell(&annex.annex),
-            annex.source_line,
-        ));
-    }
-    for (index, requirement) in analysis.bilingual_requirements.iter().enumerate() {
-        lines.push(format!(
-            "| RFP-CHECK-L{:02} | Bilingual / language obligations | high | {} | Confirm staffing, training materials, workshops, and deliverables cover the language obligation. | Delivery Lead | Language scan |",
-            index + 1,
-            table_cell(requirement),
-        ));
-    }
-    for (index, placeholder) in analysis.placeholder_risks.iter().enumerate() {
-        lines.push(format!(
-            "| RFP-CHECK-P{:02} | Placeholder and response-readiness traps | high | Resolve non-final placeholder language before submission: {} | Search the response for TBD, placeholder, pending, and similar markers; replace or explicitly escalate before final packaging. | Bid Owner | Placeholder scan |",
-            index + 1,
-            table_cell(placeholder),
-        ));
     }
     lines.join("\n")
 }

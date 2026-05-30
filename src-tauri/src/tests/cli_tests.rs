@@ -471,6 +471,41 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
             && item["requirement"]
                 .as_str()
                 .is_some_and(|value| value.contains("bid bond certificate"))));
+    assert!(report["analysis"]["complianceChecklist"]
+        .as_array()
+        .expect("compliance checklist")
+        .iter()
+        .any(|item| item["section"] == "Critical disqualification traps"
+            && item["risk"] == "critical"
+            && item["requirement"]
+                .as_str()
+                .is_some_and(|value| value.contains("bid bond certificate"))));
+    assert!(report["analysis"]["complianceChecklist"]
+        .as_array()
+        .expect("compliance checklist")
+        .iter()
+        .any(|item| item["section"] == "Scored criteria and win themes"
+            && item["requirement"]
+                .as_str()
+                .is_some_and(|value| value.contains("technical merit"))));
+    assert!(report["analysis"]["complianceChecklist"]
+        .as_array()
+        .expect("compliance checklist")
+        .iter()
+        .any(
+            |item| item["section"] == "Document checklist - attachments required"
+                && item["requirement"]
+                    .as_str()
+                    .is_some_and(|value| value.contains("insurance certificate"))
+        ));
+    assert!(report["analysis"]["complianceChecklist"]
+        .as_array()
+        .expect("compliance checklist")
+        .iter()
+        .any(|item| item["section"] == "Annex references"
+            && item["reference"]
+                .as_str()
+                .is_some_and(|value| value.contains("Source line"))));
     assert!(report["analysis"]["scoringWeights"]
         .as_array()
         .expect("scoring weights")
@@ -534,6 +569,8 @@ fn ned_cli_analyzes_rfp_sources_and_writes_response() {
     );
     let response_text = fs::read_to_string(&response).expect("response markdown");
     assert!(response_text.contains("## Compliance Checklist"));
+    assert!(response_text.contains("Scored criteria and win themes"));
+    assert!(response_text.contains("Document checklist - attachments required"));
     assert!(response_text.contains("[TOC]"));
     assert!(
         response_text
