@@ -229,6 +229,7 @@ import {
   serializeAiAssistedMarker,
   stripMarkdownFencedBlocks,
 } from "../src/lib/provenanceReview.js";
+import { buildPrintPreviewReport } from "../src/lib/printPreview.js";
 import { forgetRecentItem, rememberRecentItem } from "../src/lib/recentItems.js";
 import {
   appendChangeNoteMarker,
@@ -7843,6 +7844,33 @@ test("document layout presets expose first-class multi-column snippets", () => {
   ok(reset.snippet.includes("orientation=portrait"));
 });
 
+test("print preview report estimates page flow and layout risks", () => {
+  const markdown = [
+    "---",
+    "layout:",
+    "  pageSize: Letter",
+    "---",
+    "# Board Pack",
+    "{{section-break columns=2 margins=narrow orientation=portrait section=brief}}",
+    Array.from({ length: 1100 }, (_, index) => `word${index}`).join(" "),
+    "{{page-break}}",
+    "| Very wide table heading that should make portrait print preview warn about geometry | Value | Evidence |",
+    "| --- | ---: | --- |",
+    "| A very long row that exceeds the comfortable source width for a portrait export preview and should be reviewed | 42 | CRM |",
+  ].join("\n");
+  const report = buildPrintPreviewReport(markdown, { layoutPreset: "business", coverPage: true, pageNumbers: true });
+  equal(report.pageSize, "Letter");
+  equal(report.orientation, "portrait");
+  equal(report.margins, "narrow");
+  equal(report.columns, 2);
+  equal(report.pageBreaks, 1);
+  ok(report.estimatedPages >= 4);
+  ok(report.summary.includes("page numbers"));
+  ok(report.sectionBreaks.some((section) => section.label === "brief" && section.columns === 2));
+  ok(report.warnings.some((warning) => warning.includes("wide table")));
+  ok(report.warnings.some((warning) => warning.includes("Multi-column flow")));
+});
+
 test("workbench command bar exposes icon display controls and workflow groups", () => {
   const app = readFileSync("src/App.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
@@ -7954,6 +7982,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('store.sidebar === \'layout\''));
   ok(app.includes('aria-label="Layout advisor summary"'));
   ok(app.includes('aria-label="Professional cover builder"'));
+  ok(app.includes('aria-label="Print preview summary"'));
+  ok(app.includes('aria-label="Print preview controls"'));
+  ok(app.includes("printPreviewEnabled"));
+  ok(app.includes("printPreviewReport"));
+  ok(app.includes("togglePrintPreview"));
+  ok(app.includes('label: "Print Preview"'));
+  ok(app.includes("Show print preview"));
   ok(app.includes('aria-label="Brand kit and page design presets"'));
   ok(app.includes("brandKitPresets"));
   ok(app.includes("openBrandKitManager"));

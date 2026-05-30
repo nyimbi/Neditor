@@ -2707,6 +2707,27 @@
               <option value="presentation">Presentation</option>
             </select>
           </label>
+          <section class="print-preview-card" aria-label="Print preview controls">
+            <header>
+              <div>
+                <strong>Print preview</strong>
+                <span>{{ printPreviewReport.summary }}</span>
+              </div>
+              <button type="button" :class="{ active: printPreviewEnabled }" title="Show approximate page geometry, pagination, margins, columns, and page-break warnings in the preview" @click="togglePrintPreview">
+                {{ printPreviewEnabled ? "Hide" : "Show" }}
+              </button>
+            </header>
+            <div class="print-preview-metrics" aria-label="Print preview export metrics">
+              <span><strong>{{ printPreviewReport.estimatedPages }}</strong> pages</span>
+              <span><strong>{{ printPreviewReport.wordCount }}</strong> words</span>
+              <span><strong>{{ printPreviewReport.columns }}</strong> columns</span>
+              <span><strong>{{ printPreviewReport.margins }}</strong> margins</span>
+            </div>
+            <ul v-if="printPreviewReport.warnings.length" aria-label="Print preview export warnings">
+              <li v-for="warning in printPreviewReport.warnings" :key="warning">{{ warning }}</li>
+            </ul>
+            <p v-else class="sidebar-hint">No print-flow warnings from the approximate preview model.</p>
+          </section>
           <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Include comments</label>
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
@@ -4114,8 +4135,27 @@
             </ul>
           </article>
         </section>
+        <section v-if="printPreviewEnabled" class="print-preview-summary" aria-label="Print preview summary">
+          <header>
+            <div>
+              <strong>Print preview</strong>
+              <span>{{ printPreviewReport.summary }}</span>
+            </div>
+            <button type="button" title="Leave print preview mode" @click="printPreviewEnabled = false">Exit</button>
+          </header>
+          <div class="print-preview-metrics" aria-label="Print preview metrics">
+            <span><strong>{{ printPreviewReport.estimatedPages }}</strong> pages</span>
+            <span><strong>{{ printPreviewReport.wordCount }}</strong> words</span>
+            <span><strong>{{ printPreviewReport.pageBreaks }}</strong> page breaks</span>
+            <span><strong>{{ printPreviewReport.sectionBreaks.length }}</strong> section breaks</span>
+          </div>
+          <ul v-if="printPreviewReport.warnings.length" aria-label="Print preview warnings">
+            <li v-for="warning in printPreviewReport.warnings" :key="warning">{{ warning }}</li>
+          </ul>
+        </section>
         <article
           class="preview-document"
+          :class="{ 'print-preview-document': printPreviewEnabled }"
           role="document"
           :aria-label="previewDocumentLabel"
           tabindex="0"
@@ -6790,6 +6830,7 @@ import {
   type QualityStepAssistance,
 } from "./lib/qualityRecommendations";
 import { isAiSourceFenceOpener, markdownFenceOpener, stripMarkdownFencedBlocks } from "./lib/provenanceReview";
+import { buildPrintPreviewReport } from "./lib/printPreview";
 import {
   buildReleaseReadinessChecklist,
   formatReleaseChecklistSummary,
@@ -7519,6 +7560,7 @@ const openAppMenuId = ref<string | null>(null);
 const toolbarVisibilityMenuOpen = ref(false);
 const writingSpaceMaximized = ref(false);
 const writingSpaceRestoreLayout = ref<WritingSpaceLayoutSnapshot | null>(null);
+const printPreviewEnabled = ref(false);
 const conflictOpen = ref(false);
 const mergedConflictText = ref("");
 const conflictMergeParts = ref<ConflictMergePart[]>([]);
@@ -8260,6 +8302,13 @@ const previewDocumentStyle = computed(() => ({
   fontSize: `${clampUiFontSize(store.previewFontSize)}px`,
   lineHeight: String(clampUiLineHeight(store.previewLineHeight)),
 }));
+const printPreviewReport = computed(() =>
+  buildPrintPreviewReport(active.value.text, {
+    layoutPreset: store.exportDefaults.layoutPreset,
+    coverPage: store.exportDefaults.coverPage,
+    pageNumbers: store.exportDefaults.pageNumbers,
+  }),
+);
 const appShellStyle = computed(() => ({
   "--toolbar-font-size": `${clampToolbarTextSize(store.toolbarTextSize)}px`,
 }));
@@ -10415,6 +10464,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "save-as", label: "Save As", title: "Save document as", icon: "saveAs", run: () => saveDocumentAs() },
       { id: "export-html", label: "HTML Export", title: "Export standalone HTML", icon: "html", run: () => exportDocumentAs("html") },
       { id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package", icon: "epub", run: () => exportDocumentAs("epub") },
+      { id: "print-preview", label: "Print Preview", title: "Show approximate pagination, margins, columns, page breaks, and print-flow warnings", icon: "layout", run: () => togglePrintPreview(true) },
       { id: "publish", label: "Publish", title: "Open blog, Substack, or CMS publishing handoff", icon: "export", primary: true, run: () => openPublishingHandoff() },
       { id: "export", label: "Export", title: "Export document", icon: "export", disabled: store.exportBusy, run: () => exportDocument() },
     ],
@@ -10648,6 +10698,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "focus", label: "Focus Mode", help: "Write with fewer panes visible.", run: () => (store.mode = "focus") },
           { id: "outline", label: "Outline Mode", help: "CRUD chapters, sections, subsections, and subsubsections.", run: () => { store.mode = "outline"; store.sidebar = "outline"; } },
           { id: "export", label: "Export Preview", help: "Review delivery output and export readiness.", run: () => { store.mode = "export"; store.sidebar = "exports"; } },
+          { id: "print-preview", label: "Print Preview", help: "Approximate final pages, margins, columns, section breaks, and print-flow warnings before export.", run: () => togglePrintPreview(true) },
           { id: "review", label: "Review Mode", help: "Show source, preview, comments, QA, and release state.", run: () => { store.mode = "review"; store.sidebar = "review"; } },
         ],
       },
@@ -13729,6 +13780,20 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     description: "Restore the mode, sidebar, toolbar display, and split source panes used before maximizing writing space.",
     keywords: ["restore", "writing space", "sidebar", "toolbar", "status bar"],
     run: () => restoreWritingSpace(),
+  },
+  {
+    name: "Show print preview",
+    group: "View",
+    description: "Show approximate final pages, margins, columns, section breaks, and print-flow warnings in the preview.",
+    keywords: ["print preview", "pagination", "page breaks", "margins", "columns", "paper"],
+    run: () => togglePrintPreview(true),
+  },
+  {
+    name: "Hide print preview",
+    group: "View",
+    description: "Hide the print-preview page geometry overlay.",
+    keywords: ["print preview", "pagination", "hide"],
+    run: () => togglePrintPreview(false),
   },
   { name: "Collapse all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(true) },
   { name: "Expand all toolbars", group: "View", run: () => setAllCommandToolbarsCollapsed(false) },
@@ -18652,6 +18717,18 @@ function openLayoutAdvisor() {
   store.statusMessage = layoutQualityRecommendations.value.length
     ? `Opened Layout Advisor with ${layoutQualityRecommendations.value.length} layout finding${layoutQualityRecommendations.value.length === 1 ? "" : "s"}`
     : "Opened Layout Advisor";
+}
+
+function togglePrintPreview(force?: boolean) {
+  printPreviewEnabled.value = typeof force === "boolean" ? force : !printPreviewEnabled.value;
+  if (printPreviewEnabled.value) {
+    store.mode = "preview";
+    store.sidebar = "exports";
+    store.statusMessage = `Print preview: ${printPreviewReport.value.summary}`;
+    void nextTick(() => previewPane.value?.focus());
+  } else {
+    store.statusMessage = "Print preview hidden";
+  }
 }
 
 function openBrandKitManager() {
@@ -25220,7 +25297,8 @@ select:hover {
 }
 
 .export-preview-summary,
-.transform-preview-summary {
+.transform-preview-summary,
+.print-preview-summary {
   display: grid;
   gap: 8px;
   margin: 0 0 16px;
@@ -25273,6 +25351,66 @@ select:hover {
 
 .transform-preview-summary button {
   justify-self: start;
+}
+
+.print-preview-summary {
+  border-left-color: #6f4e00;
+  background: #fffaf0;
+}
+
+.print-preview-summary header,
+.print-preview-card header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.print-preview-summary header div,
+.print-preview-card header div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.print-preview-summary header span,
+.print-preview-card header span {
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.print-preview-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px;
+}
+
+.print-preview-metrics span {
+  padding: 6px 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.print-preview-card {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid #d8c28a;
+  border-left: 3px solid #6f4e00;
+  border-radius: 7px;
+  background: #fffaf0;
+}
+
+.print-preview-card ul,
+.print-preview-summary ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #6f4e00;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .progress-steps {
@@ -29322,6 +29460,17 @@ select:hover {
   padding: 48px;
   color: #1f2937;
   line-height: 1.65;
+}
+
+.preview-document.print-preview-document {
+  max-width: 794px;
+  min-height: 1123px;
+  padding: 72px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.18);
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    repeating-linear-gradient(to bottom, transparent 0, transparent 1040px, rgba(111, 78, 0, 0.18) 1041px, rgba(111, 78, 0, 0.18) 1042px) border-box;
 }
 
 .preview-document h1,

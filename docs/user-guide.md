@@ -579,6 +579,13 @@ shows AI Export Assistance for target metadata, readiness diagnostics, and
 artifact evidence; accepted guidance can be collected as editable export
 readiness notes and inserted into the document as an audit handoff.
 
+Use **Print Preview** from the document toolbar, View menu, command palette, or
+Export panel when page geometry matters. The preview estimates page count,
+word count, page breaks, section breaks, paper size, orientation, margins, and
+column flow. It also warns about wide portrait tables, long documents without
+explicit page breaks, and multi-column layouts that need final PDF or DOCX
+review before distribution.
+
 ## Transform Engines
 
 NEditor uses native Rust renderers or static fallbacks where practical.
