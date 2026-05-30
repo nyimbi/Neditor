@@ -2090,8 +2090,12 @@
                 <option value="duckduckgo">DuckDuckGo</option>
                 <option value="searxng">SearXNG</option>
                 <option value="tavily">Tavily</option>
+                <option value="local-library">Local source library</option>
               </select>
             </label>
+            <p v-if="citationSearchProvider === 'local-library'" class="sidebar-hint">
+              Searches the saved source library associated with this document. Save the document and download sources first to build a reusable local research base.
+            </p>
             <label v-if="citationSearchProvider === 'searxng'">
               SearXNG URL
               <input v-model="citationSearxngUrl" placeholder="http://127.0.0.1:8080" />
@@ -2118,11 +2122,11 @@
               </button>
               <button
                 type="button"
-                :disabled="citationSourceBulkBusy || !active.path || !citationSearchResults.length"
+                :disabled="citationSourceBulkBusy || citationSearchProvider === 'local-library' || !active.path || !citationSearchResults.length"
                 title="Save every visible search result into this document's local source library."
                 @click="downloadAllCitationSources()"
               >
-                {{ citationSourceBulkBusy ? "Saving sources..." : "Save all found sources" }}
+                {{ citationSearchProvider === "local-library" ? "Already local" : citationSourceBulkBusy ? "Saving sources..." : "Save all found sources" }}
               </button>
             </div>
             <p v-if="citationSourceLibraryDir" class="sidebar-hint">Saved source library: {{ citationSourceLibraryDir }}</p>
@@ -2133,7 +2137,7 @@
               <small v-if="source.snippet">{{ source.snippet }}</small>
               <div class="reference-actions">
                 <button type="button" :disabled="citationSourceBusyUrl === source.url || !active.path" @click="downloadCitationSource(source)">
-                  {{ citationSourceBusyUrl === source.url ? "Downloading..." : "Download source" }}
+                  {{ citationSourceBusyUrl === source.url ? "Downloading..." : citationSearchProvider === "local-library" ? "Re-download source" : "Download source" }}
                 </button>
                 <button type="button" @click="insertBlock(`[${source.title}](${source.url})`)">Insert link</button>
               </div>
@@ -10872,7 +10876,7 @@ const helpTopics = computed<HelpTopic[]>(() => [
       { label: "Insert bibliography", run: () => insertBlock(bibliographySnippet) },
       { label: "Citation settings", run: () => (store.sidebar = "settings") },
     ],
-    keywords: ["citation", "bibliography", "glossary", "index", "cross reference", "deep research", "source search", "searxng", "duckduckgo", "tavily"],
+    keywords: ["citation", "bibliography", "glossary", "index", "cross reference", "deep research", "source search", "local source library", "searxng", "duckduckgo", "tavily"],
   },
   {
     id: "review-provenance",
@@ -12816,6 +12820,10 @@ async function searchCitationSources(query = citationSearchQuery.value) {
   const trimmed = query.trim();
   if (!trimmed) {
     store.statusMessage = "Enter a citation search query";
+    return [];
+  }
+  if (citationSearchProvider.value === "local-library" && !active.value.path) {
+    store.statusMessage = "Save the document before searching the local source library";
     return [];
   }
   citationSearchBusy.value = true;
@@ -14773,7 +14781,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     name: "AI: Create deep research report",
     group: "AI",
     description: "Open source search, report length, and iterative sourced drafting controls.",
-    keywords: ["deep research", "research report", "sources", "duckduckgo", "searxng", "tavily", "ollama", "200 pages"],
+    keywords: ["deep research", "research report", "sources", "local source library", "duckduckgo", "searxng", "tavily", "ollama", "200 pages"],
     run: () => openDeepResearch(commandQuery.value),
   },
   {
@@ -15323,7 +15331,7 @@ const commandAgentRouteSuggestions = computed<CommandAgentRouteSuggestion[]>(() 
       id: "deep-research",
       label: "Deep Research",
       detail: "Open source search and iterative report generation with a selected page target.",
-      rank: /\b(deep research|research report|source search|citation search|duckduckgo|searxng|tavily|200 pages?)\b/.test(instruction) ? 0 : 3,
+      rank: /\b(deep research|research report|source search|citation search|local source library|duckduckgo|searxng|tavily|200 pages?)\b/.test(instruction) ? 0 : 3,
     },
     {
       id: "review",

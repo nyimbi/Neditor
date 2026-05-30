@@ -5849,6 +5849,8 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   });
   equal(settings.providerProfileId, "ollama-local");
   equal(settings.targetPages, 200);
+  equal(normalizeDeepResearchSettings({ searchProvider: "local-library" }).searchProvider, "local-library");
+  equal(normalizeDeepResearchSettings({ searchProvider: "source-library" as never }).searchProvider, "duckduckgo");
   equal(targetWordCount(settings), 100000);
   equal(expansionPassBudget(settings), 40);
   equal(pageShortfall(settings, "word ".repeat(1001)), 197);
@@ -9228,6 +9230,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("resolveCitationTodoItem"));
   ok(app.includes("deferCitationTodoItem"));
   ok(app.includes('aria-label="Downloaded citation source library"'));
+  ok(app.includes('<option value="local-library">Local source library</option>'));
+  ok(app.includes("Save the document before searching the local source library"));
+  ok(app.includes("Already local"));
   ok(app.includes("Refresh source library"));
   ok(app.includes("Save all found sources"));
   ok(app.includes("deepResearchSaveSources"));

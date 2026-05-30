@@ -511,6 +511,11 @@ Research and business documents can keep reference metadata near the source.
   research iterations, complete empty or partial Source Library Audit sections
   with missing saved-source rows, add an evidence-conflict review when search
   snippets appear to disagree, then add the `[BIBLIOGRAPHY]` marker.
+- Choose **Local source library** as the search provider when you want Deep
+  Research or citation search to reuse downloaded sources associated with the
+  current document. It ranks saved sources by title, snippet, path, provider
+  metadata, and readable local file content without sending a search request to
+  the web.
 - Use **Insert conflict review** in Source Search & Deep Research to add a
   source-disagreement table before accepting contested findings or exporting a
   research report.

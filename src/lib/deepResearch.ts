@@ -2,7 +2,7 @@ import type { AiProviderProfileId } from "./aiProviderPackages.js";
 import { normalizeCitationKey } from "./bibliographyManager.js";
 import { countCitationTodoMarkers } from "./citationTodoPatterns.js";
 
-export type DeepResearchSearchProvider = "duckduckgo" | "searxng" | "tavily";
+export type DeepResearchSearchProvider = "duckduckgo" | "searxng" | "tavily" | "local-library";
 
 export interface DeepResearchSource {
   title: string;
@@ -1181,7 +1181,7 @@ function sectionText(markdown: string, heading: string) {
 }
 
 function normalizeSearchProvider(value: unknown): DeepResearchSearchProvider {
-  if (value === "searxng" || value === "tavily") return value;
+  if (value === "searxng" || value === "tavily" || value === "local-library") return value;
   return "duckduckgo";
 }
 

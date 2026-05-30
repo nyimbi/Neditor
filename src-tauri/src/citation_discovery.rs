@@ -92,6 +92,9 @@ pub(crate) fn search_citation_sources(
         .and_then(|path| associated_source_dir(Path::new(path)).ok())
         .map(|path| path_to_string(&path));
     let results = match provider.as_str() {
+        "local-library" => {
+            search_local_source_library(query, request.document_path.as_deref(), limit)?
+        }
         "searxng" => search_searxng(query, request.searxng_url.as_deref(), limit)?,
         "tavily" => search_tavily(query, request.tavily_api_key.as_deref(), limit)?,
         _ => search_duckduckgo(query, limit)?,
@@ -363,6 +366,57 @@ fn search_tavily(
     Ok(results)
 }
 
+fn search_local_source_library(
+    query: &str,
+    document_path: Option<&str>,
+    limit: usize,
+) -> Result<Vec<CitationSearchResult>, String> {
+    let document_path = document_path
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .ok_or_else(|| {
+            "Save the document before searching the local source library.".to_string()
+        })?;
+    let document_path = Path::new(document_path);
+    let associated_dir = associated_source_dir(document_path)?;
+    let manifest_path = associated_dir.join("sources.json");
+    let query_terms = local_search_terms(query);
+    let mut scored = read_source_manifest(&manifest_path)?
+        .into_iter()
+        .filter_map(|mut item| {
+            annotate_source_file_status(&mut item);
+            let content_preview = local_source_content_preview(&item, &query_terms);
+            let score = local_source_score(&item, &query_terms, content_preview.as_deref());
+            if score == 0 {
+                return None;
+            }
+            let snippet = local_source_search_snippet(&item, content_preview.as_deref(), score);
+            Some((
+                score,
+                item.downloaded_at.clone().unwrap_or_default(),
+                CitationSearchResult {
+                    title: item.title.clone(),
+                    url: item.url.clone(),
+                    snippet,
+                    source: format!("Local source library (@{})", item.citation_key),
+                },
+            ))
+        })
+        .collect::<Vec<_>>();
+    scored.sort_by(|left, right| {
+        right
+            .0
+            .cmp(&left.0)
+            .then_with(|| right.1.cmp(&left.1))
+            .then_with(|| left.2.title.cmp(&right.2.title))
+    });
+    Ok(scored
+        .into_iter()
+        .take(limit)
+        .map(|(_, _, result)| result)
+        .collect())
+}
+
 fn curl_text(url: &str) -> Result<String, String> {
     let bytes = curl_bytes(url)?;
     String::from_utf8(bytes).map_err(|err| format!("Search response was not UTF-8 text: {err}"))
@@ -554,10 +608,149 @@ fn normalize_provider(value: Option<&str>) -> String {
         .to_ascii_lowercase()
         .as_str()
     {
+        "local" | "library" | "local-library" | "source-library" | "saved-sources" => {
+            "local-library".to_string()
+        }
         "searx" | "searxng" => "searxng".to_string(),
         "tavily" => "tavily".to_string(),
         _ => "duckduckgo".to_string(),
     }
+}
+
+fn local_search_terms(query: &str) -> Vec<String> {
+    let mut terms = Vec::new();
+    for term in query
+        .split(|ch: char| !ch.is_alphanumeric())
+        .map(|term| term.trim().to_ascii_lowercase())
+        .filter(|term| term.len() > 1)
+    {
+        if !terms.contains(&term) {
+            terms.push(term);
+        }
+    }
+    terms
+}
+
+fn local_source_score(
+    item: &CitationManifestItem,
+    query_terms: &[String],
+    content_preview: Option<&str>,
+) -> u32 {
+    if query_terms.is_empty() {
+        return 0;
+    }
+    let title = item.title.to_ascii_lowercase();
+    let snippet = item.snippet.to_ascii_lowercase();
+    let source = item.source.clone().unwrap_or_default().to_ascii_lowercase();
+    let path = format!(
+        "{} {} {} {}",
+        item.url, item.relative_path, item.citation_key, source
+    )
+    .to_ascii_lowercase();
+    let content = content_preview.unwrap_or_default().to_ascii_lowercase();
+    let mut score: u32 = 0;
+    for term in query_terms {
+        if title.contains(term) {
+            score += 8;
+        }
+        if snippet.contains(term) {
+            score += 5;
+        }
+        if path.contains(term) {
+            score += 3;
+        }
+        if content.contains(term) {
+            score += 2;
+        }
+    }
+    if score > 0 && item.file_exists == Some(true) {
+        score += 2;
+    }
+    if score > 0 && (item.hash_matches == Some(false) || item.file_exists == Some(false)) {
+        score = score.saturating_sub(3);
+    }
+    score
+}
+
+fn local_source_content_preview(
+    item: &CitationManifestItem,
+    query_terms: &[String],
+) -> Option<String> {
+    if item.file_exists == Some(false) {
+        return None;
+    }
+    let metadata = fs::metadata(&item.path).ok()?;
+    if metadata.len() > 2 * 1024 * 1024 {
+        return None;
+    }
+    let bytes = fs::read(&item.path).ok()?;
+    let raw = String::from_utf8_lossy(&bytes);
+    let cleaned = if item
+        .media_type
+        .as_deref()
+        .unwrap_or_default()
+        .contains("html")
+        || item.path.to_ascii_lowercase().ends_with(".html")
+    {
+        strip_tags(&raw)
+    } else {
+        raw.to_string()
+    };
+    let compact = collapse_whitespace(&cleaned);
+    if compact.is_empty() {
+        return None;
+    }
+    let lower = compact.to_ascii_lowercase();
+    let start = query_terms
+        .iter()
+        .filter_map(|term| lower.find(term))
+        .min()
+        .unwrap_or(0)
+        .saturating_sub(80);
+    Some(trim_to_char_boundary(&compact, start, 360))
+}
+
+fn local_source_search_snippet(
+    item: &CitationManifestItem,
+    content_preview: Option<&str>,
+    score: u32,
+) -> String {
+    let integrity = match (item.file_exists, item.hash_matches) {
+        (Some(false), _) => "Local file missing; re-download before relying on this source.",
+        (Some(true), Some(false)) => {
+            "Local file changed after download; verify before relying on this source."
+        }
+        _ => "Local copy available.",
+    };
+    let evidence = content_preview
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| {
+            let snippet = item.snippet.trim();
+            if snippet.is_empty() {
+                None
+            } else {
+                Some(snippet)
+            }
+        })
+        .unwrap_or("No saved snippet; open the local file for review.");
+    format!(
+        "Saved @{} at {}. Match score: {}. {} {}",
+        item.citation_key, item.relative_path, score, integrity, evidence
+    )
+}
+
+fn collapse_whitespace(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn trim_to_char_boundary(value: &str, start: usize, max_len: usize) -> String {
+    let start = value
+        .char_indices()
+        .map(|(index, _)| index)
+        .take_while(|index| *index <= start)
+        .last()
+        .unwrap_or(0);
+    value[start..].chars().take(max_len).collect()
 }
 
 fn is_http_url(value: &str) -> bool {
@@ -840,6 +1033,101 @@ mod tests {
         assert_eq!(items[0].citation_key, "second");
         assert_eq!(items[0].bytes, 24);
         assert_eq!(items[0].fit_score, Some(82));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn local_source_library_search_ranks_saved_sources() {
+        let dir = std::env::temp_dir().join(format!(
+            "neditor-local-source-search-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).expect("temp dir");
+        let document = dir.join("proposal.md");
+        fs::write(&document, "# Proposal\n").expect("document");
+        let source_dir = associated_source_dir(&document).expect("source dir");
+        fs::create_dir_all(&source_dir).expect("source dir create");
+        let climate_path = source_dir.join("climate-procurement.html");
+        let generic_path = source_dir.join("generic.html");
+        fs::write(
+            &climate_path,
+            "<html><body>Climate procurement controls evidence and audit timeline.</body></html>",
+        )
+        .expect("climate file");
+        fs::write(&generic_path, "General business guidance.").expect("generic file");
+        let manifest = source_dir.join("sources.json");
+        write_source_manifest(
+            &manifest,
+            &CitationManifestItem {
+                citation_key: "generic".to_string(),
+                title: "Generic Guidance".to_string(),
+                url: "https://example.com/generic.html".to_string(),
+                snippet: "General business guidance.".to_string(),
+                path: path_to_string(&generic_path),
+                relative_path: relative_source_path(&document, &generic_path),
+                sha256: sha256_hex(b"General business guidance."),
+                bytes: "General business guidance.".len(),
+                downloaded_at: Some("2026-05-28T09:00:00+03:00".to_string()),
+                media_type: Some("text/html".to_string()),
+                source: Some("DuckDuckGo".to_string()),
+                fit_score: Some(40),
+                fit_label: Some("weak".to_string()),
+                fit_reasons: Some(vec!["generic source".to_string()]),
+                file_exists: None,
+                hash_matches: None,
+                current_sha256: None,
+                current_bytes: None,
+            },
+        )
+        .expect("write generic");
+        write_source_manifest(
+            &manifest,
+            &CitationManifestItem {
+                citation_key: "climate".to_string(),
+                title: "Climate Procurement Evidence".to_string(),
+                url: "https://agency.gov/climate-procurement.html".to_string(),
+                snippet: "Saved source about controls.".to_string(),
+                path: path_to_string(&climate_path),
+                relative_path: relative_source_path(&document, &climate_path),
+                sha256: sha256_hex(
+                    b"<html><body>Climate procurement controls evidence and audit timeline.</body></html>",
+                ),
+                bytes: "<html><body>Climate procurement controls evidence and audit timeline.</body></html>".len(),
+                downloaded_at: Some("2026-05-28T10:00:00+03:00".to_string()),
+                media_type: Some("text/html".to_string()),
+                source: Some("SearXNG".to_string()),
+                fit_score: Some(91),
+                fit_label: Some("strong".to_string()),
+                fit_reasons: Some(vec!["saved source".to_string()]),
+                file_exists: None,
+                hash_matches: None,
+                current_sha256: None,
+                current_bytes: None,
+            },
+        )
+        .expect("write climate");
+
+        let response = search_citation_sources(CitationSearchRequest {
+            query: "climate procurement evidence".to_string(),
+            provider: Some("source-library".to_string()),
+            searxng_url: None,
+            tavily_api_key: None,
+            limit: Some(5),
+            document_path: Some(path_to_string(&document)),
+        })
+        .expect("search local library");
+        assert_eq!(response.provider, "local-library");
+        assert!(response
+            .associated_dir
+            .unwrap()
+            .ends_with("proposal.neditor-sources"));
+        assert_eq!(response.results.len(), 1);
+        assert_eq!(response.results[0].title, "Climate Procurement Evidence");
+        assert!(response.results[0].source.contains("@climate"));
+        assert!(response.results[0].snippet.contains("Match score"));
+        assert!(response.results[0]
+            .snippet
+            .contains("Climate procurement controls evidence"));
         let _ = fs::remove_dir_all(&dir);
     }
 
