@@ -548,9 +548,10 @@ Research and business documents can keep reference metadata near the source.
 - Use
   `ned deep-research --topic "market evidence" --provider duckduckgo --pages 10 --output research-dossier.md`
   when a terminal workflow should create an editable source-backed research
-  dossier. Add `--document report.md --save-sources` to download returned
-  source files into the document vault, or choose `--provider local-library` to
-  build from already saved sources without a live web search.
+  dossier with a page-budget table and section-by-section draft queue. Add
+  `--document report.md --save-sources` to download returned source files into
+  the document vault, or choose `--provider local-library` to build from
+  already saved sources without a live web search.
 - In **Review**, refresh **Evidence and approval review** to extract candidate
   claims, then use **Insert claim-source matrix** to map those claims to saved
   source-library citations. The matrix shows match scores, reasons, local file

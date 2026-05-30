@@ -4447,6 +4447,8 @@ fn deep_research_cli_markdown(
         .iter()
         .flat_map(|iteration| readiness_array_field(iteration, "results"))
         .collect::<Vec<_>>();
+    let draft_sections = deep_research_report_sections(target_pages as usize);
+    let top_source_keys = deep_research_top_source_keys(&all_results, 3);
     let mut lines = vec![
         "---".to_string(),
         format!("title: {}", yaml_scalar(topic)),
@@ -4481,6 +4483,45 @@ fn deep_research_cli_markdown(
     ];
     for section in deep_research_section_plan(target_pages as usize) {
         lines.push(format!("- {section}"));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Report Length Plan".to_string(),
+        "".to_string(),
+        "| Section | Target length | Target words | Drafting purpose |".to_string(),
+        "| --- | ---: | ---: | --- |".to_string(),
+    ]);
+    for section in &draft_sections {
+        lines.push(format!(
+            "| {} | {} | {} | {} |",
+            markdown_cell(&section.title),
+            markdown_cell(&section.target_length),
+            section.target_words,
+            markdown_cell(&section.purpose),
+        ));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Draft Section Queue".to_string(),
+        "".to_string(),
+        "Use this queue to turn the research dossier into the requested report length. Draft one section at a time, accept or revise the section, then run the quality handoff before export.".to_string(),
+        "".to_string(),
+    ]);
+    for section in &draft_sections {
+        lines.push(format!("### {}", section.title));
+        lines.push("".to_string());
+        lines.push(format!(
+            "- Target length: {}, about {} words.",
+            section.target_length, section.target_words
+        ));
+        lines.push(format!("- Evidence to inspect first: {top_source_keys}."));
+        lines.push(format!("- Drafting instruction: {}", section.prompt));
+        lines.push("- Acceptance gate: cite every material claim, keep unsupported claims as citation TODOs, and mark the section human-reviewed only after source inspection.".to_string());
+        lines.push(format!(
+            "<!-- ai_assisted: status=needs-review | source=NEditor Deep Research CLI | prompt={} -->",
+            html_comment_value(&section.prompt)
+        ));
+        lines.push("".to_string());
     }
     lines.extend([
         "".to_string(),
@@ -4602,6 +4643,98 @@ fn deep_research_section_plan(target_pages: usize) -> Vec<String> {
         sections.push("Create appendices for source abstracts, source-quality scoring, glossary, and data tables.".to_string());
     }
     sections
+}
+
+#[derive(Debug, Clone)]
+struct DeepResearchReportSection {
+    title: String,
+    target_length: String,
+    target_words: usize,
+    purpose: String,
+    prompt: String,
+}
+
+fn deep_research_report_sections(target_pages: usize) -> Vec<DeepResearchReportSection> {
+    let target_words = target_pages.max(1) * 500;
+    let specs = if target_pages > 75 {
+        vec![
+            ("Executive Summary", 5, "Decision-ready synthesis", "Summarize the strongest findings, confidence levels, implications, and recommended decisions."),
+            ("Research Method And Source Strategy", 8, "Method transparency", "Explain search scope, providers, source inclusion criteria, quality scoring, and known evidence limits."),
+            ("Context And Literature Review", 12, "Background evidence", "Describe the field, definitions, major actors, standards, and prior findings using accepted sources."),
+            ("Findings Chapters", 40, "Main evidence body", "Expand each major finding into a chapter with claim, evidence, counterpoint, implication, and citation review notes."),
+            ("Analysis And Interpretation", 15, "Meaning and tradeoffs", "Compare findings, identify patterns, surface conflicts, and explain what the evidence means for the audience."),
+            ("Recommendations And Roadmap", 10, "Action planning", "Translate findings into prioritized recommendations, owners, sequencing, risks, and measures of success."),
+            ("Appendices And Source Abstracts", 10, "Auditability", "Include source abstracts, search logs, quality scores, data tables, glossary terms, and bibliography maintenance notes."),
+        ]
+    } else if target_pages > 20 {
+        vec![
+            ("Executive Summary", 8, "Decision-ready synthesis", "Summarize the strongest findings, confidence levels, implications, and recommended decisions."),
+            ("Research Method And Scope", 10, "Method transparency", "Explain search questions, providers, source quality rules, exclusions, and review assumptions."),
+            ("Source And Literature Review", 15, "Evidence context", "Organize accepted sources by theme, authority, recency, and relevance to the research question."),
+            ("Detailed Findings", 35, "Main evidence body", "Draft findings with cited support, source-quality notes, and explicit uncertainty where evidence is thin."),
+            ("Implications And Risks", 15, "Business meaning", "Explain operational, commercial, legal, technical, adoption, or delivery implications for the audience."),
+            ("Recommendations", 12, "Action planning", "Give prioritized actions, decisions, owners, next evidence to collect, and review checkpoints."),
+            ("Bibliography And Audit Notes", 5, "Review handoff", "Complete bibliography records, source-library notes, unresolved citation TODOs, and quality-gate reminders."),
+        ]
+    } else {
+        vec![
+            ("Executive Summary", 15, "Decision-ready synthesis", "Summarize the answer, confidence level, and recommended reader action."),
+            ("Research Method", 10, "Method transparency", "State search scope, providers, source selection rules, and important limitations."),
+            ("Evidence-Backed Findings", 40, "Main evidence body", "Draft the core findings with direct citations and source-quality caveats."),
+            ("Analysis And Implications", 20, "Meaning and tradeoffs", "Explain what the findings mean, what remains uncertain, and where sources may disagree."),
+            ("Recommendations And Next Evidence", 15, "Action planning", "List decisions, next steps, owners, and evidence still needed before external distribution."),
+        ]
+    };
+    specs
+        .into_iter()
+        .map(|(title, weight, purpose, prompt)| {
+            let section_words = ((target_words * weight) / 100).max(50);
+            DeepResearchReportSection {
+                title: title.to_string(),
+                target_length: deep_research_page_budget(section_words),
+                target_words: section_words,
+                purpose: purpose.to_string(),
+                prompt: prompt.to_string(),
+            }
+        })
+        .collect()
+}
+
+fn deep_research_page_budget(words: usize) -> String {
+    let pages = words as f64 / 500.0;
+    if pages < 1.0 {
+        format!("{pages:.1} page")
+    } else {
+        format!("{pages:.1} pages")
+    }
+}
+
+fn deep_research_top_source_keys(results: &[Value], limit: usize) -> String {
+    let mut keys = Vec::new();
+    for result in results {
+        let Some(key) = readiness_string_field(result, "citationKey")
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            continue;
+        };
+        let marker = format!("@{key}");
+        if !keys.contains(&marker) {
+            keys.push(marker);
+        }
+        if keys.len() >= limit {
+            break;
+        }
+    }
+    if keys.is_empty() {
+        "accepted source candidates or citation TODOs once sources are reviewed".to_string()
+    } else {
+        keys.join(", ")
+    }
+}
+
+fn html_comment_value(value: &str) -> String {
+    value.replace("--", "- -").replace('\n', " ")
 }
 
 fn deep_research_review_action(result: &Value) -> String {

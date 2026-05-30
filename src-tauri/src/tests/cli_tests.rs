@@ -1060,6 +1060,11 @@ fn ned_cli_creates_deep_research_dossiers_from_terminal() {
 
     let markdown = fs::read_to_string(&output).expect("deep research markdown");
     assert!(markdown.contains("# climate procurement evidence"));
+    assert!(markdown.contains("## Report Length Plan"));
+    assert!(markdown.contains("| Evidence-Backed Findings |"));
+    assert!(markdown.contains("## Draft Section Queue"));
+    assert!(markdown.contains("### Evidence-Backed Findings"));
+    assert!(markdown.contains("Evidence to inspect first: @climate-procurement-evidence"));
     assert!(markdown.contains("## Source Quality Review"));
     assert!(markdown.contains("## Source Citation Index"));
     assert!(markdown.contains("## Deep Research Evidence Log"));

@@ -6231,8 +6231,9 @@ source fit, creates citation keys, writes an editable Markdown research
 dossier, and can save returned source documents into the document-associated
 source vault when `--document` and `--save-sources` are supplied. The generated
 dossier includes AI provenance, target page and word intent, a drafting plan,
-source quality review, citation index, evidence log, bibliography records, and
-QA handoff instructions.
+report length plan, section-by-section draft queue, source quality review,
+citation index, evidence log, bibliography records, and QA handoff
+instructions.
 
 The command accepts `--pages` or `--target-pages` from 1 to 200 so automation
 can create anything from a one-page brief to a long-form research report,
@@ -6241,11 +6242,11 @@ single run.
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_creates_deep_research_dossiers_from_terminal --lib` | Pass | Focused CLI fixture proves local-library Deep Research JSON, two search iterations, target-page settings, Markdown output writing, source-quality table, citation index, evidence log, bibliography fence, citation key generation, and missing-topic errors. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_creates_deep_research_dossiers_from_terminal --lib` | Pass | Focused CLI fixture proves local-library Deep Research JSON, two search iterations, target-page settings, Markdown output writing, report length plan, section draft queue, source-quality table, citation index, evidence log, bibliography fence, citation key generation, and missing-topic errors. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_generates_shell_completions_without_external_dependencies --lib` | Pass | Bash, zsh, and fish completions expose `deep-research`, `research-report`, provider choices, page targets, source saving, and output flags. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_help_names_supported_conversion_targets --lib` | Pass | CLI help now shows `ned deep-research` examples for provider selection, page targets, output files, and source-vault saving. |
 | `pnpm run check:cli` | Pass | 30 CLI tests passed and the debug `ned` binary built after adding Deep Research dossier commands. |
-| `src-tauri/target/debug/ned deep-research --topic "business document automation" --provider local-library --document examples/research-report.md --pages 3 --iterations 1 --results 3 --output /private/tmp/neditor-deep-research-smoke.md` | Pass | Direct smoke wrote an editable Deep Research Markdown dossier with provenance, target length, source quality review, citation index, evidence log, bibliography block, and QA handoff. |
+| `src-tauri/target/debug/ned deep-research --topic "business document automation" --provider local-library --document examples/research-report.md --pages 3 --iterations 1 --results 3 --output /private/tmp/neditor-deep-research-smoke.md` | Pass | Direct smoke wrote an editable Deep Research Markdown dossier with provenance, target length, report length plan, section draft queue, source quality review, citation index, evidence log, bibliography block, and QA handoff. |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed after the Deep Research CLI updates. |
 | `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting `ned deep-research`. |
 | `git diff --check` | Pass | No whitespace errors are present in the CLI Deep Research slice. |
