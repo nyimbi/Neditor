@@ -3320,6 +3320,59 @@
             </select>
           </label>
           <h3>Brand profile defaults</h3>
+          <section class="brand-kit-manager" tabindex="-1" aria-label="Brand kit and page design presets">
+            <header>
+              <div>
+                <strong>Brand kit and page design presets</strong>
+                <span>Apply a coherent business-document identity, layout, cover, watermark, and export profile in one step.</span>
+              </div>
+              <button type="button" :disabled="!selectedBrandKitPreset" @click="applySelectedBrandKitPreset">Apply selected</button>
+            </header>
+            <section class="brand-kit-selector">
+              <label>
+                Preset
+                <select v-model="selectedBrandKitPresetId">
+                  <option v-for="preset in brandKitPresets" :key="preset.id" :value="preset.id">
+                    {{ preset.label }}
+                  </option>
+                </select>
+              </label>
+              <p v-if="selectedBrandKitPreset" class="sidebar-hint">{{ selectedBrandKitPreset.summary }}</p>
+            </section>
+            <section class="brand-kit-grid" aria-label="Available brand kit presets">
+              <article v-for="preset in brandKitPresets" :key="preset.id" class="brand-kit-card">
+                <header>
+                  <span class="brand-kit-swatch" :style="{ backgroundColor: preset.brand.color || store.brandProfileDefaults.color }"></span>
+                  <div>
+                    <strong>{{ preset.label }}</strong>
+                    <small>{{ preset.summary }}</small>
+                  </div>
+                </header>
+                <div class="template-meta">
+                  <span v-for="item in preset.bestFor" :key="`${preset.id}-${item}`">{{ item }}</span>
+                </div>
+                <ul>
+                  <li v-for="note in preset.designNotes" :key="`${preset.id}-${note}`">{{ note }}</li>
+                </ul>
+                <button type="button" @click="applyBrandKitPreset(preset)">Apply {{ preset.label }}</button>
+              </article>
+            </section>
+            <section class="brand-kit-preview" aria-label="Current brand kit preview">
+              <header :style="{ borderColor: store.brandProfileDefaults.color }">
+                <div>
+                  <strong>{{ store.brandProfileDefaults.name || "Current brand" }}</strong>
+                  <span>{{ store.brandProfileDefaults.header || "No header template" }}</span>
+                </div>
+                <small>{{ store.exportDefaults.layoutPreset }} layout</small>
+              </header>
+              <dl>
+                <div v-for="row in currentBrandKitPreviewRows" :key="row.label">
+                  <dt>{{ row.label }}</dt>
+                  <dd>{{ row.value }}</dd>
+                </div>
+              </dl>
+            </section>
+          </section>
           <label>
             Brand name
             <input v-model="store.brandProfileDefaults.name" />
@@ -6339,6 +6392,13 @@ import {
 import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
+  applyBrandKitPresetState,
+  brandKitPresetById,
+  brandKitPresets,
+  buildBrandKitPreviewRows,
+  type BrandKitPreset,
+} from "./lib/brandKitPresets";
+import {
   commandSearchText,
   compactCommandKeywords,
   joinCommandDescription,
@@ -7193,6 +7253,7 @@ const configurationSetupOpen = ref(false);
 const configurationSetupStepId = ref<ConfigurationSetupStepId>("llm-access");
 const configurationSetupNotes = ref("");
 const selectedConfigurationSection = ref("overview");
+const selectedBrandKitPresetId = ref(brandKitPresets[0]?.id || "");
 const transformInstallerPlans = ref<TransformHandlerInstallerPlan[]>([]);
 const selectedTransformInstallerId = ref("");
 const transformInstallerBusy = ref(false);
@@ -8022,6 +8083,8 @@ const exportProfileSummary = computed(() => {
       : "";
   return `${profile.exportTarget.toUpperCase()} / ${profile.exportDefaults.layoutPreset}${latexTemplate}${brand ? ` / ${brand}` : ""}${enabled.length ? ` / ${enabled.join(", ")}` : ""}`;
 });
+const selectedBrandKitPreset = computed(() => brandKitPresetById(selectedBrandKitPresetId.value) || brandKitPresets[0] || null);
+const currentBrandKitPreviewRows = computed(() => buildBrandKitPreviewRows(store.brandProfileDefaults, store.exportDefaults));
 const previewDocumentStyle = computed(() => ({
   fontFamily: store.previewFont,
   fontSize: `${clampUiFontSize(store.previewFontSize)}px`,
@@ -9771,6 +9834,29 @@ const helpTopics = computed<HelpTopic[]>(() => [
     keywords: ["html", "pdf", "docx", "pptx", "blog", "substack", "latex", "google docs", "epub", "ebook"],
   },
   {
+    id: "brand-page-design",
+    title: "Brand and page design",
+    category: "export",
+    summary: "Apply coherent business-document brand kits with fonts, colors, headers, footers, watermarks, covers, and export layout defaults.",
+    when: "Use this before turning a draft into a client, board, proposal, policy, academic, or publishing deliverable.",
+    steps: [
+      "Open Settings and choose Export and brand configuration.",
+      "Select a brand kit preset such as Board Memo, Consulting Report, Proposal Response, Policy Brief, Academic Article, or Newsletter.",
+      "Apply the preset, then adjust brand name, logo path, header, footer, watermark, and legal disclaimer if needed.",
+      "Run Prepare for export before generating PDF, DOCX, HTML, LaTeX, Google Docs, EPUB, blog, or Substack output.",
+    ],
+    tips: [
+      "Presets change both brand identity and export defaults so cover pages, page numbers, comments, provenance, glossary, and LaTeX profile stay aligned.",
+      "Use the current brand preview to confirm the active layout before saving an export profile.",
+    ],
+    actions: [
+      { label: "Open brand kits", run: () => openBrandKitManager() },
+      { label: "Prepare export", run: () => prepareForExport() },
+      { label: "Save profile", run: () => saveExportProfile() },
+    ],
+    keywords: ["brand", "brand kit", "page design", "layout preset", "cover", "watermark", "export profile"],
+  },
+  {
     id: "keyboard-shortcuts",
     title: "Keyboard shortcuts",
     category: "settings",
@@ -10211,6 +10297,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
       { id: "layout-advisor", label: "Layout", title: "Open the Layout Advisor for columns, wide sections, gutters, and export-safe flow", icon: "layout", run: () => openLayoutAdvisor() },
       { id: "cover-builder", label: "Cover", title: "Open the professional cover builder", icon: "layout", primary: true, run: () => openLayoutAdvisor() },
+      { id: "brand-kit", label: "Brand Kit", title: "Open brand kit and page design presets for business document delivery", icon: "settings", primary: true, run: () => openBrandKitManager() },
       { id: "install-handlers", label: "Handlers", title: "Download and install transform handlers", icon: "settings", run: () => openTransformInstaller() },
       { id: "biz-part", label: "Part", title: "Insert a reusable business document part", icon: "templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
       { id: "include", label: "Include", title: "Open the include document builder", icon: "include", run: () => openIncludeBuilder() },
@@ -10519,6 +10606,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "metadata", label: "Prepare Metadata", help: "Scaffold target-specific distribution metadata.", run: () => applyExportMetadataScaffold() },
           { id: "export-current", label: "Export Selected Target", help: "Export using the selected target and settings.", disabled: store.exportBusy, run: () => exportDocument() },
           { id: "profiles", label: "Export Profiles", help: "Open saved export profiles.", run: () => { store.mode = "export"; store.sidebar = "exports"; } },
+          { id: "brand-kit", label: "Brand Kit Presets", help: "Apply coherent brand, layout, cover, watermark, and export defaults.", run: () => openBrandKitManager() },
         ],
       },
       {
@@ -10562,6 +10650,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "getting-started", label: "Getting Started", help: "Learn the workbench basics.", run: () => openHelp("getting-started") },
           { id: "docs-live", label: "Docs Live", help: "Learn AI-first drafting.", run: () => openHelp("docs-live") },
           { id: "export-help", label: "Export and Publishing", help: "Learn export targets and handoffs.", run: () => openHelp("export-publishing") },
+          { id: "brand-help", label: "Brand and Page Design", help: "Learn brand kits, page design presets, and export profiles.", run: () => openHelp("brand-page-design") },
           { id: "shortcuts", label: "Keyboard Shortcuts", help: "Review shortcut and toolbar controls.", run: () => openHelp("keyboard-shortcuts") },
         ],
       },
@@ -13497,6 +13586,20 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     run: () => importCurrentDocumentToGoogleDocs(),
   },
   { name: "Set up business identity", group: "Templates", run: () => openBusinessProfile() },
+  {
+    name: "Open brand kit presets",
+    group: "Layout",
+    description: "Apply business-document brand, page design, watermark, cover, and export defaults.",
+    keywords: ["brand", "brand kit", "page design", "layout preset", "watermark", "cover", "business document"],
+    run: () => openBrandKitManager(),
+  },
+  ...brandKitPresets.map((preset) => ({
+    name: `Apply brand kit: ${preset.label}`,
+    group: "Layout",
+    description: preset.summary,
+    keywords: ["brand", "brand kit", "page design", preset.id, ...preset.bestFor],
+    run: () => applyBrandKitPreset(preset),
+  })),
   { name: "Insert company contact block", group: "Templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
   ...businessDocumentTemplates.map((template) => ({
     name: `Wizard: ${template.label}`,
@@ -18255,6 +18358,28 @@ function openLayoutAdvisor() {
   store.statusMessage = layoutQualityRecommendations.value.length
     ? `Opened Layout Advisor with ${layoutQualityRecommendations.value.length} layout finding${layoutQualityRecommendations.value.length === 1 ? "" : "s"}`
     : "Opened Layout Advisor";
+}
+
+function openBrandKitManager() {
+  store.sidebar = "settings";
+  selectedConfigurationSection.value = "exports";
+  void nextTick(() => {
+    document.querySelector<HTMLElement>('[aria-label="Brand kit and page design presets"]')?.focus();
+  });
+  store.statusMessage = "Opened brand kit and page design presets";
+}
+
+function applyBrandKitPreset(preset: BrandKitPreset) {
+  const applied = applyBrandKitPresetState(store.brandProfileDefaults, store.exportDefaults, preset);
+  Object.assign(store.brandProfileDefaults, applied.brandProfileDefaults);
+  Object.assign(store.exportDefaults, applied.exportDefaults);
+  selectedBrandKitPresetId.value = preset.id;
+  store.statusMessage = `Applied ${preset.label} brand kit and page design defaults`;
+}
+
+function applySelectedBrandKitPreset() {
+  if (!selectedBrandKitPreset.value) return;
+  applyBrandKitPreset(selectedBrandKitPreset.value);
 }
 
 function openDocumentWizardHub(query = "") {
@@ -25765,6 +25890,166 @@ select:hover {
   flex-wrap: wrap;
   gap: 6px;
   margin: 8px 0 10px;
+}
+
+.brand-kit-manager {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #c9d2dc;
+  border-left: 3px solid #174a7c;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.brand-kit-manager > header,
+.brand-kit-card > header,
+.brand-kit-preview > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.brand-kit-manager > header div,
+.brand-kit-card > header div,
+.brand-kit-preview > header div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.brand-kit-manager header span,
+.brand-kit-card small,
+.brand-kit-preview header span {
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.brand-kit-selector {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.brand-kit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.brand-kit-card {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #d8e0e8;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.brand-kit-swatch {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgb(0 0 0 / 18%);
+}
+
+.brand-kit-card ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 18px;
+  color: #2d3746;
+  font-size: 12px;
+}
+
+.brand-kit-card button {
+  justify-self: start;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+.brand-kit-preview {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+}
+
+.brand-kit-preview > header {
+  padding-left: 8px;
+  border-left: 4px solid #275da8;
+}
+
+.brand-kit-preview dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.brand-kit-preview div {
+  min-width: 0;
+}
+
+.brand-kit-preview dt {
+  color: #526171;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.brand-kit-preview dd {
+  margin: 2px 0 0;
+  color: #182433;
+  font-size: 12px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.app-shell[data-theme="dark"] .brand-kit-manager,
+.app-shell[data-theme="dark"] .brand-kit-card,
+.app-shell[data-theme="dark"] .brand-kit-preview {
+  border-color: #34465a;
+  background: #1b2736;
+  color: #dce7f3;
+}
+
+.app-shell[data-theme="dark"] .brand-kit-manager header span,
+.app-shell[data-theme="dark"] .brand-kit-card small,
+.app-shell[data-theme="dark"] .brand-kit-card ul,
+.app-shell[data-theme="dark"] .brand-kit-preview header span,
+.app-shell[data-theme="dark"] .brand-kit-preview dt {
+  color: #aebdcc;
+}
+
+.app-shell[data-theme="dark"] .brand-kit-preview dd {
+  color: #e6edf5;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-shell[data-theme="system"] .brand-kit-manager,
+  .app-shell[data-theme="system"] .brand-kit-card,
+  .app-shell[data-theme="system"] .brand-kit-preview {
+    border-color: #34465a;
+    background: #1b2736;
+    color: #dce7f3;
+  }
+
+  .app-shell[data-theme="system"] .brand-kit-manager header span,
+  .app-shell[data-theme="system"] .brand-kit-card small,
+  .app-shell[data-theme="system"] .brand-kit-card ul,
+  .app-shell[data-theme="system"] .brand-kit-preview header span,
+  .app-shell[data-theme="system"] .brand-kit-preview dt {
+    color: #aebdcc;
+  }
+
+  .app-shell[data-theme="system"] .brand-kit-preview dd {
+    color: #e6edf5;
+  }
 }
 
 .export-profile-manager {

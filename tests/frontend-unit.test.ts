@@ -61,6 +61,12 @@ import {
   normalizeCitationKey,
 } from "../src/lib/bibliographyManager.js";
 import {
+  applyBrandKitPresetState,
+  brandKitPresetById,
+  brandKitPresets,
+  buildBrandKitPreviewRows,
+} from "../src/lib/brandKitPresets.js";
+import {
   acceptExternalRootConflictState,
   applyExternalRootReloadState,
   applyRootConflictMergeState,
@@ -496,6 +502,56 @@ test("export profile helpers save apply and delete normalized profile state", ()
   equal(unchanged.profiles.length, 1);
   equal(unchanged.activeExportProfileId, "profile-1");
   equal(unchanged.statusMessage, "");
+});
+
+test("brand kit presets apply coherent business document defaults", () => {
+  ok(brandKitPresets.length >= 6);
+  const proposal = brandKitPresetById("proposal-response");
+  if (!proposal) throw new Error("proposal-response brand kit preset missing");
+
+  const applied = applyBrandKitPresetState(
+    {
+      name: "Legacy",
+      color: "#000000",
+      logo: "brand.svg",
+      font: "",
+      header: "",
+      footer: "",
+      watermark: "",
+      legalDisclaimer: "",
+    },
+    {
+      includeManifest: true,
+      includeStyles: true,
+      includeSyntaxHighlighting: true,
+      htmlLanguage: "en",
+      htmlDescription: "",
+      canonicalUrl: "",
+      coverPage: false,
+      pageNumbers: false,
+      layoutPreset: "compact",
+      latexTemplate: "article",
+      includeComments: false,
+      includeProvenance: false,
+      includeGlossary: false,
+      includeAgenda: true,
+    },
+    proposal,
+  );
+
+  equal(applied.brandProfileDefaults.name, "Bid Team");
+  equal(applied.brandProfileDefaults.logo, "brand.svg");
+  equal(applied.brandProfileDefaults.watermark, "Draft");
+  equal(applied.exportDefaults.coverPage, true);
+  equal(applied.exportDefaults.pageNumbers, true);
+  equal(applied.exportDefaults.layoutPreset, "business");
+  equal(applied.exportDefaults.latexTemplate, "rfp-response");
+  equal(applied.exportDefaults.includeGlossary, true);
+  equal(applied.exportDefaults.includeAgenda, false);
+
+  const previewRows = buildBrandKitPreviewRows(applied.brandProfileDefaults, applied.exportDefaults);
+  equal(previewRows.find((row) => row.label === "Brand")?.value, "Bid Team");
+  equal(previewRows.find((row) => row.label === "Layout")?.value, "business");
 });
 
 test("document export option helpers normalize compile export and transform settings", () => {
@@ -7844,6 +7900,13 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('store.sidebar === \'layout\''));
   ok(app.includes('aria-label="Layout advisor summary"'));
   ok(app.includes('aria-label="Professional cover builder"'));
+  ok(app.includes('aria-label="Brand kit and page design presets"'));
+  ok(app.includes("brandKitPresets"));
+  ok(app.includes("openBrandKitManager"));
+  ok(app.includes("applyBrandKitPreset"));
+  ok(app.includes('label: "Brand Kit"'));
+  ok(app.includes('label: "Brand Kit Presets"'));
+  ok(app.includes('title: "Brand and page design"'));
   ok(app.includes("coverBuilderDraft"));
   ok(app.includes("coverBuilderEffective"));
   ok(app.includes("applyCoverBuilderMetadata"));
