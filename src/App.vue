@@ -3197,6 +3197,36 @@
             </template>
             <p v-else class="sidebar-hint">Refresh to create an evidence review snapshot for the current document.</p>
           </section>
+          <section class="release-evidence-dashboard" :data-status="releaseEvidenceDashboard.status" aria-label="Release evidence dashboard">
+            <header>
+              <h3>Release evidence</h3>
+              <span>{{ releaseEvidenceDashboard.summary }}</span>
+            </header>
+            <p>Track complete, blocked, manual, credentialed, cross-platform, stale, and ready-to-send evidence before distribution.</p>
+            <div class="release-evidence-metrics" aria-label="Release evidence lane counts">
+              <span><strong>{{ releaseEvidenceDashboard.counts.complete }}</strong> complete</span>
+              <span><strong>{{ releaseEvidenceDashboard.counts.blocked }}</strong> blocked</span>
+              <span><strong>{{ releaseEvidenceDashboard.counts.manual }}</strong> manual</span>
+              <span><strong>{{ releaseEvidenceDashboard.counts.credentialed }}</strong> credentialed</span>
+              <span><strong>{{ releaseEvidenceDashboard.counts["cross-platform"] }}</strong> cross-platform</span>
+              <span><strong>{{ releaseEvidenceDashboard.counts.stale }}</strong> stale</span>
+              <span><strong>{{ releaseEvidenceDashboard.counts["ready-to-send"] }}</strong> ready</span>
+            </div>
+            <div class="release-readiness-actions">
+              <button type="button" @click="openConfigurationSetup('release-readiness')">Setup release evidence</button>
+              <button type="button" @click="insertReleaseEvidenceDashboard">Insert evidence dashboard</button>
+            </div>
+            <article
+              v-for="item in releaseEvidenceDashboard.items"
+              :key="item.id"
+              class="snapshot-row"
+              :data-status="item.lane"
+            >
+              <strong>{{ item.label }}</strong>
+              <p>{{ item.detail }}</p>
+              <small>{{ item.lane }} | {{ item.action }}</small>
+            </article>
+          </section>
           <section class="release-readiness-checklist" aria-label="Release readiness checklist">
             <header>
               <h3>Release readiness</h3>
@@ -7155,6 +7185,7 @@ import {
   releaseReadinessAuditMarkdown,
   type ReleaseChecklistItem,
 } from "./lib/releaseReadiness";
+import { buildReleaseEvidenceDashboard, releaseEvidenceDashboardMarkdown } from "./lib/releaseEvidenceDashboard";
 import {
   blankCustomTransformTemplate,
   builtinTransformTemplates,
@@ -9411,6 +9442,22 @@ const releaseReadinessChecklist = computed<ReleaseChecklistItem[]>(() => {
 });
 const releaseChecklistSummary = computed(() => formatReleaseChecklistSummary(releaseReadinessChecklist.value));
 const releaseChecklistHelp = computed(() => releaseChecklistHelpText(releaseReadinessChecklist.value));
+const releaseEvidenceDashboard = computed(() =>
+  buildReleaseEvidenceDashboard({
+    releaseChecklist: releaseReadinessChecklist.value,
+    exportVisualQa: exportVisualQaDashboard.value,
+    accessibilityQa: accessibilityQaReport.value,
+    sourceCount: citationSourceLibrary.value.length,
+    sourceIntegrityIssueCount: citationSourceLibrary.value.filter((source) => citationSourceNeedsRecovery(source)).length,
+    unresolvedCitationTodoCount: openCitationTodoCount.value,
+    diagnosticsErrorCount: (active.value.compile?.diagnostics || []).filter((diagnostic) => diagnostic.severity === "error").length,
+    exportReadinessErrorCount: store.exportReadiness?.error_count || 0,
+    exportReadinessWarningCount: store.exportReadiness?.warning_count || 0,
+    gitDirty: store.gitStatus?.dirty,
+    googleAuthenticated: googleAuthReady.value,
+    releaseTarget: frontMatterAnyScalar(active.value.text, ["releaseTarget"]) || store.exportTarget,
+  }),
+);
 const citationStyle = computed(() =>
   String(active.value.compile?.metadata.citationStyle || active.value.compile?.metadata.cslStyle || store.bibliographyDefaults.citationStyle),
 );
@@ -11049,6 +11096,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "qa-agent", label: "Improve", title: "Open an AI agent quality-improvement workflow", icon: "agent", run: () => openQualityAgent() },
       { id: "release-ready", label: "Release", title: "Prepare release metadata", icon: "snapshot", run: () => applyReleaseMetadataScaffold() },
       { id: "release-audit", label: "Audit", title: "Insert release readiness audit", icon: "snapshot", run: () => insertReleaseReadinessAudit() },
+      { id: "release-evidence", label: "Evidence", title: "Insert release evidence dashboard with complete, blocked, manual, credentialed, cross-platform, stale, and ready lanes", icon: "snapshot", primary: true, run: () => insertReleaseEvidenceDashboard() },
     ],
   },
 ]);
@@ -11311,6 +11359,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "review-readiness", label: "Review Readiness", help: "Open the Review sidebar and AI Control Center.", run: () => runAgentPlanReview() },
           { id: "release-metadata", label: "Prepare Release Metadata", help: "Scaffold status, version, owner, target, and approvals.", run: () => applyReleaseMetadataScaffold() },
           { id: "release-audit", label: "Insert Release Audit", help: "Insert release readiness evidence.", run: () => insertReleaseReadinessAudit() },
+          { id: "release-evidence-dashboard", label: "Insert Release Evidence Dashboard", help: "Insert complete, blocked, manual, credentialed, cross-platform, stale, and ready-to-send release evidence lanes.", run: () => insertReleaseEvidenceDashboard() },
         ],
       },
       {
@@ -14389,6 +14438,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Improve document with agent", group: "Quality", description: "Open an AI agent workflow seeded with current QA findings.", keywords: ["improve", "humanize", "quality", "agent"], run: () => openQualityAgent() },
   { name: "Prepare release metadata", group: "Review", run: () => applyReleaseMetadataScaffold() },
   { name: "Insert release readiness audit", group: "Review", run: () => insertReleaseReadinessAudit() },
+  {
+    name: "Insert release evidence dashboard",
+    group: "Review",
+    description: "Insert complete, blocked, manual, credentialed, cross-platform, stale, and ready-to-send release evidence lanes.",
+    keywords: ["release evidence", "release dashboard", "homebrew", "signing", "notarization", "cross platform", "ready to send"],
+    run: () => insertReleaseEvidenceDashboard(),
+  },
   { name: "Open table editor", group: "Tables", run: () => openTableEditor() },
   {
     name: "Edit table at cursor",
@@ -20715,6 +20771,14 @@ function insertReleaseReadinessAudit() {
   store.statusMessage = "Inserted release readiness audit";
 }
 
+function insertReleaseEvidenceDashboard() {
+  flushEditorTextToStore();
+  insertBlock(releaseEvidenceDashboardMarkdown(releaseEvidenceDashboard.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted release evidence dashboard";
+}
+
 function applyExportMetadataScaffold() {
   flushEditorTextToStore();
   const target = store.exportTarget;
@@ -26641,6 +26705,7 @@ select:hover {
 }
 
 .release-readiness-checklist,
+.release-evidence-dashboard,
 .quality-recommendations,
 .review-evidence-snapshot,
 .accessibility-qa-panel,
@@ -26658,6 +26723,18 @@ select:hover {
 
 .quality-recommendations {
   border-left-color: #5d55a5;
+}
+
+.release-evidence-dashboard {
+  border-left-color: #1f6f8b;
+}
+
+.release-evidence-dashboard[data-status="blocked"] {
+  border-left-color: #b42318;
+}
+
+.release-evidence-dashboard[data-status="needs-work"] {
+  border-left-color: #c68a1a;
 }
 
 .review-evidence-snapshot {
@@ -26683,6 +26760,7 @@ select:hover {
 }
 
 .release-readiness-checklist header,
+.release-evidence-dashboard header,
 .quality-recommendations header,
 .review-evidence-snapshot header,
 .accessibility-qa-panel header,
@@ -26695,6 +26773,8 @@ select:hover {
 
 .release-readiness-checklist h3,
 .release-readiness-checklist p,
+.release-evidence-dashboard h3,
+.release-evidence-dashboard p,
 .quality-recommendations h3,
 .quality-recommendations p,
 .review-evidence-snapshot h3,
@@ -26710,6 +26790,9 @@ select:hover {
 .release-readiness-checklist header span,
 .release-readiness-checklist p,
 .release-readiness-checklist small,
+.release-evidence-dashboard header span,
+.release-evidence-dashboard p,
+.release-evidence-dashboard small,
 .quality-recommendations header span,
 .quality-recommendations p,
 .quality-recommendations small,
@@ -26727,6 +26810,19 @@ select:hover {
 .layout-preset-grid p,
 .layout-preset-grid small {
   color: #526171;
+}
+
+.release-evidence-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 6px;
+}
+
+.release-evidence-metrics span {
+  padding: 6px 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+  font-size: 12px;
 }
 
 .accessibility-qa-metrics {
@@ -26820,6 +26916,22 @@ select:hover {
 
 .release-readiness-checklist .snapshot-row[data-status="missing"],
 .release-readiness-checklist .snapshot-row[data-status="needs-review"] {
+  border-left: 3px solid #c68a1a;
+}
+
+.release-evidence-dashboard .snapshot-row[data-status="complete"],
+.release-evidence-dashboard .snapshot-row[data-status="ready-to-send"] {
+  border-left: 3px solid #2f855a;
+}
+
+.release-evidence-dashboard .snapshot-row[data-status="blocked"],
+.release-evidence-dashboard .snapshot-row[data-status="stale"] {
+  border-left: 3px solid #b42318;
+}
+
+.release-evidence-dashboard .snapshot-row[data-status="manual"],
+.release-evidence-dashboard .snapshot-row[data-status="credentialed"],
+.release-evidence-dashboard .snapshot-row[data-status="cross-platform"] {
   border-left: 3px solid #c68a1a;
 }
 

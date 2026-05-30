@@ -259,6 +259,7 @@ import {
   releaseChecklistHelp,
   releaseReadinessAuditMarkdown,
 } from "../src/lib/releaseReadiness.js";
+import { buildReleaseEvidenceDashboard, releaseEvidenceDashboardMarkdown } from "../src/lib/releaseEvidenceDashboard.js";
 import {
   applyTransformProbeFailureState,
   applyTransformProbeSuccessState,
@@ -4643,6 +4644,89 @@ test("release readiness checklist and audit pass for approved documents", () => 
   ok(markdown.includes("QA Lead"));
 });
 
+test("release evidence dashboard separates blockers, stale evidence, credentials, and ready-to-send proof", () => {
+  const draftChecklist = buildReleaseReadinessChecklist({
+    text: "# Draft\n\nUnreleased notes.",
+    semantic: {
+      status: "draft",
+      comments: [{ line: 4, author: "Legal", state: "open", text: "Check warranty language." }],
+      change_notes: [],
+      ai_sources: [],
+      ai_assisted_sections: [{ line: 2, heading: "Draft", status: "needs-review", reviewed_by: "", reviewed_at: "", source: "docs-live", prompt_summary: "draft" }],
+    },
+  });
+
+  const blocked = buildReleaseEvidenceDashboard({
+    releaseChecklist: draftChecklist,
+    exportVisualQa: { status: "blocked", summary: "0 ready | 0 needs review | 1 blocked | 9 not run" },
+    accessibilityQa: { status: "needs-review", summary: "5 ready | 2 need review | 0 blocked" },
+    sourceCount: 2,
+    sourceIntegrityIssueCount: 1,
+    unresolvedCitationTodoCount: 1,
+    diagnosticsErrorCount: 1,
+    exportReadinessErrorCount: 1,
+    exportReadinessWarningCount: 2,
+    gitDirty: true,
+    googleAuthenticated: false,
+    releaseTarget: "Google Docs",
+  });
+
+  equal(blocked.status, "blocked");
+  ok(blocked.counts.blocked > 0);
+  ok(blocked.counts.stale > 0);
+  ok(blocked.items.some((item) => item.lane === "manual"));
+  ok(blocked.items.some((item) => item.label === "Homebrew, signing, and notarization" && item.lane === "credentialed"));
+  const blockedMarkdown = releaseEvidenceDashboardMarkdown(blocked, "2026-05-30T00:00:00.000Z");
+  ok(blockedMarkdown.includes("## Release Evidence Dashboard"));
+  ok(blockedMarkdown.includes("| stale | Sources and citation vault |"));
+  ok(blockedMarkdown.includes("Homebrew, signing, and notarization"));
+
+  const readyChecklist = buildReleaseReadinessChecklist({
+    text: [
+      "---",
+      "status: Approved",
+      "version: 2.0.0",
+      "owner: Strategy Office",
+      "releaseTarget: Client PDF",
+      "reviewer: QA Lead",
+      "approvedAt: 2026-05-26T00:00:00.000Z",
+      "---",
+      "",
+      "# Final Report",
+      "",
+    ].join("\n"),
+    semantic: {
+      status: "PUBLISHED",
+      comments: [{ line: 12, author: "QA", state: "resolved", text: "Resolved." }],
+      change_notes: [{ line: 13, author: "QA", text: "Approved release package." }],
+      ai_sources: [{ line: 14, provider: "local", model: "draft", date: "2026-05-26", prompt_summary: "Draft", reviewed_by: "QA Lead", reviewed_at: "2026-05-26T00:00:00.000Z", status: "human-reviewed" }],
+      ai_assisted_sections: [],
+    },
+  });
+
+  const ready = buildReleaseEvidenceDashboard({
+    releaseChecklist: readyChecklist,
+    exportVisualQa: { status: "ready", summary: "10 ready | 0 needs review | 0 blocked | 0 not run" },
+    accessibilityQa: { status: "ready", summary: "7 ready | 0 need review | 0 blocked" },
+    sourceCount: 1,
+    sourceIntegrityIssueCount: 0,
+    unresolvedCitationTodoCount: 0,
+    diagnosticsErrorCount: 0,
+    exportReadinessErrorCount: 0,
+    exportReadinessWarningCount: 0,
+    gitDirty: false,
+    googleAuthenticated: true,
+    homebrewEvidenceReady: true,
+    signingEvidenceReady: true,
+    platformEvidenceReady: true,
+    releaseTarget: "Client PDF",
+  });
+
+  equal(ready.status, "ready");
+  ok(ready.items.some((item) => item.id === "ready-to-send" && item.lane === "ready-to-send"));
+  ok(releaseEvidenceDashboardMarkdown(ready).includes("Release target Client PDF has complete local, visual, accessibility, platform, and signing evidence."));
+});
+
 test("export metadata checklist validates publishing and ebook handoff readiness", () => {
   const blogChecklist = buildExportMetadataChecklist({
     target: "blog",
@@ -8283,14 +8367,20 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Print preview summary"'));
   ok(app.includes('aria-label="Print preview controls"'));
   ok(app.includes('aria-label="Export visual QA dashboard"'));
+  ok(app.includes('aria-label="Release evidence dashboard"'));
+  ok(app.includes('aria-label="Release evidence lane counts"'));
   ok(app.includes("printPreviewEnabled"));
   ok(app.includes("printPreviewReport"));
   ok(app.includes("exportVisualQaDashboard"));
   ok(app.includes("exportVisualQaCurrentRow"));
   ok(app.includes("insertExportVisualQaReport"));
+  ok(app.includes("releaseEvidenceDashboard"));
+  ok(app.includes("insertReleaseEvidenceDashboard"));
   ok(app.includes("openExportVisualQaDashboard"));
   ok(app.includes("Open Visual QA Dashboard"));
   ok(app.includes("Insert Visual QA Report"));
+  ok(app.includes("Insert release evidence dashboard"));
+  ok(app.includes("complete, blocked, manual, credentialed, cross-platform, stale, and ready-to-send"));
   ok(app.includes("Open export visual QA dashboard"));
   ok(app.includes("Insert export visual QA report"));
   ok(app.includes("togglePrintPreview"));

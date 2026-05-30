@@ -790,6 +790,26 @@ See [Storage model](storage-model.md) and
 [Security threat model](security-threat-model.md) for persistence and trust
 boundaries.
 
+## Release Evidence Dashboard
+
+Open the **Review** panel or choose **Quality** -> **Insert Release Evidence
+Dashboard** to review whether a document is complete, blocked, manual,
+credentialed, cross-platform, stale, or ready to send.
+
+The dashboard combines release metadata, review comments, AI provenance,
+export readiness, visual QA, citation vault integrity, unresolved citation
+TODOs, accessibility QA, Google credential state, platform package evidence,
+Homebrew evidence, signing evidence, notarization evidence, Git cleanliness,
+and evidence freshness into one release-manager view. Use **Setup release
+evidence** to open the consolidated configurator, or **Insert evidence
+dashboard** to add the current release evidence table to the active Markdown
+document for review packets and stakeholder handoff.
+
+NEditor stays conservative: credentialed integrations, cross-platform package
+smoke checks, Homebrew audit output, signing proof, and notarization proof must
+be backed by explicit evidence before the dashboard can mark a package ready to
+send.
+
 ## Accessibility QA
 
 Open **Settings** -> **Appearance** to review the in-app **Accessibility QA**
