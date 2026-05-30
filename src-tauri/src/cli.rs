@@ -108,6 +108,9 @@ const CLI_COMMANDS: &[&str] = &[
     "release-readiness",
     "evidence",
     "evidence-status",
+    "evidence-packet",
+    "evidence-return-packet",
+    "release-evidence-packet",
     "release-candidate",
     "candidate",
     "support",
@@ -545,6 +548,9 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
         "readiness" | "release-readiness" => run_readiness_command(&args[2..]),
         "evidence" | "evidence-status" => run_evidence_command(&args[2..]),
+        "evidence-packet" | "evidence-return-packet" | "release-evidence-packet" => {
+            run_evidence_packet_command(&args[2..])
+        }
         "release-candidate" | "candidate" => run_release_candidate_command(&args[2..]),
         "support" | "support-bundle" => run_support_bundle_command(&args[2..]),
         "completions" | "completion" => run_completions_command(&args[2..]),
@@ -3710,6 +3716,136 @@ fn run_evidence_command(args: &[String]) -> Result<CliOutcome, String> {
     })
 }
 
+fn run_evidence_packet_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut readiness_report_path = PathBuf::from(".tmp/release-readiness/report.json");
+    let mut spec_report_path = PathBuf::from(".tmp/spec-completion/report.json");
+    let mut spec_work_orders_path: Option<PathBuf> = None;
+    let mut release_candidate_dir = PathBuf::from(".tmp/release-candidate");
+    let mut engine_report_path = PathBuf::from(".tmp/external-engines/probe-report.json");
+    let mut evidence_root_path = PathBuf::from(".tmp");
+    let mut evidence_kit_path = PathBuf::from(".tmp/release-evidence-kit/manifest.json");
+    let mut output_path: Option<PathBuf> = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--workspace" => {
+                index += 1;
+                workspace = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--workspace requires a directory path".to_string())?,
+                );
+            }
+            "--readiness-report" => {
+                index += 1;
+                readiness_report_path =
+                    PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--readiness-report requires a JSON report path".to_string()
+                    })?);
+            }
+            "--spec-report" => {
+                index += 1;
+                spec_report_path = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--spec-report requires a JSON report path".to_string())?,
+                );
+            }
+            "--spec-work-orders" => {
+                index += 1;
+                spec_work_orders_path = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--spec-work-orders requires a JSON work orders path".to_string()
+                })?));
+            }
+            "--release-candidate-dir" => {
+                index += 1;
+                release_candidate_dir = PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--release-candidate-dir requires a release-candidate directory".to_string()
+                })?);
+            }
+            "--engine-report" => {
+                index += 1;
+                engine_report_path =
+                    PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--engine-report requires a JSON report path".to_string()
+                    })?);
+            }
+            "--evidence-root" => {
+                index += 1;
+                evidence_root_path = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| "--evidence-root requires a directory path".to_string())?,
+                );
+            }
+            "--evidence-kit" => {
+                index += 1;
+                evidence_kit_path = PathBuf::from(args.get(index).ok_or_else(|| {
+                    "--evidence-kit requires a kit directory or manifest path".to_string()
+                })?);
+            }
+            "--output" | "-o" => {
+                index += 1;
+                output_path =
+                    Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--output requires a Markdown file path".to_string()
+                    })?));
+            }
+            value => return Err(format!("Unsupported evidence-packet option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let spec_work_orders_path =
+        spec_work_orders_path.unwrap_or_else(|| default_spec_work_orders_path(&spec_report_path));
+    let (support_report, _) = build_support_bundle_report(
+        &workspace,
+        &readiness_report_path,
+        &spec_report_path,
+        &spec_work_orders_path,
+        &release_candidate_dir,
+        &engine_report_path,
+        &evidence_root_path,
+        &evidence_kit_path,
+        None,
+    )?;
+    let markdown = evidence_return_packet_markdown(&support_report);
+    if let Some(path) = output_path.as_deref() {
+        write_cli_markdown_output(path, &markdown)?;
+    }
+
+    if json_output {
+        let report = json!({
+            "schema": "neditor.ned-evidence-return-packet.v1",
+            "generatedAtUnixSeconds": unix_timestamp_seconds(),
+            "workspace": readiness_string_field(&support_report, "workspace"),
+            "outputPath": output_path.as_deref().map(path_to_display),
+            "releaseReadiness": support_report.get("releaseReadiness").cloned().unwrap_or_else(|| json!({})),
+            "releaseActionPlan": support_report.get("releaseActionPlan").cloned().unwrap_or_else(|| json!({})),
+            "specActionPlan": support_report.get("specActionPlan").cloned().unwrap_or_else(|| json!({})),
+            "evidenceReports": readiness_array_field(&support_report, "evidenceReports"),
+            "evidenceReportSummary": support_report.get("evidenceReportSummary").cloned().unwrap_or_else(|| json!({})),
+            "markdown": markdown,
+        });
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+
+    Ok(CliOutcome {
+        message: if let Some(path) = output_path.as_deref() {
+            format!(
+                "Wrote release evidence return packet: {}",
+                path_to_display(path)
+            )
+        } else {
+            markdown
+        },
+        exit_code: 0,
+    })
+}
+
 fn run_release_candidate_command(args: &[String]) -> Result<CliOutcome, String> {
     let mut json_output = false;
     let mut strict = false;
@@ -4994,6 +5130,323 @@ fn support_bundle_text_report(report: &Value, written_to: Option<&str>) -> Strin
             .to_string(),
     );
     lines.join("\n")
+}
+
+fn evidence_return_packet_markdown(report: &Value) -> String {
+    let workspace = readiness_string_field(report, "workspace").unwrap_or("current workspace");
+    let release_readiness = report.get("releaseReadiness").unwrap_or(&Value::Null);
+    let release_action_plan = report.get("releaseActionPlan").unwrap_or(&Value::Null);
+    let spec_action_plan = report.get("specActionPlan").unwrap_or(&Value::Null);
+    let release_candidate = report.get("releaseCandidate").unwrap_or(&Value::Null);
+    let evidence_reports = readiness_array_field(report, "evidenceReports");
+    let evidence_summary = report.get("evidenceReportSummary").unwrap_or(&Value::Null);
+    let release_items = readiness_array_field(release_action_plan, "workItems");
+    let spec_orders = readiness_array_field(spec_action_plan, "workOrders");
+    let fallback_commit = git_head_commit().unwrap_or_else(|| "<current git commit>".to_string());
+    let source_commit = readiness_string_field(release_candidate, "currentSourceCommit")
+        .or_else(|| readiness_string_field(release_action_plan, "currentSourceCommit"))
+        .or_else(|| readiness_string_field(release_action_plan, "sourceCommit"))
+        .unwrap_or(fallback_commit.as_str());
+    let readiness_status = readiness_string_field(release_readiness, "status").unwrap_or("unknown");
+    let evidence_gap_count = readiness_array_field(release_readiness, "evidenceGaps")
+        .len()
+        .max(number_field_u64(
+            release_readiness.get("summary").unwrap_or(&Value::Null),
+            "evidenceGaps",
+        ) as usize);
+    let closure_commands = evidence_packet_closure_commands(&release_items, &spec_orders);
+
+    let mut lines = vec![
+        "# NEditor Release Evidence Return Packet".to_string(),
+        "".to_string(),
+        format!("Workspace: {workspace}"),
+        format!("Source commit: {source_commit}"),
+        format!("Release readiness: {readiness_status}"),
+        format!("Open release evidence gaps: {evidence_gap_count}"),
+        format!(
+            "Release evidence reports: {} ready, {} attention, {} missing, {} failed",
+            number_field_u64(evidence_summary, "ready"),
+            number_field_u64(evidence_summary, "attention"),
+            number_field_u64(evidence_summary, "missing"),
+            number_field_u64(evidence_summary, "failed")
+        ),
+        "".to_string(),
+        "Use this packet to assign release and specification evidence to platform owners, credentialed operators, human reviewers, and supported-host testers. Return files under one folder, then ingest them with `pnpm run ingest:evidence -- --source <returned-evidence-dir>`.".to_string(),
+        "".to_string(),
+        "## Redaction Rules".to_string(),
+        "".to_string(),
+        "- Return only validator reports, screenshots needed for release evidence, signed review JSON, package artifacts, cask files, and command-output logs.".to_string(),
+        "- Do not include secrets, customer documents, API keys, OAuth tokens, raw audio, private clipboard contents, or unrelated user files.".to_string(),
+        "- Keep credentialed proof descriptive unless the validator schema explicitly requires a non-secret identifier.".to_string(),
+        "".to_string(),
+        "## Release Evidence Assignments".to_string(),
+        "".to_string(),
+        "| Work item | Owner lane | What to return | Recognized ingest candidates | Validators | Runbooks |".to_string(),
+        "| --- | --- | --- | --- | --- | --- |".to_string(),
+    ];
+
+    if release_items.is_empty() {
+        lines.push("| - | No open release work items | Run `pnpm run collect:evidence-kit`, then regenerate this packet | - | `pnpm run check:release-readiness` | release evidence kit |".to_string());
+    } else {
+        for item in &release_items {
+            let id = readiness_string_field(item, "id").unwrap_or("release-evidence");
+            let returns = string_array_field(item, "returns");
+            let validators = string_array_field(item, "validatorCommands");
+            let runbooks = runbook_labels(item);
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} | {} |",
+                markdown_cell(id),
+                markdown_cell(evidence_owner_lane(id)),
+                markdown_cell(&returns.join("; ")),
+                markdown_cell(&evidence_return_candidates(&returns).join("; ")),
+                markdown_cell(&validators.join("; ")),
+                markdown_cell(&runbooks.join("; ")),
+            ));
+        }
+    }
+
+    lines.extend([
+        "".to_string(),
+        "## Specification And Manual Review Work Orders".to_string(),
+        "".to_string(),
+        "| Work order | Classification | Owner | Requirement | Return evidence | Validators |"
+            .to_string(),
+        "| --- | --- | --- | --- | --- | --- |".to_string(),
+    ]);
+    if spec_orders.is_empty() {
+        lines.push("| - | No open spec work orders | - | Run `pnpm run check:spec-completion`, then regenerate this packet | - | `pnpm run check:spec-completion` |".to_string());
+    } else {
+        for order in &spec_orders {
+            let id = readiness_string_field(order, "id").unwrap_or("spec-work-order");
+            let section = readiness_string_field(order, "specSection").unwrap_or("Spec");
+            let area = readiness_string_field(order, "requirementArea").unwrap_or("Requirement");
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} | {} |",
+                markdown_cell(id),
+                markdown_cell(
+                    readiness_string_field(order, "classification").unwrap_or("evidence")
+                ),
+                markdown_cell(
+                    readiness_string_field(order, "owner").unwrap_or("Release/spec owner")
+                ),
+                markdown_cell(&format!("{section} / {area}")),
+                markdown_cell(&string_array_field(order, "returns").join("; ")),
+                markdown_cell(&string_array_field(order, "validatorCommands").join("; ")),
+            ));
+        }
+    }
+
+    lines.extend([
+        "".to_string(),
+        "## Evidence Report Status".to_string(),
+        "".to_string(),
+        "| Report | Bucket | Status | Path | Detail |".to_string(),
+        "| --- | --- | --- | --- | --- |".to_string(),
+    ]);
+    if evidence_reports.is_empty() {
+        lines.push("| - | missing | No evidence reports attached | Run `ned evidence --json`, then regenerate this packet | - |".to_string());
+    } else {
+        for item in &evidence_reports {
+            lines.push(format!(
+                "| {} | {} | {} | {} | {} |",
+                markdown_cell(
+                    readiness_string_field(item, "label")
+                        .or_else(|| readiness_string_field(item, "id"))
+                        .unwrap_or("Evidence report")
+                ),
+                markdown_cell(readiness_string_field(item, "bucket").unwrap_or("unknown")),
+                markdown_cell(readiness_string_field(item, "status").unwrap_or("unknown")),
+                markdown_cell(readiness_string_field(item, "reportPath").unwrap_or("not reported")),
+                markdown_cell(&evidence_report_summary_text(item)),
+            ));
+        }
+    }
+
+    lines.extend([
+        "".to_string(),
+        "## Return Folder Layout".to_string(),
+        "".to_string(),
+        "```text".to_string(),
+        "returned-evidence/".to_string(),
+        "  platform-evidence/external/win32/package-artifacts.json".to_string(),
+        "  platform-evidence/external/win32/tauri-webdriver-report.json".to_string(),
+        "  platform-evidence/external/linux/package-artifacts.json".to_string(),
+        "  platform-evidence/external/linux/tauri-webdriver-report.json".to_string(),
+        "  release-signing/external/darwin/signing-evidence.json".to_string(),
+        "  release-signing/external/win32/signing-evidence.json".to_string(),
+        "  release-signing/external/linux/signing-evidence.json".to_string(),
+        "  homebrew/neditor.rb".to_string(),
+        "  homebrew/materialize-cask-report.json".to_string(),
+        "  google-docs-import/external/import-evidence.json".to_string(),
+        "  ai-provider-evidence/external/provider-evidence.json".to_string(),
+        "  ai-runtime-evidence/external/runtime-evidence.json".to_string(),
+        "  security-review/external/security-review.json".to_string(),
+        "  performance-profile/external/native-profile.json".to_string(),
+        "  rendered-export/visual-review-signoff.json".to_string(),
+        "  table-editor/manual-review-signoff.json".to_string(),
+        "  accessibility/manual-review-signoff.json".to_string(),
+        "  manual-review/<work-order-id>/signoff.json".to_string(),
+        "  manual-review/<work-order-id>/artifacts/".to_string(),
+        "```".to_string(),
+        "".to_string(),
+        "## Closure Commands".to_string(),
+        "".to_string(),
+    ]);
+    lines.extend(
+        closure_commands
+            .iter()
+            .map(|command| format!("- `{command}`")),
+    );
+    lines.extend([
+        "".to_string(),
+        "## Acceptance Gate".to_string(),
+        "".to_string(),
+        "- `pnpm run ingest:evidence -- --source <returned-evidence-dir>` copies recognized returns into the local evidence cache.".to_string(),
+        "- `pnpm run check:release-readiness` must report zero failed checks before release packaging is considered complete.".to_string(),
+        "- `pnpm run check:spec-completion` must no longer list manual or credentialed closure gaps for returned work orders.".to_string(),
+    ]);
+
+    lines.join("\n")
+}
+
+fn evidence_packet_closure_commands(release_items: &[Value], spec_orders: &[Value]) -> Vec<String> {
+    let mut commands = Vec::new();
+    for item in release_items {
+        for command in string_array_field(item, "validatorCommands") {
+            push_unique_string(&mut commands, command);
+        }
+        if let Some(command) = readiness_string_field(item, "ingestCommand") {
+            push_unique_string(&mut commands, command.to_string());
+        }
+        if let Some(command) = readiness_string_field(item, "finalReadinessCommand") {
+            push_unique_string(&mut commands, command.to_string());
+        }
+    }
+    for order in spec_orders {
+        for command in string_array_field(order, "validatorCommands") {
+            push_unique_string(&mut commands, command);
+        }
+        if let Some(command) = readiness_string_field(order, "ingestCommand") {
+            push_unique_string(&mut commands, command.to_string());
+        }
+        if let Some(command) = readiness_string_field(order, "matrixClosureCommand") {
+            push_unique_string(&mut commands, command.to_string());
+        }
+    }
+    push_unique_string(
+        &mut commands,
+        "pnpm run ingest:evidence -- --source <returned-evidence-dir>".to_string(),
+    );
+    push_unique_string(
+        &mut commands,
+        "pnpm run check:release-readiness".to_string(),
+    );
+    push_unique_string(&mut commands, "pnpm run check:spec-completion".to_string());
+    commands
+}
+
+fn push_unique_string(values: &mut Vec<String>, value: String) {
+    if !value.trim().is_empty() && !values.iter().any(|item| item == value.trim()) {
+        values.push(value.trim().to_string());
+    }
+}
+
+fn runbook_labels(item: &Value) -> Vec<String> {
+    readiness_array_field(item, "runbooks")
+        .into_iter()
+        .filter_map(|runbook| {
+            runbook
+                .as_str()
+                .map(str::to_string)
+                .or_else(|| readiness_string_field(&runbook, "path").map(str::to_string))
+                .or_else(|| readiness_string_field(&runbook, "title").map(str::to_string))
+        })
+        .collect()
+}
+
+fn evidence_return_candidates(returns: &[String]) -> Vec<String> {
+    let mut candidates = Vec::new();
+    for returned in returns {
+        push_unique_string(&mut candidates, returned.to_string());
+        push_unique_string(
+            &mut candidates,
+            returned.trim_start_matches(".tmp/").to_string(),
+        );
+        if let Some(name) = Path::new(returned)
+            .file_name()
+            .and_then(|name| name.to_str())
+        {
+            push_unique_string(&mut candidates, name.to_string());
+        }
+    }
+    candidates
+}
+
+fn evidence_owner_lane(id: &str) -> &'static str {
+    let normalized = id.to_ascii_lowercase();
+    if normalized.contains("windows") || normalized.contains("win32") {
+        "Windows platform owner"
+    } else if normalized.contains("linux") {
+        "Linux platform owner"
+    } else if normalized.contains("signing") || normalized.contains("notarization") {
+        "Signing and notarization owner"
+    } else if normalized.contains("homebrew") {
+        "Homebrew release owner"
+    } else if normalized.contains("google") {
+        "Google Docs credentialed operator"
+    } else if normalized.contains("ai-provider") {
+        "AI provider operator"
+    } else if normalized.contains("ai-runtime") || normalized.contains("ollama") {
+        "AI runtime device owner"
+    } else if normalized.contains("security") {
+        "Independent security reviewer"
+    } else if normalized.contains("performance") {
+        "Release-device performance tester"
+    } else if normalized.contains("rendered") {
+        "Rendered export human reviewer"
+    } else if normalized.contains("accessibility") {
+        "Accessibility reviewer"
+    } else if normalized.contains("table") {
+        "Table editor manual reviewer"
+    } else {
+        "Release evidence owner"
+    }
+}
+
+fn evidence_report_summary_text(report: &Value) -> String {
+    let mut parts = Vec::new();
+    if let Some(generated) = readiness_string_field(report, "generatedAt") {
+        parts.push(format!("generated {generated}"));
+    }
+    if let Some(error) = readiness_string_field(report, "error") {
+        parts.push(error.to_string());
+    }
+    if let Some(summary) = report.get("summary").and_then(Value::as_object) {
+        for (key, value) in summary.iter().take(4) {
+            if let Some(text) = value
+                .as_str()
+                .map(str::to_string)
+                .or_else(|| value.as_u64().map(|number| number.to_string()))
+                .or_else(|| value.as_i64().map(|number| number.to_string()))
+                .or_else(|| value.as_bool().map(|flag| flag.to_string()))
+            {
+                parts.push(format!("{key}: {text}"));
+            }
+        }
+    }
+    if parts.is_empty() {
+        "No detail reported".to_string()
+    } else {
+        parts.join("; ")
+    }
+}
+
+fn markdown_cell(value: &str) -> String {
+    value
+        .replace('|', "\\|")
+        .replace(['\r', '\n'], " ")
+        .trim()
+        .to_string()
 }
 
 fn release_action_plan_preview_lines(action_plan: &Value) -> Vec<String> {
@@ -12223,6 +12676,9 @@ _ned() {{
       evidence|evidence-status)
         COMPREPLY=( $(compgen -W "--json --strict --evidence-root" -- "$cur") )
         ;;
+      evidence-packet|evidence-return-packet|release-evidence-packet)
+        COMPREPLY=( $(compgen -W "--json --workspace --readiness-report --spec-report --spec-work-orders --release-candidate-dir --engine-report --evidence-root --evidence-kit --output" -- "$cur") )
+        ;;
       release-candidate|candidate)
         COMPREPLY=( $(compgen -W "--json --strict --candidate-dir --dir" -- "$cur") )
         ;;
@@ -12335,6 +12791,9 @@ _ned() {{
       ;;
     evidence|evidence-status)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when any evidence report needs attention]' '--evidence-root[read standard release evidence reports from a .tmp-style root]:directory:_files -/'
+      ;;
+    evidence-packet|evidence-return-packet|release-evidence-packet)
+      _arguments '--json[print machine-readable JSON]' '--workspace[inspect NEditor project scaffold]:directory:_files -/' '--readiness-report[attach a specific release-readiness report]:file:_files' '--spec-report[attach a specific spec-completion report]:file:_files' '--spec-work-orders[attach spec-completion work orders]:file:_files' '--release-candidate-dir[attach release-candidate status]:directory:_files -/' '--engine-report[attach a specific transform engine probe report]:file:_files' '--evidence-root[attach standard release evidence reports from a .tmp-style root]:directory:_files -/' '--evidence-kit[attach release evidence-kit work items]:file:_files' '--output[write Markdown packet]:file:_files'
       ;;
     release-candidate|candidate)
       _arguments '--json[print machine-readable JSON]' '--strict[fail when candidate is not checked and final-releaseable]' '--candidate-dir[read a release-candidate directory]:directory:_files -/' '--dir[alias for --candidate-dir]:directory:_files -/'
@@ -12567,6 +13026,26 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from evidence evidence-status' -l strict"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from evidence evidence-status' -l evidence-root -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l json"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l workspace -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l readiness-report -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l spec-report -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l spec-work-orders -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l release-candidate-dir -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l engine-report -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l evidence-root -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l evidence-kit -r"
+            .to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from evidence-packet evidence-return-packet release-evidence-packet' -l output -s o -r"
             .to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from release-candidate candidate' -l json"
             .to_string(),
@@ -13065,6 +13544,7 @@ fn help_text() -> String {
         "  ned readiness [--json] [--strict] [--report .tmp/release-readiness/report.json] [--action-plan --evidence-kit .tmp/release-evidence-kit]"
             .to_string(),
         "  ned evidence [--json] [--strict] [--evidence-root .tmp]".to_string(),
+        "  ned evidence-packet [--output release-evidence.md] [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--spec-work-orders path] [--evidence-root .tmp] [--evidence-kit .tmp/release-evidence-kit]".to_string(),
         "  ned release-candidate [--json] [--strict] [--candidate-dir .tmp/release-candidate]"
             .to_string(),
         "  ned support-bundle [--json] [--workspace path] [--readiness-report path] [--spec-report path] [--spec-work-orders path] [--release-candidate-dir path] [--engine-report path] [--evidence-root .tmp] [--evidence-kit .tmp/release-evidence-kit] [--output support.json]"

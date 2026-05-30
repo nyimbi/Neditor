@@ -108,6 +108,7 @@ ned rfp-response buyer-rfp.pdf --output response.md --matrix-output compliance.m
 ned convert board-paper.md --to pdf,docx,html --output-dir exports
 ned readiness --json
 ned support-bundle --workspace . --output support.json
+ned evidence-packet --output release-evidence-return-packet.md
 ```
 
 Inside the app, use **File -> Deploy CLI Globally** to make `ned` available
@@ -141,6 +142,7 @@ Useful commands:
 pnpm run check:release-readiness
 pnpm run collect:evidence-kit
 pnpm run check:evidence-kit
+ned evidence-packet --output release-evidence-return-packet.md
 pnpm run check:platform-packaging
 pnpm run check:release-signing
 pnpm run check:homebrew

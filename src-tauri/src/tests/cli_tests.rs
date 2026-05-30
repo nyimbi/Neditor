@@ -2483,6 +2483,90 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         "Next commands: pnpm run collect:evidence-kit -> pnpm run ingest:evidence -- --source /path/to/return-dir -> pnpm run check:release-readiness"
     ));
 
+    let evidence_packet_path = root.join("support").join("release-evidence-packet.md");
+    let evidence_packet = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "evidence-packet".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--readiness-report".to_string(),
+        readiness_gap_path.to_string_lossy().to_string(),
+        "--spec-report".to_string(),
+        spec_path.to_string_lossy().to_string(),
+        "--spec-work-orders".to_string(),
+        spec_work_orders_path.to_string_lossy().to_string(),
+        "--release-candidate-dir".to_string(),
+        release_candidate_dir.to_string_lossy().to_string(),
+        "--engine-report".to_string(),
+        engine_path.to_string_lossy().to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
+        "--evidence-kit".to_string(),
+        evidence_kit_dir.to_string_lossy().to_string(),
+        "--output".to_string(),
+        evidence_packet_path.to_string_lossy().to_string(),
+    ])
+    .expect("write evidence return packet");
+    assert_eq!(evidence_packet.exit_code, 0);
+    assert!(evidence_packet
+        .message
+        .contains("Wrote release evidence return packet"));
+    let evidence_packet_markdown =
+        fs::read_to_string(&evidence_packet_path).expect("read evidence packet");
+    assert!(evidence_packet_markdown.contains("# NEditor Release Evidence Return Packet"));
+    assert!(evidence_packet_markdown.contains("Release Evidence Assignments"));
+    assert!(evidence_packet_markdown.contains("homebrew-final-cask"));
+    assert!(evidence_packet_markdown.contains("Homebrew release owner"));
+    assert!(evidence_packet_markdown.contains("Specification And Manual Review Work Orders"));
+    assert!(evidence_packet_markdown.contains("001-manual-review-native-dialogs"));
+    assert!(
+        evidence_packet_markdown.contains("Do not include secrets, customer documents, API keys")
+    );
+    assert!(evidence_packet_markdown
+        .contains("pnpm run ingest:evidence -- --source <returned-evidence-dir>"));
+
+    let evidence_packet_json = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "evidence-return-packet".to_string(),
+        "--workspace".to_string(),
+        root.to_string_lossy().to_string(),
+        "--readiness-report".to_string(),
+        readiness_gap_path.to_string_lossy().to_string(),
+        "--spec-report".to_string(),
+        spec_path.to_string_lossy().to_string(),
+        "--spec-work-orders".to_string(),
+        spec_work_orders_path.to_string_lossy().to_string(),
+        "--release-candidate-dir".to_string(),
+        release_candidate_dir.to_string_lossy().to_string(),
+        "--engine-report".to_string(),
+        engine_path.to_string_lossy().to_string(),
+        "--evidence-root".to_string(),
+        evidence_root.to_string_lossy().to_string(),
+        "--evidence-kit".to_string(),
+        evidence_kit_dir.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("evidence return packet json");
+    assert_eq!(evidence_packet_json.exit_code, 0);
+    let evidence_packet_json: serde_json::Value =
+        serde_json::from_str(&evidence_packet_json.message).expect("evidence packet json");
+    assert_eq!(
+        evidence_packet_json["schema"],
+        "neditor.ned-evidence-return-packet.v1"
+    );
+    assert_eq!(
+        evidence_packet_json["releaseActionPlan"]["workItems"][0]["id"],
+        "homebrew-final-cask"
+    );
+    assert_eq!(
+        evidence_packet_json["specActionPlan"]["workOrders"][0]["id"],
+        "001-manual-review-native-dialogs"
+    );
+    assert!(evidence_packet_json["markdown"]
+        .as_str()
+        .expect("evidence packet markdown")
+        .contains("Return Folder Layout"));
+
     let covered_missing_engine_path = root.join("engine-covered-missing.json");
     fs::write(
         &covered_missing_engine_path,
@@ -2856,6 +2940,7 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("handlers"));
     assert!(bash.message.contains("readiness"));
     assert!(bash.message.contains("evidence"));
+    assert!(bash.message.contains("evidence-packet"));
     assert!(bash.message.contains("snippets"));
     assert!(bash.message.contains("--markdown"));
     assert!(bash.message.contains("--title"));
@@ -2892,6 +2977,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--spec-report"));
     assert!(zsh.message.contains("--engine-report"));
     assert!(zsh.message.contains("--evidence-root"));
+    assert!(zsh.message.contains("evidence-return-packet"));
+    assert!(zsh
+        .message
+        .contains("'--output[write Markdown packet]:file:_files'"));
     assert!(zsh.message.contains("--ids-only"));
     assert!(zsh.message.contains("--markdown"));
     assert!(zsh.message.contains("--title"));
@@ -2922,6 +3011,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("handlers"));
     assert!(fish.message.contains("readiness"));
     assert!(fish.message.contains("evidence"));
+    assert!(fish.message.contains("evidence-packet"));
+    assert!(fish.message.contains("release-evidence-packet"));
     assert!(fish.message.contains("-l title"));
     assert!(fish.message.contains("snippets"));
     assert!(fish.message.contains("ids-only"));
@@ -3481,6 +3572,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned handlers"));
     assert!(outcome.message.contains("ned readiness"));
     assert!(outcome.message.contains("ned evidence"));
+    assert!(outcome.message.contains("ned evidence-packet"));
     assert!(outcome.message.contains("ned support-bundle"));
     assert!(outcome
         .message

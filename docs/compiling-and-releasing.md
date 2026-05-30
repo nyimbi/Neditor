@@ -227,6 +227,17 @@ commands, ingest commands, and final readiness commands. Send that directory to
 supported-host owners or human reviewers when the local machine cannot produce
 the needed evidence.
 
+To produce a single Markdown handoff for tickets, reviewers, or credentialed
+operators, run:
+
+```sh
+ned evidence-packet --output release-evidence-return-packet.md
+```
+
+The packet combines release evidence work items, spec/manual work orders,
+recognized ingest paths, validator commands, redaction rules, and closure
+commands without including document content or secrets.
+
 When evidence returns from another host, ingest it:
 
 ```sh

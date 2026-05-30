@@ -652,12 +652,15 @@ NEditor is built for drafts that need evidence before publication.
   privacy notes. Use **Insert evidence return packet** when external platform
   owners, credentialed operators, or human reviewers need exact return paths,
   recognized ingest filenames, validator commands, redaction rules, and closure
-  commands for release evidence collection. If the bundle includes
-  manual-review spec work orders, use **Insert manual review kit** to add
-  reviewer-ready sign-off templates, expected artifact paths, validator
-  commands, and closure commands to the active document. Add the suggestion to
-  editable setup notes when a non-technical user needs a clear setup record
-  before changing configuration.
+  commands for release evidence collection. Release managers can generate the
+  same packet outside the app with
+  `ned evidence-packet --output release-evidence-return-packet.md`, which is
+  useful for support tickets, QA handoffs, and credentialed-host assignments.
+  If the bundle includes manual-review spec work orders, use **Insert manual
+  review kit** to add reviewer-ready sign-off templates, expected artifact
+  paths, validator commands, and closure commands to the active document. Add
+  the suggestion to editable setup notes when a non-technical user needs a
+  clear setup record before changing configuration.
 - For Claude Code, Codex, OpenCode, and Google Antigravity profiles, use
   **Prepare local agent workspace** to write the governed prompt package under
   `.neditor/agent-handoffs` in the active document folder. NEditor reports the
@@ -897,7 +900,11 @@ document for review packets and stakeholder handoff.
 The same release view now derives **Production readiness work orders** with
 priority, owner, command, and acceptance evidence for every open lane. Use
 **Insert work orders** when the release owner needs assignable next steps
-instead of a passive status summary.
+instead of a passive status summary. From the terminal, use
+`ned evidence-packet --output release-evidence-return-packet.md` to generate a
+Markdown packet that combines release work items, spec/manual work orders,
+recognized ingest paths, validator commands, redaction rules, and final closure
+commands.
 
 NEditor stays conservative: credentialed integrations, cross-platform package
 smoke checks, Homebrew audit output, signing proof, and notarization proof must

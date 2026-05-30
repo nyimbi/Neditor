@@ -6160,6 +6160,26 @@ JSON or generated kit folders.
 | `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including Markdown generation and UI exposure for the evidence return packet. |
 | `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting the evidence return packet. |
 
+## 2026-05-30 CLI Evidence Return Packet
+
+`ned evidence-packet` now generates the same release-evidence handoff from the
+terminal. The Markdown packet combines release evidence work items,
+spec/manual-review work orders, evidence report status, recognized ingest
+candidate paths, validator commands, redaction rules, return-folder layout, and
+closure commands. It supports `--output` for support tickets and `--json` for
+automation, with shell-completion and help-text coverage.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_creates_redaction_safe_support_bundles --lib` | Pass | Focused CLI fixture covers `ned evidence-packet --output`, `ned evidence-return-packet --json`, release work items, spec/manual work orders, redaction rules, and packet Markdown. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_generates_shell_completions_without_external_dependencies --lib` | Pass | Shell completions now expose `evidence-packet`, `evidence-return-packet`, `release-evidence-packet`, and their report/evidence/output flags. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_help_names_supported_conversion_targets --lib` | Pass | CLI help names `ned evidence-packet` alongside evidence, readiness, and support-bundle commands. |
+| `pnpm run check:cli` | Pass | 27 CLI tests passed and the debug `ned` binary built after adding the packet command. |
+| `src-tauri/target/debug/ned evidence-packet --output /private/tmp/neditor-release-evidence-packet-smoke.md` | Pass | Direct smoke wrote a Markdown packet for the current checkout with 20 release evidence gaps and 68 spec/manual work orders. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting check passed after the CLI command and test updates. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting the CLI packet. |
+| `git diff --check` | Pass | No whitespace errors are present in the CLI evidence-packet slice. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
