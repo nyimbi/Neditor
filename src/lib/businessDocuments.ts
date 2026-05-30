@@ -95,6 +95,8 @@ export interface BusinessDocumentSnippet {
   body: string;
 }
 
+export type CustomBusinessDocumentSnippet = BusinessDocumentSnippet;
+
 export interface VersionedBusinessClause {
   id: string;
   label: string;
@@ -1074,6 +1076,86 @@ export const versionedBusinessClauses: VersionedBusinessClause[] = [
   },
 ];
 
+export function createCustomBusinessSnippetId() {
+  return `custom-snippet-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function blankCustomBusinessSnippet(): CustomBusinessDocumentSnippet {
+  return {
+    id: createCustomBusinessSnippetId(),
+    label: "Custom document part",
+    kind: "proposal",
+    summary: "Reusable standard section for business documents.",
+    body: [
+      "## Custom Document Part",
+      "",
+      "Replace this with approved reusable language. Use {{companyName}}, {{defaultClientName}}, and other saved profile fields where recurring identity should be filled automatically.",
+    ].join("\n"),
+  };
+}
+
+export function normalizeCustomBusinessSnippets(value: unknown): CustomBusinessDocumentSnippet[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const snippets: CustomBusinessDocumentSnippet[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const id = slugifyReusableId(outlineStringValue(record.id) || outlineStringValue(record.label) || createCustomBusinessSnippetId());
+    if (!id || seen.has(id)) continue;
+    const label = outlineStringValue(record.label) || "Custom document part";
+    const body = outlineStringValue(record.body);
+    if (!body) continue;
+    seen.add(id);
+    snippets.push({
+      id,
+      label,
+      kind: normalizeBusinessSnippetKind(record.kind),
+      summary: outlineStringValue(record.summary) || "Reusable standard section for business documents.",
+      body,
+    });
+  }
+  return snippets.slice(0, 120);
+}
+
+export interface SaveCustomBusinessSnippetStateResult {
+  snippets: CustomBusinessDocumentSnippet[];
+  snippet: CustomBusinessDocumentSnippet | null;
+  changed: boolean;
+}
+
+export interface DeleteCustomBusinessSnippetStateResult {
+  snippets: CustomBusinessDocumentSnippet[];
+  changed: boolean;
+}
+
+export function saveCustomBusinessSnippetState(
+  snippets: CustomBusinessDocumentSnippet[],
+  snippet: CustomBusinessDocumentSnippet,
+): SaveCustomBusinessSnippetStateResult {
+  const normalizedSnippets = normalizeCustomBusinessSnippets(snippets);
+  const [normalized] = normalizeCustomBusinessSnippets([snippet]);
+  if (!normalized) return { snippets: normalizedSnippets, snippet: null, changed: false };
+  const existingIndex = normalizedSnippets.findIndex((candidate) => candidate.id === normalized.id);
+  if (existingIndex >= 0) {
+    return {
+      snippets: normalizedSnippets.map((candidate, index) => (index === existingIndex ? normalized : candidate)),
+      snippet: normalized,
+      changed: true,
+    };
+  }
+  return { snippets: [...normalizedSnippets, normalized], snippet: normalized, changed: true };
+}
+
+export function deleteCustomBusinessSnippetState(
+  snippets: CustomBusinessDocumentSnippet[],
+  id: string,
+): DeleteCustomBusinessSnippetStateResult {
+  const normalizedSnippets = normalizeCustomBusinessSnippets(snippets);
+  const nextSnippets = normalizedSnippets.filter((snippet) => snippet.id !== id);
+  return { snippets: nextSnippets, changed: nextSnippets.length !== normalizedSnippets.length };
+}
+
 export function versionedClauseMarkdown(clause: VersionedBusinessClause, profile: Partial<BusinessProfile> = {}) {
   const body = fillBusinessTemplate(clause.body, profile).trimEnd();
   const currentPattern = new RegExp(`clause:${escapeRegExp(clause.id)}\\s+version=${escapeRegExp(clause.currentVersion)}\\b`, "i");
@@ -1205,6 +1287,10 @@ export function deleteCustomVersionedClauseState(
 }
 
 function slugifyClauseId(value: string) {
+  return slugifyReusableId(value);
+}
+
+function slugifyReusableId(value: string) {
   return value
     .trim()
     .toLowerCase()

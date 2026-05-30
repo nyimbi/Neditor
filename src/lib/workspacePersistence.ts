@@ -2,9 +2,11 @@ import type { AiCleanupOptions } from "../types.js";
 import type { AiProviderProfileId } from "./aiProviderPackages.js";
 import {
   normalizeBusinessProfile,
+  normalizeCustomBusinessSnippets,
   normalizeCustomDocumentOutlineTemplates,
   normalizeCustomVersionedClauses,
   type BusinessProfile,
+  type CustomBusinessDocumentSnippet,
   type CustomDocumentOutlineTemplate,
   type CustomVersionedBusinessClause,
 } from "./businessDocuments.js";
@@ -467,6 +469,7 @@ export interface PersistedWorkspace {
   databaseProfiles?: Partial<DatabaseProfile>[];
   activeDatabaseProfileId?: string;
   customLatexTemplates?: Partial<CustomLatexTemplateProfile>[];
+  customBusinessSnippets?: CustomBusinessDocumentSnippet[];
   customDocumentOutlineTemplates?: CustomDocumentOutlineTemplate[];
   customVersionedClauses?: CustomVersionedBusinessClause[];
   documentMemoryText?: string;
@@ -1390,6 +1393,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   migrated.databaseProfiles = normalizeDatabaseProfiles(raw.databaseProfiles);
   migrated.activeDatabaseProfileId = stringValue(raw.activeDatabaseProfileId) || "";
   migrated.customLatexTemplates = normalizeCustomLatexTemplateProfiles(raw.customLatexTemplates);
+  migrated.customBusinessSnippets = normalizeCustomBusinessSnippets(raw.customBusinessSnippets);
   migrated.customDocumentOutlineTemplates = normalizeCustomDocumentOutlineTemplates(raw.customDocumentOutlineTemplates);
   migrated.customVersionedClauses = normalizeCustomVersionedClauses(raw.customVersionedClauses);
   migrated.documentMemoryText = normalizedString(raw.documentMemoryText, 20_000) || "";

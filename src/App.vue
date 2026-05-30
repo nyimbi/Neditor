@@ -1566,13 +1566,45 @@
               Find a part
               <input v-model="businessSnippetQuery" placeholder="scope, pricing, compliance, risk, review" />
             </label>
+            <div class="versioned-clause-editor" aria-label="Custom reusable document part editor">
+              <label>
+                Part label
+                <input v-model="customSnippetDraft.label" placeholder="Client onboarding checklist" />
+              </label>
+              <label>
+                Kind
+                <select v-model="customSnippetDraft.kind">
+                  <option value="identity">Identity</option>
+                  <option value="proposal">Proposal</option>
+                  <option value="procurement">Procurement</option>
+                  <option value="delivery">Delivery</option>
+                  <option value="governance">Governance</option>
+                  <option value="review">Review</option>
+                </select>
+              </label>
+              <label>
+                Summary
+                <input v-model="customSnippetDraft.summary" placeholder="Where this reusable section should be used" />
+              </label>
+              <label>
+                Part Markdown
+                <textarea v-model="customSnippetDraft.body" rows="5" aria-label="Custom reusable document part Markdown"></textarea>
+              </label>
+              <div class="template-actions">
+                <button type="button" title="Start a new reusable document part" @click="resetCustomSnippetDraft">New part</button>
+                <button type="button" title="Save this reusable document part in the workspace library" @click="saveCustomBusinessSnippet">Save custom part</button>
+                <button v-if="editingCustomSnippetId" type="button" title="Delete this reusable document part from the workspace library" @click="deleteEditingCustomBusinessSnippet">Delete custom part</button>
+              </div>
+              <p class="sidebar-hint">Custom document parts are profile-aware Markdown snippets. Use saved business-profile fields such as <code v-pre>{{companyName}}</code> and <code v-pre>{{defaultClientName}}</code> to keep repeated language consistent.</p>
+            </div>
             <div class="snippet-list" role="list" aria-label="Standard document snippets">
               <article v-for="snippet in filteredBusinessSnippets" :key="snippet.id" class="snippet-card" role="listitem">
                 <div>
                   <strong>{{ snippet.label }}</strong>
-                  <small>{{ snippet.kind }} | {{ snippet.summary }}</small>
+                  <small>{{ snippet.kind }} | {{ snippet.summary }}{{ store.customBusinessSnippets.some((item) => item.id === snippet.id) ? " | custom" : "" }}</small>
                 </div>
                 <button type="button" :title="`Insert ${snippet.label} into the document`" @click="insertBusinessSnippet(snippet)">Insert</button>
+                <button v-if="store.customBusinessSnippets.some((item) => item.id === snippet.id)" type="button" :title="`Edit ${snippet.label}`" @click="editCustomBusinessSnippet(snippet)">Edit</button>
               </article>
             </div>
           </section>
@@ -7233,6 +7265,7 @@ import {
   analyzeRfpSource,
   aiDocumentWizardSteps,
   auditVersionedClauses,
+  blankCustomBusinessSnippet,
   blankCustomVersionedClause,
   blankCustomDocumentOutlineTemplate,
   builtInDocumentOutlineTemplates,
@@ -7256,6 +7289,7 @@ import {
   type BusinessDocumentSnippet,
   type BusinessDocumentTemplate,
   type BusinessProfile,
+  type CustomBusinessDocumentSnippet,
   type CustomDocumentOutlineTemplate,
   type CustomVersionedBusinessClause,
   type DocumentOutlineTemplate,
@@ -8190,6 +8224,8 @@ const businessProfileOpen = ref(false);
 const businessProfileDraft = ref<BusinessProfile>(normalizeBusinessProfile({}));
 const businessTemplateQuery = ref("");
 const businessSnippetQuery = ref("");
+const customSnippetDraft = ref<CustomBusinessDocumentSnippet>(blankCustomBusinessSnippet());
+const editingCustomSnippetId = ref("");
 const customClauseDraft = ref<CustomVersionedBusinessClause>(blankCustomVersionedClause());
 const editingCustomClauseId = ref("");
 const equationEditorOpen = ref(false);
@@ -10111,6 +10147,10 @@ const filteredBusinessTemplates = computed(() => {
     return [template.label, template.summary, template.docsLiveType, ...template.bestFor, ...template.outline].join(" ").toLowerCase().includes(query);
   });
 });
+const allBusinessSnippets = computed<BusinessDocumentSnippet[]>(() => {
+  const customIds = new Set(store.customBusinessSnippets.map((snippet) => snippet.id));
+  return [...businessDocumentSnippets.filter((snippet) => !customIds.has(snippet.id)), ...store.customBusinessSnippets];
+});
 const allDocumentOutlineTemplates = computed<DocumentOutlineTemplate[]>(() => [
   ...builtInDocumentOutlineTemplates,
   ...store.customDocumentOutlineTemplates.map((template) => ({ ...template, source: "custom" as const })),
@@ -10128,7 +10168,7 @@ const filteredDocumentOutlineTemplates = computed(() => {
 });
 const filteredBusinessSnippets = computed(() => {
   const query = businessSnippetQuery.value.trim().toLowerCase();
-  return businessDocumentSnippets.filter((snippet) => {
+  return allBusinessSnippets.value.filter((snippet) => {
     if (!query) return true;
     return [snippet.label, snippet.kind, snippet.summary, snippet.body].join(" ").toLowerCase().includes(query);
   });
@@ -10948,7 +10988,7 @@ const startWorkspaceItems = computed<StartWorkspaceItem[]>(() => {
   const currentText = active.value.text.trim();
   const hasStarterContent = currentText.length > 80;
   const hasOutline = /^#{1,4}\s+/m.test(currentText) || Boolean(active.value.compile?.semantic.outline.length);
-  const hasTemplates = businessDocumentTemplates.length + businessDocumentSnippets.length > 0;
+  const hasTemplates = businessDocumentTemplates.length + allBusinessSnippets.value.length > 0;
   const exportReady = Boolean(store.exportReadiness?.manifest || active.value.compile?.export_manifest);
   const cliReady = Boolean(cliDeployPlan.value?.applied && cliDeployPlan.value?.pathReady);
   return [
@@ -10995,7 +11035,7 @@ const startWorkspaceItems = computed<StartWorkspaceItem[]>(() => {
     {
       id: "templates",
       label: "Reusable blocks",
-      status: `${businessDocumentSnippets.length} snippets and ${hasTemplates ? "template library ready" : "no templates"}`,
+      status: `${allBusinessSnippets.value.length} snippets and ${hasTemplates ? "template library ready" : "no templates"}`,
       detail: "Insert reusable business clauses, profile-aware snippets, calculation templates, tables, diagrams, and standard document parts.",
       actionLabel: "Open templates",
       title: "Open templates, snippets, transform templates, and document outline starters",
@@ -11603,7 +11643,7 @@ const appMenus = computed<AppMenu[]>(() => [
         id: "parts",
         label: "Reusable parts",
         items: [
-          ...businessDocumentSnippets.map((snippet) => ({
+          ...allBusinessSnippets.value.map((snippet) => ({
             id: `part-${snippet.id}`,
             label: snippet.label,
             help: snippet.summary,
@@ -14931,7 +14971,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     keywords: [template.id, template.docsLiveType, ...template.bestFor],
     run: () => startBusinessDocumentWizard(template),
   })),
-  ...businessDocumentSnippets.map((snippet) => ({
+  ...allBusinessSnippets.value.map((snippet) => ({
     name: `Insert part: ${snippet.label}`,
     group: "Templates",
     description: snippet.summary,
@@ -19910,20 +19950,23 @@ async function installPastedTemplatePack() {
   }
   const result = installTemplatePackState({
     existingOutlines: store.customDocumentOutlineTemplates,
+    existingSnippets: store.customBusinessSnippets,
     existingTransforms: store.customTransformTemplates,
     existingLatexTemplates: store.customLatexTemplates,
     existingClauses: store.customVersionedClauses,
     pack,
   });
   const existingOutlineIds = new Set(store.customDocumentOutlineTemplates.map((template) => template.id));
+  const existingSnippetIds = new Set(store.customBusinessSnippets.map((snippet) => snippet.id));
   const existingTransformIds = new Set(store.customTransformTemplates.map((template) => template.id));
   const existingLatexIds = new Set(store.customLatexTemplates.map((template) => template.id));
   const existingClauseIds = new Set(store.customVersionedClauses.map((clause) => clause.id));
   for (const template of pack.outlines.filter((template) => !existingOutlineIds.has(template.id))) await store.saveCustomDocumentOutlineTemplate(template);
+  for (const snippet of pack.snippets.filter((snippet) => !existingSnippetIds.has(snippet.id))) await store.saveCustomBusinessSnippet(snippet);
   for (const template of pack.transforms.filter((template) => !existingTransformIds.has(template.id))) await store.saveCustomTransformTemplate(template);
   for (const template of pack.latexTemplates.filter((template) => !existingLatexIds.has(template.id))) store.saveCustomLatexTemplate(template);
   for (const clause of pack.clauses.filter((clause) => !existingClauseIds.has(clause.id))) await store.saveCustomVersionedClause(clause);
-  templatePackStatus.value = `Installed ${result.added.outlines} outline(s), ${result.added.transforms} transform template(s), ${result.added.latexTemplates} LaTeX template(s), and ${result.added.clauses} versioned clause(s) from ${pack.metadata.name}. Business templates and snippets are preserved in the pack manifest.`;
+  templatePackStatus.value = `Installed ${result.added.outlines} outline(s), ${result.added.snippets} reusable document part(s), ${result.added.transforms} transform template(s), ${result.added.latexTemplates} LaTeX template(s), and ${result.added.clauses} versioned clause(s) from ${pack.metadata.name}. Business templates are preserved in the pack manifest.`;
   store.statusMessage = templatePackStatus.value;
 }
 
@@ -20069,6 +20112,40 @@ function businessWizardStepAssistance(template: BusinessDocumentTemplate) {
 function insertBusinessSnippet(snippet: BusinessDocumentSnippet) {
   insertBlock(businessSnippetMarkdown(snippet, store.businessProfile));
   store.statusMessage = `Inserted ${snippet.label} document part`;
+}
+function resetCustomSnippetDraft() {
+  customSnippetDraft.value = blankCustomBusinessSnippet();
+  editingCustomSnippetId.value = "";
+  store.statusMessage = "Started a new custom reusable document part";
+}
+function editCustomBusinessSnippet(snippet: BusinessDocumentSnippet) {
+  customSnippetDraft.value = {
+    id: snippet.id,
+    label: snippet.label,
+    kind: snippet.kind,
+    summary: snippet.summary,
+    body: snippet.body,
+  };
+  editingCustomSnippetId.value = snippet.id;
+  store.statusMessage = `Editing custom document part ${snippet.label}`;
+}
+async function saveCustomBusinessSnippet() {
+  const draft = { ...customSnippetDraft.value };
+  if (!draft.label.trim() || !draft.body.trim()) {
+    store.statusMessage = "Add a label and Markdown body before saving a custom document part";
+    return;
+  }
+  const saved = await store.saveCustomBusinessSnippet(draft);
+  if (saved) {
+    customSnippetDraft.value = saved;
+    editingCustomSnippetId.value = saved.id;
+  }
+}
+async function deleteEditingCustomBusinessSnippet() {
+  const id = editingCustomSnippetId.value;
+  if (!id) return;
+  await store.deleteCustomBusinessSnippet(id);
+  resetCustomSnippetDraft();
 }
 
 function insertCalloutPreset(preset: CalloutPreset) {

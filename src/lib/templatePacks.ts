@@ -1,11 +1,12 @@
 import type {
   BusinessDocumentSnippet,
   BusinessDocumentTemplate,
+  CustomBusinessDocumentSnippet,
   CustomDocumentOutlineTemplate,
   CustomVersionedBusinessClause,
   DocumentOutlineTemplate,
 } from "./businessDocuments.js";
-import { normalizeCustomDocumentOutlineTemplates, normalizeCustomVersionedClauses } from "./businessDocuments.js";
+import { normalizeCustomBusinessSnippets, normalizeCustomDocumentOutlineTemplates, normalizeCustomVersionedClauses } from "./businessDocuments.js";
 import type { CustomTransformTemplate, TransformTemplate } from "./transformTemplates.js";
 import { normalizeCustomTransformTemplates } from "./transformTemplates.js";
 import type { CustomLatexTemplateProfile } from "./workspacePersistence.js";
@@ -31,7 +32,7 @@ export interface NeditorTemplatePack {
   schema: typeof templatePackSchema;
   metadata: TemplatePackMetadata;
   businessTemplates: BusinessDocumentTemplate[];
-  snippets: BusinessDocumentSnippet[];
+  snippets: CustomBusinessDocumentSnippet[];
   outlines: CustomDocumentOutlineTemplate[];
   transforms: CustomTransformTemplate[];
   latexTemplates: CustomLatexTemplateProfile[];
@@ -59,6 +60,7 @@ export interface BuildTemplatePackInput {
 
 export interface TemplatePackInstallInput {
   existingOutlines: CustomDocumentOutlineTemplate[];
+  existingSnippets: CustomBusinessDocumentSnippet[];
   existingTransforms: CustomTransformTemplate[];
   existingLatexTemplates: CustomLatexTemplateProfile[];
   existingClauses: CustomVersionedBusinessClause[];
@@ -67,11 +69,13 @@ export interface TemplatePackInstallInput {
 
 export interface TemplatePackInstallResult {
   outlines: CustomDocumentOutlineTemplate[];
+  snippets: CustomBusinessDocumentSnippet[];
   transforms: CustomTransformTemplate[];
   latexTemplates: CustomLatexTemplateProfile[];
   clauses: CustomVersionedBusinessClause[];
   added: {
     outlines: number;
+    snippets: number;
     transforms: number;
     latexTemplates: number;
     clauses: number;
@@ -85,7 +89,7 @@ export interface TemplatePackSummaryRow {
 
 export function buildTemplatePack(input: BuildTemplatePackInput): NeditorTemplatePack {
   const businessTemplates = dedupeById(input.businessTemplates || []).slice(0, 30);
-  const snippets = dedupeById(input.snippets || []).slice(0, 60);
+  const snippets = normalizeCustomBusinessSnippets(input.snippets || []).slice(0, 60);
   const outlines = normalizeCustomDocumentOutlineTemplates(
     (input.outlines || []).map((template) => ({
       ...template,
@@ -164,20 +168,24 @@ export function parseTemplatePackJson(text: string): NeditorTemplatePack | null 
 
 export function installTemplatePackState(input: TemplatePackInstallInput): TemplatePackInstallResult {
   const outlineIds = new Set(input.existingOutlines.map((template) => template.id));
+  const snippetIds = new Set(input.existingSnippets.map((snippet) => snippet.id));
   const transformIds = new Set(input.existingTransforms.map((template) => template.id));
   const latexIds = new Set(input.existingLatexTemplates.map((template) => template.id));
   const clauseIds = new Set(input.existingClauses.map((clause) => clause.id));
   const newOutlines = input.pack.outlines.filter((template) => !outlineIds.has(template.id));
+  const newSnippets = input.pack.snippets.filter((snippet) => !snippetIds.has(snippet.id));
   const newTransforms = input.pack.transforms.filter((template) => !transformIds.has(template.id));
   const newLatexTemplates = input.pack.latexTemplates.filter((template) => !latexIds.has(template.id));
   const newClauses = input.pack.clauses.filter((clause) => !clauseIds.has(clause.id));
   return {
     outlines: normalizeCustomDocumentOutlineTemplates([...input.existingOutlines, ...newOutlines]),
+    snippets: normalizeCustomBusinessSnippets([...input.existingSnippets, ...newSnippets]),
     transforms: normalizeCustomTransformTemplates([...input.existingTransforms, ...newTransforms]),
     latexTemplates: [...input.existingLatexTemplates, ...newLatexTemplates].slice(0, 40),
     clauses: normalizeCustomVersionedClauses([...input.existingClauses, ...newClauses]),
     added: {
       outlines: newOutlines.length,
+      snippets: newSnippets.length,
       transforms: newTransforms.length,
       latexTemplates: newLatexTemplates.length,
       clauses: newClauses.length,

@@ -1,5 +1,10 @@
 import { activeDocumentState } from "./documentSelectors.js";
-import { normalizeBusinessProfile, normalizeCustomDocumentOutlineTemplates, normalizeCustomVersionedClauses } from "./businessDocuments.js";
+import {
+  normalizeBusinessProfile,
+  normalizeCustomBusinessSnippets,
+  normalizeCustomDocumentOutlineTemplates,
+  normalizeCustomVersionedClauses,
+} from "./businessDocuments.js";
 import { normalizeDatabaseProfiles, type DatabaseProfile } from "./databaseProfiles.js";
 import { normalizeGoogleIntegrationPreferences } from "./googleAuth.js";
 import { normalizeCustomTransformTemplates } from "./transformTemplates.js";
@@ -85,6 +90,7 @@ export interface WorkspacePersistenceStateInput {
   databaseProfiles: DatabaseProfile[];
   activeDatabaseProfileId: string;
   customLatexTemplates: RequiredPersistedValue<"customLatexTemplates">;
+  customBusinessSnippets: RequiredPersistedValue<"customBusinessSnippets">;
   customDocumentOutlineTemplates: RequiredPersistedValue<"customDocumentOutlineTemplates">;
   customVersionedClauses: RequiredPersistedValue<"customVersionedClauses">;
   documentMemoryText: string;
@@ -153,6 +159,7 @@ export function applyPersistedWorkspacePreferenceState(
     databaseProfiles: normalizeDatabaseProfiles(persisted.databaseProfiles),
     activeDatabaseProfileId: persisted.activeDatabaseProfileId || "",
     customLatexTemplates: normalizeCustomLatexTemplateProfiles(persisted.customLatexTemplates),
+    customBusinessSnippets: normalizeCustomBusinessSnippets(persisted.customBusinessSnippets),
     customDocumentOutlineTemplates: normalizeCustomDocumentOutlineTemplates(persisted.customDocumentOutlineTemplates),
     customVersionedClauses: normalizeCustomVersionedClauses(persisted.customVersionedClauses),
     documentMemoryText: persisted.documentMemoryText || "",
@@ -241,6 +248,7 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     databaseProfiles: state.databaseProfiles,
     activeDatabaseProfileId: state.activeDatabaseProfileId,
     customLatexTemplates: state.customLatexTemplates,
+    customBusinessSnippets: state.customBusinessSnippets,
     customDocumentOutlineTemplates: state.customDocumentOutlineTemplates,
     customVersionedClauses: state.customVersionedClauses,
     documentMemoryText: state.documentMemoryText,

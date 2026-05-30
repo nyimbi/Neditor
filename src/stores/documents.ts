@@ -5,15 +5,18 @@ import { watch as watchFs, type UnwatchFn, type WatchEvent } from "@tauri-apps/p
 import { Store } from "@tauri-apps/plugin-store";
 import { beginLatestDocumentTask, cancelLatestDocumentTask, isLatestDocumentTaskCurrent } from "../lib/asyncGuards";
 import {
+  deleteCustomBusinessSnippetState,
   deleteCustomDocumentOutlineTemplateState,
   deleteCustomVersionedClauseState,
   normalizeBusinessProfile,
+  saveCustomBusinessSnippetState,
   saveCustomDocumentOutlineTemplateState,
   saveCustomVersionedClauseState,
   workspaceDocumentOutlineLibraryJson,
   workspaceDocumentOutlineTemplatesFromJson,
   workspaceOutlineLibraryPath,
   type BusinessProfile,
+  type CustomBusinessDocumentSnippet,
   type CustomDocumentOutlineTemplate,
   type CustomVersionedBusinessClause,
 } from "../lib/businessDocuments";
@@ -436,6 +439,7 @@ export const useDocumentsStore = defineStore("documents", {
     databaseProfiles: normalizeDatabaseProfiles([]) as DatabaseProfile[],
     activeDatabaseProfileId: "",
     customLatexTemplates: [] as CustomLatexTemplateProfile[],
+    customBusinessSnippets: [] as CustomBusinessDocumentSnippet[],
     customDocumentOutlineTemplates: [] as CustomDocumentOutlineTemplate[],
     customVersionedClauses: [] as CustomVersionedBusinessClause[],
     documentMemoryText: "",
@@ -1541,6 +1545,21 @@ export const useDocumentsStore = defineStore("documents", {
       this.customDocumentOutlineTemplates = next.templates;
       if (this.workspaceRoot) await this.deleteWorkspaceDocumentOutlineTemplate(id);
       this.statusMessage = "Deleted custom outline from the app library and workspace outline file";
+      await this.persistWorkspace();
+    },
+    async saveCustomBusinessSnippet(snippet: CustomBusinessDocumentSnippet) {
+      const next = saveCustomBusinessSnippetState(this.customBusinessSnippets, snippet);
+      if (!next.changed || !next.snippet) return null;
+      this.customBusinessSnippets = next.snippets;
+      this.statusMessage = `Saved custom document part ${next.snippet.label}`;
+      await this.persistWorkspace();
+      return next.snippet;
+    },
+    async deleteCustomBusinessSnippet(id: string) {
+      const next = deleteCustomBusinessSnippetState(this.customBusinessSnippets, id);
+      if (!next.changed) return;
+      this.customBusinessSnippets = next.snippets;
+      this.statusMessage = "Deleted custom document part";
       await this.persistWorkspace();
     },
     async saveCustomVersionedClause(clause: CustomVersionedBusinessClause) {

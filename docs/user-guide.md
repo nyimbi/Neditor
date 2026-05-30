@@ -308,15 +308,23 @@ current version, stale markers, and Markdown body; NEditor fills saved business
 profile placeholders when inserting it, then audits the active document for
 current, stale, and missing clause versions before external review.
 
+Use **Reusable document parts** when a full document template is too heavy.
+Built-in parts cover contact blocks, company overviews, executive summaries,
+scope, pricing assumptions, compliance matrices, tender checklists, tutorial
+steps, risk registers, and review handoffs. You can also save custom parts with
+a label, kind, summary, and Markdown body; custom parts are profile-aware,
+searchable beside built-ins, persisted with the workspace, and installable from
+template packs.
+
 Use **Template pack marketplace** in the same panel to package filtered
 business templates, snippets, outlines, transform templates, company LaTeX
 profiles, and custom versioned clauses into a portable
 `neditor.template-pack.v1` JSON file. Packs include publisher metadata,
 version, license, tags, placeholder inventory, examples, outline rules, and
 usage guidance so another workspace can inspect the pack before installing it.
-Pasted packs install reusable outlines, transform templates, LaTeX templates,
-and custom clauses into the local workspace library; business templates and
-snippets remain preserved in the pack manifest for review and copy-forward use.
+Pasted packs install reusable document parts, outlines, transform templates,
+LaTeX templates, and custom clauses into the local workspace library; business
+templates remain preserved in the pack manifest for review and copy-forward use.
 
 Use **References > Local data sources** for CSV, TSV, JSON, YAML, and XLSX
 inputs that should travel with a document. The **Data refresh workflow** shows

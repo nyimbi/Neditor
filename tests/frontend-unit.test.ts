@@ -102,7 +102,9 @@ import {
   businessSnippetMarkdown,
   businessTemplateMarkdown,
   businessWizardContext,
+  blankCustomBusinessSnippet,
   blankCustomVersionedClause,
+  normalizeCustomBusinessSnippets,
   normalizeBusinessProfile,
   normalizeCustomVersionedClauses,
   rfpComplianceChecklistMarkdown,
@@ -110,6 +112,8 @@ import {
   rfpProposalOutlineBullets,
   rfpProposalOutlineMarkdown,
   rfpResponseMarkdown,
+  saveCustomBusinessSnippetState,
+  deleteCustomBusinessSnippetState,
   saveCustomVersionedClauseState,
   deleteCustomVersionedClauseState,
   versionedBusinessClauses,
@@ -3814,6 +3818,22 @@ test("business document helpers fill identity templates snippets and wizard cont
   ok(snippet.includes("Jane Doe"));
   ok(snippet.includes("Acme Advisory"));
   ok(snippet.includes("https://acme.example"));
+  const customSnippet = {
+    ...blankCustomBusinessSnippet(),
+    id: "Client Onboarding Checklist",
+    label: "Client onboarding checklist",
+    kind: "delivery" as const,
+    summary: "Reusable kickoff checklist.",
+    body: "## Client Onboarding\n{{companyName}} will confirm {{defaultClientName}} stakeholders and access.",
+  };
+  const normalizedCustomSnippets = normalizeCustomBusinessSnippets([customSnippet]);
+  equal(normalizedCustomSnippets[0].id, "client-onboarding-checklist");
+  ok(businessSnippetMarkdown(normalizedCustomSnippets[0], profile).includes("Acme Advisory will confirm Globex"));
+  const savedCustomSnippet = saveCustomBusinessSnippetState([], customSnippet);
+  equal(savedCustomSnippet.snippets.length, 1);
+  equal(savedCustomSnippet.snippet?.id, "client-onboarding-checklist");
+  const deletedCustomSnippet = deleteCustomBusinessSnippetState(savedCustomSnippet.snippets, "client-onboarding-checklist");
+  equal(deletedCustomSnippet.snippets.length, 0);
   const confidentiality = versionedBusinessClauses.find((clause) => clause.id === "standard-confidentiality")!;
   ok(confidentiality);
   const clauseMarkdown = versionedClauseMarkdown(confidentiality, profile);
@@ -7387,6 +7407,16 @@ test("workspace persistence migration versions and normalizes saved settings", (
       { id: "custom-latex-board", name: "Duplicate ignored" },
       { name: "Missing id ignored" },
     ],
+    customBusinessSnippets: [
+      {
+        id: "client-onboarding-checklist",
+        label: " Client Onboarding ",
+        kind: "delivery",
+        summary: " Kickoff checklist. ",
+        body: "## Client Onboarding\nConfirm {{defaultClientName}} stakeholders.",
+      },
+      { id: "missing-body", label: "Ignored" },
+    ],
     customDocumentOutlineTemplates: [
       {
         id: "outline-qbr",
@@ -7783,6 +7813,15 @@ test("workspace persistence migration versions and normalizes saved settings", (
       sourcePath: "templates/board.tex",
     },
   ]);
+  deepEqual(migrated.customBusinessSnippets, [
+    {
+      id: "client-onboarding-checklist",
+      label: "Client Onboarding",
+      kind: "delivery",
+      summary: "Kickoff checklist.",
+      body: "## Client Onboarding\nConfirm {{defaultClientName}} stakeholders.",
+    },
+  ]);
   deepEqual(migrated.customDocumentOutlineTemplates, [
     {
       id: "outline-qbr",
@@ -7908,6 +7947,15 @@ test("workspace persistence state helper builds normalized store snapshots", () 
     databaseProfiles: normalizeDatabaseProfiles([{ name: "Warehouse", databasePath: "data/warehouse.sqlite" }]),
     activeDatabaseProfileId: "warehouse",
     customLatexTemplates: [],
+    customBusinessSnippets: [
+      {
+        id: "client-onboarding-checklist",
+        label: "Client onboarding checklist",
+        kind: "delivery",
+        summary: "Kickoff checklist.",
+        body: "## Client Onboarding\nConfirm {{defaultClientName}} stakeholders.",
+      },
+    ],
     customDocumentOutlineTemplates: [],
     customVersionedClauses: [
       {
@@ -7943,6 +7991,7 @@ test("workspace persistence state helper builds normalized store snapshots", () 
   deepEqual(workspace.transformEnginePaths, { dot: "/usr/bin/dot" });
   equal(workspace.databaseProfiles?.[0]?.name, "Warehouse");
   equal(workspace.activeDatabaseProfileId, "warehouse");
+  equal(workspace.customBusinessSnippets?.[0]?.id, "client-onboarding-checklist");
   equal(workspace.customVersionedClauses?.[0]?.id, "mutual-confidentiality");
   equal(workspace.documentMemoryText, "[terminology] ARR: Annual recurring revenue");
   deepEqual(workspace.googleIntegration?.scopes, ["https://www.googleapis.com/auth/drive.file"]);
@@ -8007,6 +8056,7 @@ test("workspace persistence state helper applies persisted preferences and resto
     databaseProfiles: [],
     activeDatabaseProfileId: "",
     customLatexTemplates: [],
+    customBusinessSnippets: [],
     customDocumentOutlineTemplates: [],
     customVersionedClauses: [],
     documentMemoryText: "",
@@ -8045,6 +8095,15 @@ test("workspace persistence state helper applies persisted preferences and resto
       transformTimeoutMs: 45_000,
       databaseProfiles: [{ name: "Warehouse", databasePath: "data/warehouse.sqlite" }],
       activeDatabaseProfileId: "warehouse",
+      customBusinessSnippets: [
+        {
+          id: "client-onboarding-checklist",
+          label: "Client onboarding checklist",
+          kind: "delivery",
+          summary: "Kickoff checklist.",
+          body: "## Client Onboarding\nConfirm {{defaultClientName}} stakeholders.",
+        },
+      ],
       customDocumentOutlineTemplates: [{ id: "outline-qbr", name: "QBR", category: "Executive", summary: "QBR outline", outline: ["Executive Summary"], tags: ["qbr"], bestFor: ["Reviews"] }],
       customVersionedClauses: [
         {
@@ -8085,6 +8144,7 @@ test("workspace persistence state helper applies persisted preferences and resto
   equal(result.state.databaseProfiles[0]?.id, "warehouse");
   equal(result.state.activeDatabaseProfileId, "warehouse");
   deepEqual(result.state.guidedDemoCompletedStepIds, ["ai-create"]);
+  equal(result.state.customBusinessSnippets[0]?.label, "Client onboarding checklist");
   equal(result.state.customDocumentOutlineTemplates[0]?.name, "QBR");
   equal(result.state.customVersionedClauses[0]?.label, "Mutual confidentiality");
   equal(result.state.documentMemoryText, "[terminology] ARR: Annual recurring revenue");
@@ -8359,30 +8419,34 @@ test("template packs serialize portable marketplace metadata and install reusabl
   ok(pack.metadata.placeholders.includes("companyName"));
   ok(pack.metadata.usageGuidance[0].includes("Replace placeholders"));
   ok(templatePackSummaryRows(pack).some((row) => row.label === "Transform templates" && row.value === "1"));
+  ok(templatePackSummaryRows(pack).some((row) => row.label === "Snippets" && row.value === "1"));
   ok(templatePackSummaryRows(pack).some((row) => row.label === "Versioned clauses" && row.value === "1"));
 
   const parsed = parseTemplatePackJson(templatePackJson(pack));
   if (!parsed) throw new Error("expected parsed template pack");
   equal(parsed.metadata.name, "Proposal acceleration pack");
+  equal(parsed.snippets[0].id, "company-contact-block");
   equal(parsed.transforms[0].id, "calc-business-roi");
   equal(parsed.clauses[0].id, "mutual-confidentiality");
 
   const firstInstall = installTemplatePackState({
     existingOutlines: [],
+    existingSnippets: [],
     existingTransforms: [],
     existingLatexTemplates: [],
     existingClauses: [],
     pack: parsed,
   });
-  deepEqual(firstInstall.added, { outlines: 1, transforms: 1, latexTemplates: 1, clauses: 1 });
+  deepEqual(firstInstall.added, { outlines: 1, snippets: 1, transforms: 1, latexTemplates: 1, clauses: 1 });
   const secondInstall = installTemplatePackState({
     existingOutlines: firstInstall.outlines,
+    existingSnippets: firstInstall.snippets,
     existingTransforms: firstInstall.transforms,
     existingLatexTemplates: firstInstall.latexTemplates,
     existingClauses: firstInstall.clauses,
     pack: parsed,
   });
-  deepEqual(secondInstall.added, { outlines: 0, transforms: 0, latexTemplates: 0, clauses: 0 });
+  deepEqual(secondInstall.added, { outlines: 0, snippets: 0, transforms: 0, latexTemplates: 0, clauses: 0 });
   equal(parseTemplatePackJson("{ bad json"), null);
 });
 
@@ -8708,6 +8772,10 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("equationEditorTemplates"));
   ok(app.includes("Open equation editor"));
   ok(app.includes('aria-label="Reusable document parts"'));
+  ok(app.includes('aria-label="Custom reusable document part editor"'));
+  ok(app.includes("Save custom part"));
+  ok(app.includes("allBusinessSnippets"));
+  ok(app.includes("saveCustomBusinessSnippet"));
   ok(app.includes('aria-label="Versioned reusable clauses"'));
   ok(app.includes('aria-label="Custom versioned clause editor"'));
   ok(app.includes("Save custom clause"));
