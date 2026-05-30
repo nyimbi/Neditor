@@ -3471,9 +3471,9 @@ test("edits with explicit multi-cursor commands", async ({ page }) => {
   await moveEditorCursorToEnd(page);
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("multi cursor");
-  await expect(page.getByRole("button", { name: /Add cursor above.*line above.*Edit/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Add cursor below.*line below.*Edit/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Select next occurrence.*simultaneous editing.*Edit/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add cursor above Edit" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add cursor below Edit" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Select next occurrence Edit" })).toBeVisible();
   await page.getByRole("button", { name: /Add cursor above.*Edit/ }).click();
   await page.keyboard.type("!");
 
@@ -3483,7 +3483,7 @@ test("edits with explicit multi-cursor commands", async ({ page }) => {
   await page.locator(".cm-line").filter({ hasText: "TODO first item" }).dblclick({ position: { x: 16, y: 8 } });
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("select all occurrences");
-  await expect(page.getByRole("button", { name: /Select all occurrences.*simultaneous editing.*Edit/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Select all occurrences Edit" })).toBeVisible();
   await page.getByRole("button", { name: /Select all occurrences.*Edit/ }).click();
   await page.keyboard.type("DONE");
   await expect.poll(() => editorText(page)).toContain("DONE first item");
@@ -3495,7 +3495,7 @@ test("edits with explicit multi-cursor commands", async ({ page }) => {
   await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
   await page.getByRole("button", { name: "Commands" }).click();
   await page.getByPlaceholder("Search commands, headings, citations, glossary, index terms").fill("split selection into line cursors");
-  await expect(page.getByRole("button", { name: /Split selection into line cursors.*selected range on every line.*Edit/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Split selection into line cursors Edit" })).toBeVisible();
   await page.getByRole("button", { name: /Split selection into line cursors.*Edit/ }).click();
   await page.keyboard.type("X");
   await expect.poll(() => editorText(page)).toBe(["X", "X", "X", "X", "X", "X", "X", "X", "X", "X", "X", "X"].join("\n"));
