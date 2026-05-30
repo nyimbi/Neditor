@@ -28,6 +28,18 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-30 Runtime Accessibility Region Repair
+
+The runtime accessibility audit now finds the primary source and preview panes
+by their expected landmark names again. The Markdown editor pane is exposed as
+`Markdown source`, the rendered pane is exposed as `Live preview`, and the
+Review toolbar order keeps Help immediately after Commands so focus help
+announces the Help Center control.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:a11y:runtime` | Pass | 7 Playwright runtime accessibility workflows passed after repairing source/preview landmark names and Help toolbar tab order. |
+
 ## 2026-05-30 Accessibility And Rendered Export Signoff Collectors
 
 NEditor now has collectors for two more human release gates.

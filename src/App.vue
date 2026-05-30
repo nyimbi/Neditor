@@ -4664,7 +4664,7 @@
         </template>
       </aside>
 
-      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" aria-label="Document source editor" tabindex="-1">
+      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" aria-label="Markdown source" tabindex="-1">
         <div class="editor-split-grid" :data-split-source="store.splitSourcePanes ? 'true' : 'false'">
           <div ref="editorHost" class="editor-host editor-host-primary" aria-label="Primary Markdown source pane"></div>
           <div v-if="store.splitSourcePanes" ref="secondaryEditorHost" class="editor-host editor-host-secondary" aria-label="Secondary Markdown source pane"></div>
@@ -4691,7 +4691,7 @@
         v-show="store.mode !== 'source' && store.mode !== 'focus' && store.mode !== 'outline'"
         class="preview-pane"
         :data-preview-theme="store.previewTheme"
-        aria-label="Document preview"
+        aria-label="Live preview"
         tabindex="-1"
         @scroll="syncEditorScrollFromPreview"
       >
@@ -11799,8 +11799,8 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "ai-paste", label: "AI Paste", title: "Paste from AI chat", icon: "ai", run: () => openAiPaste() },
       { id: "comment", label: "Comment", title: "Insert review comment", icon: "comment", run: () => insertBlock(commentSnippet) },
       { id: "commands", label: "Commands", title: "Open command palette", icon: "commands", run: () => (commandPaletteOpen.value = true) },
-      { id: "start-workspace", label: "Start", title: "Open the Start Workspace onboarding cockpit", icon: "help", primary: true, run: () => openStartWorkspace() },
       { id: "help", label: "Help", title: "Open Help Center", icon: "help", run: () => openHelp() },
+      { id: "start-workspace", label: "Start", title: "Open the Start Workspace onboarding cockpit", icon: "help", primary: true, run: () => openStartWorkspace() },
       { id: "demo", label: "Demo", title: "Start guided product demo", icon: "help", run: () => openGuidedDemo() },
     ],
   },
