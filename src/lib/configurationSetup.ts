@@ -100,6 +100,14 @@ export interface ConfigurationSetupStatusInput {
   googleTokenExpiresAt: string;
   externalEngineCount: number;
   transformReadyOrDisabled: boolean;
+  releaseEvidenceStatus: string;
+  releaseEvidenceSummary: string;
+  releaseEvidenceBlockedCount: number;
+  releaseEvidenceManualCount: number;
+  releaseEvidenceCredentialedCount: number;
+  releaseEvidenceCrossPlatformCount: number;
+  releaseEvidenceStaleCount: number;
+  releaseEvidenceReadyToSendCount: number;
 }
 
 export interface ConfigurationSetupAssistanceInput {
@@ -128,6 +136,14 @@ export interface ConfigurationSetupAssistanceInput {
   readyEngineCount: number;
   disabledEngineCount: number;
   externalEngineCount: number;
+  releaseEvidenceStatus: string;
+  releaseEvidenceSummary: string;
+  releaseEvidenceBlockedCount: number;
+  releaseEvidenceManualCount: number;
+  releaseEvidenceCredentialedCount: number;
+  releaseEvidenceCrossPlatformCount: number;
+  releaseEvidenceStaleCount: number;
+  releaseEvidenceReadyToSendCount: number;
 }
 
 export interface ConfigurationCenterSectionInput {
@@ -143,6 +159,8 @@ export interface ConfigurationCenterSectionInput {
   ttsEngine: string;
   externalEngineCount: number;
   installerPlanCount: number;
+  releaseEvidenceStatus: string;
+  releaseEvidenceSummary: string;
 }
 
 export function configurationSetupStepById(stepId: string): (typeof configurationSetupSteps)[number] {
@@ -158,6 +176,13 @@ export function buildConfigurationSetupStatus(input: ConfigurationSetupStatusInp
   const runtimeDone = input.docsLiveRuntimeIssueCount !== null;
   const exportDone = Boolean(input.exportIncludeManifest && input.exportLayoutPreset && input.citationStyle);
   const googleDone = Boolean(input.googleClientId && input.googleScopeCount && input.googleAuthorized);
+  const releaseDone = input.releaseEvidenceReadyToSendCount > 0;
+  const releaseNeedsAction =
+    input.releaseEvidenceBlockedCount ||
+    input.releaseEvidenceManualCount ||
+    input.releaseEvidenceCredentialedCount ||
+    input.releaseEvidenceCrossPlatformCount ||
+    input.releaseEvidenceStaleCount;
   const items: ConfigurationSetupStatusItem[] = [
     {
       id: "identity",
@@ -197,7 +222,16 @@ export function buildConfigurationSetupStatus(input: ConfigurationSetupStatusInp
       done: input.transformReadyOrDisabled,
       detail: `${input.externalEngineCount} external engines`,
     },
-    { id: "release", label: "Release gates", done: false, detail: "external evidence required" },
+    {
+      id: "release",
+      label: "Release gates",
+      done: releaseDone,
+      detail: releaseDone
+        ? "ready to send"
+        : releaseNeedsAction
+          ? `${input.releaseEvidenceStatus}: ${input.releaseEvidenceSummary}`
+          : "release evidence not generated",
+    },
   ];
   return {
     items,
@@ -274,9 +308,16 @@ export function buildConfigurationSetupStepAssistance(input: ConfigurationSetupA
       contextSignals.push(`Ready engines: ${input.readyEngineCount}`, `Disabled engines: ${input.disabledEngineCount}`);
       break;
     case "release":
-      suggestedAnswer = "Treat release readiness as incomplete until external evidence is supplied for signing/notarization, Windows and Linux package proof, Google Docs live import/readback, live provider evidence, real-device AI runtime evidence, rendered export sign-off, accessibility sign-off, and sustained performance profiling.";
-      rationale = "Some production gates cannot be proven on the current host; they must remain visible release blockers rather than being hidden behind local green checks.";
-      contextSignals.push("External evidence required");
+      suggestedAnswer =
+        input.releaseEvidenceReadyToSendCount > 0
+          ? `Release evidence is ready to send. Archive the evidence dashboard, export visual QA, accessibility QA, signed/notarized artifacts, Homebrew audit, and platform package proof with the release packet.`
+          : `Keep release setup open until the evidence dashboard has no blocked or stale lanes. Current release evidence is ${input.releaseEvidenceStatus}: ${input.releaseEvidenceSummary}. Resolve blocked (${input.releaseEvidenceBlockedCount}), stale (${input.releaseEvidenceStaleCount}), manual (${input.releaseEvidenceManualCount}), credentialed (${input.releaseEvidenceCredentialedCount}), and cross-platform (${input.releaseEvidenceCrossPlatformCount}) lanes before distribution.`;
+      rationale = "Release readiness should be based on the same evidence lanes release managers inspect before publishing, not on a static setup placeholder.";
+      contextSignals.push(
+        `Release status: ${input.releaseEvidenceStatus}`,
+        `Release summary: ${input.releaseEvidenceSummary}`,
+        `Ready-to-send lanes: ${input.releaseEvidenceReadyToSendCount}`,
+      );
       break;
   }
   return {
@@ -340,6 +381,12 @@ export function buildConfigurationCenterSections(input: ConfigurationCenterSecti
       label: "Transforms",
       summary: `${input.externalEngineCount} external engines; ${input.installerPlanCount} installer plan`,
       detail: "Download handlers, set executable paths, trust engines, probe setup, timeout, and execution modes.",
+    },
+    {
+      id: "release",
+      label: "Release evidence",
+      summary: `${input.releaseEvidenceStatus}; ${input.releaseEvidenceSummary}`,
+      detail: "Release gates, evidence freshness, credentialed proof, platform packaging, signing, Homebrew, and ready-to-send state.",
     },
   ] as const;
 }

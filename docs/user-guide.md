@@ -579,8 +579,11 @@ NEditor is built for drafts that need evidence before publication.
   workstation. Each setup area now includes AI setup assistance with a suggested
   next answer, rationale, and context signals for identity, LLM access, local
   agents, voice runtime, read-aloud, exports, transforms, and release gates.
-  Add the suggestion to editable setup notes when a non-technical user needs a
-  clear setup record before changing configuration.
+  The release setup area now mirrors the Release Evidence Dashboard, so blocked,
+  stale, manual, credentialed, cross-platform, and ready-to-send lanes are
+  visible from the same configurator used for AI, TTS, transforms, Google Docs,
+  and exports. Add the suggestion to editable setup notes when a non-technical
+  user needs a clear setup record before changing configuration.
 - For Claude Code, Codex, OpenCode, and Google Antigravity profiles, use
   **Prepare local agent workspace** to write the governed prompt package under
   `.neditor/agent-handoffs` in the active document folder. NEditor reports the

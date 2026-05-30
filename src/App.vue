@@ -3213,7 +3213,7 @@
               <span><strong>{{ releaseEvidenceDashboard.counts["ready-to-send"] }}</strong> ready</span>
             </div>
             <div class="release-readiness-actions">
-              <button type="button" @click="openConfigurationSetup('release-readiness')">Setup release evidence</button>
+              <button type="button" @click="openConfigurationSetup('release')">Setup release evidence</button>
               <button type="button" @click="insertReleaseEvidenceDashboard">Insert evidence dashboard</button>
             </div>
             <article
@@ -4145,6 +4145,39 @@
             </button>
           </section>
           </section>
+          <section v-show="selectedConfigurationSection === 'release'" class="configuration-center-panel" aria-label="Release evidence configuration">
+            <section class="release-evidence-dashboard" :data-status="releaseEvidenceDashboard.status" aria-label="Configurator release evidence dashboard">
+              <header>
+                <h3>Release evidence setup</h3>
+                <span>{{ releaseEvidenceDashboard.summary }}</span>
+              </header>
+              <p>Use this setup area to keep release gates, credentialed workflows, cross-platform package proof, Homebrew evidence, signing, notarization, accessibility, and freshness visible before distribution.</p>
+              <div class="release-evidence-metrics" aria-label="Configurator release evidence lane counts">
+                <span><strong>{{ releaseEvidenceDashboard.counts.complete }}</strong> complete</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts.blocked }}</strong> blocked</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts.manual }}</strong> manual</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts.credentialed }}</strong> credentialed</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts["cross-platform"] }}</strong> cross-platform</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts.stale }}</strong> stale</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts["ready-to-send"] }}</strong> ready</span>
+              </div>
+              <div class="release-readiness-actions">
+                <button type="button" @click="openConfigurationSetup('release')">Open release setup wizard</button>
+                <button type="button" @click="insertReleaseEvidenceDashboard">Insert evidence dashboard</button>
+                <button type="button" @click="insertReleaseReadinessAudit">Insert release audit</button>
+              </div>
+              <article
+                v-for="item in releaseEvidenceDashboard.items"
+                :key="item.id"
+                class="snapshot-row"
+                :data-status="item.lane"
+              >
+                <strong>{{ item.label }}</strong>
+                <p>{{ item.detail }}</p>
+                <small>{{ item.action }}</small>
+              </article>
+            </section>
+          </section>
           <section v-show="selectedConfigurationSection === 'transforms'" class="configuration-center-panel" aria-label="Transform engine configuration">
           <h3>Transform engines</h3>
           <section class="transform-handler-installer" aria-label="Transform handler installer">
@@ -4816,6 +4849,27 @@
                 </li>
               </ul>
               <p class="sidebar-hint">Selection reading uses the editor selection first. Full-document reading uses the active Markdown source and keeps the document text local for browser speech or native engines.</p>
+            </section>
+            <section v-else-if="currentConfigurationSetupStep.id === 'release'" class="business-profile-preview">
+              <div class="release-evidence-metrics" aria-label="Setup wizard release evidence lane counts">
+                <span><strong>{{ releaseEvidenceDashboard.counts.complete }}</strong> complete</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts.blocked }}</strong> blocked</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts.manual }}</strong> manual</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts.credentialed }}</strong> credentialed</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts["cross-platform"] }}</strong> cross-platform</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts.stale }}</strong> stale</span>
+                <span><strong>{{ releaseEvidenceDashboard.counts["ready-to-send"] }}</strong> ready</span>
+              </div>
+              <ul>
+                <li v-for="item in releaseEvidenceDashboard.items" :key="item.id">
+                  <strong>{{ item.label }}</strong>: {{ item.lane }} - {{ item.detail }}
+                </li>
+              </ul>
+              <div class="reference-actions">
+                <button type="button" @click="insertReleaseEvidenceDashboard">Insert evidence dashboard</button>
+                <button type="button" @click="insertReleaseReadinessAudit">Insert release audit</button>
+              </div>
+              <p class="sidebar-hint">Ready-to-send requires complete local, visual, accessibility, platform, Homebrew, signing, and credentialed evidence. Manual and external gates stay visible until proof is attached.</p>
             </section>
             <section v-else class="business-profile-preview">
               <p>{{ currentConfigurationSetupStep.summary }}</p>
@@ -10002,6 +10056,14 @@ const configurationSetupStatus = computed(() =>
     transformReadyOrDisabled: store.externalTransformEngines.length
       ? store.externalTransformEngines.some((engine) => externalEngineSetupStatus(engine).status === "ready" || store.disabledTransformEngines[engine.name])
       : true,
+    releaseEvidenceStatus: releaseEvidenceDashboard.value.status,
+    releaseEvidenceSummary: releaseEvidenceDashboard.value.summary,
+    releaseEvidenceBlockedCount: releaseEvidenceDashboard.value.counts.blocked,
+    releaseEvidenceManualCount: releaseEvidenceDashboard.value.counts.manual,
+    releaseEvidenceCredentialedCount: releaseEvidenceDashboard.value.counts.credentialed,
+    releaseEvidenceCrossPlatformCount: releaseEvidenceDashboard.value.counts["cross-platform"],
+    releaseEvidenceStaleCount: releaseEvidenceDashboard.value.counts.stale,
+    releaseEvidenceReadyToSendCount: releaseEvidenceDashboard.value.counts["ready-to-send"],
   }),
 );
 const configurationSetupSummary = computed(() => formatConfigurationSetupSummary(configurationSetupStatus.value));
@@ -10037,6 +10099,14 @@ const configurationSetupStepAssistance = computed(() => {
     readyEngineCount: readyEngines,
     disabledEngineCount: disabledEngines,
     externalEngineCount: store.externalTransformEngines.length,
+    releaseEvidenceStatus: releaseEvidenceDashboard.value.status,
+    releaseEvidenceSummary: releaseEvidenceDashboard.value.summary,
+    releaseEvidenceBlockedCount: releaseEvidenceDashboard.value.counts.blocked,
+    releaseEvidenceManualCount: releaseEvidenceDashboard.value.counts.manual,
+    releaseEvidenceCredentialedCount: releaseEvidenceDashboard.value.counts.credentialed,
+    releaseEvidenceCrossPlatformCount: releaseEvidenceDashboard.value.counts["cross-platform"],
+    releaseEvidenceStaleCount: releaseEvidenceDashboard.value.counts.stale,
+    releaseEvidenceReadyToSendCount: releaseEvidenceDashboard.value.counts["ready-to-send"],
   });
 });
 const selectedTransformInstallerPlan = computed(() =>
@@ -10067,6 +10137,8 @@ const configurationCenterSections = computed(() =>
     ttsEngine: store.ttsPreferences.engine,
     externalEngineCount: store.externalTransformEngines.length,
     installerPlanCount: transformInstallerPlans.value.length,
+    releaseEvidenceStatus: releaseEvidenceDashboard.value.status,
+    releaseEvidenceSummary: releaseEvidenceDashboard.value.summary,
   }),
 );
 const rfpAnalysisSummary = computed(() => {
@@ -19784,8 +19856,9 @@ async function runConfigurationSetupStep(stepId: ConfigurationSetupStepId) {
     await store.compileActive();
   } else {
     closeConfigurationSetup();
-    store.sidebar = "review";
-    store.statusMessage = "Review release readiness, Homebrew blockers, signing, accessibility, and evidence gates before distribution";
+    store.sidebar = "settings";
+    selectedConfigurationSection.value = "release";
+    store.statusMessage = "Opened release evidence setup with Homebrew, signing, accessibility, platform, and freshness lanes";
   }
 }
 
