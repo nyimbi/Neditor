@@ -16,16 +16,45 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `270a3cc Validate
-  manual review assets in evidence kits`
+- Latest inspected committed baseline before this update: `3ae9071 Record
+  current macOS release evidence`
 - Remote alignment at inspection time: `main...origin/main`
-- Worktree before this log update: clean and aligned with `origin/main`.
+- Worktree before this log update: performance-profile evidence collection
+  tooling was in progress and not yet committed.
 
 ## Durable Planning Artifacts
 
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Performance Profile Evidence Collector
+
+NEditor now has a first-class release-device performance evidence collector
+instead of requiring release-device testers to hand-edit the final evidence JSON.
+`pnpm run collect:performance-profile -- --write-template` writes a dedicated
+metrics input template, and `pnpm run collect:performance-profile` turns a real
+30+ minute release-device profiling session plus profiler artifacts into
+hashed `neditor.performance-profile-evidence.v1` evidence for
+`pnpm run check:performance-profile`.
+
+This does not close the release-device performance gap by itself. The collector
+requires a clean Git tree, a real profiled release binary, a named reviewer, a
+metrics JSON file, and profiler summary/trace artifacts. It improves the
+release workflow by making the missing evidence easy to collect and validate
+without fabricating performance proof locally.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/collect-performance-profile-evidence.mjs` | Pass | Collector syntax is valid after adding help output, metrics-template generation, clean-tree enforcement, artifact hashing, and validation guidance. |
+| `node --check scripts/check-performance-profile-evidence.mjs` | Pass | Validator syntax is valid after adding the generated metrics-template contract to the performance profile report. |
+| `pnpm run collect:performance-profile -- --help` | Pass | Help output documents required metrics, profiler artifact, binary, output, reviewer, environment-variable, and `--write-template` options. |
+| `pnpm run collect:performance-profile -- --write-template` | Pass | Wrote `.tmp/performance-profile/templates/native-profile-metrics.template.json` without requiring or synthesizing release evidence. |
+| `pnpm run check:performance-profile` | Pass with release-device profile pending | Wrote `.tmp/performance-profile/report.json`; status remains `pending-release-device-profile` until a real release-device evidence JSON is returned. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including static coverage for the collector script, package command, metrics template, evidence-kit runbook, and performance validator contract. |
+| `pnpm run check:release-ci` | Pass | Release CI workflow guard accepts the new collector command surface and refreshed `.tmp/release-ci/workflow-report.json`. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked after adding the release-device performance evidence runbook section. |
+| `git diff --check` | Pass | No whitespace errors are present in this release-evidence workflow slice. |
 
 ## 2026-05-30 Current-Binary macOS Evidence Refresh
 

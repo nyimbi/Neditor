@@ -40,6 +40,7 @@
     "collect:google-docs-import": "node scripts/collect-google-docs-import-evidence.mjs",
     "collect:engine-evidence": "node scripts/check-external-engines.mjs --write-evidence",
     "collect:platform-evidence": "node scripts/collect-platform-evidence.mjs",
+    "collect:performance-profile": "node scripts/collect-performance-profile-evidence.mjs",
     "collect:evidence-kit": "node scripts/collect-release-evidence-kit.mjs",
     "collect:release-signing": "node scripts/collect-release-signing-evidence.mjs",
     "ingest:evidence": "node scripts/ingest-release-evidence.mjs",

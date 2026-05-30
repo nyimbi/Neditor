@@ -175,6 +175,7 @@ function discoverEvidenceFiles(dir) {
 
 function writeTemplate() {
   const templatePath = join(templatesDir, "native-profile.template.json");
+  const metricsTemplatePath = join(templatesDir, "native-profile-metrics.template.json");
   writeFileSync(
     templatePath,
     `${JSON.stringify(
@@ -241,10 +242,57 @@ function writeTemplate() {
       2,
     )}\n`,
   );
+  writeFileSync(
+    metricsTemplatePath,
+    `${JSON.stringify(
+      {
+        schema: "neditor.performance-profile-metrics.v1",
+        durationMinutes: 45,
+        platform: process.platform,
+        arch: process.arch,
+        deviceClass: "release-laptop-or-workstation",
+        environment: {
+          osVersion: "replace-with-profiled-device-os-version",
+          cpu: "replace-with-profiled-device-cpu-model",
+          memoryGb: 16,
+          powerMode: "plugged-in",
+        },
+        scenarios: requiredScenarioIds.map((id) => ({
+          id,
+          status: "passed",
+          samples: 5,
+          p95InteractionMs: 250,
+          maxInteractionMs: 750,
+          peakRssMb: 900,
+          memoryGrowthMb: 80,
+          notes: "Replace with measurement method, profiler name, and observed behavior.",
+        })),
+        soak: {
+          durationMinutes: 45,
+          crashes: 0,
+          hangs: 0,
+          errorDialogs: 0,
+          memoryGrowthMb: 80,
+        },
+        exports: {
+          completed: 5,
+          failed: 0,
+          targets: ["html", "pdf", "docx", "pptx", "markdown-bundle"],
+          p95Ms: 3_000,
+        },
+        artifacts: {
+          notes: "Summarize profiler artifact paths and measurement context. The collector records hashes from --summary-artifact and optional --trace-artifact.",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 function writeReport(status, evidence, invalid) {
   const templatePath = join(templatesDir, "native-profile.template.json");
+  const metricsTemplatePath = join(templatesDir, "native-profile-metrics.template.json");
   writeFileSync(
     reportPath,
     `${JSON.stringify(
@@ -259,6 +307,10 @@ function writeReport(status, evidence, invalid) {
         template: {
           path: relative(templatePath),
           bytes: statSync(templatePath).size,
+        },
+        metricsTemplate: {
+          path: relative(metricsTemplatePath),
+          bytes: statSync(metricsTemplatePath).size,
         },
         summary: {
           acceptedEvidence: evidence.filter((item) => item.status === "accepted").length,

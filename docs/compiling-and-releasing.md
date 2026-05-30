@@ -266,6 +266,38 @@ Typical returned evidence includes:
 Release readiness rejects stale evidence when it was collected for a different
 source commit or when the current source tree is dirty.
 
+### Release-Device Performance Evidence
+
+The performance-profile gap must be closed with a real release-device run, not
+with synthetic metrics. On the profiling host, first generate the metrics input
+template:
+
+```sh
+pnpm run collect:performance-profile -- --write-template
+```
+
+Run the packaged release app for at least 30 minutes and record the required
+startup/open, large-document edit/preview, export-suite, file-watch conflict,
+and Agent Workspace review scenarios in
+`.tmp/performance-profile/templates/native-profile-metrics.template.json` or a
+copy of that file. Then collect hashed evidence from the metrics and profiler
+artifacts:
+
+```sh
+pnpm run collect:performance-profile -- \
+  --metrics /path/to/native-profile-metrics.json \
+  --summary-artifact /path/to/profiler-summary.txt \
+  --trace-artifact /path/to/profiler-trace.json \
+  --reviewer-name "Reviewer Name"
+pnpm run check:performance-profile
+```
+
+The collector requires a clean Git tree, hashes the profiled release binary and
+profiler artifacts, writes
+`.tmp/performance-profile/external/native-profile.json`, and leaves validation
+to `check:performance-profile`. Return that JSON through the release evidence
+kit or ingest it into the release checkout.
+
 ## Creating a Local Release Candidate
 
 From a clean checkout:

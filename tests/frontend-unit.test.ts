@@ -10593,6 +10593,7 @@ test("local verification scripts expose local baseline checks", () => {
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
   const platformEvidence = readFileSync("scripts/check-platform-evidence.mjs", "utf8");
   const performanceProfile = readFileSync("scripts/check-performance-profile-evidence.mjs", "utf8");
+  const performanceCollector = readFileSync("scripts/collect-performance-profile-evidence.mjs", "utf8");
   const signingCollector = readFileSync("scripts/collect-release-signing-evidence.mjs", "utf8");
   const releaseSigning = readFileSync("scripts/check-release-signing.mjs", "utf8");
   const externalTransformDocs = readFileSync("scripts/check-external-transform-docs.mjs", "utf8");
@@ -10629,6 +10630,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["collect:google-docs-import"], "node scripts/collect-google-docs-import-evidence.mjs");
   equal(scripts["collect:engine-evidence"], "node scripts/check-external-engines.mjs --write-evidence");
   equal(scripts["collect:platform-evidence"], "node scripts/collect-platform-evidence.mjs");
+  equal(scripts["collect:performance-profile"], "node scripts/collect-performance-profile-evidence.mjs");
   equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
   equal(scripts["ingest:evidence"], "node scripts/ingest-release-evidence.mjs");
@@ -10790,6 +10792,16 @@ test("local verification scripts expose local baseline checks", () => {
   ok(performanceProfile.includes("large-document-edit-preview"));
   ok(performanceProfile.includes("agent-workflow-review"));
   ok(performanceProfile.includes("binary.sha256 must be a 64-character SHA-256"));
+  ok(performanceProfile.includes("native-profile-metrics.template.json"));
+  ok(performanceProfile.includes("neditor.performance-profile-metrics.v1"));
+  ok(performanceCollector.includes("NEDITOR_PERFORMANCE_PROFILE_METRICS"));
+  ok(performanceCollector.includes("NEDITOR_PERFORMANCE_PROFILE_SUMMARY"));
+  ok(performanceCollector.includes("NEDITOR_PERFORMANCE_PROFILE_BINARY"));
+  ok(performanceCollector.includes("Performance profile evidence must be collected from a clean Git tree"));
+  ok(performanceCollector.includes("neditor.performance-profile-evidence.v1"));
+  ok(performanceCollector.includes("neditor.performance-profile-metrics.v1"));
+  ok(performanceCollector.includes("summarySha256: sha256File(summaryArtifactPath)"));
+  ok(performanceCollector.includes("Validate it with: pnpm run check:performance-profile"));
   ok(googleDocsImport.includes("neditor.google-docs-import-evidence.v1"));
   ok(googleDocsImport.includes("appVersion must match package.json version"));
   ok(googleDocsImport.includes("sourceCommit must match current git commit"));
@@ -10887,6 +10899,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("runtime-evidence.template.json"));
   ok(evidenceKitCollector.includes("security-review.template.json"));
   ok(evidenceKitCollector.includes("native-profile.template.json"));
+  ok(evidenceKitCollector.includes("native-profile-metrics.template.json"));
+  ok(evidenceKitCollector.includes("collect:performance-profile"));
   ok(evidenceKitCollector.includes("visual-review-signoff.template.json"));
   ok(evidenceKitCollector.includes("manual-review-template.json"));
   ok(evidenceKitCollector.includes("copyManualReviewAssets"));
@@ -10919,10 +10933,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("runbooks/independent-security-review.md"));
   ok(evidenceKitChecker.includes("runbooks/homebrew-release.md"));
   ok(evidenceKitChecker.includes("runbooks/release-device-performance-profile.md"));
+  ok(evidenceKitChecker.includes("const expectedTemplateCount = 18"));
   ok(evidenceKitChecker.includes("runbooks/table-editor-human-review.md"));
   ok(evidenceKitChecker.includes("runbooks/optional-external-engines.md"));
   ok(evidenceKitChecker.includes("runbooks/spec-completion-closure.md"));
-  ok(evidenceKitChecker.includes("expectedTemplateCount = 17"));
+  ok(evidenceKitChecker.includes("copiedTemplates must include ${expectedTemplateCount} entries"));
   ok(evidenceKitChecker.includes("report.json"));
   ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
   ok(evidenceKitChecker.includes("current source tree must be clean"));
