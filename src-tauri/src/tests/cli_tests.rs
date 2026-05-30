@@ -89,6 +89,7 @@ fn ned_cli_initializes_project_workspace_scaffold() {
         .is_file());
     assert!(root.join(".neditor").join("outlines.json").is_file());
     assert!(root.join(".neditor").join("latex-templates.json").is_file());
+    assert!(root.join(".neditor").join("export-profiles.json").is_file());
     assert!(root
         .join(".neditor")
         .join("snippets")
@@ -114,6 +115,10 @@ fn ned_cli_initializes_project_workspace_scaffold() {
         .expect("latex templates");
     assert!(latex_templates.contains("neditor.workspace-latex-templates.v1"));
     assert!(latex_templates.contains("Client Report House Style"));
+    let export_profiles = fs::read_to_string(root.join(".neditor").join("export-profiles.json"))
+        .expect("export profiles");
+    assert!(export_profiles.contains("neditor.workspace-export-profiles.v1"));
+    assert!(export_profiles.contains("Client PDF Delivery"));
     assert!(profile.contains("\"brandVoice\""));
     let snippet = fs::read_to_string(root.join(".neditor").join("snippets").join("business.md"))
         .expect("snippet");
@@ -349,6 +354,126 @@ fn ned_cli_manages_reusable_business_profile() {
     ])
     .expect_err("unknown profile field");
     assert!(unknown.contains("Unknown profile field"));
+}
+
+#[test]
+fn ned_cli_manages_workspace_export_profiles_and_applies_them() {
+    let workspace = temp_workspace_path("export-profiles");
+    fs::create_dir_all(&workspace).expect("workspace");
+    let source = temp_markdown_path("profile-export-source");
+    fs::write(
+        &source,
+        "---\ntitle: Profile Export\n---\n\n# Profile Export\n\nA reusable delivery profile test.",
+    )
+    .expect("write source");
+    let output_dir = workspace.join("exports");
+
+    let saved = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "export-profiles".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--save".to_string(),
+        "client-html".to_string(),
+        "--name".to_string(),
+        "Client HTML".to_string(),
+        "--target".to_string(),
+        "html".to_string(),
+        "--layout-preset".to_string(),
+        "business".to_string(),
+        "--no-comments".to_string(),
+        "--brand".to_string(),
+        "name=Acme".to_string(),
+        "--brand".to_string(),
+        "color=#123456".to_string(),
+        "--citation-style".to_string(),
+        "apa".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("save export profile");
+    let saved_report: serde_json::Value =
+        serde_json::from_str(&saved.message).expect("save profile json");
+    assert_eq!(saved_report["schema"], "neditor.ned-export-profiles.v1");
+    assert_eq!(
+        saved_report["library"]["activeExportProfileId"],
+        "client-html"
+    );
+    assert!(workspace
+        .join(".neditor")
+        .join("export-profiles.json")
+        .is_file());
+
+    let ids = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "export-profiles".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--ids-only".to_string(),
+    ])
+    .expect("ids only");
+    assert_eq!(ids.message.trim(), "client-html");
+
+    let markdown = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "delivery-profiles".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--markdown".to_string(),
+        "client-html".to_string(),
+    ])
+    .expect("profile markdown");
+    assert!(markdown.message.contains("# Export Profile: Client HTML"));
+    assert!(markdown
+        .message
+        .contains("\"defaultCitationStyle\": \"apa\""));
+    assert!(markdown.message.contains("\"name\": \"Acme\""));
+
+    let dry_run = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "export-profiles".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--apply".to_string(),
+        "client-html".to_string(),
+        "--document".to_string(),
+        source.to_string_lossy().to_string(),
+        "--output-dir".to_string(),
+        output_dir.to_string_lossy().to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .expect("profile dry-run apply");
+    let dry_report: serde_json::Value =
+        serde_json::from_str(&dry_run.message).expect("dry profile json");
+    assert_eq!(dry_report["export"]["dryRun"], true);
+    assert_eq!(dry_report["export"]["target"], "html");
+    assert_eq!(
+        dry_report["export"]["options"]["defaultBrandProfile"]["color"],
+        "#123456"
+    );
+    assert!(!output_dir.exists());
+
+    let applied = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "export-profiles".to_string(),
+        "--workspace".to_string(),
+        workspace.to_string_lossy().to_string(),
+        "--apply".to_string(),
+        "client-html".to_string(),
+        "--document".to_string(),
+        source.to_string_lossy().to_string(),
+        "--output-dir".to_string(),
+        output_dir.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("profile apply export");
+    let applied_report: serde_json::Value =
+        serde_json::from_str(&applied.message).expect("applied profile json");
+    let output_path = applied_report["export"]["outputPath"]
+        .as_str()
+        .expect("output path");
+    assert!(std::path::Path::new(output_path).is_file());
+    assert!(output_path.ends_with(".html"));
 }
 
 #[test]
@@ -3225,6 +3350,13 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         .as_array()
         .expect("improvement items")
         .iter()
+        .any(|item| item["number"] == 80
+            && item["title"] == "Export profiles"
+            && item["status"] == "implemented-evidence-present"));
+    assert!(report["items"]
+        .as_array()
+        .expect("improvement items")
+        .iter()
         .any(|item| item["number"] == 99 && item["title"] == "Release evidence dashboard"));
 
     let markdown = fs::read_to_string(&output).expect("improvements markdown");
@@ -3431,6 +3563,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("inspect"));
     assert!(bash.message.contains("rfp-response"));
     assert!(bash.message.contains("publish"));
+    assert!(bash.message.contains("export-profiles"));
+    assert!(bash.message.contains("--citation-style"));
     assert!(bash.message.contains("--token-env"));
     assert!(bash.message.contains("--matrix-output"));
     assert!(bash.message.contains("--checklist-output"));
@@ -3487,6 +3621,10 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
         .contains("--markdown[print Markdown reviewer handoff]"));
     assert!(zsh.message.contains("--endpoint"));
     assert!(zsh.message.contains("--allow-not-ready"));
+    assert!(zsh
+        .message
+        .contains("delivery-profiles\\:delivery-profiles"));
+    assert!(zsh.message.contains("--brand[set brand default key=value]"));
     assert!(zsh.message.contains("--matrix-output"));
     assert!(zsh.message.contains("--checklist-output"));
     assert!(zsh
@@ -3550,6 +3688,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("support-bundle"));
     assert!(fish.message.contains("inspect"));
     assert!(fish.message.contains("publish"));
+    assert!(fish.message.contains("export-profiles"));
+    assert!(fish.message.contains("citation-style"));
     assert!(fish.message.contains("token-env"));
     assert!(fish.message.contains("deploy-cli"));
     assert!(fish.message.contains("target-dir"));
@@ -4170,6 +4310,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert_eq!(outcome.exit_code, 0);
     assert!(outcome.message.contains("ned convert"));
     assert!(outcome.message.contains("ned publish"));
+    assert!(outcome.message.contains("ned export-profiles"));
     assert!(outcome.message.contains("--output-dir"));
     assert!(outcome.message.contains("--stdout"));
     assert!(outcome.message.contains("ned init"));

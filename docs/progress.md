@@ -16,8 +16,8 @@ progress records prove the requested end state.
 ## Current Repository State
 
 - Branch: `main`
-- Latest inspected committed baseline before this update: `e0d1576 Make toolbar
-  recovery self-evident`
+- Latest inspected committed baseline before this update: `fcc7ca5 Make CLI
+  read-aloud consent gated`
 - Remote alignment at inspection time: `main...origin/main`
 - Worktree before this log update: clean and aligned with `origin/main`.
 
@@ -26,6 +26,30 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-30 Scriptable Export Profiles
+
+Reusable delivery settings are now scriptable through `ned export-profiles`
+and `ned delivery-profiles`. Workspaces can store `.neditor/export-profiles.json`
+with named target, layout, manifest, citation, and brand defaults for repeated
+client, internal, blog, Substack, Google Docs, EPUB, LaTeX, and bundle
+deliveries. The workspace scaffold now includes a starter client PDF profile,
+and the CLI can list IDs, print a profile handoff in Markdown, save or update
+profiles, mark one active, delete profiles, dry-run an application, or export a
+document with the saved profile in one command.
+
+This closes a productization gap around repeated business-document delivery:
+release operators and non-technical teams no longer have to reconstruct the
+same target/options/brand choices for every scripted export.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:cli` | Pass | 34 CLI tests passed and the debug `ned` binary rebuilt, including export-profile save/list/Markdown/apply flows, dry-run no-write behavior, shell completions, scaffold coverage, and the 100-improvement audit item 80 status. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting reusable export profiles. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting verified after adding the export-profile CLI and audit classification. |
+| `src-tauri/target/debug/ned export-profiles --workspace "$tmpdir" --apply client-html --document "$tmpdir/report.md" --output-dir "$tmpdir/exports" --dry-run --json` | Pass | Smoke output used schema `neditor.ned-export-profiles.v1`, showed active profile `client-html`, target `html`, brand default `Smoke`, citation style `apa`, dry-run `true`, and did not write an export. |
+| `src-tauri/target/debug/ned improvements --json` | Pass with open roadmap work | Conservative audit now reports 66/100 implementation-evidenced items, marks item 80 Export profiles as implementation-evidenced, and still reports 34 partial/external-proof items, so the overall 100-improvement goal remains active. |
+| `git diff --check` | Pass | No whitespace errors in the working diff. |
 
 ## 2026-05-30 CLI Read-Aloud And TTS Consent Gate
 

@@ -878,6 +878,15 @@ The packaged CLI exposes the same handoff for automation:
 ned publish document.md --target blog --destination wordpress-rest --endpoint https://cms.example.com/wp-json/wp/v2/posts --token-env CMS_TOKEN --output publish-payload.json --json
 ```
 
+Repeated delivery settings can be saved as project-local export profiles under
+`.neditor/export-profiles.json`. Use
+`ned export-profiles --workspace . --save client-html --target html --layout-preset business --brand name=Client --citation-style apa --json`
+to create a reusable client or channel profile, then run
+`ned export-profiles --workspace . --apply client-html --document document.md --output-dir exports`
+to export with the saved target, layout, citation style, manifest setting, and
+brand defaults. Add `--dry-run --json` to preview the resolved options and
+output path before writing an artifact.
+
 The payload references the token environment variable but never stores the
 token value.
 Google Docs package exports are ZIP files with `document.docx` as the primary
