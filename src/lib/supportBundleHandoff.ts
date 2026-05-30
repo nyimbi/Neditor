@@ -70,6 +70,7 @@ export interface SupportBundleHandoffReport {
       invalidExternalEvidence?: number;
     };
   };
+  evidenceReports?: SupportBundleEvidenceReport[];
   evidenceReportSummary?: {
     ready?: number;
     attention?: number;
@@ -78,6 +79,17 @@ export interface SupportBundleHandoffReport {
     total?: number;
   };
   recommendations?: string[];
+}
+
+export interface SupportBundleEvidenceReport {
+  id?: string;
+  label?: string;
+  reportPath?: string;
+  status?: string;
+  bucket?: string;
+  generatedAt?: string;
+  error?: string;
+  summary?: Record<string, unknown>;
 }
 
 export interface SupportBundleReleaseWorkItem {
@@ -150,6 +162,95 @@ export function supportBundleManualReviewKitMarkdown(report: SupportBundleHandof
     "- `pnpm run ingest:evidence -- --source <returned-evidence-dir>`",
     "- `pnpm run check:release-readiness`",
     "- `pnpm run check:spec-completion`",
+    "",
+  ].join("\n");
+}
+
+export function supportBundleEvidenceReturnPacketMarkdown(report: SupportBundleHandoffReport, generatedAt = new Date().toISOString()) {
+  const releaseItems = report.releaseActionPlan?.workItems || [];
+  const evidenceReports = report.evidenceReports || [];
+  const sourceCommit = report.releaseCandidate?.currentSourceCommit || "<current git commit>";
+  const openEvidenceGaps = (report.releaseReadiness?.evidenceGaps || []).map((gap) => evidenceGapId(gap)).filter(Boolean);
+  const commands = uniqueStrings([
+    ...releaseItems.flatMap((item) => [...(item.validatorCommands || []), item.ingestCommand || "", item.finalReadinessCommand || ""]),
+    "pnpm run ingest:evidence -- --source <returned-evidence-dir>",
+    "pnpm run check:release-readiness",
+    "pnpm run check:spec-completion",
+  ]);
+
+  return [
+    "## Release Evidence Return Packet",
+    "",
+    `Generated: ${generatedAt}`,
+    `Workspace: ${report.workspace || "current workspace"}`,
+    `Source commit: ${sourceCommit}`,
+    `Release readiness: ${report.releaseReadiness?.status || "unknown"}`,
+    `Evidence gaps: ${openEvidenceGaps.length || report.releaseReadiness?.evidenceGaps?.length || 0}`,
+    "",
+    "Use this packet to collect release evidence from platform owners, credentialed operators, human reviewers, and external-device testers. Return files under one folder, then ingest them with `pnpm run ingest:evidence -- --source <returned-evidence-dir>`.",
+    "",
+    "### Redaction Rules",
+    "",
+    "- Return only validator reports, screenshots needed for release evidence, signed review JSON, package artifacts, cask files, and command-output logs.",
+    "- Do not include secrets, customer documents, API keys, OAuth tokens, raw audio, private clipboard contents, or unrelated user files.",
+    "- Keep credentialed proof descriptive unless the validator schema explicitly requires a non-secret identifier.",
+    "",
+    "### Open Evidence Assignments",
+    "",
+    "| Work item | Owner lane | What to return | Recognized ingest candidates | Validators | Runbooks |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...(releaseItems.length
+      ? releaseItems.map((item) => {
+          const guide = evidenceReturnGuide(item.id || "");
+          const returns = item.returns?.length ? item.returns : guide.returns;
+          const validators = item.validatorCommands?.length ? item.validatorCommands : guide.validators;
+          const runbook = item.runbooks?.length ? runbookText(item.runbooks) : guide.runbook;
+          return `| ${cell(item.id || "release-evidence")} | ${cell(guide.owner)} | ${cell(returns.join("; ") || "Evidence report or artifact path")} | ${cell(returnCandidates(returns, guide.candidates).join("; ") || "Use paths listed in the evidence kit")} | ${cell(validators.join("; ") || "pnpm run check:release-readiness")} | ${cell(runbook)} |`;
+        })
+      : ["| - | No open release work items | Run `pnpm run collect:evidence-kit` then preview the support bundle again | - | `pnpm run check:release-readiness` | release evidence kit |"]),
+    "",
+    "### Evidence Report Status",
+    "",
+    "| Report | Bucket | Status | Path | Detail |",
+    "| --- | --- | --- | --- | --- |",
+    ...(evidenceReports.length
+      ? evidenceReports.map((item) => `| ${cell(item.label || item.id || "evidence report")} | ${cell(item.bucket || "unknown")} | ${cell(item.status || "unknown")} | ${cell(item.reportPath || "not reported")} | ${cell(evidenceReportDetail(item))} |`)
+      : ["| - | missing | No evidence reports attached to this support bundle | Run `ned support-bundle --workspace . --json` after `pnpm run check:release-readiness` | - |"]),
+    "",
+    "### Return Folder Layout",
+    "",
+    "```text",
+    "returned-evidence/",
+    "  platform-evidence/external/win32/package-artifacts.json",
+    "  platform-evidence/external/win32/tauri-webdriver-report.json",
+    "  platform-evidence/external/linux/package-artifacts.json",
+    "  platform-evidence/external/linux/tauri-webdriver-report.json",
+    "  release-signing/external/darwin/signing-evidence.json",
+    "  release-signing/external/win32/signing-evidence.json",
+    "  release-signing/external/linux/signing-evidence.json",
+    "  homebrew/neditor.rb",
+    "  homebrew/materialize-cask-report.json",
+    "  google-docs-import/external/import-evidence.json",
+    "  ai-provider-evidence/external/provider-evidence.json",
+    "  ai-runtime-evidence/external/runtime-evidence.json",
+    "  security-review/external/security-review.json",
+    "  performance-profile/external/native-profile.json",
+    "  rendered-export/visual-review-signoff.json",
+    "  table-editor/manual-review-signoff.json",
+    "  accessibility/manual-review-signoff.json",
+    "  manual-review/<work-order-id>/signoff.json",
+    "  manual-review/<work-order-id>/artifacts/",
+    "```",
+    "",
+    "### Closure Commands",
+    "",
+    ...commands.slice(0, 18).map((command) => `- \`${command}\``),
+    "",
+    "### Acceptance Gate",
+    "",
+    "- `pnpm run ingest:evidence -- --source <returned-evidence-dir>` copies recognized returns into the local evidence cache.",
+    "- `pnpm run check:release-readiness` must report zero failed checks before release packaging is considered complete.",
+    "- `pnpm run check:spec-completion` must no longer list manual or credentialed closure gaps for returned work orders.",
     "",
   ].join("\n");
 }
@@ -317,6 +418,161 @@ function generatedIsoPlaceholder() {
 
 function runbookText(runbooks: SupportBundleReleaseWorkItem["runbooks"]) {
   return (runbooks || []).map((runbook) => runbook.path || runbook.title).filter(Boolean).join(", ") || "not mapped";
+}
+
+function evidenceGapId(gap: unknown) {
+  if (typeof gap === "string") return gap;
+  if (!gap || typeof gap !== "object") return "";
+  const value = gap as Record<string, unknown>;
+  return String(value.id || value.check || value.name || "").trim();
+}
+
+function evidenceReturnGuide(id: string) {
+  const normalized = id.toLowerCase();
+  if (normalized.includes("windows") || normalized.includes("win32")) {
+    return {
+      owner: "Windows platform owner",
+      returns: [".tmp/platform-evidence/external/win32/package-artifacts.json", ".tmp/platform-evidence/external/win32/tauri-webdriver-report.json"],
+      candidates: ["win32/package-artifacts.json", "win32/tauri-webdriver-report.json"],
+      validators: ["pnpm run check:platform-evidence"],
+      runbook: "runbooks/windows-platform.md",
+    };
+  }
+  if (normalized.includes("linux")) {
+    return {
+      owner: "Linux platform owner",
+      returns: [".tmp/platform-evidence/external/linux/package-artifacts.json", ".tmp/platform-evidence/external/linux/tauri-webdriver-report.json"],
+      candidates: ["linux/package-artifacts.json", "linux/tauri-webdriver-report.json"],
+      validators: ["pnpm run check:platform-evidence"],
+      runbook: "runbooks/linux-platform.md",
+    };
+  }
+  if (normalized.includes("signing") || normalized.includes("notarization")) {
+    return {
+      owner: "Signing and notarization owner",
+      returns: [".tmp/release-signing/external/darwin/signing-evidence.json", ".tmp/release-signing/external/win32/signing-evidence.json", ".tmp/release-signing/external/linux/signing-evidence.json"],
+      candidates: ["darwin-signing-evidence.json", "win32-signing-evidence.json", "linux-signing-evidence.json"],
+      validators: ["pnpm run check:release-signing"],
+      runbook: "runbooks/release-signing.md",
+    };
+  }
+  if (normalized.includes("homebrew")) {
+    return {
+      owner: "Homebrew release owner",
+      returns: [".tmp/homebrew/external/neditor.rb", ".tmp/homebrew/external/materialize-cask-report.json", ".tmp/homebrew/external/neditor-release-artifact"],
+      candidates: ["homebrew/neditor.rb", "homebrew/materialize-cask-report.json", "NEditor-macos.dmg"],
+      validators: ["pnpm run check:homebrew"],
+      runbook: "runbooks/homebrew-release.md",
+    };
+  }
+  if (normalized.includes("google")) {
+    return {
+      owner: "Google Docs credentialed operator",
+      returns: [".tmp/google-docs-import/external/import-evidence.json"],
+      candidates: ["google-docs/import-evidence.json", "import-evidence.json"],
+      validators: ["pnpm run check:google-docs-import"],
+      runbook: "runbooks/google-docs-import.md",
+    };
+  }
+  if (normalized.includes("ai-provider")) {
+    return {
+      owner: "AI provider operator",
+      returns: [".tmp/ai-provider-evidence/external/provider-evidence.json"],
+      candidates: ["ai-provider/provider-evidence.json", "provider-evidence.json"],
+      validators: ["pnpm run check:ai-provider"],
+      runbook: "runbooks/ai-provider-endpoint.md",
+    };
+  }
+  if (normalized.includes("ai-runtime") || normalized.includes("ollama")) {
+    return {
+      owner: "AI runtime device owner",
+      returns: [".tmp/ai-runtime-evidence/external/runtime-evidence.json"],
+      candidates: ["ai-runtime/runtime-evidence.json", "runtime-evidence.json"],
+      validators: ["pnpm run check:ai-runtime"],
+      runbook: "runbooks/ai-runtime-device.md",
+    };
+  }
+  if (normalized.includes("security")) {
+    return {
+      owner: "Independent security reviewer",
+      returns: [".tmp/security-review/external/security-review.json"],
+      candidates: ["security-review.json", "security/security-review.json"],
+      validators: ["pnpm run check:security-review"],
+      runbook: "runbooks/independent-security-review.md",
+    };
+  }
+  if (normalized.includes("performance")) {
+    return {
+      owner: "Release-device performance tester",
+      returns: [".tmp/performance-profile/external/native-profile.json"],
+      candidates: ["performance/native-profile.json", "native-profile.json"],
+      validators: ["pnpm run check:performance-profile"],
+      runbook: "runbooks/release-device-performance-profile.md",
+    };
+  }
+  if (normalized.includes("rendered")) {
+    return {
+      owner: "Rendered export human reviewer",
+      returns: [".tmp/rendered-export-audit/external/visual-review-signoff.json"],
+      candidates: ["rendered-export/visual-review-signoff.json", "visual-review-signoff.json"],
+      validators: ["pnpm run test:rendered-exports -- --validate-signoff-only"],
+      runbook: "runbooks/rendered-export-human-review.md",
+    };
+  }
+  if (normalized.includes("accessibility")) {
+    return {
+      owner: "Accessibility reviewer",
+      returns: [".tmp/accessibility/external/manual-review-signoff.json"],
+      candidates: ["accessibility/manual-review-signoff.json", "manual-review-signoff.json"],
+      validators: ["pnpm run check:a11y:manual"],
+      runbook: "runbooks/accessibility-human-review.md",
+    };
+  }
+  if (normalized.includes("table")) {
+    return {
+      owner: "Table editor manual reviewer",
+      returns: [".tmp/table-editor/external/manual-review-signoff.json"],
+      candidates: ["table-editor/manual-review-signoff.json", "table-editor-signoff.json"],
+      validators: ["pnpm run check:tables:manual"],
+      runbook: "runbooks/table-editor-human-review.md",
+    };
+  }
+  return {
+    owner: "Release evidence owner",
+    returns: [] as string[],
+    candidates: [] as string[],
+    validators: [] as string[],
+    runbook: "release evidence kit",
+  };
+}
+
+function returnCandidates(returns: string[], extraCandidates: string[]) {
+  return uniqueStrings(
+    [
+      ...returns,
+      ...returns.map((item) => item.replace(/^\.tmp\//, "")),
+      ...returns.map((item) => item.split(/[\\/]/).pop() || ""),
+      ...extraCandidates,
+    ].filter(Boolean),
+  );
+}
+
+function evidenceReportDetail(report: SupportBundleEvidenceReport) {
+  const details = [
+    report.generatedAt ? `generated ${report.generatedAt}` : "",
+    report.error || "",
+    summaryDetail(report.summary),
+  ].filter(Boolean);
+  return details.join("; ") || "No detail reported";
+}
+
+function summaryDetail(summary: SupportBundleEvidenceReport["summary"]) {
+  if (!summary) return "";
+  return Object.entries(summary)
+    .filter(([, value]) => typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    .slice(0, 4)
+    .map(([key, value]) => `${key}: ${String(value)}`)
+    .join(", ");
 }
 
 function evidenceStatus(summary: SupportBundleHandoffReport["evidenceReportSummary"]) {

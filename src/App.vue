@@ -4163,6 +4163,7 @@
             <div class="support-bundle-actions">
               <button type="button" :disabled="supportBundleBusy" title="Choose where to write the support bundle JSON" @click="saveSupportBundle">Save JSON</button>
               <button type="button" :disabled="!supportBundleReport" title="Insert a redaction-safe setup, release, and spec-closure handoff into the active document" @click="insertSupportBundleHandoff">Insert handoff</button>
+              <button type="button" :disabled="!supportBundleReport" title="Insert exact return paths, ingest candidates, validators, and redaction rules for release evidence owners" @click="insertEvidenceReturnPacket">Insert evidence return packet</button>
               <button type="button" :disabled="!supportBundleManualReviewWorkOrders.length" title="Insert reviewer-ready manual sign-off templates for spec-closure work orders" @click="insertManualReviewSignoffKit">Insert manual review kit</button>
               <span>{{ supportBundleStatus || "The bundle contains setup status and evidence summaries, not document content or secrets." }}</span>
             </div>
@@ -4353,6 +4354,7 @@
               <div class="support-bundle-actions">
                 <button type="button" :disabled="supportBundleBusy" @click="saveSupportBundle">Save JSON</button>
                 <button type="button" :disabled="!supportBundleReport" @click="insertSupportBundleHandoff">Insert handoff</button>
+                <button type="button" :disabled="!supportBundleReport" @click="insertEvidenceReturnPacket">Insert evidence packet</button>
                 <button type="button" :disabled="!supportBundleManualReviewWorkOrders.length" @click="insertManualReviewSignoffKit">Insert manual review kit</button>
                 <button type="button" @click="openConfigurationSetup('support')">Open support setup wizard</button>
                 <span>{{ supportBundleStatus || "The bundle contains setup status and evidence summaries, not document content or secrets." }}</span>
@@ -5120,6 +5122,7 @@
                 <button type="button" :disabled="supportBundleBusy" @click="previewSupportBundle">Preview support bundle</button>
                 <button type="button" :disabled="supportBundleBusy" @click="saveSupportBundle">Save support JSON</button>
                 <button type="button" :disabled="!supportBundleReport" @click="insertSupportBundleHandoff">Insert support handoff</button>
+                <button type="button" :disabled="!supportBundleReport" @click="insertEvidenceReturnPacket">Insert evidence packet</button>
                 <button type="button" :disabled="!supportBundleManualReviewWorkOrders.length" @click="insertManualReviewSignoffKit">Insert review kit</button>
               </div>
               <p class="sidebar-hint">The support bundle includes setup status, command paths, release evidence summaries, spec work orders, and transform health, but not active document content or stored secrets.</p>
@@ -7579,7 +7582,7 @@ import {
   templatePackSummaryRows,
   type NeditorTemplatePack,
 } from "./lib/templatePacks";
-import { supportBundleHandoffMarkdown, supportBundleManualReviewKitMarkdown } from "./lib/supportBundleHandoff";
+import { supportBundleEvidenceReturnPacketMarkdown, supportBundleHandoffMarkdown, supportBundleManualReviewKitMarkdown } from "./lib/supportBundleHandoff";
 import {
   buildTtsModelDownloadPlan,
   formatTtsRuntimeSummary,
@@ -7970,7 +7973,16 @@ type SupportBundleReport = {
     };
     engines?: unknown[];
   };
-  evidenceReports?: unknown[];
+  evidenceReports?: Array<{
+    id?: string;
+    label?: string;
+    reportPath?: string;
+    status?: string;
+    bucket?: string;
+    generatedAt?: string;
+    error?: string;
+    summary?: Record<string, unknown>;
+  }>;
   evidenceReportSummary?: {
     ready?: number;
     attention?: number;
@@ -22121,6 +22133,19 @@ function insertSupportBundleHandoff() {
   store.sidebar = "settings";
   selectedConfigurationSection.value = "support";
   store.statusMessage = "Inserted support and release handoff";
+}
+
+function insertEvidenceReturnPacket() {
+  if (!supportBundleReport.value) {
+    supportBundleStatus.value = "Preview the support bundle before inserting the evidence return packet";
+    return;
+  }
+  flushEditorTextToStore();
+  insertBlock(supportBundleEvidenceReturnPacketMarkdown(supportBundleReport.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "settings";
+  selectedConfigurationSection.value = "support";
+  store.statusMessage = `Inserted release evidence return packet with ${supportBundleReport.value.releaseActionPlan?.workItems?.length || 0} assignment${supportBundleReport.value.releaseActionPlan?.workItems?.length === 1 ? "" : "s"}`;
 }
 
 function insertManualReviewSignoffKit() {

@@ -6142,6 +6142,24 @@ open generated JSON or terminal output to discover the required sign-off shape.
 | `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including manual review kit Markdown generation and UI exposure guards. |
 | `git diff --check` | Pass | The manual review kit slice has no whitespace errors. |
 
+## 2026-05-30 Release Evidence Return Packet
+
+Support bundles now produce an insertable **Release Evidence Return Packet** for
+external platform owners, credentialed operators, human reviewers, and
+release-device testers. The packet lists open release work items with owner
+lanes, exact return paths, recognized ingest candidates, validator commands,
+runbooks, evidence report status, a standard return-folder layout, redaction
+rules, and final closure commands. This keeps the remaining external evidence
+gates assignable from the UI instead of forcing release managers to inspect raw
+JSON or generated kit folders.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `git diff --check` | Pass | The evidence return packet slice has no whitespace errors. |
+| `pnpm run check` | Pass | Vue type checking passed after wiring the support-bundle evidence packet insertion path. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including Markdown generation and UI exposure for the evidence return packet. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting the evidence return packet. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

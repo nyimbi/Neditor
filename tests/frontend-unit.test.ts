@@ -283,7 +283,7 @@ import {
   releaseReadinessAuditMarkdown,
 } from "../src/lib/releaseReadiness.js";
 import { buildReleaseEvidenceDashboard, buildReleaseEvidenceWorkOrders, releaseEvidenceDashboardMarkdown, releaseEvidenceWorkOrdersMarkdown } from "../src/lib/releaseEvidenceDashboard.js";
-import { supportBundleHandoffMarkdown, supportBundleManualReviewKitMarkdown } from "../src/lib/supportBundleHandoff.js";
+import { supportBundleEvidenceReturnPacketMarkdown, supportBundleHandoffMarkdown, supportBundleManualReviewKitMarkdown } from "../src/lib/supportBundleHandoff.js";
 import {
   applyTransformProbeFailureState,
   applyTransformProbeSuccessState,
@@ -4867,7 +4867,7 @@ test("support bundle handoff summarizes setup release and spec assignments", () 
     releaseReadiness: {
       status: "current-host-ready-with-external-gaps",
       releaseReady: false,
-      evidenceGaps: ["Windows package proof", "Google Docs readback"],
+      evidenceGaps: [{ id: "windows-package-artifact-proof" }, { id: "google-docs-live-import-readback" }],
       failures: [],
     },
     releaseActionPlan: {
@@ -4941,6 +4941,26 @@ test("support bundle handoff summarizes setup release and spec assignments", () 
       missing: 1,
       failed: 0,
     },
+    evidenceReports: [
+      {
+        id: "platform-evidence",
+        label: "Windows/Linux platform evidence",
+        reportPath: ".tmp/platform-evidence/report.json",
+        status: "pending-external-proof",
+        bucket: "attention",
+        generatedAt: "2026-05-30T00:00:00.000Z",
+        summary: { win32: "missing", linux: "missing" },
+      },
+      {
+        id: "google-docs-import",
+        label: "Google Docs import/readback",
+        reportPath: ".tmp/google-docs-import/report.json",
+        status: "missing",
+        bucket: "missing",
+        error: "Could not read report",
+        summary: {},
+      },
+    ],
     recommendations: ["Assign Windows package evidence to the platform release owner."],
   };
   const markdown = supportBundleHandoffMarkdown(report, "2026-05-30T00:00:00.000Z");
@@ -4963,6 +4983,18 @@ test("support bundle handoff summarizes setup release and spec assignments", () 
   ok(manualKit.includes("\"sourceCommit\": \"abc123\""));
   ok(manualKit.includes("pnpm run ingest:evidence -- --source <returned-evidence-dir>"));
   ok(manualKit.includes("artifacts/screenshot-or-export-proof.png"));
+
+  const evidencePacket = supportBundleEvidenceReturnPacketMarkdown(report, "2026-05-30T00:00:00.000Z");
+  ok(evidencePacket.includes("## Release Evidence Return Packet"));
+  ok(evidencePacket.includes("Source commit: abc123"));
+  ok(evidencePacket.includes("Release readiness: current-host-ready-with-external-gaps"));
+  ok(evidencePacket.includes("Windows platform owner"));
+  ok(evidencePacket.includes(".tmp/platform-evidence/windows.json"));
+  ok(evidencePacket.includes("platform-evidence/windows.json"));
+  ok(evidencePacket.includes("Google Docs import/readback"));
+  ok(evidencePacket.includes("returned-evidence/"));
+  ok(evidencePacket.includes("Do not include secrets, customer documents, API keys"));
+  ok(evidencePacket.includes("pnpm run ingest:evidence -- --source <returned-evidence-dir>"));
 });
 
 test("export metadata checklist validates publishing and ebook handoff readiness", () => {
@@ -10050,12 +10082,16 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("ned support-bundle --output support.json"));
   ok(app.includes("Support bundle"));
   ok(app.includes("redaction-safe setup and release-readiness handoff"));
+  ok(app.includes("supportBundleEvidenceReturnPacketMarkdown"));
   ok(app.includes("supportBundleHandoffMarkdown"));
   ok(app.includes("supportBundleManualReviewKitMarkdown"));
+  ok(app.includes("insertEvidenceReturnPacket"));
   ok(app.includes("insertSupportBundleHandoff"));
   ok(app.includes("insertManualReviewSignoffKit"));
   ok(app.includes("Insert handoff"));
   ok(app.includes("Insert support handoff"));
+  ok(app.includes("Insert evidence return packet"));
+  ok(app.includes("Insert evidence packet"));
   ok(app.includes("Insert manual review kit"));
   ok(app.includes("Insert review kit"));
   ok(app.includes("supportBundleManualReviewWorkOrders"));
