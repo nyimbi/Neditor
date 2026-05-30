@@ -2918,6 +2918,62 @@
               <button type="button" @click="insertQualityReviewNotes">Insert review notes</button>
             </section>
           </section>
+          <section class="review-evidence-snapshot" aria-label="Document evidence and approval review">
+            <header>
+              <div>
+                <h3>Evidence and approval review</h3>
+                <span>{{ reviewEvidenceSnapshotSummary }}</span>
+              </div>
+              <button type="button" @click="refreshReviewEvidenceSnapshot">Refresh</button>
+            </header>
+            <p>Surface claims, missing citations, unresolved reviewer comments, approval metadata, and specialist reviewer actions before export.</p>
+            <div class="release-readiness-actions">
+              <button type="button" :disabled="!activeReviewEvidenceRun" @click="insertReviewEvidenceAudit">Insert evidence audit</button>
+              <button type="button" @click="openAgentWorkspace('Review this document for claim inventory, citations, approval metadata, reviewer objections, and export release blockers.')">Open agent workspace</button>
+            </div>
+            <template v-if="activeReviewEvidenceRun">
+              <section class="review-evidence-metrics" aria-label="Evidence review metrics">
+                <span><strong>{{ activeReviewEvidenceRun.documentEvidence.claimInventory.length }}</strong> claims</span>
+                <span><strong>{{ activeReviewEvidenceRun.documentEvidence.citationTodos.length }}</strong> citation TODOs</span>
+                <span><strong>{{ activeReviewEvidenceRun.documentEvidence.reviewCommentResolutions.length }}</strong> comments</span>
+                <span><strong>{{ activeReviewEvidenceRun.approvalGate.blockers.length }}</strong> approval blockers</span>
+              </section>
+              <details :open="Boolean(activeReviewEvidenceRun.documentEvidence.claimInventory.length)">
+                <summary>Claim inventory</summary>
+                <article
+                  v-for="claim in activeReviewEvidenceRun.documentEvidence.claimInventory.slice(0, 12)"
+                  :key="`${claim.sourceLine}-${claim.text}`"
+                  class="snapshot-row"
+                  :data-status="claim.kind"
+                >
+                  <strong>Line {{ claim.sourceLine }} | {{ claim.kind }}</strong>
+                  <p>{{ claim.text }}</p>
+                  <small>{{ claim.reason }}</small>
+                </article>
+                <p v-if="!activeReviewEvidenceRun.documentEvidence.claimInventory.length" class="sidebar-hint">No candidate claims detected in the current snapshot.</p>
+              </details>
+              <details :open="Boolean(activeReviewEvidenceRun.approvalGate.blockers.length)">
+                <summary>Approval metadata gate</summary>
+                <article v-for="field in activeReviewEvidenceRun.approvalGate.fields" :key="field.key" class="snapshot-row" :data-status="field.status">
+                  <strong>{{ field.label }}</strong>
+                  <p>{{ field.value || "Missing" }}</p>
+                  <small>{{ field.guidance }}</small>
+                </article>
+                <ul v-if="activeReviewEvidenceRun.approvalGate.blockers.length" class="signal-list">
+                  <li v-for="blocker in activeReviewEvidenceRun.approvalGate.blockers" :key="blocker">{{ blocker }}</li>
+                </ul>
+              </details>
+              <details>
+                <summary>Reviewer agents</summary>
+                <article v-for="reviewer in activeReviewEvidenceRun.reviewerAgents" :key="reviewer.id" class="snapshot-row" :data-status="reviewer.status">
+                  <strong>{{ reviewer.label }}</strong>
+                  <p>{{ reviewer.mandate }}</p>
+                  <small>{{ reviewer.requiredActions.slice(0, 2).join(" | ") }}</small>
+                </article>
+              </details>
+            </template>
+            <p v-else class="sidebar-hint">Refresh to create an evidence review snapshot for the current document.</p>
+          </section>
           <section class="release-readiness-checklist" aria-label="Release readiness checklist">
             <header>
               <h3>Release readiness</h3>
@@ -7279,6 +7335,7 @@ const agentHistoryQuery = ref("");
 const agentHistoryStatusFilter = ref<"all" | AgentRunHistoryItem["status"]>("all");
 const agentHistoryLaneFilter = ref<"all" | AgenticWorkflowLane>("all");
 const agentHistoryTargetFilter = ref<"all" | ExportTarget>("all");
+const reviewEvidenceRun = ref<AgenticWorkflowRun | null>(null);
 const docsLiveOpen = ref(false);
 const guidedDemoOpen = ref(false);
 const configurationSetupOpen = ref(false);
@@ -8246,6 +8303,19 @@ const agentProviderSourcePackMarkdown = computed(() =>
 const latestAgentRunHistory = computed(() => store.agentRunHistory[0] || null);
 const latestDocsLiveDraftHistory = computed(() => store.docsLiveDraftHistory[0] || null);
 const activeAgentControlCenter = computed(() => agentRun.value?.controlCenter || latestAgentRunHistory.value?.controlCenter || null);
+const activeReviewEvidenceRun = computed(() => reviewEvidenceRun.value || agentRun.value || null);
+const reviewEvidenceSnapshotSummary = computed(() => {
+  const run = activeReviewEvidenceRun.value;
+  if (!run) return "No evidence review snapshot yet.";
+  const evidence = run.documentEvidence;
+  return [
+    `${evidence.claimInventory.length} claims`,
+    `${evidence.citationTodos.length} citation TODOs`,
+    `${evidence.reviewCommentResolutions.length} unresolved comments`,
+    `${run.approvalGate.blockers.length} approval blockers`,
+    `${run.reviewerAgents.length} reviewer agents`,
+  ].join(" | ");
+});
 const agentTaskLaneOptions: Array<"all" | AgenticWorkflowLane> = ["all", "create", "compose", "edit", "revise", "review", "distribute"];
 const agentTaskStatusOptions: Array<"all" | AgentLifecycleExecutionStatus> = ["all", "queued", "in-progress", "needs-review", "complete", "blocked"];
 const agentTaskOwnerOptions = computed(() => [
@@ -10396,6 +10466,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     actions: [
       { id: "qa-review", label: "QA Review", title: "Run quality assurance and improvement recommendations", icon: "comment", primary: true, run: () => runQualityReview() },
       { id: "qa-report", label: "QA Report", title: "Insert the quality improvement report", icon: "comment", run: () => insertQualityImprovementReport() },
+      { id: "evidence-review", label: "Evidence", title: "Refresh claim inventory, approval metadata gate, and reviewer-agent evidence review", icon: "comment", primary: true, run: () => refreshReviewEvidenceSnapshot() },
       { id: "qa-agent", label: "Improve", title: "Open an AI agent quality-improvement workflow", icon: "agent", run: () => openQualityAgent() },
       { id: "release-ready", label: "Release", title: "Prepare release metadata", icon: "snapshot", run: () => applyReleaseMetadataScaffold() },
       { id: "release-audit", label: "Audit", title: "Insert release readiness audit", icon: "snapshot", run: () => insertReleaseReadinessAudit() },
@@ -10640,6 +10711,8 @@ const appMenus = computed<AppMenu[]>(() => [
         items: [
           { id: "qa-review", label: "Run QA Review", help: "Scan for quality risks and improvement recommendations.", run: () => runQualityReview() },
           { id: "qa-report", label: "Insert QA Report", help: "Insert the current recommendations as a review artifact.", run: () => insertQualityImprovementReport() },
+          { id: "evidence-review", label: "Refresh Evidence Review", help: "Build a claim inventory, approval gate, and reviewer-agent evidence snapshot.", run: () => refreshReviewEvidenceSnapshot() },
+          { id: "evidence-audit", label: "Insert Evidence Audit", help: "Insert the current evidence and approval review snapshot as a Markdown audit.", disabled: !activeReviewEvidenceRun.value, run: () => insertReviewEvidenceAudit() },
           { id: "qa-agent", label: "Improve with Agent", help: "Open an agent workflow seeded with current QA findings.", run: () => openQualityAgent() },
           { id: "review-readiness", label: "Review Readiness", help: "Open the Review sidebar and AI Control Center.", run: () => runAgentPlanReview() },
           { id: "release-metadata", label: "Prepare Release Metadata", help: "Scaffold status, version, owner, target, and approvals.", run: () => applyReleaseMetadataScaffold() },
@@ -13590,6 +13663,8 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Add review comment", group: "Review", run: () => (store.sidebar = "review") },
   { name: "Run QA recommendations", group: "Quality", description: "Scan the current document for quality assurance and quality improvement recommendations.", keywords: ["quality assurance", "quality improvement", "qa", "recommendations"], run: () => runQualityReview() },
   { name: "Insert QA improvement report", group: "Quality", description: "Insert a Markdown report of the current quality recommendations.", keywords: ["quality report", "qa report", "review"], run: () => insertQualityImprovementReport() },
+  { name: "Refresh evidence and approval review", group: "Quality", description: "Build a claim inventory, approval metadata gate, unresolved comment queue, and reviewer-agent action list.", keywords: ["claim inventory", "evidence", "approval gate", "citation", "reviewer"], run: () => refreshReviewEvidenceSnapshot() },
+  { name: "Insert evidence and approval audit", group: "Quality", description: "Insert the current claim inventory and approval gate review as Markdown.", keywords: ["evidence audit", "approval audit", "claim inventory"], run: () => insertReviewEvidenceAudit() },
   { name: "Improve document with agent", group: "Quality", description: "Open an AI agent workflow seeded with current QA findings.", keywords: ["improve", "humanize", "quality", "agent"], run: () => openQualityAgent() },
   { name: "Prepare release metadata", group: "Review", run: () => applyReleaseMetadataScaffold() },
   { name: "Insert release readiness audit", group: "Review", run: () => insertReleaseReadinessAudit() },
@@ -19563,6 +19638,77 @@ function insertQualityImprovementReport() {
   store.statusMessage = "Inserted QA improvement report";
 }
 
+function refreshReviewEvidenceSnapshot() {
+  flushEditorTextToStore();
+  reviewEvidenceRun.value = buildAgenticWorkflowRun({
+    instruction: "Review this document for claim inventory, citation coverage, approval metadata, reviewer objections, AI provenance, and export release blockers.",
+    documentTitle: active.value.compile?.semantic.title || active.value.title,
+    documentText: active.value.text,
+    selectedText: currentEditorSelectionText(),
+  });
+  store.sidebar = "review";
+  store.statusMessage = `Evidence review found ${reviewEvidenceRun.value.documentEvidence.claimInventory.length} claims and ${reviewEvidenceRun.value.approvalGate.blockers.length} approval blockers`;
+}
+
+function reviewEvidenceAuditMarkdown() {
+  const run = activeReviewEvidenceRun.value;
+  if (!run) return "";
+  const evidence = run.documentEvidence;
+  const claimRows = evidence.claimInventory.length
+    ? evidence.claimInventory.map(
+        (claim) =>
+          `| ${claim.sourceLine} | ${escapeMarkdownTableCell(claim.kind)} | ${escapeMarkdownTableCell(claim.text)} | ${escapeMarkdownTableCell(claim.reason)} |`,
+      )
+    : ["| - | ready | No candidate claims detected. | - |"];
+  const approvalRows = run.approvalGate.fields.map(
+    (field) =>
+      `| ${escapeMarkdownTableCell(field.label)} | ${field.status} | ${escapeMarkdownTableCell(field.value || "Missing")} | ${escapeMarkdownTableCell(field.guidance)} |`,
+  );
+  const reviewerRows = run.reviewerAgents.map(
+    (reviewer) =>
+      `| ${escapeMarkdownTableCell(reviewer.label)} | ${reviewer.status} | ${escapeMarkdownTableCell(reviewer.requiredActions.slice(0, 3).join("; "))} |`,
+  );
+  return [
+    "## Document Evidence And Approval Review",
+    "",
+    `Generated: ${new Date().toISOString()}`,
+    `Summary: ${reviewEvidenceSnapshotSummary.value}`,
+    `Readiness score: ${run.controlCenter.readinessScore}/100`,
+    "",
+    "### Claim Inventory",
+    "",
+    "| Line | Kind | Claim | Reason |",
+    "| --- | --- | --- | --- |",
+    ...claimRows,
+    "",
+    "### Approval Metadata Gate",
+    "",
+    "| Field | Status | Value | Guidance |",
+    "| --- | --- | --- | --- |",
+    ...approvalRows,
+    "",
+    "### Reviewer Agent Actions",
+    "",
+    "| Reviewer | Status | Required actions |",
+    "| --- | --- | --- |",
+    ...reviewerRows,
+    "",
+  ].join("\n");
+}
+
+function insertReviewEvidenceAudit() {
+  const markdown = reviewEvidenceAuditMarkdown();
+  if (!markdown) {
+    refreshReviewEvidenceSnapshot();
+    return;
+  }
+  flushEditorTextToStore();
+  insertBlock(markdown);
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted evidence and approval review audit";
+}
+
 function qualityStepAssistanceBlock(item: QualityStepAssistance) {
   return [
     `### ${item.label}`,
@@ -25182,6 +25328,7 @@ select:hover {
 
 .release-readiness-checklist,
 .quality-recommendations,
+.review-evidence-snapshot,
 .layout-advisor-summary,
 .layout-advisor-findings,
 .layout-preset-grid {
@@ -25198,6 +25345,10 @@ select:hover {
   border-left-color: #5d55a5;
 }
 
+.review-evidence-snapshot {
+  border-left-color: #8a1538;
+}
+
 .layout-advisor-summary,
 .layout-advisor-findings,
 .layout-preset-grid {
@@ -25206,6 +25357,7 @@ select:hover {
 
 .release-readiness-checklist header,
 .quality-recommendations header,
+.review-evidence-snapshot header,
 .layout-advisor-findings header {
   display: flex;
   align-items: baseline;
@@ -25217,6 +25369,8 @@ select:hover {
 .release-readiness-checklist p,
 .quality-recommendations h3,
 .quality-recommendations p,
+.review-evidence-snapshot h3,
+.review-evidence-snapshot p,
 .layout-advisor-findings h3,
 .layout-advisor-findings p,
 .layout-preset-grid p {
@@ -25229,6 +25383,9 @@ select:hover {
 .quality-recommendations header span,
 .quality-recommendations p,
 .quality-recommendations small,
+.review-evidence-snapshot header span,
+.review-evidence-snapshot p,
+.review-evidence-snapshot small,
 .layout-advisor-summary p,
 .layout-advisor-summary small,
 .layout-advisor-findings header span,
@@ -25243,6 +25400,25 @@ select:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.review-evidence-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+.review-evidence-metrics span {
+  padding: 6px 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.review-evidence-snapshot details {
+  padding: 7px 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
 }
 
 .quality-step-assistance {

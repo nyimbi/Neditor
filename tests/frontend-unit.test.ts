@@ -7927,6 +7927,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('label: "Callout"'));
   ok(app.includes('label: "Business Callout"'));
   ok(app.includes('title: "Business callouts"'));
+  ok(app.includes('aria-label="Document evidence and approval review"'));
+  ok(app.includes("reviewEvidenceRun"));
+  ok(app.includes("refreshReviewEvidenceSnapshot"));
+  ok(app.includes("insertReviewEvidenceAudit"));
+  ok(app.includes("claim inventory, approval metadata gate"));
   ok(app.includes("coverBuilderDraft"));
   ok(app.includes("coverBuilderEffective"));
   ok(app.includes("applyCoverBuilderMetadata"));
