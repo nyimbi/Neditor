@@ -24,6 +24,7 @@ import {
 import {
   assessDeepResearchSource,
   detectDeepResearchEvidenceConflicts,
+  deepResearchAuditPacketMarkdown,
   deepResearchBibliographyMarkdown,
   deepResearchCitationGuidanceMarkdown,
   deepResearchCitationIndexMarkdown,
@@ -5908,6 +5909,38 @@ test("Ollama provider profiles support direct AI workflows and deep research siz
   ok(conflictAudit.includes("Possible conflicts detected: 2"));
   ok(conflictAudit.includes("supportive or effective signal versus opposing or ineffective signal"));
   ok(conflictAudit.includes("Open the cited sources for AI procurement controls evidence"));
+  const auditPacket = deepResearchAuditPacketMarkdown(
+    settings,
+    "# Draft\n\nControls improved. [@agency2026]\n\nCitation TODO: verify budget.",
+    conflictIterations,
+    {
+      generatedAt: "2026-05-28T10:00:00.000Z",
+      savedSourceCount: 1,
+      bibliographySources: [
+        {
+          citation_key: "agency2026",
+          title: "Agency evaluation confirms controls are effective",
+          url: "https://agency.gov/effective-controls.pdf",
+          snippet: "Evidence shows AI procurement controls improved audit outcomes.",
+          source: "DuckDuckGo",
+          relative_path: "research.neditor-sources/effective-controls.pdf",
+        },
+      ],
+      sourceLibraryAuditMarkdown: "## Source Library Audit\n\n| Citation | Status |\n| --- | --- |\n| @agency2026 | OK |",
+    },
+  );
+  ok(auditPacket.startsWith("# Deep Research Audit Packet"));
+  ok(auditPacket.includes("| Target pages | 200 |"));
+  ok(auditPacket.includes("| Search iterations | 1 |"));
+  ok(auditPacket.includes("| Citation TODOs in draft | 1 |"));
+  ok(auditPacket.includes("## Search Query Log"));
+  ok(auditPacket.includes("## Source Quality Summary"));
+  ok(auditPacket.includes("## Deep Research Evidence Conflict Review"));
+  ok(auditPacket.includes("## Bibliography State"));
+  ok(auditPacket.includes('"id": "agency2026"'));
+  ok(auditPacket.includes("## Source Citation Index State"));
+  ok(auditPacket.includes("## Source Library Audit"));
+  ok(auditPacket.includes("Every evidence conflict is resolved"));
   const standalone = deepResearchDocumentMarkdown(
     settings,
     "# Draft\n\nBody with source review.",
@@ -9099,6 +9132,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("insertDeepResearchConflictReview"));
   ok(app.includes("Insert conflict review"));
   ok(app.includes("AI: Insert deep research conflict review"));
+  ok(app.includes("insertDeepResearchAuditPacket"));
+  ok(app.includes("Insert audit packet"));
+  ok(app.includes("AI: Insert deep research audit packet"));
   ok(app.includes('case "deep-research"'));
   ok(app.includes("Routed command palette instruction to Deep Research"));
   ok(app.includes("AI Paste cleanup"));

@@ -2224,6 +2224,7 @@
               <button type="button" :disabled="!deepResearchDraft" @click="openDeepResearchDraftAsDocument">Open as document</button>
               <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchLog">Insert research log</button>
               <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchConflictReview">Insert conflict review</button>
+              <button type="button" :disabled="!deepResearchIterations.length" @click="insertDeepResearchAuditPacket">Insert audit packet</button>
             </div>
             <p class="sidebar-hint">
               {{ deepResearchStatus || "Deep research plans queries, searches, reflects on gaps, writes, and iterates expansion passes until it reaches the requested page count or the provider stops adding useful length." }}
@@ -7217,6 +7218,7 @@ import {
 import { buildConflictDiff, type ConflictDiffRow } from "./lib/conflict";
 import {
   deepResearchDraftPrompt,
+  deepResearchAuditPacketMarkdown,
   deepResearchDocumentMarkdown,
   deepResearchEvidenceConflictMarkdown,
   deepResearchExpansionPrompt,
@@ -11576,6 +11578,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "docs-live", label: "Docs Live", help: "Dictate and structure a draft with context and placeholders.", run: () => openDocsLive() },
           { id: "deep-research", label: "Deep Research", help: "Search sources and generate a sourced report from a 1-page brief to a 200-page report.", run: () => openDeepResearch() },
           { id: "deep-research-conflicts", label: "Insert Research Conflicts", help: "Insert a conflict-review table for Deep Research sources that appear to disagree.", disabled: !deepResearchIterations.value.length, run: () => insertDeepResearchConflictReview() },
+          { id: "deep-research-audit", label: "Insert Research Audit", help: "Insert the full Deep Research audit packet with queries, source quality, conflicts, bibliography, and source library state.", disabled: !deepResearchIterations.value.length, run: () => insertDeepResearchAuditPacket() },
           { id: "agent", label: "AI Agent Workspace", help: "Plan, revise, review, and distribute with governed agent workflows.", run: () => openAgentWorkspace() },
           { id: "document-memory", label: "Document Memory", help: "Capture reusable terminology, style, accepted decisions, rejected directions, review preferences, and distribution preferences.", run: () => openAgentWorkspace() },
           { id: "capture-document-memory", label: "Capture Document Memory", help: "Derive reusable document memory from current context and document signals.", run: () => captureAgentMemoryFromCurrentDocument() },
@@ -13236,6 +13239,17 @@ function insertDeepResearchConflictReview() {
   insertBlock(deepResearchEvidenceConflictMarkdown(deepResearchIterations.value));
   store.statusMessage = `Inserted Deep Research conflict review with ${deepResearchEvidenceConflicts.value.length} possible conflict${deepResearchEvidenceConflicts.value.length === 1 ? "" : "s"}`;
 }
+
+function insertDeepResearchAuditPacket() {
+  const packet = deepResearchAuditPacketMarkdown(
+    deepResearchSettings(),
+    deepResearchDraft.value || active.value.text,
+    deepResearchIterations.value,
+    deepResearchDocumentOptions(),
+  );
+  insertBlock(packet);
+  store.statusMessage = "Inserted Deep Research audit packet";
+}
 function buildAgentWorkspacePlan() {
   flushEditorTextToStore();
   agentPlan.value = buildAgenticWorkflowPlan({
@@ -14724,6 +14738,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     description: "Insert a review table for source snippets that appear to disagree.",
     keywords: ["deep research", "evidence conflict", "source disagreement", "citation review"],
     run: () => insertDeepResearchConflictReview(),
+  },
+  {
+    name: "AI: Insert deep research audit packet",
+    group: "AI",
+    description: "Insert search queries, source quality, conflicts, bibliography state, and saved-source audit for reviewers.",
+    keywords: ["deep research", "audit packet", "source audit", "research evidence", "bibliography"],
+    run: () => insertDeepResearchAuditPacket(),
   },
   { name: "AI: Review and clean pasted text", group: "AI", run: () => openAiPaste() },
   { name: "Open Docs Live", group: "AI", run: () => openDocsLive() },

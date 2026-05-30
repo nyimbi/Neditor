@@ -352,6 +352,89 @@ export function deepResearchReviewPackageMarkdown(
   return appendDeepResearchEvidenceSections(withProvenance, iterations, options);
 }
 
+export function deepResearchAuditPacketMarkdown(
+  settings: DeepResearchSettings,
+  draftMarkdown: string,
+  iterations: DeepResearchIteration[],
+  options: DeepResearchDocumentOptions = {},
+) {
+  const generatedAt = options.generatedAt || new Date().toISOString();
+  const pages = estimateMarkdownPages(draftMarkdown || "");
+  const citationTodos = countCitationTodoMarkers(draftMarkdown || "");
+  const uniqueSourceCount = uniqueSources(iterations).length;
+  const sourceQualityRows = deepResearchSourceQualityRows(iterations);
+  const searchRows = iterations.length
+    ? iterations.map((iteration) => [
+        String(iteration.index),
+        iteration.query,
+        `${iteration.results.length} result${iteration.results.length === 1 ? "" : "s"}`,
+        iteration.gaps.join("; ") || "No explicit gap recorded",
+      ])
+    : [["-", "No search iterations recorded", "0 results", "Run Deep Research before finalizing the audit packet"]];
+  const conflictReview = deepResearchEvidenceConflictMarkdown(iterations).trim();
+  const citationIndex = deepResearchCitationIndexMarkdown(iterations, options.bibliographySources).trim();
+  const bibliography = deepResearchBibliographyMarkdown(iterations, options.bibliographySources).trim();
+  const sourceLibraryAudit = normalizeSourceLibraryAudit(options.sourceLibraryAuditMarkdown)
+    || "## Source Library Audit\n\nNo saved citation source audit is available for this packet.\n";
+  return [
+    "# Deep Research Audit Packet",
+    "",
+    `Generated: ${generatedAt}`,
+    "",
+    "## Run Configuration",
+    "",
+    "| Field | Value |",
+    "| --- | --- |",
+    `| Topic | ${tableCell(settings.topic || "Untitled research")} |`,
+    `| Document type | ${tableCell(settings.documentType)} |`,
+    `| Audience | ${tableCell(settings.audience)} |`,
+    `| Search provider | ${tableCell(settings.searchProvider)} |`,
+    `| AI provider profile | ${tableCell(settings.providerProfileId)} |`,
+    `| Model | ${tableCell(settings.model)} |`,
+    `| Target pages | ${settings.targetPages} |`,
+    `| Draft pages estimated | ${pages} |`,
+    `| Target words | ${targetWordCount(settings)} |`,
+    `| Search iterations | ${iterations.length} |`,
+    `| Unique source candidates | ${uniqueSourceCount} |`,
+    `| Saved source documents | ${Math.max(0, options.savedSourceCount || 0)} |`,
+    `| Citation TODOs in draft | ${citationTodos} |`,
+    "",
+    "## Search Query Log",
+    "",
+    "| Iteration | Query | Results | Gaps carried forward |",
+    "| --- | --- | --- | --- |",
+    ...searchRows.map((row) => `| ${row.map(tableCell).join(" | ")} |`),
+    "",
+    "## Source Quality Summary",
+    "",
+    "| Fit band | Sources | Review meaning |",
+    "| --- | ---: | --- |",
+    ...sourceQualityRows.map((row) => `| ${row.label} | ${row.count} | ${tableCell(row.guidance)} |`),
+    "",
+    conflictReview,
+    "",
+    "## Bibliography State",
+    "",
+    bibliography || "No bibliography records could be generated from the current research iterations.",
+    "",
+    "## Source Citation Index State",
+    "",
+    citationIndex || "No source citation index records are available yet.",
+    "",
+    sourceLibraryAudit.trim(),
+    "",
+    "## Reviewer Sign-Off Checklist",
+    "",
+    "- [ ] Every material draft claim has an inline citation or citation TODO.",
+    "- [ ] Every cited source appears in the bibliography and source citation index.",
+    "- [ ] Every downloaded source file exists and matches its recorded hash.",
+    "- [ ] Every evidence conflict is resolved, caveated, or assigned to a reviewer.",
+    "- [ ] Search query coverage is sufficient for the requested document scope and page count.",
+    "- [ ] Final export includes the bibliography, source audit, and review handoff.",
+    "",
+  ].join("\n");
+}
+
 function appendDeepResearchEvidenceSections(
   markdown: string,
   iterations: DeepResearchIteration[],
@@ -578,6 +661,27 @@ function deepResearchEvidenceConflictMarkdownFromConflicts(conflicts: DeepResear
     ...conflicts.map((conflict) => `| ${tableCell(conflict.id)} | ${conflict.severity} | ${tableCell(conflict.topic)} | ${tableCell(conflict.signals.join(" versus "))} | ${tableCell(conflict.sources.map((source) => `${source.stance}: ${source.title}`).join("; "))} | ${tableCell(conflict.recommendation)} |`),
     "",
   ].join("\n");
+}
+
+function deepResearchSourceQualityRows(iterations: DeepResearchIteration[]) {
+  const counts = new Map<string, number>([
+    ["strong", 0],
+    ["good", 0],
+    ["review", 0],
+    ["weak", 0],
+  ]);
+  for (const iteration of iterations) {
+    for (const source of iteration.results) {
+      const label = source.fitLabel || assessDeepResearchSource(source, iteration.query).label;
+      counts.set(label, (counts.get(label) || 0) + 1);
+    }
+  }
+  return [
+    { label: "strong", count: counts.get("strong") || 0, guidance: "Likely useful source candidates, still verify against the downloaded document." },
+    { label: "good", count: counts.get("good") || 0, guidance: "Usable source candidates that need normal evidence review." },
+    { label: "review", count: counts.get("review") || 0, guidance: "Weakly matched or context-limited sources; use cautiously." },
+    { label: "weak", count: counts.get("weak") || 0, guidance: "Low-confidence sources; avoid relying on them without corroboration." },
+  ];
 }
 
 export function parseReflection(markdown: string) {

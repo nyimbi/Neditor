@@ -514,6 +514,10 @@ Research and business documents can keep reference metadata near the source.
 - Use **Insert conflict review** in Source Search & Deep Research to add a
   source-disagreement table before accepting contested findings or exporting a
   research report.
+- Use **Insert audit packet** to add one reviewer handoff containing run
+  settings, search queries, source-quality bands, conflict review, generated
+  bibliography records, citation index state, saved-source audit, and a final
+  sign-off checklist.
 - Choose `title`, `author-year`, `key`, `numeric`, or a common CSL alias such
   as `apa`, `chicago-author-date`, `ieee`, or `vancouver` from front matter,
   preferences, or the references panel.
