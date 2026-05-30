@@ -3474,6 +3474,35 @@
           </label>
           <label><input v-model="store.highContrast" type="checkbox" /> High contrast</label>
           <label><input v-model="store.reducedMotion" type="checkbox" /> Reduced motion</label>
+          <section class="accessibility-qa-panel" :data-status="accessibilityQaReport.status" aria-label="Screen-reader and accessibility QA">
+            <header>
+              <div>
+                <h3>Accessibility QA</h3>
+                <span>{{ accessibilityQaReport.summary }}</span>
+              </div>
+              <strong>{{ accessibilityQaReport.status }}</strong>
+            </header>
+            <div class="accessibility-qa-metrics" aria-label="Accessibility QA status counts">
+              <span><strong>{{ accessibilityQaReport.counts.ready }}</strong> ready</span>
+              <span><strong>{{ accessibilityQaReport.counts["needs-review"] }}</strong> review</span>
+              <span><strong>{{ accessibilityQaReport.counts.blocked }}</strong> blocked</span>
+            </div>
+            <article
+              v-for="item in accessibilityQaReport.items"
+              :key="item.id"
+              class="snapshot-row"
+              :data-status="item.status"
+            >
+              <strong>{{ item.label }}</strong>
+              <p>{{ item.detail }}</p>
+              <small>{{ item.action }}</small>
+            </article>
+            <div class="reference-actions">
+              <button type="button" title="Switch on high contrast for screen-reader and low-vision QA review" @click="store.highContrast = true">Use high contrast</button>
+              <button type="button" title="Switch on reduced motion for users who prefer less animation" @click="store.reducedMotion = true">Reduce motion</button>
+              <button type="button" title="Insert this accessibility QA report into the active Markdown document" @click="insertAccessibilityQaReport">Insert QA report</button>
+            </div>
+          </section>
           </section>
           <section v-show="selectedConfigurationSection === 'files'" class="configuration-center-panel" aria-label="Files and history configuration">
           <label><input v-model="store.autosave" type="checkbox" /> Autosave existing files</label>
@@ -6852,6 +6881,7 @@ import {
   type LocalAgentCliProfile,
 } from "./lib/aiProviderPackages";
 import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
+import { accessibilityQaMarkdown, buildAccessibilityQaReport } from "./lib/accessibilityQa";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
   applyBrandKitPresetState,
@@ -11015,6 +11045,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "qa-report", label: "QA Report", title: "Insert the quality improvement report", icon: "comment", run: () => insertQualityImprovementReport() },
       { id: "evidence-review", label: "Evidence", title: "Refresh claim inventory, approval metadata gate, and reviewer-agent evidence review", icon: "comment", primary: true, run: () => refreshReviewEvidenceSnapshot() },
       { id: "visual-qa-report", label: "Visual QA", title: "Insert export visual QA evidence for reviewers", icon: "snapshot", run: () => insertExportVisualQaReport() },
+      { id: "accessibility-qa", label: "A11y QA", title: "Open screen-reader, keyboard, contrast, motion, and help-readiness checks", icon: "help", run: () => openAccessibilityQaPanel() },
       { id: "qa-agent", label: "Improve", title: "Open an AI agent quality-improvement workflow", icon: "agent", run: () => openQualityAgent() },
       { id: "release-ready", label: "Release", title: "Prepare release metadata", icon: "snapshot", run: () => applyReleaseMetadataScaffold() },
       { id: "release-audit", label: "Audit", title: "Insert release readiness audit", icon: "snapshot", run: () => insertReleaseReadinessAudit() },
@@ -11129,6 +11160,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "outline-panel", label: "Document Outline", help: "Open the outline sidebar.", run: () => showOutline() },
           { id: "exports-panel", label: "Export Panel", help: "Open distribution and export controls.", run: () => (store.sidebar = "exports") },
           { id: "settings", label: "Settings", help: "Tune toolbar, editor, preview, and accessibility settings.", run: () => (store.sidebar = "settings") },
+          { id: "accessibility-qa", label: "Screen-reader QA", help: "Open keyboard, screen-reader, contrast, motion, and help coverage checks.", run: () => openAccessibilityQaPanel() },
         ],
       },
       {
@@ -11273,6 +11305,8 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "evidence-review", label: "Refresh Evidence Review", help: "Build a claim inventory, approval gate, and reviewer-agent evidence snapshot.", run: () => refreshReviewEvidenceSnapshot() },
           { id: "evidence-audit", label: "Insert Evidence Audit", help: "Insert the current evidence and approval review snapshot as a Markdown audit.", disabled: !activeReviewEvidenceRun.value, run: () => insertReviewEvidenceAudit() },
           { id: "visual-export-qa", label: "Insert Export Visual QA", help: "Insert target-specific visual QA and export evidence as a reviewer handoff.", run: () => insertExportVisualQaReport() },
+          { id: "accessibility-qa", label: "Open Accessibility QA", help: "Review screen-reader, keyboard, hover-help, contrast, motion, and manual sign-off readiness.", run: () => openAccessibilityQaPanel() },
+          { id: "accessibility-qa-report", label: "Insert Accessibility QA", help: "Insert accessibility QA status and actions as a Markdown reviewer handoff.", run: () => insertAccessibilityQaReport() },
           { id: "qa-agent", label: "Improve with Agent", help: "Open an agent workflow seeded with current QA findings.", run: () => openQualityAgent() },
           { id: "review-readiness", label: "Review Readiness", help: "Open the Review sidebar and AI Control Center.", run: () => runAgentPlanReview() },
           { id: "release-metadata", label: "Prepare Release Metadata", help: "Scaffold status, version, owner, target, and approvals.", run: () => applyReleaseMetadataScaffold() },
@@ -11357,6 +11391,21 @@ const appMenus = computed<AppMenu[]>(() => [
     ],
   },
 ]);
+const accessibilityQaReport = computed(() =>
+  buildAccessibilityQaReport({
+    highContrast: store.highContrast,
+    reducedMotion: store.reducedMotion,
+    toolbarDisplay: store.toolbarDisplay,
+    commandCount: commands.value.length,
+    menuCount: appMenus.value.length,
+    helpTopicCount: helpTopics.value.length,
+    currentMode: store.mode,
+    currentSidebar: store.sidebar,
+    hasSkipLinks: true,
+    hasHoverHelp: true,
+    hasStatusRegion: true,
+  }),
+);
 const toolbarCollapseRows = computed(() => toolbarCollapseRowDefinitions);
 const collapsedToolbarRows = computed(() => toolbarCollapseRows.value.filter((row) => store.toolbarCollapsedRows.includes(row.id)));
 const hiddenToolbarNames = computed(() => collapsedToolbarRows.value.map((row) => row.label).join(", "));
@@ -14198,6 +14247,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     keywords: ["setup", "configuration", "llm", "openai", "claude code", "codex", "google antigravity", "opencode", "api key"],
     run: () => openConfigurationSetup(),
   },
+  {
+    name: "Open accessibility QA",
+    group: "Settings",
+    description: "Review keyboard, screen-reader, contrast, motion, hover-help, status, and manual sign-off readiness.",
+    keywords: ["accessibility", "screen reader", "voiceover", "keyboard", "contrast", "reduced motion", "a11y"],
+    run: () => openAccessibilityQaPanel(),
+  },
   { name: "AI: Create document", group: "AI", run: () => startAiDocumentCreation() },
   { name: "AI: Document creation wizard", group: "AI", run: () => openDocumentWizardHub() },
   { name: "AI: Compose from outline", group: "AI", run: () => openDocsLiveFromOutline() },
@@ -14327,6 +14383,7 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Run QA recommendations", group: "Quality", description: "Scan the current document for quality assurance and quality improvement recommendations.", keywords: ["quality assurance", "quality improvement", "qa", "recommendations"], run: () => runQualityReview() },
   { name: "Insert QA improvement report", group: "Quality", description: "Insert a Markdown report of the current quality recommendations.", keywords: ["quality report", "qa report", "review"], run: () => insertQualityImprovementReport() },
   { name: "Insert export visual QA review report", group: "Quality", description: "Insert target-specific visual QA, readiness, manifest, and output evidence.", keywords: ["visual qa", "export qa", "output proof", "delivery review"], run: () => insertExportVisualQaReport() },
+  { name: "Insert accessibility QA report", group: "Quality", description: "Insert accessibility QA status and manual screen-reader review actions.", keywords: ["accessibility", "screen reader", "a11y", "voiceover", "qa report"], run: () => insertAccessibilityQaReport() },
   { name: "Refresh evidence and approval review", group: "Quality", description: "Build a claim inventory, approval metadata gate, unresolved comment queue, and reviewer-agent action list.", keywords: ["claim inventory", "evidence", "approval gate", "citation", "reviewer"], run: () => refreshReviewEvidenceSnapshot() },
   { name: "Insert evidence and approval audit", group: "Quality", description: "Insert the current claim inventory and approval gate review as Markdown.", keywords: ["evidence audit", "approval audit", "claim inventory"], run: () => insertReviewEvidenceAudit() },
   { name: "Improve document with agent", group: "Quality", description: "Open an AI agent workflow seeded with current QA findings.", keywords: ["improve", "humanize", "quality", "agent"], run: () => openQualityAgent() },
@@ -20733,6 +20790,21 @@ function insertExportVisualQaReport() {
   store.statusMessage = "Inserted export visual QA report";
 }
 
+function openAccessibilityQaPanel() {
+  store.sidebar = "settings";
+  selectedConfigurationSection.value = "appearance";
+  store.statusMessage = `Accessibility QA: ${accessibilityQaReport.value.summary}`;
+}
+
+function insertAccessibilityQaReport() {
+  flushEditorTextToStore();
+  insertBlock(accessibilityQaMarkdown(accessibilityQaReport.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "settings";
+  selectedConfigurationSection.value = "appearance";
+  store.statusMessage = "Inserted accessibility QA report";
+}
+
 function enableFrontMatterToc() {
   setFrontMatterField("toc", "true");
   store.statusMessage = "Enabled front matter table of contents";
@@ -26571,6 +26643,7 @@ select:hover {
 .release-readiness-checklist,
 .quality-recommendations,
 .review-evidence-snapshot,
+.accessibility-qa-panel,
 .layout-advisor-summary,
 .layout-advisor-findings,
 .layout-preset-grid {
@@ -26591,6 +26664,18 @@ select:hover {
   border-left-color: #8a1538;
 }
 
+.accessibility-qa-panel {
+  border-left-color: #276749;
+}
+
+.accessibility-qa-panel[data-status="needs-review"] {
+  border-left-color: #c68a1a;
+}
+
+.accessibility-qa-panel[data-status="blocked"] {
+  border-left-color: #b42318;
+}
+
 .layout-advisor-summary,
 .layout-advisor-findings,
 .layout-preset-grid {
@@ -26600,6 +26685,7 @@ select:hover {
 .release-readiness-checklist header,
 .quality-recommendations header,
 .review-evidence-snapshot header,
+.accessibility-qa-panel header,
 .layout-advisor-findings header {
   display: flex;
   align-items: baseline;
@@ -26613,6 +26699,8 @@ select:hover {
 .quality-recommendations p,
 .review-evidence-snapshot h3,
 .review-evidence-snapshot p,
+.accessibility-qa-panel h3,
+.accessibility-qa-panel p,
 .layout-advisor-findings h3,
 .layout-advisor-findings p,
 .layout-preset-grid p {
@@ -26628,6 +26716,9 @@ select:hover {
 .review-evidence-snapshot header span,
 .review-evidence-snapshot p,
 .review-evidence-snapshot small,
+.accessibility-qa-panel header span,
+.accessibility-qa-panel p,
+.accessibility-qa-panel small,
 .layout-advisor-summary p,
 .layout-advisor-summary small,
 .layout-advisor-findings header span,
@@ -26636,6 +26727,19 @@ select:hover {
 .layout-preset-grid p,
 .layout-preset-grid small {
   color: #526171;
+}
+
+.accessibility-qa-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.accessibility-qa-metrics span {
+  padding: 6px 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+  font-size: 12px;
 }
 
 .release-readiness-actions {
@@ -26732,6 +26836,18 @@ select:hover {
 }
 
 .quality-recommendations .snapshot-row[data-status="blocker"] {
+  border-left: 3px solid #b42318;
+}
+
+.accessibility-qa-panel .snapshot-row[data-status="ready"] {
+  border-left: 3px solid #2f855a;
+}
+
+.accessibility-qa-panel .snapshot-row[data-status="needs-review"] {
+  border-left: 3px solid #c68a1a;
+}
+
+.accessibility-qa-panel .snapshot-row[data-status="blocked"] {
   border-left: 3px solid #b42318;
 }
 

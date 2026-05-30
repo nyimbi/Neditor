@@ -8,6 +8,7 @@ import {
   isLatestDocumentTaskCurrent,
   type LatestDocumentTaskGate,
 } from "../src/lib/asyncGuards.js";
+import { accessibilityQaMarkdown, buildAccessibilityQaReport } from "../src/lib/accessibilityQa.js";
 import { inspectAiRuntimeReadiness } from "../src/lib/aiRuntimeReadiness.js";
 import {
   aiProviderProfiles,
@@ -1487,6 +1488,47 @@ test("UI preference helpers validate persisted workbench display settings", () =
   equal(preserved.previewFont, current.previewFont);
   equal(preserved.mode, current.mode);
   equal(preserved.sidebar, current.sidebar);
+});
+
+test("accessibility QA report surfaces screen-reader and keyboard release actions", () => {
+  const report = buildAccessibilityQaReport({
+    highContrast: false,
+    reducedMotion: false,
+    toolbarDisplay: "both",
+    commandCount: 140,
+    menuCount: 7,
+    helpTopicCount: 18,
+    currentMode: "split",
+    currentSidebar: "settings",
+    hasSkipLinks: true,
+    hasHoverHelp: true,
+    hasStatusRegion: true,
+  });
+
+  equal(report.status, "needs-review");
+  equal(report.counts.blocked, 0);
+  ok(report.items.some((item) => item.id === "manual-assistive-tech-signoff" && item.status === "needs-review"));
+  ok(report.items.some((item) => item.id === "keyboard-command-access" && item.status === "ready"));
+  const markdown = accessibilityQaMarkdown(report, "2026-05-30T00:00:00.000Z");
+  ok(markdown.includes("## Accessibility QA Report"));
+  ok(markdown.includes("Manual assistive-technology sign-off"));
+  ok(markdown.includes("High contrast is off; reduced motion is off"));
+
+  const blocked = buildAccessibilityQaReport({
+    highContrast: true,
+    reducedMotion: true,
+    toolbarDisplay: "icons",
+    commandCount: 12,
+    menuCount: 3,
+    helpTopicCount: 4,
+    currentMode: "focus",
+    currentSidebar: "files",
+    hasSkipLinks: false,
+    hasHoverHelp: false,
+    hasStatusRegion: false,
+  });
+  equal(blocked.status, "blocked");
+  ok(blocked.items.some((item) => item.id === "skip-links-landmarks" && item.status === "blocked"));
 });
 
 test("recent item helpers deduplicate limit and forget paths", () => {
@@ -8141,6 +8183,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes(':style="appShellStyle"'));
   ok(app.includes('aria-label="Toolbar button display"'));
   ok(app.includes('aria-label="Toolbar text size"'));
+  ok(app.includes('aria-label="Screen-reader and accessibility QA"'));
+  ok(app.includes("accessibilityQaReport"));
+  ok(app.includes("openAccessibilityQaPanel"));
+  ok(app.includes("insertAccessibilityQaReport"));
+  ok(app.includes("Open accessibility QA"));
+  ok(app.includes("Insert accessibility QA report"));
   ok(app.includes('aria-label="Deep research target report pages"'));
   ok(app.includes('aria-label="Exact deep research target pages"'));
   ok(app.includes('aria-label="Ollama model discovery"'));

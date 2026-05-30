@@ -790,6 +790,19 @@ See [Storage model](storage-model.md) and
 [Security threat model](security-threat-model.md) for persistence and trust
 boundaries.
 
+## Accessibility QA
+
+Open **Settings** -> **Appearance** to review the in-app **Accessibility QA**
+panel. It summarizes keyboard command access, skip links, screen-reader
+landmarks, hover/focus button help, status feedback, plain-language help, high
+contrast, reduced motion, and manual assistive-technology sign-off readiness.
+
+Use **Open accessibility QA** from the command palette or Quality menu when a
+document is heading to external review. The panel can switch on high contrast,
+switch on reduced motion, and insert an **Accessibility QA Report** into the
+active Markdown document so a reviewer or release manager can see exactly what
+has been checked and what still requires manual screen-reader sign-off.
+
 ## Troubleshooting
 
 - If a local link or image is missing, check the diagnostics panel and export
