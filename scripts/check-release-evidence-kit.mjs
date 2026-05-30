@@ -74,6 +74,7 @@ function validateManifest(manifest, readiness, readinessStatus) {
   requireValue(Array.isArray(manifest.staleTemplates) && manifest.staleTemplates.length === 0, "staleTemplates must be empty");
   validateSpecCompletionWorkOrders(manifest.specCompletionWorkOrders);
   validateSpecCompletionRunbooks(manifest.specCompletionRunbooks, manifest.specCompletionWorkOrders);
+  validateManualReviewAssets(manifest.manualReviewAssets);
   for (const template of copiedTemplates) {
     requireValue(template.copied === true, `template must be copied: ${template.source || template.path}`);
     requireValue(template.freshness?.status === "current", `template freshness must be current: ${template.source || template.path}`);
@@ -105,6 +106,26 @@ function validateManifest(manifest, readiness, readinessStatus) {
     requireValue(String(item.ingestCommand || "").includes("pnpm run ingest:evidence"), `gap work item ${item.id} must list ingest command`);
     requireValue(String(item.finalReadinessCommand || "").includes("pnpm run check:release-readiness"), `gap work item ${item.id} must list final readiness command`);
   }
+}
+
+function validateManualReviewAssets(manualReviewAssets) {
+  requireValue(manualReviewAssets && typeof manualReviewAssets === "object", "manifest must include manualReviewAssets");
+  const expectedManualWorkOrders = Number(manualReviewAssets?.expectedManualWorkOrders || 0);
+  const templates = manualReviewAssets?.templates || {};
+  requireValue(Number.isFinite(expectedManualWorkOrders) && expectedManualWorkOrders >= 0, "manualReviewAssets expectedManualWorkOrders must be numeric");
+  if (expectedManualWorkOrders === 0) return;
+  requireValue(templates.copied === true, "manual-review work-order templates must be copied");
+  requireValue(Number(templates.total || 0) === expectedManualWorkOrders, "manual-review template count must match manual work-order count");
+  requireValue(Array.isArray(templates.files) && templates.files.length === expectedManualWorkOrders, "manual-review template files must list every work order");
+  for (const templatePath of Array.isArray(templates.files) ? templates.files : []) {
+    requireFile(join(kitDir, templatePath), `manual-review template ${templatePath}`, 100);
+  }
+  requireValue(manualReviewAssets.dashboardMarkdown?.copied === true, "manual-review Markdown dashboard must be copied");
+  requireValue(manualReviewAssets.dashboardHtml?.copied === true, "manual-review HTML dashboard must be copied");
+  requireValue(manualReviewAssets.assignmentsCsv?.copied === true, "manual-review assignments CSV must be copied");
+  requireFile(join(kitDir, manualReviewAssets.dashboardMarkdown.path || ""), "manual-review Markdown dashboard", 100);
+  requireFile(join(kitDir, manualReviewAssets.dashboardHtml.path || ""), "manual-review HTML dashboard", 100);
+  requireFile(join(kitDir, manualReviewAssets.assignmentsCsv.path || ""), "manual-review assignments CSV", 50);
 }
 
 function validateSpecCompletionWorkOrders(workOrders) {
@@ -164,6 +185,10 @@ function writeReport(manifest, readiness, readinessStatus) {
           staleTemplates: Array.isArray(manifest?.staleTemplates) ? manifest.staleTemplates.length : 0,
           runbooks: Array.isArray(manifest?.runbooks) ? manifest.runbooks.length : 0,
           specCompletionRunbooks: Array.isArray(manifest?.specCompletionRunbooks) ? manifest.specCompletionRunbooks.length : 0,
+          manualReviewTemplates: Number(manifest?.manualReviewAssets?.templates?.total || 0),
+          manualReviewDashboardCopied: Boolean(
+            manifest?.manualReviewAssets?.dashboardMarkdown?.copied || manifest?.manualReviewAssets?.dashboardHtml?.copied,
+          ),
           specWorkOrders: Number(manifest?.specCompletionWorkOrders?.total || 0),
           specWorkOrdersReady: Number(manifest?.specCompletionWorkOrders?.readyToSend || 0),
           issues: issues.length,

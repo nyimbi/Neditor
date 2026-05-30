@@ -48,6 +48,7 @@ from the release evidence kit.
 | --- | --- | --- |
 | `node --check scripts/check-manual-review-evidence.mjs` | Pass | Manual review evidence script syntax is valid after adding dashboards, grouped section counts, assignment CSV output, and richer sign-off templates. |
 | `node --check scripts/collect-release-evidence-kit.mjs` | Pass | Evidence kit collector syntax is valid after copying dynamic spec manual-review templates and dashboards. |
+| `node --check scripts/check-release-evidence-kit.mjs` | Pass | Evidence kit checker syntax is valid after adding strict validation for copied manual-review templates, dashboards, and assignment CSVs. |
 | `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including coverage for manual-review dashboards, assignment CSVs, richer sign-off templates, and evidence-kit copying into `templates/spec-manual-review/`. |
 | `pnpm run check:docs` | Pass | 26 Markdown files checked; local links resolve after documenting the sendable manual-review kit. |
 | `pnpm run check:manual-review` | Pass with human review pending | Wrote `.tmp/manual-review/report.json`, `.tmp/manual-review/dashboard.md`, `.tmp/manual-review/dashboard.html`, `.tmp/manual-review/assignments.csv`, and 33 pending work-order templates. |

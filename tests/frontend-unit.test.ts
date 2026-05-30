@@ -10933,6 +10933,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("spec completion work-orders JSON must be copied"));
   ok(evidenceKitChecker.includes("all spec completion work orders must be ready to send"));
   ok(evidenceKitChecker.includes("specWorkOrdersReady"));
+  ok(evidenceKitChecker.includes("validateManualReviewAssets"));
+  ok(evidenceKitChecker.includes("manualReviewAssets"));
+  ok(evidenceKitChecker.includes("manualReviewTemplates"));
+  ok(evidenceKitChecker.includes("manual-review assignments CSV must be copied"));
   ok(evidenceKitChecker.includes("manifest gaps must mirror the release readiness report"));
   ok(evidenceKitChecker.includes("gapWorkItems must mirror the release readiness report"));
   ok(evidenceKitChecker.includes("must list validator commands"));
