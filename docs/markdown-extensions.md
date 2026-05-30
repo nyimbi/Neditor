@@ -44,6 +44,7 @@ and `sql` only when a repeatable database query is needed.
 | Includes | `!include chapters/intro.md` | Build master documents from child Markdown files | Child front matter is stripped; include graph is watched and recorded in manifests. |
 | Generated sections | `[TOC]`, `[BIBLIOGRAPHY]`, `[INDEX]` | Insert compiled tables of contents, bibliography, glossary, index, figures, and tables | Generated from the semantic document model, excluding fenced examples. |
 | Layout directives | `{{section-break columns=2 columnGap=18pt}}` | Multi-column sections, landscape appendices, margins, page flow | Preview/export preserve layout evidence; readiness flags risky layouts. |
+| Callouts | `> [!risk] Material risk` | Decision, recommendation, risk, warning, assumption, evidence, action, and note boxes | Compiled into semantic callout blocks for preview, AST, HTML, PDF, DOCX, LaTeX, and bundles. |
 | Calculation fences | ```` ```calc ```` | Named business, scientific, and mathematical calculations | Values can feed inline formulas and review evidence. |
 | Structured data fences | ```` ```csv ````, ```` ```json ````, ```` ```yaml ```` | Render readable tables or structured summaries from data | Safe deterministic rendering; formula-cell and parse errors become diagnostics. |
 | SQL fences | ```` ```sql database="data/revenue.sqlite" ```` | Repeatable read-only database-backed tables | Requires trusted `sqlite3`; only `SELECT`/`WITH` queries are accepted. |
@@ -178,6 +179,33 @@ Use a section break to change layout from that point forward:
 ```md
 {{section-break columns=2 columnGap=18pt pageSize=letter orientation=landscape margins=narrow}}
 ```
+
+## Business Callouts And Admonitions
+
+Use callouts when a key business point should be visible during review,
+approval, or export:
+
+```md
+> [!decision] Decision needed
+> Decision: Approve the phase 2 budget.
+> Owner: Steering committee
+> Needed by: 2026-06-15
+```
+
+Supported preset types include `decision`, `recommendation`, `risk`,
+`warning`, `assumption`, `evidence`, `action`, and `note`. The Templates panel
+can insert each preset with placeholders for owner, date, mitigation, source,
+confidence, or evidence. The source remains ordinary blockquote-style Markdown
+and the compiler converts it into a semantic callout block for preview,
+exports, bundle metadata, and review evidence.
+
+Use callouts deliberately:
+
+- Use `decision` and `action` when a reader must do something.
+- Use `risk` and `warning` for blockers, compliance traps, or dependencies.
+- Use `evidence` for source-backed proof that reviewers should inspect.
+- Use `assumption` for unresolved inputs that must not disappear into polished
+  prose.
 
 Use another section break to return to single-column flow:
 

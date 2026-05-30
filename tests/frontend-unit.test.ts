@@ -66,6 +66,7 @@ import {
   brandKitPresets,
   buildBrandKitPreviewRows,
 } from "../src/lib/brandKitPresets.js";
+import { calloutPresetById, calloutPresetMarkdown, calloutPresets } from "../src/lib/calloutPresets.js";
 import {
   acceptExternalRootConflictState,
   applyExternalRootReloadState,
@@ -552,6 +553,19 @@ test("brand kit presets apply coherent business document defaults", () => {
   const previewRows = buildBrandKitPreviewRows(applied.brandProfileDefaults, applied.exportDefaults);
   equal(previewRows.find((row) => row.label === "Brand")?.value, "Bid Team");
   equal(previewRows.find((row) => row.label === "Layout")?.value, "business");
+});
+
+test("callout presets generate supported business admonition Markdown", () => {
+  ok(calloutPresets.length >= 8);
+  const risk = calloutPresetById("risk");
+  if (!risk) throw new Error("risk callout preset missing");
+  const markdown = calloutPresetMarkdown(risk);
+  ok(markdown.startsWith("> [!risk] Material risk"));
+  ok(markdown.includes("> Mitigation: {{mitigation}}"));
+  ok(markdown.endsWith("\n"));
+  ok(calloutPresets.some((preset) => preset.calloutType === "decision"));
+  ok(calloutPresets.some((preset) => preset.calloutType === "evidence"));
+  ok(calloutPresets.every((preset) => /^[a-z0-9-]+$/.test(preset.calloutType)));
 });
 
 test("document export option helpers normalize compile export and transform settings", () => {
@@ -7907,6 +7921,12 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('label: "Brand Kit"'));
   ok(app.includes('label: "Brand Kit Presets"'));
   ok(app.includes('title: "Brand and page design"'));
+  ok(app.includes('aria-label="Business callout and admonition styles"'));
+  ok(app.includes("calloutPresets"));
+  ok(app.includes("insertCalloutPreset"));
+  ok(app.includes('label: "Callout"'));
+  ok(app.includes('label: "Business Callout"'));
+  ok(app.includes('title: "Business callouts"'));
   ok(app.includes("coverBuilderDraft"));
   ok(app.includes("coverBuilderEffective"));
   ok(app.includes("applyCoverBuilderMetadata"));

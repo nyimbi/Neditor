@@ -1576,6 +1576,37 @@
               </article>
             </div>
           </section>
+          <section class="business-template-hub callout-palette" aria-label="Business callout and admonition styles">
+            <header>
+              <div>
+                <strong>Business callouts</strong>
+                <span>Insert styled decision, risk, evidence, warning, recommendation, assumption, action, and note boxes.</span>
+              </div>
+              <button type="button" :disabled="!selectedCalloutPreset" @click="insertSelectedCalloutPreset">Insert selected</button>
+            </header>
+            <section class="callout-selector">
+              <label>
+                Callout style
+                <select v-model="selectedCalloutPresetId">
+                  <option v-for="preset in calloutPresets" :key="preset.id" :value="preset.id">{{ preset.label }}</option>
+                </select>
+              </label>
+              <p v-if="selectedCalloutPreset" class="sidebar-hint">{{ selectedCalloutPreset.summary }}</p>
+            </section>
+            <div class="callout-grid" role="list" aria-label="Callout style library">
+              <article v-for="preset in calloutPresets" :key="preset.id" class="callout-card" :data-tone="preset.tone" role="listitem">
+                <div>
+                  <strong>{{ preset.label }}</strong>
+                  <small>{{ preset.summary }}</small>
+                </div>
+                <div class="template-meta" aria-label="Callout best uses">
+                  <span v-for="item in preset.bestFor" :key="`${preset.id}-${item}`">{{ item }}</span>
+                </div>
+                <pre>{{ calloutPresetMarkdown(preset) }}</pre>
+                <button type="button" :title="`Insert ${preset.label} callout`" @click="insertCalloutPreset(preset)">Insert</button>
+              </article>
+            </div>
+          </section>
           <section class="business-template-hub" aria-label="Versioned reusable clauses">
             <header>
               <div>
@@ -6398,6 +6429,7 @@ import {
   buildBrandKitPreviewRows,
   type BrandKitPreset,
 } from "./lib/brandKitPresets";
+import { calloutPresetById, calloutPresetMarkdown, calloutPresets, type CalloutPreset } from "./lib/calloutPresets";
 import {
   commandSearchText,
   compactCommandKeywords,
@@ -7413,6 +7445,7 @@ const templateTransform = ref("all");
 const transformTemplateAssistanceNotes = ref("");
 const customTemplateDraft = ref<CustomTransformTemplate>(blankCustomTransformTemplate());
 const editingCustomTemplateId = ref("");
+const selectedCalloutPresetId = ref(calloutPresets[0]?.id || "decision");
 const businessProfileOpen = ref(false);
 const businessProfileDraft = ref<BusinessProfile>(normalizeBusinessProfile({}));
 const businessTemplateQuery = ref("");
@@ -8085,6 +8118,7 @@ const exportProfileSummary = computed(() => {
 });
 const selectedBrandKitPreset = computed(() => brandKitPresetById(selectedBrandKitPresetId.value) || brandKitPresets[0] || null);
 const currentBrandKitPreviewRows = computed(() => buildBrandKitPreviewRows(store.brandProfileDefaults, store.exportDefaults));
+const selectedCalloutPreset = computed(() => calloutPresetById(selectedCalloutPresetId.value) || calloutPresets[0] || null);
 const previewDocumentStyle = computed(() => ({
   fontFamily: store.previewFont,
   fontSize: `${clampUiFontSize(store.previewFontSize)}px`,
@@ -9721,6 +9755,29 @@ const helpTopics = computed<HelpTopic[]>(() => [
     keywords: ["calc", "tables", "templates", "transform", "formula", "spreadsheet"],
   },
   {
+    id: "business-callouts",
+    title: "Business callouts",
+    category: "content",
+    summary: "Use styled decision, recommendation, risk, warning, assumption, evidence, action, and note boxes to make business documents easier to scan.",
+    when: "Use this when an important point should be visible during review, approval, or export instead of buried in a paragraph.",
+    steps: [
+      "Open Templates and browse Business callouts.",
+      "Choose the callout style that matches the reader task: decision, recommendation, risk, warning, assumption, evidence, action, or note.",
+      "Insert the callout and replace the placeholders with owners, dates, evidence, and next steps.",
+      "Preview or export to confirm the callout remains visually distinct across deliverable formats.",
+    ],
+    tips: [
+      "Use risk and warning callouts sparingly so real blockers remain visible.",
+      "Decision and action callouts should name an owner and date whenever possible.",
+    ],
+    actions: [
+      { label: "Open templates", run: () => openTransformTemplates() },
+      { label: "Insert selected callout", run: () => insertSelectedCalloutPreset() },
+      { label: "Preview only", run: () => (store.mode = "preview") },
+    ],
+    keywords: ["callout", "admonition", "risk", "decision", "warning", "evidence", "action", "recommendation"],
+  },
+  {
     id: "external-transform-troubleshooting",
     title: "External transform troubleshooting",
     category: "content",
@@ -10295,6 +10352,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "figure", label: "Figure", title: "Insert figure", icon: "figure", run: () => insertFigureSnippet() },
       { id: "calc", label: "Calc", title: "Insert calculation block", icon: "calc", run: () => insertBlock(calcSnippet) },
       { id: "templates", label: "Templates", title: "Open transform templates", icon: "templates", run: () => openTransformTemplates() },
+      { id: "callout", label: "Callout", title: "Insert a decision, risk, evidence, warning, recommendation, assumption, action, or note callout", icon: "comment", primary: true, run: () => insertSelectedCalloutPreset() },
       { id: "layout-advisor", label: "Layout", title: "Open the Layout Advisor for columns, wide sections, gutters, and export-safe flow", icon: "layout", run: () => openLayoutAdvisor() },
       { id: "cover-builder", label: "Cover", title: "Open the professional cover builder", icon: "layout", primary: true, run: () => openLayoutAdvisor() },
       { id: "brand-kit", label: "Brand Kit", title: "Open brand kit and page design presets for business document delivery", icon: "settings", primary: true, run: () => openBrandKitManager() },
@@ -10505,6 +10563,13 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "export-table-xlsx", label: "Export Table as XLSX", help: "Export the current table draft or selected Markdown table to XLSX.", disabled: tableDataBusy.value || !tableDraft.value, run: () => exportSelectedTable("xlsx") },
           { id: "figure", label: "Figure", help: "Insert a figure scaffold.", run: () => insertFigureSnippet() },
           { id: "calc", label: "Calculation", help: "Insert a calculation block.", run: () => insertBlock(calcSnippet) },
+          { id: "callout", label: "Business Callout", help: "Insert a styled decision, risk, evidence, warning, recommendation, assumption, action, or note box.", run: () => insertSelectedCalloutPreset() },
+          ...calloutPresets.map((preset) => ({
+            id: `callout-${preset.id}`,
+            label: `${preset.label} Callout`,
+            help: preset.summary,
+            run: () => insertCalloutPreset(preset),
+          })),
           { id: "equation", label: "Equation Editor", help: "Open equation templates and LaTeX insertion.", run: () => openEquationEditor() },
           { id: "layout-two-column", label: "Two-column Section", help: "Insert an export-aware two-column section for polished business narratives.", run: () => insertDocumentLayoutPreset("two-column-section") },
           { id: "cover-builder", label: "Professional Cover Builder", help: "Open the cover builder for title, client, status, version, confidentiality, and cover-page metadata.", run: () => openLayoutAdvisor() },
@@ -13624,6 +13689,13 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   })),
   { name: "Insert code fence", group: "Snippet", run: () => insertBlock(codeFenceSnippet) },
   { name: "Insert table", group: "Snippet", run: () => insertBlock(tableSnippet) },
+  ...calloutPresets.map((preset) => ({
+    name: `Insert ${preset.label} callout`,
+    group: "Callout",
+    description: preset.summary,
+    keywords: ["callout", "admonition", preset.calloutType, preset.tone, ...preset.bestFor],
+    run: () => insertCalloutPreset(preset),
+  })),
   { name: "Edit table cell at cursor", group: "Writing Tools", keywords: ["table", "cell", "markdown", "text"], run: () => loadTableTextCellAtCursor() },
   {
     name: "Apply table grid to Markdown text",
@@ -18559,6 +18631,17 @@ function businessWizardStepAssistance(template: BusinessDocumentTemplate) {
 function insertBusinessSnippet(snippet: BusinessDocumentSnippet) {
   insertBlock(businessSnippetMarkdown(snippet, store.businessProfile));
   store.statusMessage = `Inserted ${snippet.label} document part`;
+}
+
+function insertCalloutPreset(preset: CalloutPreset) {
+  insertBlock(calloutPresetMarkdown(preset));
+  selectedCalloutPresetId.value = preset.id;
+  store.statusMessage = `Inserted ${preset.label} callout`;
+}
+
+function insertSelectedCalloutPreset() {
+  if (!selectedCalloutPreset.value) return;
+  insertCalloutPreset(selectedCalloutPreset.value);
 }
 
 function insertVersionedClause(clause: VersionedBusinessClause) {
@@ -25625,6 +25708,110 @@ select:hover {
   overflow-wrap: anywhere;
 }
 
+.callout-palette {
+  border-left-color: #8a1538;
+  background: #fffafa;
+}
+
+.callout-selector {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.callout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.callout-card {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #d8e0e8;
+  border-left: 4px solid #526171;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.callout-card[data-tone="positive"] {
+  border-left-color: #1f6f55;
+}
+
+.callout-card[data-tone="caution"] {
+  border-left-color: #b7791f;
+}
+
+.callout-card[data-tone="critical"] {
+  border-left-color: #b42318;
+}
+
+.callout-card[data-tone="evidence"] {
+  border-left-color: #275da8;
+}
+
+.callout-card[data-tone="action"] {
+  border-left-color: #6f4e00;
+}
+
+.callout-card div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.callout-card small {
+  color: #526171;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.callout-card pre {
+  max-height: 130px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #d8e0e8;
+  background: #f8fafc;
+  white-space: pre-wrap;
+}
+
+.app-shell[data-theme="dark"] .callout-palette,
+.app-shell[data-theme="dark"] .callout-card {
+  border-color: #34465a;
+  background: #1b2736;
+  color: #dce7f3;
+}
+
+.app-shell[data-theme="dark"] .callout-card small {
+  color: #aebdcc;
+}
+
+.app-shell[data-theme="dark"] .callout-card pre {
+  border-color: #34465a;
+  background: #111821;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-shell[data-theme="system"] .callout-palette,
+  .app-shell[data-theme="system"] .callout-card {
+    border-color: #34465a;
+    background: #1b2736;
+    color: #dce7f3;
+  }
+
+  .app-shell[data-theme="system"] .callout-card small {
+    color: #aebdcc;
+  }
+
+  .app-shell[data-theme="system"] .callout-card pre {
+    border-color: #34465a;
+    background: #111821;
+  }
+}
+
 .business-profile-modal {
   max-width: 900px;
 }
@@ -28942,6 +29129,51 @@ select:hover {
   display: block;
   color: #0f5132;
   margin-bottom: 4px;
+}
+
+.preview-document .callout-decision,
+.preview-document .callout-action {
+  border-left-color: #6f4e00;
+  background: #fff8e6;
+}
+
+.preview-document .callout-decision strong,
+.preview-document .callout-action strong {
+  color: #5a3b00;
+}
+
+.preview-document .callout-recommendation {
+  border-left-color: #1f6f55;
+  background: #eefaf4;
+}
+
+.preview-document .callout-risk,
+.preview-document .callout-warning {
+  border-left-color: #b42318;
+  background: #fff4f2;
+}
+
+.preview-document .callout-risk strong,
+.preview-document .callout-warning strong {
+  color: #7a271a;
+}
+
+.preview-document .callout-assumption {
+  border-left-color: #526171;
+  background: #f5f7fa;
+}
+
+.preview-document .callout-assumption strong {
+  color: #2d3746;
+}
+
+.preview-document .callout-evidence {
+  border-left-color: #275da8;
+  background: #eff6ff;
+}
+
+.preview-document .callout-evidence strong {
+  color: #174a7c;
 }
 
 .preview-document .equation {
