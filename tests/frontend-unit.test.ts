@@ -197,7 +197,9 @@ import {
 } from "../src/lib/latexTemplates.js";
 import {
   buildPublishingHandoff,
+  buildPublishingPreflightReport,
   buildPublishingRequestPreview,
+  publishingPreflightMarkdown,
   publishingPrimaryContent,
 } from "../src/lib/publishingWorkflow.js";
 import { buildDocumentCompileOptions, buildDocumentExportOptions } from "../src/lib/documentExportOptions.js";
@@ -5010,6 +5012,34 @@ test("publishing workflow builds endpoint payloads without persisting secrets", 
   equal(generic.body.packageType, "neditor-publishing-handoff");
   equal(generic.body.audit && typeof generic.body.audit === "object", true);
   ok(generic.bodyText.includes("sha256:abc"));
+  const genericPreflightDryRun = buildPublishingPreflightReport(handoff, generic, {
+    targetKind: "generic-webhook",
+    endpointUrl: "https://cms.example.com/hooks/neditor",
+    contentFormat: "html",
+    authHeaderName: "X-NEditor-Token",
+    authToken: "session-token",
+    destinationName: "CMS bridge",
+    dryRun: true,
+  });
+  equal(genericPreflightDryRun.canSend, false);
+  equal(genericPreflightDryRun.blockers.length, 0);
+  ok(genericPreflightDryRun.needsReview.some((item) => item.id === "dry-run"));
+  ok(genericPreflightDryRun.needsReview.some((item) => item.id === "secrets"));
+  const genericPreflightLive = buildPublishingPreflightReport(handoff, generic, {
+    targetKind: "generic-webhook",
+    endpointUrl: "https://cms.example.com/hooks/neditor",
+    contentFormat: "html",
+    authHeaderName: "X-NEditor-Token",
+    authToken: "session-token",
+    destinationName: "CMS bridge",
+    dryRun: false,
+  });
+  equal(genericPreflightLive.canSend, true);
+  const preflightMarkdown = publishingPreflightMarkdown(genericPreflightDryRun, handoff);
+  ok(preflightMarkdown.includes("## Publishing Preflight Audit"));
+  ok(preflightMarkdown.includes("Destination: CMS bridge"));
+  ok(preflightMarkdown.includes("Dry run is enabled"));
+  ok(preflightMarkdown.includes("Secret handling"));
 
   const wordpress = buildPublishingRequestPreview(handoff, {
     targetKind: "wordpress-rest",
@@ -5027,6 +5057,13 @@ test("publishing workflow builds endpoint payloads without persisting secrets", 
   });
   equal(unsafe.canSend, false);
   ok(unsafe.warnings.some((warning) => warning.includes("HTTPS")));
+  const unsafePreflight = buildPublishingPreflightReport(handoff, unsafe, {
+    targetKind: "generic-webhook",
+    endpointUrl: "http://example.com/hook",
+    contentFormat: "text",
+    dryRun: false,
+  });
+  ok(unsafePreflight.blockers.some((item) => item.id === "endpoint"));
 
   const substack = buildPublishingRequestPreview(handoff, {
     targetKind: "substack-manual",
@@ -5035,6 +5072,13 @@ test("publishing workflow builds endpoint payloads without persisting secrets", 
   });
   equal(substack.canSend, false);
   ok(substack.warnings.some((warning) => warning.includes("Substack")));
+  const substackPreflight = buildPublishingPreflightReport(handoff, substack, {
+    targetKind: "substack-manual",
+    endpointUrl: "",
+    contentFormat: "html",
+    dryRun: true,
+  });
+  ok(substackPreflight.needsReview.some((item) => item.id === "target"));
 });
 
 test("agentic workflow planner coordinates creation revision review and distribution", () => {
@@ -9911,6 +9955,11 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("Prepare publishing packet"));
   ok(app.includes("Copy publishing payload"));
   ok(app.includes("Copy publishing content"));
+  ok(app.includes('aria-label="Publishing preflight audit"'));
+  ok(app.includes("publishingPreflightReport"));
+  ok(app.includes("insertPublishingPreflightAudit"));
+  ok(app.includes("copyPublishingPreflightAudit"));
+  ok(app.includes("Insert publishing preflight audit"));
   ok(app.includes("openPublishingHandoff"));
   ok(app.includes('aria-label="Export readiness notes"'));
   ok(app.includes("exportStepAssistance"));

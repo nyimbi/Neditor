@@ -2864,9 +2864,23 @@
                 <p>{{ item.detail }}</p>
               </article>
             </div>
+            <section class="publishing-preflight" aria-label="Publishing preflight audit">
+              <header>
+                <div>
+                  <strong>Publishing preflight</strong>
+                  <span>{{ publishingPreflightReport.blockers.length }} blocker{{ publishingPreflightReport.blockers.length === 1 ? "" : "s" }} | {{ publishingPreflightReport.needsReview.length }} review item{{ publishingPreflightReport.needsReview.length === 1 ? "" : "s" }}</span>
+                </div>
+              </header>
+              <article v-for="item in publishingPreflightReport.items" :key="item.id" class="snapshot-row" :data-status="item.status">
+                <strong>{{ item.label }}</strong>
+                <p>{{ item.status }} | {{ item.detail }}</p>
+              </article>
+            </section>
             <div class="reference-actions">
               <button type="button" @click="copyPublishingPayload">Copy payload</button>
               <button type="button" @click="copyPublishingContent">Copy content</button>
+              <button type="button" @click="insertPublishingPreflightAudit">Insert preflight</button>
+              <button type="button" @click="copyPublishingPreflightAudit">Copy preflight</button>
               <button
                 type="button"
                 :disabled="publishingBusy || publishingDryRun || !publishingRequestPreview.canSend"
@@ -7361,7 +7375,9 @@ import {
 import { buildExportVisualQaDashboard, exportVisualQaMarkdown } from "./lib/exportVisualQa";
 import {
   buildPublishingHandoff,
+  buildPublishingPreflightReport,
   buildPublishingRequestPreview,
+  publishingPreflightMarkdown,
   publishingTargetHelp,
   publishingTargetLabels,
   type PublishingContentFormat,
@@ -9380,6 +9396,17 @@ const publishingRequestPreview = computed(() =>
     contentFormat: publishingContentFormat.value,
     authHeaderName: publishingAuthHeaderName.value,
     authToken: publishingAuthToken.value,
+  }),
+);
+const publishingPreflightReport = computed(() =>
+  buildPublishingPreflightReport(publishingHandoff.value, publishingRequestPreview.value, {
+    targetKind: publishingTargetKind.value,
+    endpointUrl: publishingEndpointUrl.value,
+    contentFormat: publishingContentFormat.value,
+    authHeaderName: publishingAuthHeaderName.value,
+    authToken: publishingAuthToken.value,
+    destinationName: publishingDestinationName.value,
+    dryRun: publishingDryRun.value,
   }),
 );
 const publishingTargetHelpText = computed(() => publishingTargetHelp(publishingTargetKind.value));
@@ -11753,6 +11780,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "publish-prepare", label: "Prepare Publishing Packet", help: "Run export readiness and build a publishable payload preview.", disabled: store.exportBusy, run: () => preparePublishingHandoff() },
           { id: "publish-copy-payload", label: "Copy Publishing Payload", help: "Copy the JSON payload for a CMS bridge or automation.", run: () => copyPublishingPayload() },
           { id: "publish-copy-content", label: "Copy Publishing Content", help: "Copy the selected HTML, Markdown, or plain-text publishing content.", run: () => copyPublishingContent() },
+          { id: "publish-preflight", label: "Insert Publishing Preflight", help: "Insert endpoint, metadata, dry-run, secret-handling, and target workflow checks.", run: () => insertPublishingPreflightAudit() },
           { id: "publish-save-destination", label: "Save Publishing Destination", help: "Save the current non-secret endpoint profile for reuse.", run: () => savePublishingDestinationProfile() },
         ],
       },
@@ -14682,6 +14710,8 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Prepare publishing packet", group: "Export", keywords: ["publish", "payload", "cms", "webhook", "substack"], run: () => void preparePublishingHandoff() },
   { name: "Copy publishing payload", group: "Export", keywords: ["publish", "json", "webhook", "cms"], run: () => void copyPublishingPayload() },
   { name: "Copy publishing content", group: "Export", keywords: ["publish", "html", "markdown", "substack"], run: () => void copyPublishingContent() },
+  { name: "Insert publishing preflight audit", group: "Export", keywords: ["publish", "preflight", "audit", "cms", "webhook", "substack"], run: () => insertPublishingPreflightAudit() },
+  { name: "Copy publishing preflight audit", group: "Export", keywords: ["publish", "preflight", "audit", "copy"], run: () => void copyPublishingPreflightAudit() },
   { name: "Save publishing destination", group: "Export", keywords: ["publish", "destination", "profile", "webhook", "cms"], run: () => savePublishingDestinationProfile() },
   { name: "Export HTML", group: "Export", run: () => void exportDocumentAs("html") },
   { name: "Export EPUB", group: "Export", run: () => void exportDocumentAs("epub") },
@@ -22243,6 +22273,25 @@ async function copyPublishingContent() {
   }
 }
 
+function publishingPreflightAuditMarkdown() {
+  return publishingPreflightMarkdown(publishingPreflightReport.value, publishingHandoff.value);
+}
+
+function insertPublishingPreflightAudit() {
+  insertBlock(publishingPreflightAuditMarkdown());
+  store.statusMessage = "Inserted publishing preflight audit";
+}
+
+async function copyPublishingPreflightAudit() {
+  const audit = publishingPreflightAuditMarkdown();
+  try {
+    await navigator.clipboard?.writeText(audit);
+    store.statusMessage = "Copied publishing preflight audit";
+  } catch {
+    store.statusMessage = "Publishing preflight audit is ready to copy";
+  }
+}
+
 async function sendPublishingPayload() {
   if (publishingDryRun.value || !publishingRequestPreview.value.canSend || publishingBusy.value) return;
   publishingBusy.value = true;
@@ -27250,17 +27299,36 @@ select:hover {
   border-left: 3px solid #c68a1a;
 }
 
-.publishing-checklist {
+.publishing-checklist,
+.publishing-preflight {
   display: grid;
   gap: 8px;
 }
 
-.publishing-checklist .snapshot-row[data-status="ready"] {
+.publishing-preflight {
+  padding: 8px;
+  border: 1px solid #d7dee7;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.publishing-preflight header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.publishing-checklist .snapshot-row[data-status="ready"],
+.publishing-preflight .snapshot-row[data-status="ready"] {
   border-left: 3px solid #2f855a;
 }
 
-.publishing-checklist .snapshot-row[data-status="needs-review"] {
+.publishing-checklist .snapshot-row[data-status="needs-review"],
+.publishing-preflight .snapshot-row[data-status="needs-review"] {
   border-left: 3px solid #c68a1a;
+}
+
+.publishing-preflight .snapshot-row[data-status="blocked"] {
+  border-left: 3px solid #b42318;
 }
 
 .release-readiness-checklist,

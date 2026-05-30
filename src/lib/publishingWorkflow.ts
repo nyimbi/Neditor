@@ -58,6 +58,24 @@ export interface PublishingRequestPreview {
   warnings: string[];
 }
 
+export interface PublishingPreflightItem {
+  id: string;
+  label: string;
+  status: "ready" | "needs-review" | "blocked";
+  detail: string;
+}
+
+export interface PublishingPreflightReport {
+  destination: string;
+  targetKind: PublishingTargetKind;
+  contentFormat: PublishingContentFormat;
+  canSend: boolean;
+  blockers: PublishingPreflightItem[];
+  needsReview: PublishingPreflightItem[];
+  ready: PublishingPreflightItem[];
+  items: PublishingPreflightItem[];
+}
+
 export const publishingTargetLabels: Record<PublishingTargetKind, string> = {
   "generic-webhook": "Generic webhook",
   "wordpress-rest": "WordPress REST draft",
@@ -154,6 +172,111 @@ export function buildPublishingRequestPreview(
     bodyText: JSON.stringify(body, null, 2),
     warnings,
   };
+}
+
+export function buildPublishingPreflightReport(
+  handoff: PublishingHandoff,
+  preview: PublishingRequestPreview,
+  input: PublishingEndpointInput & { destinationName?: string; dryRun?: boolean },
+): PublishingPreflightReport {
+  const targetKind = input.targetKind;
+  const dryRun = input.dryRun !== false;
+  const checklistIssues = handoff.checklist
+    .filter((item) => item.status !== "ready")
+    .map((item) => `${item.label}: ${item.detail}`);
+  const items: PublishingPreflightItem[] = [
+    {
+      id: "endpoint",
+      label: "Endpoint safety",
+      status: preview.canSend || targetKind === "substack-manual" ? "ready" : "blocked",
+      detail: preview.url
+        ? preview.warnings.find((warning) => /HTTPS|endpoint/i.test(warning)) || `Endpoint: ${preview.url}`
+        : targetKind === "substack-manual"
+          ? "Manual Substack handoff does not require an endpoint."
+          : "Add a publishing endpoint before sending.",
+    },
+    {
+      id: "dry-run",
+      label: "Send guard",
+      status: dryRun ? "needs-review" : preview.canSend ? "ready" : "blocked",
+      detail: dryRun
+        ? "Dry run is enabled; copy or inspect the payload before explicitly sending."
+        : preview.canSend
+          ? "Dry run is off and endpoint preview can be sent."
+          : "Sending is blocked until endpoint and target warnings are resolved.",
+    },
+    {
+      id: "metadata",
+      label: "Public metadata",
+      status: checklistIssues.length ? "needs-review" : "ready",
+      detail: checklistIssues.length ? checklistIssues.join("; ") : "Title, summary, tags, approval status, and readiness checks are complete.",
+    },
+    {
+      id: "content",
+      label: "Content payload",
+      status: publishingPrimaryContent(handoff, input.contentFormat).trim() ? "ready" : "blocked",
+      detail: publishingPrimaryContent(handoff, input.contentFormat).trim()
+        ? `${input.contentFormat.toUpperCase()} content is available for ${publishingTargetLabels[targetKind]}.`
+        : `No ${input.contentFormat} content is available for the payload.`,
+    },
+    {
+      id: "secrets",
+      label: "Secret handling",
+      status: preview.headers.Authorization || Object.keys(preview.headers).some((header) => !/^content-type$/i.test(header)) ? "needs-review" : "ready",
+      detail: preview.headers.Authorization || Object.keys(preview.headers).some((header) => !/^content-type$/i.test(header))
+        ? "A session-only auth header is present; confirm the token is not saved in the document or workspace."
+        : "No session auth token is attached to the preview.",
+    },
+    {
+      id: "target",
+      label: "Target workflow",
+      status: targetKind === "substack-manual" ? "needs-review" : "ready",
+      detail: targetKind === "substack-manual"
+        ? "Substack remains a manual copy/paste workflow; verify the editor preview before publishing."
+        : publishingTargetHelp(targetKind),
+    },
+    ...preview.warnings
+      .filter((warning) => !/HTTPS|endpoint|Substack/i.test(warning))
+      .map((warning, index) => ({
+        id: `warning-${index + 1}`,
+        label: "Preview warning",
+        status: "needs-review" as const,
+        detail: warning,
+      })),
+  ];
+  return {
+    destination: input.destinationName?.trim() || publishingTargetLabels[targetKind],
+    targetKind,
+    contentFormat: input.contentFormat,
+    canSend: preview.canSend && !dryRun,
+    blockers: items.filter((item) => item.status === "blocked"),
+    needsReview: items.filter((item) => item.status === "needs-review"),
+    ready: items.filter((item) => item.status === "ready"),
+    items,
+  };
+}
+
+export function publishingPreflightMarkdown(report: PublishingPreflightReport, handoff: PublishingHandoff) {
+  return [
+    "## Publishing Preflight Audit",
+    "",
+    `- Destination: ${report.destination}`,
+    `- Target: ${publishingTargetLabels[report.targetKind]}`,
+    `- Content format: ${report.contentFormat}`,
+    `- Send state: ${report.canSend ? "ready to send" : "not ready to send or dry-run only"}`,
+    `- Handoff: ${handoff.title} (${handoff.slug})`,
+    `- Readiness: ${handoff.readinessLabel}`,
+    "",
+    "| Check | Status | Detail |",
+    "| --- | --- | --- |",
+    ...report.items.map((item) => `| ${escapeTableCell(item.label)} | ${item.status} | ${escapeTableCell(item.detail)} |`),
+    "",
+    "### Required Before Publishing",
+    "",
+    ...(report.blockers.length ? report.blockers.map((item) => `- [ ] Resolve blocker: ${item.label} - ${item.detail}`) : ["- [x] No blocking publishing preflight issues detected."]),
+    ...(report.needsReview.length ? report.needsReview.map((item) => `- [ ] Review: ${item.label} - ${item.detail}`) : ["- [x] No additional review warnings detected."]),
+    "",
+  ].join("\n");
 }
 
 export function publishingPrimaryContent(handoff: PublishingHandoff, format: PublishingContentFormat) {
@@ -259,6 +382,13 @@ function slugValue(value: unknown) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function escapeTableCell(value: string) {
+  return (value || "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
+    .trim();
 }
 
 function firstParagraph(markdown: string) {

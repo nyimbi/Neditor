@@ -776,6 +776,10 @@ automation, WordPress REST endpoint, or Ghost Admin proxy, the toolbar
 endpoint tokens session-only, supports dry-run preview before sending, and
 blocks unsafe non-local HTTP endpoints so business users can post through an
 approved publishing bridge without copying files by hand.
+Use **Insert preflight** to add a publishing audit section before sending. It
+records endpoint safety, dry-run state, public metadata, content payload
+availability, secret handling, target workflow caveats, and the exact blockers
+or review items that remain.
 The packaged CLI exposes the same handoff for automation:
 
 ```sh
