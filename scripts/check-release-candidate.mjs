@@ -1,11 +1,16 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const args = new Set(process.argv.slice(2));
 const candidateDir = resolveCandidateDir();
+const allowNonReleaseable = args.has("--allow-nonreleaseable") || process.env.NEDITOR_RELEASE_CANDIDATE_ALLOW_NONRELEASEABLE === "1";
+const currentSourceCommit = git(["rev-parse", "HEAD"]).stdout.trim();
+const currentSourceTreeClean = gitTreeClean();
 const issues = [];
 const warnings = [];
 const requiredKinds = ["frontend:index", "native:app-binary", "native:ned-cli", "native:prepared-ned-sidecar", "distribution:showcase-example"];
@@ -35,6 +40,9 @@ const report = {
     warnings: warnings.length,
     artifacts: Array.isArray(manifest?.artifacts) ? manifest.artifacts.length : 0,
     requiredKinds,
+    allowNonReleaseable,
+    currentSourceCommit,
+    currentSourceTreeClean,
   },
   issues,
   warnings,
@@ -99,6 +107,7 @@ function validateManifest(candidate) {
   if (!candidate.product?.version) issues.push("manifest product.version is missing");
   if (!candidate.source?.commit) issues.push("manifest source.commit is missing");
   if (typeof candidate.releaseable !== "boolean") issues.push("manifest releaseable must be boolean");
+  validateReleaseability(candidate);
   if (!Array.isArray(candidate.artifacts) || !candidate.artifacts.length) {
     issues.push("manifest artifacts must be a non-empty array");
     return;
@@ -137,6 +146,28 @@ function validateManifest(candidate) {
 
   for (const kind of requiredKinds) {
     if (!artifactKinds.has(kind)) issues.push(`manifest is missing required artifact kind ${kind}`);
+  }
+}
+
+function validateReleaseability(candidate) {
+  if (allowNonReleaseable) {
+    warnings.push("--allow-nonreleaseable was used; this check is suitable for local inspection only, not release handoff.");
+    return;
+  }
+  if (candidate.releaseable !== true) {
+    issues.push("manifest releaseable must be true for release handoff; use --allow-nonreleaseable only for local dry-run inspection");
+  }
+  if (candidate.source?.commit && candidate.source.commit !== currentSourceCommit) {
+    issues.push(`manifest source.commit must match current HEAD ${currentSourceCommit}, got ${candidate.source.commit}`);
+  }
+  if (candidate.source?.treeCleanBefore !== true) {
+    issues.push("manifest source.treeCleanBefore must be true for a handoff candidate");
+  }
+  if (candidate.source?.treeCleanAfter !== true) {
+    issues.push("manifest source.treeCleanAfter must be true for a handoff candidate");
+  }
+  if (!currentSourceTreeClean) {
+    issues.push("current source tree must be clean before checking a release handoff candidate");
   }
 }
 
@@ -182,6 +213,19 @@ function validRelativeArtifactPath(path) {
 
 function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function git(args) {
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  if (result.status !== 0) {
+    console.error(`git ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
+    process.exit(1);
+  }
+  return result;
+}
+
+function gitTreeClean() {
+  return git(["status", "--porcelain"]).stdout.trim() === "";
 }
 
 function relativePath(path) {

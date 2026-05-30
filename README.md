@@ -1060,12 +1060,16 @@ passed, and every final readiness gap has a sendable work item.
 Run `pnpm run check:release-candidate` against the generated directory before
 handoff; it independently validates `manifest.json`, `SHA256SUMS`, the README,
 artifact file sizes, SHA-256 hashes, required native/frontend artifact kinds,
-and the prepared `ned-*` sidecar hash, then writes
+the prepared `ned-*` sidecar hash, clean-checkout provenance, current Git
+commit, and final-releaseable status, then writes
 `.tmp/release-candidate/check-report.json`. `ned release-candidate --json`
 reads that same directory without rebuilding anything and summarizes candidate
 status, releaseability, artifact count, checker issues, evidence gaps, next
 steps, and follow-up commands for support scripts. Use `--strict` when a release
 automation step should fail unless the candidate is checked and final-releaseable.
+Use `node scripts/check-release-candidate.mjs --allow-nonreleaseable` only for
+local inspection of a stale or deliberately dirty dry-run packet; that mode is
+not a release handoff gate.
 
 On the Windows or Linux host that produced the package and WebDriver evidence,
 run `pnpm run collect:platform-evidence` after `pnpm run test:tauri-webdriver`

@@ -284,8 +284,18 @@ refreshes are opt-in because some CI, headless, or sandboxed hosts cannot launch
 real windows reliably.
 
 `check:release-candidate` independently validates the candidate manifest,
-hashes, README, required artifact kinds, file sizes, SHA-256 values, and prepared
-sidecar hash parity. Do not hand off a candidate that fails this check.
+hashes, README, required artifact kinds, file sizes, SHA-256 values, prepared
+sidecar hash parity, clean-checkout provenance, current Git commit, and
+`releaseable: true` handoff status. Do not hand off a candidate that fails this
+check. For local inspection of an old or deliberately dirty dry-run packet only,
+use:
+
+```sh
+node scripts/check-release-candidate.mjs --allow-nonreleaseable
+```
+
+That flag still validates hashes and artifact structure, but the generated
+`check-report.json` records that the result is not suitable for release handoff.
 
 ## Signing and Notarization
 

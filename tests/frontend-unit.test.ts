@@ -9438,6 +9438,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCandidateChecker.includes("size mismatch"));
   ok(releaseCandidateChecker.includes("SHA-256 mismatch"));
   ok(releaseCandidateChecker.includes("README.md must state whether the candidate is releaseable on this host"));
+  ok(releaseCandidateChecker.includes("manifest releaseable must be true for release handoff"));
+  ok(releaseCandidateChecker.includes("manifest source.commit must match current HEAD"));
+  ok(releaseCandidateChecker.includes("current source tree must be clean before checking a release handoff candidate"));
+  ok(releaseCandidateChecker.includes("--allow-nonreleaseable was used"));
+  ok(releaseCandidateChecker.includes("NEDITOR_RELEASE_CANDIDATE_ALLOW_NONRELEASEABLE"));
   ok(desktopBundleChecker.includes("examples\", \"showcase\", \"neditor-capability-showcase.md"));
   ok(desktopBundleChecker.includes("capability showcase example is missing"));
   ok(releaseCandidate.includes("readyToSend: workItem.readyToSend === true"));
