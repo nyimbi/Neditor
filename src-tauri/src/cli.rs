@@ -6521,7 +6521,11 @@ fn build_accessibility_qa_report(manual_signoff: bool) -> Value {
         accessibility_item(
             "screen-reader-workbench-regions",
             "Screen-reader workbench regions",
-            source_has_all(APP_SOURCE, &["aria-label=\"NEditor workbench\"", "aria-label=\"Document source editor\"", "aria-label=\"Document preview\""]),
+            source_has_all(APP_SOURCE, &[
+                "aria-label=\"NEditor workbench\"",
+                "aria-label=\"Markdown source\"",
+                "aria-label=\"Live preview\"",
+            ]),
             "Expose source editor, preview, sidebars, and workbench regions with stable accessible labels.",
         ),
         accessibility_item(
@@ -6699,6 +6703,7 @@ fn build_release_dashboard_report() -> Value {
     let summary = improvement_audit.get("summary").unwrap_or(&Value::Null);
     let open_improvements = number_field_u64(summary, "open");
     let accessibility = build_accessibility_qa_report(false);
+    let (homebrew_lane, homebrew_detail) = release_dashboard_homebrew_state();
     let mut items = vec![
         release_dashboard_item(
             "implementation-roadmap",
@@ -6734,9 +6739,9 @@ fn build_release_dashboard_report() -> Value {
         ),
         release_dashboard_item(
             "homebrew-signing",
-            "credentialed",
+            &homebrew_lane,
             "Homebrew, signing, and notarization",
-            "Requires signed/notarized macOS artifact, concrete cask SHA, and Homebrew audit evidence.",
+            &homebrew_detail,
             "pnpm run check:homebrew && pnpm run check:release-signing",
         ),
         release_dashboard_item(
@@ -6806,6 +6811,55 @@ fn build_release_dashboard_report() -> Value {
         ],
         "note": "The dashboard is intentionally conservative: it shows implementation, manual, credentialed, cross-platform, Homebrew, Google Docs, and ready-to-send lanes without hiding external release proof."
     })
+}
+
+fn release_dashboard_homebrew_state() -> (String, String) {
+    let Ok(report) = read_json_report(Path::new(".tmp/homebrew/homebrew-packaging-report.json"))
+    else {
+        return (
+            "credentialed".to_string(),
+            "Requires signed/notarized macOS artifact, concrete cask SHA, and Homebrew audit evidence.".to_string(),
+        );
+    };
+    let status = readiness_string_field(&report, "status").unwrap_or("unknown");
+    let supplied_cask_checked = report
+        .pointer("/cask/supplied/status")
+        .and_then(Value::as_str)
+        == Some("checked");
+    let supplied_artifact_checked =
+        report.pointer("/artifact/status").and_then(Value::as_str) == Some("checked");
+    let materialization_checked = report
+        .pointer("/materialization/status")
+        .and_then(Value::as_str)
+        == Some("checked");
+    let blockers = readiness_array_field(&report, "blockers");
+    let has_signing_blocker = blockers
+        .iter()
+        .any(|blocker| readiness_string_field(blocker, "id") == Some("homebrew-macos-signing"));
+
+    if status == "ready" {
+        return (
+            "complete".to_string(),
+            "Homebrew cask, artifact SHA, materialization, and macOS signing evidence are accepted; run final brew audit before publishing.".to_string(),
+        );
+    }
+    if supplied_cask_checked && supplied_artifact_checked && materialization_checked {
+        if has_signing_blocker {
+            return (
+                "credentialed".to_string(),
+                "Homebrew cask, artifact SHA, and materialization are checked; remaining blocker is macOS signing/notarization evidence plus final brew audit on the release host.".to_string(),
+            );
+        }
+        return (
+            "credentialed".to_string(),
+            "Homebrew cask, artifact SHA, and materialization are checked; review remaining Homebrew blockers with pnpm run check:homebrew.".to_string(),
+        );
+    }
+    (
+        "credentialed".to_string(),
+        "Requires signed/notarized macOS artifact, concrete cask SHA, and Homebrew audit evidence."
+            .to_string(),
+    )
 }
 
 fn release_dashboard_item(id: &str, lane: &str, label: &str, detail: &str, command: &str) -> Value {

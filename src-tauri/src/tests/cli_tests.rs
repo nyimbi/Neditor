@@ -2630,6 +2630,20 @@ fn ned_cli_reports_accessibility_qa_and_release_dashboard() {
             .iter()
             .any(|item| item["id"] == item_id));
     }
+    let homebrew_item = dashboard_report["items"]
+        .as_array()
+        .expect("dashboard items")
+        .iter()
+        .find(|item| item["id"] == "homebrew-signing")
+        .expect("homebrew release dashboard item");
+    let homebrew_detail = homebrew_item["detail"]
+        .as_str()
+        .expect("homebrew dashboard detail");
+    assert!(
+        homebrew_detail.contains("concrete cask SHA")
+            || homebrew_detail.contains("cask, artifact SHA, and materialization are checked"),
+        "homebrew dashboard detail should distinguish missing SHA proof from checked local cask/artifact proof: {homebrew_detail}"
+    );
     assert!(dashboard_report["nextCommands"]
         .as_array()
         .expect("dashboard next commands")
