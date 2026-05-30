@@ -974,6 +974,109 @@ fn ned_cli_manages_citation_source_library_from_terminal() {
 }
 
 #[test]
+fn ned_cli_creates_deep_research_dossiers_from_terminal() {
+    let root = temp_workspace_path("deep-research");
+    fs::create_dir_all(&root).expect("create deep research workspace");
+    let document = root.join("proposal.md");
+    fs::write(
+        &document,
+        "# Proposal\n\nClimate procurement controls need evidence.\n",
+    )
+    .expect("write document");
+    let source_dir = root.join("proposal.neditor-sources");
+    fs::create_dir_all(&source_dir).expect("create source dir");
+    let source_path = source_dir.join("climate.html");
+    let source_body =
+        "<html><body>Climate procurement controls evidence and audit timeline.</body></html>";
+    fs::write(&source_path, source_body).expect("write saved source");
+    fs::write(
+        source_dir.join("sources.json"),
+        serde_json::to_string_pretty(&serde_json::json!([
+            {
+                "citation_key": "climate-procurement-evidence",
+                "title": "Climate Procurement Evidence",
+                "url": "https://agency.gov/climate-procurement.html",
+                "snippet": "Climate procurement controls evidence for source review.",
+                "source": "SearXNG",
+                "path": source_path.to_string_lossy(),
+                "relative_path": "proposal.neditor-sources/climate.html",
+                "sha256": "placeholder-hash",
+                "bytes": source_body.len(),
+                "downloaded_at": "2026-05-30T08:00:00+03:00",
+                "media_type": "text/html",
+                "fit_score": 91,
+                "fit_label": "strong",
+                "fit_reasons": ["query term in title", "saved source document"]
+            }
+        ]))
+        .expect("source manifest json"),
+    )
+    .expect("write source manifest");
+
+    let output = root.join("deep-research.md");
+    let outcome = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "deep-research".to_string(),
+        "--topic".to_string(),
+        "climate procurement evidence".to_string(),
+        "--document".to_string(),
+        document.to_string_lossy().to_string(),
+        "--provider".to_string(),
+        "local-library".to_string(),
+        "--pages".to_string(),
+        "12".to_string(),
+        "--iterations".to_string(),
+        "2".to_string(),
+        "--results".to_string(),
+        "2".to_string(),
+        "--output".to_string(),
+        output.to_string_lossy().to_string(),
+        "--json".to_string(),
+    ])
+    .expect("deep research json");
+    assert_eq!(outcome.exit_code, 0);
+    let report: serde_json::Value =
+        serde_json::from_str(&outcome.message).expect("deep research json");
+    assert_eq!(report["schema"], "neditor.ned-deep-research.v1");
+    assert_eq!(report["settings"]["topic"], "climate procurement evidence");
+    assert_eq!(report["settings"]["searchProvider"], "local-library");
+    assert_eq!(report["settings"]["targetPages"], 12);
+    assert_eq!(
+        report["iterations"].as_array().expect("iterations").len(),
+        2
+    );
+    assert_eq!(report["iterations"][0]["provider"], "local-library");
+    assert!(report["iterations"][0]["results"]
+        .as_array()
+        .expect("results")
+        .iter()
+        .any(|result| result["title"] == "Climate Procurement Evidence"
+            && result["citationKey"] == "climate-procurement-evidence"
+            && result["fitScore"].as_u64().expect("fit score") > 0));
+    assert!(report["markdown"]
+        .as_str()
+        .expect("markdown")
+        .contains("provider: NEditor Deep Research CLI"));
+
+    let markdown = fs::read_to_string(&output).expect("deep research markdown");
+    assert!(markdown.contains("# climate procurement evidence"));
+    assert!(markdown.contains("## Source Quality Review"));
+    assert!(markdown.contains("## Source Citation Index"));
+    assert!(markdown.contains("## Deep Research Evidence Log"));
+    assert!(markdown.contains("@climate-procurement-evidence"));
+    assert!(markdown.contains("```bibliography"));
+
+    let missing_topic = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "research-report".to_string(),
+        "--provider".to_string(),
+        "local-library".to_string(),
+    ])
+    .expect_err("missing topic should fail");
+    assert!(missing_topic.contains("--topic is required"));
+}
+
+#[test]
 fn ned_cli_generates_quality_review_recommendations() {
     let source = temp_markdown_path("quality");
     let long_paragraph = (0..130).map(|_| "review").collect::<Vec<_>>().join(" ");
@@ -3127,6 +3230,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(bash.message.contains("evidence-packet"));
     assert!(bash.message.contains("sources"));
     assert!(bash.message.contains("--download-url"));
+    assert!(bash.message.contains("deep-research"));
+    assert!(bash.message.contains("--target-pages"));
     assert!(bash.message.contains("quality"));
     assert!(bash.message.contains("--report"));
     assert!(bash.message.contains("snippets"));
@@ -3179,6 +3284,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(zsh.message.contains("--get"));
     assert!(zsh.message.contains("citation-sources"));
     assert!(zsh.message.contains("--provider[search provider]"));
+    assert!(zsh.message.contains("research-report"));
+    assert!(zsh.message.contains("--save-sources"));
     assert!(zsh.message.contains("quality\\:quality"));
     assert!(zsh
         .message
@@ -3209,6 +3316,8 @@ fn ned_cli_generates_shell_completions_without_external_dependencies() {
     assert!(fish.message.contains("release-evidence-packet"));
     assert!(fish.message.contains("citation-sources"));
     assert!(fish.message.contains("download-url"));
+    assert!(fish.message.contains("deep-research"));
+    assert!(fish.message.contains("target-pages"));
     assert!(fish
         .message
         .contains("__fish_seen_subcommand_from quality qa review"));
@@ -3774,6 +3883,7 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("ned evidence"));
     assert!(outcome.message.contains("ned evidence-packet"));
     assert!(outcome.message.contains("ned sources --document"));
+    assert!(outcome.message.contains("ned deep-research"));
     assert!(outcome.message.contains("ned support-bundle"));
     assert!(outcome
         .message

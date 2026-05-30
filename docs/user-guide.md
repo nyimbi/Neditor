@@ -545,6 +545,12 @@ Research and business documents can keep reference metadata near the source.
   `ned sources --document report.md --audit --output source-audit.md` to
   create a reviewer-ready audit of saved files, hashes, citation keys, source
   quality notes, and missing or modified local evidence.
+- Use
+  `ned deep-research --topic "market evidence" --provider duckduckgo --pages 10 --output research-dossier.md`
+  when a terminal workflow should create an editable source-backed research
+  dossier. Add `--document report.md --save-sources` to download returned
+  source files into the document vault, or choose `--provider local-library` to
+  build from already saved sources without a live web search.
 - In **Review**, refresh **Evidence and approval review** to extract candidate
   claims, then use **Insert claim-source matrix** to map those claims to saved
   source-library citations. The matrix shows match scores, reasons, local file

@@ -109,6 +109,9 @@ const CLI_COMMANDS: &[&str] = &[
     "source-library",
     "citations",
     "citation-sources",
+    "deep-research",
+    "research",
+    "research-report",
     "rfp",
     "rfp-response",
     "analyze-rfp",
@@ -578,6 +581,7 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "sources" | "source-library" | "citations" | "citation-sources" => {
             run_sources_command(&args[2..])
         }
+        "deep-research" | "research" | "research-report" => run_deep_research_command(&args[2..]),
         "rfp" | "rfp-response" | "analyze-rfp" => run_rfp_response_command(&args[2..], stdin_text),
         "targets" => run_list_command("targets", SUPPORTED_EXPORT_TARGETS, &args[2..]),
         "handlers" | "transform-handlers" => run_handlers_command(&args[2..]),
@@ -4015,6 +4019,617 @@ fn run_sources_command(args: &[String]) -> Result<CliOutcome, String> {
         },
         exit_code: 0,
     })
+}
+
+fn run_deep_research_command(args: &[String]) -> Result<CliOutcome, String> {
+    let mut json_output = false;
+    let mut topic: Option<String> = None;
+    let mut document_type = "research report".to_string();
+    let mut audience = "business readers".to_string();
+    let mut provider = "duckduckgo".to_string();
+    let mut document_path: Option<String> = None;
+    let mut searxng_url: Option<String> = None;
+    let mut tavily_api_key: Option<String> = None;
+    let mut target_pages = 5usize;
+    let mut iterations = 3usize;
+    let mut results_per_iteration = 5usize;
+    let mut output_path: Option<PathBuf> = None;
+    let mut save_sources = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--topic" | "--query" => {
+                index += 1;
+                topic = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--topic requires research topic text".to_string())?
+                        .to_string(),
+                );
+            }
+            "--document-type" | "--type" => {
+                index += 1;
+                document_type = args
+                    .get(index)
+                    .ok_or_else(|| "--document-type requires document type text".to_string())?
+                    .trim()
+                    .to_string();
+            }
+            "--audience" => {
+                index += 1;
+                audience = args
+                    .get(index)
+                    .ok_or_else(|| "--audience requires audience text".to_string())?
+                    .trim()
+                    .to_string();
+            }
+            "--provider" => {
+                index += 1;
+                provider = args
+                    .get(index)
+                    .ok_or_else(|| {
+                        "--provider requires duckduckgo, searxng, tavily, or local-library"
+                            .to_string()
+                    })?
+                    .trim()
+                    .to_string();
+            }
+            "--document" | "--file" | "--path" => {
+                index += 1;
+                document_path = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--document requires a Markdown document path".to_string())?
+                        .to_string(),
+                );
+            }
+            "--searxng-url" => {
+                index += 1;
+                searxng_url = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--searxng-url requires a URL".to_string())?
+                        .to_string(),
+                );
+            }
+            "--tavily-api-key" => {
+                index += 1;
+                tavily_api_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| "--tavily-api-key requires an API key".to_string())?
+                        .to_string(),
+                );
+            }
+            "--pages" | "--target-pages" => {
+                index += 1;
+                target_pages = parse_deep_research_pages(
+                    args.get(index)
+                        .ok_or_else(|| "--pages requires a number from 1 to 200".to_string())?,
+                )?;
+            }
+            "--iterations" => {
+                index += 1;
+                iterations = parse_bounded_usize(
+                    args.get(index)
+                        .ok_or_else(|| "--iterations requires a number from 1 to 5".to_string())?,
+                    "--iterations",
+                    1,
+                    5,
+                )?;
+            }
+            "--results" | "--results-per-iteration" => {
+                index += 1;
+                results_per_iteration = parse_bounded_usize(
+                    args.get(index)
+                        .ok_or_else(|| "--results requires a number from 1 to 20".to_string())?,
+                    "--results",
+                    1,
+                    20,
+                )?;
+            }
+            "--save-sources" => save_sources = true,
+            "--output" | "-o" => {
+                index += 1;
+                output_path =
+                    Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                        "--output requires a Markdown file path".to_string()
+                    })?));
+            }
+            value => return Err(format!("Unsupported deep-research option '{value}'")),
+        }
+        index += 1;
+    }
+
+    let topic = topic
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "--topic is required for `ned deep-research`.".to_string())?
+        .to_string();
+    let mut iteration_reports = Vec::new();
+    let mut saved_sources = Vec::new();
+    for iteration_index in 1..=iterations {
+        let query = deep_research_query_for_iteration(&topic, iteration_index, target_pages);
+        let response = search_citation_sources(CitationSearchRequest {
+            query: query.clone(),
+            provider: Some(provider.clone()),
+            searxng_url: searxng_url.clone(),
+            tavily_api_key: tavily_api_key.clone(),
+            limit: Some(results_per_iteration),
+            document_path: document_path.clone(),
+        })?;
+        let mut results = serde_json::to_value(response.results).map_err(|err| err.to_string())?;
+        let results_array = results.as_array_mut().ok_or_else(|| {
+            "Could not encode Deep Research search results as an array.".to_string()
+        })?;
+        for result in results_array.iter_mut() {
+            let fit = deep_research_source_fit(&topic, result);
+            let citation_key = deep_research_citation_key(result);
+            if let Some(object) = result.as_object_mut() {
+                object.insert("fitScore".to_string(), json!(fit.0));
+                object.insert("fitLabel".to_string(), json!(fit.1));
+                object.insert("fitReasons".to_string(), json!(fit.2));
+                object.insert("citationKey".to_string(), json!(citation_key));
+            }
+        }
+        if save_sources {
+            if let Some(document_path) = document_path.as_deref() {
+                for result in results_array.iter().take(results_per_iteration) {
+                    if let Some(url) = readiness_string_field(result, "url") {
+                        let saved = download_citation_source(CitationDownloadRequest {
+                            document_path: document_path.to_string(),
+                            url: url.to_string(),
+                            title: readiness_string_field(result, "title").map(str::to_string),
+                            snippet: readiness_string_field(result, "snippet").map(str::to_string),
+                            source: readiness_string_field(result, "source").map(str::to_string),
+                            citation_key: readiness_string_field(result, "citationKey")
+                                .map(str::to_string),
+                            fit_score: result
+                                .get("fitScore")
+                                .and_then(Value::as_u64)
+                                .map(|score| score.min(100) as u8),
+                            fit_label: readiness_string_field(result, "fitLabel")
+                                .map(str::to_string),
+                            fit_reasons: Some(string_array_field(result, "fitReasons")),
+                            force_refresh: Some(false),
+                        })?;
+                        saved_sources
+                            .push(serde_json::to_value(saved).map_err(|err| err.to_string())?);
+                    }
+                }
+            }
+        }
+        let summary = deep_research_iteration_summary(results_array);
+        let gaps = deep_research_iteration_gaps(results_array);
+        let results_for_report = results_array.clone();
+        iteration_reports.push(json!({
+            "index": iteration_index,
+            "query": query,
+            "provider": provider.clone(),
+            "results": results_for_report,
+            "summary": summary,
+            "gaps": gaps,
+        }));
+    }
+
+    let settings = json!({
+        "topic": topic,
+        "documentType": document_type,
+        "audience": audience,
+        "searchProvider": provider,
+        "targetPages": target_pages,
+        "targetWords": target_pages * 500,
+        "iterations": iterations,
+        "resultsPerIteration": results_per_iteration,
+        "documentPath": document_path,
+        "saveSources": save_sources,
+    });
+    let markdown = deep_research_cli_markdown(&settings, &iteration_reports, &saved_sources);
+    if let Some(path) = output_path.as_deref() {
+        write_cli_markdown_output(path, &markdown)?;
+    }
+    if json_output {
+        return Ok(CliOutcome {
+            message: serde_json::to_string_pretty(&json!({
+                "schema": "neditor.ned-deep-research.v1",
+                "generatedAtUnixSeconds": unix_timestamp_seconds(),
+                "outputPath": output_path.as_deref().map(path_to_display),
+                "settings": settings,
+                "iterations": iteration_reports,
+                "savedSources": saved_sources,
+                "markdown": markdown,
+            }))
+            .map_err(|err| err.to_string())?,
+            exit_code: 0,
+        });
+    }
+    Ok(CliOutcome {
+        message: if let Some(path) = output_path.as_deref() {
+            format!("Wrote Deep Research dossier: {}", path_to_display(path))
+        } else {
+            markdown
+        },
+        exit_code: 0,
+    })
+}
+
+fn parse_deep_research_pages(value: &str) -> Result<usize, String> {
+    parse_bounded_usize(value, "--pages", 1, 200)
+}
+
+fn parse_bounded_usize(
+    value: &str,
+    flag: &str,
+    minimum: usize,
+    maximum: usize,
+) -> Result<usize, String> {
+    value
+        .parse::<usize>()
+        .map(|number| number.clamp(minimum, maximum))
+        .map_err(|_| format!("{flag} must be a number from {minimum} to {maximum}"))
+}
+
+fn deep_research_query_for_iteration(topic: &str, iteration: usize, target_pages: usize) -> String {
+    match iteration {
+        1 => topic.to_string(),
+        2 => format!("{topic} evidence data requirements limitations"),
+        3 => format!("{topic} case studies implementation risks outcomes"),
+        4 => format!("{topic} standards governance evaluation metrics"),
+        _ if target_pages > 50 => {
+            format!("{topic} comprehensive review bibliography source documents")
+        }
+        _ => format!("{topic} recent analysis recommendations"),
+    }
+}
+
+fn deep_research_source_fit(topic: &str, source: &Value) -> (u64, String, Vec<String>) {
+    let title = readiness_string_field(source, "title").unwrap_or("");
+    let snippet = readiness_string_field(source, "snippet").unwrap_or("");
+    let url = readiness_string_field(source, "url").unwrap_or("");
+    let provider = readiness_string_field(source, "source").unwrap_or("");
+    let topic_terms = topic
+        .to_ascii_lowercase()
+        .split(|ch: char| !ch.is_ascii_alphanumeric())
+        .filter(|term| term.len() > 3)
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let haystack = format!("{title} {snippet} {url} {provider}").to_ascii_lowercase();
+    let mut score = 20u64;
+    let mut reasons = Vec::new();
+    let matching_terms = topic_terms
+        .iter()
+        .filter(|term| haystack.contains(term.as_str()))
+        .take(6)
+        .cloned()
+        .collect::<Vec<_>>();
+    if !matching_terms.is_empty() {
+        score += (matching_terms.len() as u64) * 8;
+        reasons.push(format!(
+            "matches topic terms: {}",
+            matching_terms.join(", ")
+        ));
+    }
+    if url.contains(".gov") || url.contains(".edu") || url.contains(".int") {
+        score += 18;
+        reasons.push("high-authority domain".to_string());
+    } else if url.contains(".org") {
+        score += 10;
+        reasons.push("organization domain".to_string());
+    }
+    if snippet.len() > 180 {
+        score += 12;
+        reasons.push("substantive snippet".to_string());
+    } else if snippet.len() > 40 {
+        score += 6;
+        reasons.push("reviewable snippet".to_string());
+    }
+    if provider
+        .to_ascii_lowercase()
+        .contains("local source library")
+    {
+        score += 14;
+        reasons.push("saved local source candidate".to_string());
+    } else if !provider.trim().is_empty() {
+        score += 4;
+        reasons.push(format!("provider: {provider}"));
+    }
+    let score = score.min(100);
+    let label = if score >= 75 {
+        "strong"
+    } else if score >= 45 {
+        "review"
+    } else {
+        "weak"
+    }
+    .to_string();
+    if reasons.is_empty() {
+        reasons.push("candidate needs manual source review".to_string());
+    }
+    (score, label, reasons)
+}
+
+fn deep_research_citation_key(source: &Value) -> String {
+    let title = readiness_string_field(source, "title").unwrap_or("");
+    let url = readiness_string_field(source, "url").unwrap_or("");
+    let base = if title.trim().is_empty() {
+        url_host_label(url)
+    } else {
+        title.to_string()
+    };
+    let mut key = base
+        .to_ascii_lowercase()
+        .split(|ch: char| !ch.is_ascii_alphanumeric())
+        .filter(|part| !part.is_empty())
+        .take(4)
+        .collect::<Vec<_>>()
+        .join("-");
+    if key.is_empty() {
+        key = "source".to_string();
+    }
+    if key.len() > 48 {
+        key.truncate(48);
+        key = key.trim_end_matches('-').to_string();
+    }
+    key
+}
+
+fn url_host_label(url: &str) -> String {
+    url.trim()
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .split('/')
+        .next()
+        .unwrap_or("source")
+        .trim_start_matches("www.")
+        .to_string()
+}
+
+fn deep_research_iteration_summary(results: &[Value]) -> String {
+    if results.is_empty() {
+        return "No source candidates were returned for this query.".to_string();
+    }
+    let strong = results
+        .iter()
+        .filter(|result| readiness_string_field(result, "fitLabel") == Some("strong"))
+        .count();
+    let review = results
+        .iter()
+        .filter(|result| readiness_string_field(result, "fitLabel") == Some("review"))
+        .count();
+    format!(
+        "{} source candidate(s): {} strong, {} review, {} weak.",
+        results.len(),
+        strong,
+        review,
+        results.len().saturating_sub(strong + review)
+    )
+}
+
+fn deep_research_iteration_gaps(results: &[Value]) -> Vec<String> {
+    let mut gaps = Vec::new();
+    if results.is_empty() {
+        gaps.push("Run another provider or broaden the query before drafting.".to_string());
+    }
+    if !results
+        .iter()
+        .any(|result| readiness_string_field(result, "fitLabel") == Some("strong"))
+    {
+        gaps.push("No strong source candidate yet; reviewer should inspect source quality before relying on claims.".to_string());
+    }
+    if results.iter().any(|result| {
+        readiness_string_field(result, "snippet")
+            .map(str::trim)
+            .unwrap_or("")
+            .is_empty()
+    }) {
+        gaps.push("Some sources have no snippet; download and inspect the local source file before citing.".to_string());
+    }
+    if gaps.is_empty() {
+        gaps.push(
+            "Download and inspect the strongest source documents before final approval."
+                .to_string(),
+        );
+    }
+    gaps
+}
+
+fn deep_research_cli_markdown(
+    settings: &Value,
+    iterations: &[Value],
+    saved_sources: &[Value],
+) -> String {
+    let topic = readiness_string_field(settings, "topic").unwrap_or("Deep Research");
+    let document_type =
+        readiness_string_field(settings, "documentType").unwrap_or("research report");
+    let audience = readiness_string_field(settings, "audience").unwrap_or("business readers");
+    let provider = readiness_string_field(settings, "searchProvider").unwrap_or("duckduckgo");
+    let target_pages = number_field_u64(settings, "targetPages");
+    let target_words = number_field_u64(settings, "targetWords");
+    let all_results = iterations
+        .iter()
+        .flat_map(|iteration| readiness_array_field(iteration, "results"))
+        .collect::<Vec<_>>();
+    let mut lines = vec![
+        "---".to_string(),
+        format!("title: {}", yaml_scalar(topic)),
+        format!("documentType: {}", yaml_scalar(document_type)),
+        "status: draft".to_string(),
+        format!("deepResearchTopic: {}", yaml_scalar(topic)),
+        format!("deepResearchTargetPages: {target_pages}"),
+        format!("deepResearchSourceCandidates: {}", all_results.len()),
+        format!("deepResearchSavedSources: {}", saved_sources.len()),
+        "---".to_string(),
+        "".to_string(),
+        "```ai-source".to_string(),
+        "provider: NEditor Deep Research CLI".to_string(),
+        format!("model: {provider} search provider"),
+        format!("date: {}", unix_timestamp_seconds()),
+        format!("promptSummary: Research dossier for {topic}"),
+        "status: needs-review".to_string(),
+        "```".to_string(),
+        "".to_string(),
+        format!("# {topic}"),
+        "".to_string(),
+        "## Research Brief".to_string(),
+        "".to_string(),
+        format!("- Document type: {document_type}"),
+        format!("- Audience: {audience}"),
+        format!("- Target length: about {target_pages} page(s), approximately {target_words} words."),
+        format!("- Search provider: {provider}"),
+        "- Drafting state: source-backed starter dossier; claims require reviewer acceptance before distribution.".to_string(),
+        "".to_string(),
+        "## Recommended Drafting Plan".to_string(),
+        "".to_string(),
+    ];
+    for section in deep_research_section_plan(target_pages as usize) {
+        lines.push(format!("- {section}"));
+    }
+    lines.extend([
+        "".to_string(),
+        "## Source Quality Review".to_string(),
+        "".to_string(),
+        "| Citation key | Fit | Source | Title | Review action | URL |".to_string(),
+        "| --- | --- | --- | --- | --- | --- |".to_string(),
+    ]);
+    if all_results.is_empty() {
+        lines.push(
+            "| - | weak | none | No source candidates | Run another search before drafting | - |"
+                .to_string(),
+        );
+    } else {
+        for result in &all_results {
+            lines.push(format!(
+                "| @{} | {} | {} | {} | {} | {} |",
+                markdown_cell(readiness_string_field(result, "citationKey").unwrap_or("source")),
+                markdown_cell(&format!(
+                    "{}/100 {}",
+                    number_field_u64(result, "fitScore"),
+                    readiness_string_field(result, "fitLabel").unwrap_or("review")
+                )),
+                markdown_cell(readiness_string_field(result, "source").unwrap_or("unknown")),
+                markdown_cell(readiness_string_field(result, "title").unwrap_or("Untitled source")),
+                markdown_cell(&deep_research_review_action(result)),
+                markdown_cell(readiness_string_field(result, "url").unwrap_or("")),
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "## Source Citation Index".to_string(),
+        "".to_string(),
+        "| Citation | Usage guidance | Local source |".to_string(),
+        "| --- | --- | --- |".to_string(),
+    ]);
+    if all_results.is_empty() {
+        lines.push("| - | No citation keys available yet | - |".to_string());
+    } else {
+        for result in &all_results {
+            let key = readiness_string_field(result, "citationKey").unwrap_or("source");
+            lines.push(format!(
+                "| [@{}] | {} | {} |",
+                markdown_cell(key),
+                markdown_cell(&deep_research_review_action(result)),
+                markdown_cell(
+                    saved_sources
+                        .iter()
+                        .find(|source| readiness_string_field(source, "citation_key") == Some(key))
+                        .and_then(|source| readiness_string_field(source, "relative_path"))
+                        .unwrap_or("not downloaded")
+                ),
+            ));
+        }
+    }
+    lines.extend([
+        "".to_string(),
+        "## Deep Research Evidence Log".to_string(),
+        "".to_string(),
+    ]);
+    for iteration in iterations {
+        lines.push(format!(
+            "### Iteration {}",
+            number_field_u64(iteration, "index")
+        ));
+        lines.push("".to_string());
+        lines.push(format!(
+            "- Query: {}",
+            readiness_string_field(iteration, "query").unwrap_or("")
+        ));
+        lines.push(format!(
+            "- Summary: {}",
+            readiness_string_field(iteration, "summary").unwrap_or("")
+        ));
+        for gap in string_array_field(iteration, "gaps") {
+            lines.push(format!("- Gap: {gap}"));
+        }
+        lines.push("".to_string());
+    }
+    lines.push("## Bibliography".to_string());
+    lines.push("".to_string());
+    lines.push("```bibliography".to_string());
+    lines.push("[".to_string());
+    let records = all_results
+        .iter()
+        .map(deep_research_bibliography_record)
+        .collect::<Vec<_>>();
+    for (index, record) in records.iter().enumerate() {
+        let suffix = if index + 1 == records.len() { "" } else { "," };
+        lines.push(format!("  {record}{suffix}"));
+    }
+    lines.push("]".to_string());
+    lines.push("```".to_string());
+    lines.extend([
+        "".to_string(),
+        "## Quality Assurance & Review Handoff".to_string(),
+        "".to_string(),
+        "- Verify every cited claim against downloaded source documents, not just search snippets.".to_string(),
+        "- Replace this starter dossier with section-by-section prose only after source review.".to_string(),
+        "- Run `ned sources --document <doc.md> --audit --output source-audit.md` after downloading source files.".to_string(),
+        "- Run `ned quality <doc.md> --markdown --output quality-review.md` before export.".to_string(),
+    ]);
+    lines.join("\n")
+}
+
+fn deep_research_section_plan(target_pages: usize) -> Vec<String> {
+    let mut sections = vec![
+        "Executive summary with source-grounded findings.".to_string(),
+        "Research questions, scope, and method.".to_string(),
+        "Evidence-backed findings with inline citations.".to_string(),
+        "Limitations, uncertainties, and source conflicts.".to_string(),
+        "Recommendations, decisions, and next evidence to collect.".to_string(),
+    ];
+    if target_pages > 20 {
+        sections.push("Expand each major finding into a chapter with context, evidence, implications, and reviewer notes.".to_string());
+    }
+    if target_pages > 75 {
+        sections.push("Create appendices for source abstracts, source-quality scoring, glossary, and data tables.".to_string());
+    }
+    sections
+}
+
+fn deep_research_review_action(result: &Value) -> String {
+    match readiness_string_field(result, "fitLabel").unwrap_or("review") {
+        "strong" => "Inspect source file, then cite for directly supported claims.".to_string(),
+        "review" => "Use as background until reviewer confirms source strength.".to_string(),
+        _ => "Treat as weak lead; do not cite without stronger corroboration.".to_string(),
+    }
+}
+
+fn deep_research_bibliography_record(result: &Value) -> String {
+    let key = json_string(readiness_string_field(result, "citationKey").unwrap_or("source"));
+    let title = json_string(readiness_string_field(result, "title").unwrap_or("Untitled source"));
+    let url = json_string(readiness_string_field(result, "url").unwrap_or(""));
+    let note = json_string(&format!(
+        "Deep Research source | provider: {} | fit: {}/100 {}",
+        readiness_string_field(result, "source").unwrap_or("unknown"),
+        number_field_u64(result, "fitScore"),
+        readiness_string_field(result, "fitLabel").unwrap_or("review")
+    ));
+    format!(
+        "{{\"id\":{},\"type\":\"webpage\",\"title\":{},\"URL\":{},\"note\":{}}}",
+        key, title, url, note
+    )
+}
+
+fn json_string(value: &str) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string())
 }
 
 fn run_rfp_response_command(
@@ -13686,6 +14301,9 @@ _ned() {{
       sources|source-library|citations|citation-sources)
         COMPREPLY=( $(compgen -W "--json --audit --markdown --bibliography --bib --document --file --path --query --search --provider --searxng-url --tavily-api-key --limit --download-url --url --title --snippet --source --citation-key --key --fit-score --fit-label --fit-reason --force-refresh --force --output" -- "$cur") )
         ;;
+      deep-research|research|research-report)
+        COMPREPLY=( $(compgen -W "--json --topic --query --document-type --type --audience --provider --document --file --path --searxng-url --tavily-api-key --pages --target-pages --iterations --results --results-per-iteration --save-sources --output" -- "$cur") )
+        ;;
       rfp|rfp-response|analyze-rfp)
         COMPREPLY=( $(compgen -W "--source-type --kind --url --output --matrix-output --checklist-output --workspace --context --notes --json --markdown --matrix --checklist" -- "$cur") )
         ;;
@@ -13804,6 +14422,9 @@ _ned() {{
       ;;
     sources|source-library|citations|citation-sources)
       _arguments '--json[print machine-readable JSON]' '--audit[print source-library audit Markdown]' '--markdown[alias for --audit]' '--bibliography[print only downloaded bibliography stub]' '--bib[alias for --bibliography]' '--document[Markdown document whose associated source vault should be used]:file:_files -g "*.md"' '--file[alias for --document]:file:_files -g "*.md"' '--path[alias for --document]:file:_files -g "*.md"' '--query[search citation sources]:query:' '--search[alias for --query]:query:' '--provider[search provider]:provider:(duckduckgo searxng tavily local-library)' '--searxng-url[SearXNG base URL]:url:' '--tavily-api-key[Tavily API key for this run]:key:' '--limit[result limit]:number:' '--download-url[download and save this source URL]:url:' '--url[alias for --download-url]:url:' '--title[source title]:title:' '--snippet[source snippet]:snippet:' '--source[source/provider label]:source:' '--citation-key[citation key]:key:' '--key[alias for --citation-key]:key:' '--fit-score[source fit score 0-100]:number:' '--fit-label[source fit label]:label:' '--fit-reason[source fit reason]:reason:' '--force-refresh[redownload an existing URL]' '--force[alias for --force-refresh]' '--output[write Markdown output]:file:_files'
+      ;;
+    deep-research|research|research-report)
+      _arguments '--json[print machine-readable JSON]' '--topic[research topic]:topic:' '--query[alias for --topic]:topic:' '--document-type[report type]:type:' '--type[alias for --document-type]:type:' '--audience[target readers]:audience:' '--provider[search provider]:provider:(duckduckgo searxng tavily local-library)' '--document[Markdown document whose source vault should be used]:file:_files -g "*.md"' '--file[alias for --document]:file:_files -g "*.md"' '--path[alias for --document]:file:_files -g "*.md"' '--searxng-url[SearXNG base URL]:url:' '--tavily-api-key[Tavily API key for this run]:key:' '--pages[target pages 1-200]:number:' '--target-pages[alias for --pages]:number:' '--iterations[search loops 1-5]:number:' '--results[results per loop]:number:' '--results-per-iteration[alias for --results]:number:' '--save-sources[download returned sources into the document vault]' '--output[write Deep Research Markdown dossier]:file:_files'
       ;;
     rfp|rfp-response|analyze-rfp)
       _arguments '*:RFP source:_files' '--source-type[source type]:kind:(markdown pdf docx url)' '--kind[source type alias]:kind:(markdown pdf docx url)' '--url[fetch public RFP URL]:url:' '--output[write response Markdown]:file:_files' '--matrix-output[write compliance matrix Markdown]:file:_files' '--checklist-output[write compliance checklist Markdown]:file:_files' '--workspace[workspace containing .neditor]:directory:_files -/' '--context[response guidance]:notes:' '--notes[response guidance alias]:notes:' '--json[print machine-readable JSON]' '--markdown[print response Markdown]' '--matrix[print compliance matrix Markdown]' '--checklist[print compliance checklist Markdown]'
@@ -14047,6 +14668,25 @@ fn fish_completion_script() -> String {
         "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l force-refresh".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l force".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from sources source-library citations citation-sources' -l output -s o -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l json".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l topic -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l query -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l document-type -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l type -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l audience -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l provider -a 'duckduckgo searxng tavily local-library'".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l document -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l file -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l path -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l searxng-url -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l tavily-api-key -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l pages -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l target-pages -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l iterations -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l results -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l results-per-iteration -r".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l save-sources".to_string(),
+        "complete -c ned -n '__fish_seen_subcommand_from deep-research research research-report' -l output -s o -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l source-type -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l kind -r".to_string(),
         "complete -c ned -n '__fish_seen_subcommand_from rfp rfp-response analyze-rfp' -l url -r".to_string(),
@@ -14936,6 +15576,8 @@ fn help_text() -> String {
         "  ned sources --document report.md [--audit|--json]".to_string(),
         "  ned sources --document report.md --query \"market evidence\" [--provider duckduckgo|searxng|tavily|local-library] [--output sources.md]".to_string(),
         "  ned sources --document report.md --download-url https://example.com/source.pdf --title \"Source title\" [--citation-key key] [--bibliography]".to_string(),
+        "  ned deep-research --topic \"market evidence\" [--provider duckduckgo|searxng|tavily|local-library] [--pages 20] [--output research-dossier.md] [--json]".to_string(),
+        "  ned deep-research --topic \"market evidence\" --document report.md --save-sources --output research-dossier.md".to_string(),
         "  ned rfp-response <rfp.md|rfp.docx|rfp.pdf|url|-> [--output response.md] [--matrix-output matrix.md] [--checklist-output checklist.md] [--json|--markdown|--matrix|--checklist]".to_string(),
         "  ned targets [--json]".to_string(),
         "  ned handlers [--json] [--commands-only] [--platform macos|windows|linux]".to_string(),
