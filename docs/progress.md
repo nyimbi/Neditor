@@ -28,6 +28,29 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-30 Security Review Evidence Collector
+
+NEditor now has a first-class independent security-review evidence collector.
+`pnpm run collect:security-review` hashes a reviewer-supplied report and
+optional scanner output, attaches independent reviewer metadata, records the
+required trust-boundary and artifact scope, and emits validator-shaped
+`neditor.security-review-evidence.v1` evidence for
+`pnpm run check:security-review`.
+
+This does not perform or replace the independent review. It only packages a real
+reviewer report into the strict release evidence contract, requires a clean Git
+tree, preserves zero critical/high/unresolved findings, caps medium findings at
+three, and keeps the explicit release signoff fields visible.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/collect-security-review-evidence.mjs` | Pass | Collector syntax is valid after adding report/tool-output hashing, reviewer metadata, clean-tree enforcement, finding counts, scope, and release signoff output. |
+| `pnpm run collect:security-review -- --help` | Pass | Help output documents report files, optional tool output, reviewer fields, finding counts, accepted risks, environment variables, and validation command. |
+| `pnpm run check:security-review` | Pass with independent review pending | Wrote `.tmp/security-review/report.json`; status remains `pending-independent-security-review` until returned independent reviewer evidence is supplied. |
+| `pnpm run test:unit` | Pass | 134 frontend/static tests passed, including static coverage for the collector script, package command, evidence-kit runbook, and security-review validator contract. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked after adding the independent security review evidence section. |
+| `git diff --check` | Pass | No whitespace errors are present in this security-review evidence workflow slice. |
+
 ## 2026-05-30 AI Runtime Evidence Collector
 
 NEditor now has a first-class AI runtime evidence collector for the real-device

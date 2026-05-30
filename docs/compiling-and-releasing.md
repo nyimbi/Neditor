@@ -441,6 +441,31 @@ pnpm run test:desktop-dmg
 NEDITOR_DESKTOP_SMOKE_LAUNCH=1 pnpm run test:desktop-smoke
 ```
 
+## Independent Security Review Evidence
+
+The security-review release gate requires a real independent review. The local
+collector does not perform the review; it packages reviewer-supplied report and
+tool-output hashes into the strict evidence schema.
+
+After the independent reviewer has covered the Tauri command boundary,
+filesystem/snapshot/include/export/Git boundaries, external transform execution,
+AI provider boundary, persistence migration, and release evidence contracts, run:
+
+```sh
+pnpm run collect:security-review -- \
+  --report-file /path/to/security-review-report.md \
+  --tool-output-file /path/to/scanner-output.txt \
+  --reviewer-name "Reviewer Name" \
+  --reviewer-organization "Independent Org"
+pnpm run check:security-review
+```
+
+The collector requires a clean Git tree, records zero critical/high/unresolved
+findings, accepts at most three medium findings, hashes the reviewer report and
+optional tool output, and writes
+`.tmp/security-review/external/security-review.json`. Return that JSON through
+the release evidence kit or ingest it into the release checkout.
+
 ## Homebrew Release
 
 Use a cask, not a formula. The template lives at

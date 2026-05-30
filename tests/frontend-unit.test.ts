@@ -10580,6 +10580,7 @@ test("local verification scripts expose local baseline checks", () => {
   const aiRuntimeEvidence = readFileSync("scripts/check-ai-runtime-evidence.mjs", "utf8");
   const aiRuntimeCollector = readFileSync("scripts/collect-ai-runtime-evidence.mjs", "utf8");
   const securityReview = readFileSync("scripts/check-security-review-evidence.mjs", "utf8");
+  const securityReviewCollector = readFileSync("scripts/collect-security-review-evidence.mjs", "utf8");
   const specCompletion = readFileSync("scripts/check-spec-completion-matrix.mjs", "utf8");
   const manualReviewEvidence = readFileSync("scripts/check-manual-review-evidence.mjs", "utf8");
   const googleDocsImport = readFileSync("scripts/check-google-docs-import-evidence.mjs", "utf8");
@@ -10635,6 +10636,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["collect:performance-profile"], "node scripts/collect-performance-profile-evidence.mjs");
   equal(scripts["collect:evidence-kit"], "node scripts/collect-release-evidence-kit.mjs");
   equal(scripts["collect:release-signing"], "node scripts/collect-release-signing-evidence.mjs");
+  equal(scripts["collect:security-review"], "node scripts/collect-security-review-evidence.mjs");
   equal(scripts["ingest:evidence"], "node scripts/ingest-release-evidence.mjs");
   equal(scripts["release:local"], "node scripts/create-release-candidate.mjs");
   equal(scripts["release:homebrew"], "node scripts/create-homebrew-cask.mjs");
@@ -10757,6 +10759,14 @@ test("local verification scripts expose local baseline checks", () => {
   ok(securityReview.includes("findings.critical must be 0"));
   ok(securityReview.includes("signoff.approvedForRelease must be true"));
   ok(securityReview.includes("signoff.networkTelemetryAdded must be false"));
+  ok(securityReviewCollector.includes("NEDITOR_SECURITY_REVIEW_REPORT_FILE"));
+  ok(securityReviewCollector.includes("NEDITOR_SECURITY_REVIEWER_NAME"));
+  ok(securityReviewCollector.includes("NEDITOR_SECURITY_REVIEWER_ORGANIZATION"));
+  ok(securityReviewCollector.includes("Security review evidence must be collected from a clean Git tree"));
+  ok(securityReviewCollector.includes("neditor.security-review-evidence.v1"));
+  ok(securityReviewCollector.includes("reportSha256: sha256File(reportPath)"));
+  ok(securityReviewCollector.includes("approvedForRelease: true"));
+  ok(securityReviewCollector.includes("Validate returned evidence with pnpm run check:security-review"));
   ok(specCompletion.includes("neditor.spec-completion-report.v1"));
   ok(specCompletion.includes("partial-with-release-risks"));
   ok(specCompletion.includes("Current major verification gaps"));
@@ -10912,6 +10922,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitCollector.includes("runtime-readiness.template.json"));
   ok(evidenceKitCollector.includes("collect:ai-runtime"));
   ok(evidenceKitCollector.includes("security-review.template.json"));
+  ok(evidenceKitCollector.includes("collect:security-review"));
   ok(evidenceKitCollector.includes("native-profile.template.json"));
   ok(evidenceKitCollector.includes("native-profile-metrics.template.json"));
   ok(evidenceKitCollector.includes("collect:performance-profile"));

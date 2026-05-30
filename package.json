@@ -44,6 +44,7 @@
     "collect:performance-profile": "node scripts/collect-performance-profile-evidence.mjs",
     "collect:evidence-kit": "node scripts/collect-release-evidence-kit.mjs",
     "collect:release-signing": "node scripts/collect-release-signing-evidence.mjs",
+    "collect:security-review": "node scripts/collect-security-review-evidence.mjs",
     "ingest:evidence": "node scripts/ingest-release-evidence.mjs",
     "release:local": "node scripts/create-release-candidate.mjs",
     "release:homebrew": "node scripts/create-homebrew-cask.mjs",
