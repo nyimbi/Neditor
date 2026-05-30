@@ -3349,7 +3349,20 @@
             <div class="release-readiness-actions">
               <button type="button" @click="openConfigurationSetup('release')">Setup release evidence</button>
               <button type="button" @click="insertReleaseEvidenceDashboard">Insert evidence dashboard</button>
+              <button type="button" @click="insertProductionReadinessWorkOrders">Insert work orders</button>
             </div>
+            <section class="production-readiness-work-orders" aria-label="Production readiness work orders">
+              <header>
+                <h4>Production readiness work orders</h4>
+                <span>{{ productionReadinessWorkOrders.length }} open</span>
+              </header>
+              <article v-for="workOrder in productionReadinessWorkOrders.slice(0, 6)" :key="workOrder.id" class="snapshot-row" :data-status="workOrder.priority">
+                <strong>{{ workOrder.title }}</strong>
+                <p>{{ workOrder.owner }} | {{ workOrder.command }}</p>
+                <small>{{ workOrder.priority }} | {{ workOrder.lane }} | {{ workOrder.acceptanceEvidence }}</small>
+              </article>
+              <p v-if="!productionReadinessWorkOrders.length" class="sidebar-hint">All production-readiness evidence lanes are closed or ready to send.</p>
+            </section>
             <article
               v-for="item in releaseEvidenceDashboard.items"
               :key="item.id"
@@ -4299,7 +4312,19 @@
                 <button type="button" @click="openConfigurationSetup('release')">Open release setup wizard</button>
                 <button type="button" @click="insertReleaseEvidenceDashboard">Insert evidence dashboard</button>
                 <button type="button" @click="insertReleaseReadinessAudit">Insert release audit</button>
+                <button type="button" @click="insertProductionReadinessWorkOrders">Insert work orders</button>
               </div>
+              <section class="production-readiness-work-orders" aria-label="Configurator production readiness work orders">
+                <header>
+                  <h4>Open production work orders</h4>
+                  <span>{{ productionReadinessWorkOrders.length }} open</span>
+                </header>
+                <article v-for="workOrder in productionReadinessWorkOrders.slice(0, 4)" :key="workOrder.id" class="snapshot-row" :data-status="workOrder.priority">
+                  <strong>{{ workOrder.title }}</strong>
+                  <p>{{ workOrder.owner }} | {{ workOrder.command }}</p>
+                  <small>{{ workOrder.acceptanceEvidence }}</small>
+                </article>
+              </section>
               <article
                 v-for="item in releaseEvidenceDashboard.items"
                 :key="item.id"
@@ -5054,7 +5079,13 @@
               <div class="reference-actions">
                 <button type="button" @click="insertReleaseEvidenceDashboard">Insert evidence dashboard</button>
                 <button type="button" @click="insertReleaseReadinessAudit">Insert release audit</button>
+                <button type="button" @click="insertProductionReadinessWorkOrders">Insert production work orders</button>
               </div>
+              <ul class="docs-live-runtime" aria-label="Setup wizard production readiness work orders">
+                <li v-for="workOrder in productionReadinessWorkOrders.slice(0, 4)" :key="workOrder.id">
+                  {{ workOrder.priority }}: {{ workOrder.owner }} - {{ workOrder.title }}
+                </li>
+              </ul>
               <p class="sidebar-hint">Ready-to-send requires complete local, visual, accessibility, platform, Homebrew, signing, and credentialed evidence. Manual and external gates stay visible until proof is attached.</p>
             </section>
             <section v-else-if="currentConfigurationSetupStep.id === 'support'" class="business-profile-preview">
@@ -7519,7 +7550,7 @@ import {
   releaseReadinessAuditMarkdown,
   type ReleaseChecklistItem,
 } from "./lib/releaseReadiness";
-import { buildReleaseEvidenceDashboard, releaseEvidenceDashboardMarkdown } from "./lib/releaseEvidenceDashboard";
+import { buildReleaseEvidenceDashboard, buildReleaseEvidenceWorkOrders, releaseEvidenceDashboardMarkdown, releaseEvidenceWorkOrdersMarkdown } from "./lib/releaseEvidenceDashboard";
 import {
   blankCustomTransformTemplate,
   builtinTransformTemplates,
@@ -9845,6 +9876,7 @@ const releaseEvidenceDashboard = computed(() =>
     releaseTarget: frontMatterAnyScalar(active.value.text, ["releaseTarget"]) || store.exportTarget,
   }),
 );
+const productionReadinessWorkOrders = computed(() => buildReleaseEvidenceWorkOrders(releaseEvidenceDashboard.value));
 const citationStyle = computed(() =>
   String(active.value.compile?.metadata.citationStyle || active.value.compile?.metadata.cslStyle || store.bibliographyDefaults.citationStyle),
 );
@@ -21641,6 +21673,14 @@ function insertReleaseEvidenceDashboard() {
   store.statusMessage = "Inserted release evidence dashboard";
 }
 
+function insertProductionReadinessWorkOrders() {
+  flushEditorTextToStore();
+  insertBlock(releaseEvidenceWorkOrdersMarkdown(productionReadinessWorkOrders.value));
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  store.sidebar = "review";
+  store.statusMessage = "Inserted production readiness work orders";
+}
+
 function applyExportMetadataScaffold() {
   flushEditorTextToStore();
   const target = store.exportTarget;
@@ -27930,6 +27970,38 @@ select:hover {
   border: 1px solid #d8e0e8;
   background: #ffffff;
   font-size: 12px;
+}
+
+.production-readiness-work-orders {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #d8e0e8;
+  background: #ffffff;
+}
+
+.production-readiness-work-orders header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.production-readiness-work-orders h4,
+.production-readiness-work-orders p {
+  margin: 0;
+}
+
+.production-readiness-work-orders .snapshot-row[data-status="blocker"] {
+  border-left: 3px solid #b42318;
+}
+
+.production-readiness-work-orders .snapshot-row[data-status="high"] {
+  border-left: 3px solid #c68a1a;
+}
+
+.production-readiness-work-orders .snapshot-row[data-status="medium"] {
+  border-left: 3px solid #4575b4;
 }
 
 .accessibility-qa-metrics {

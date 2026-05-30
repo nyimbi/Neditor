@@ -884,6 +884,10 @@ and evidence freshness into one release-manager view. Use **Setup release
 evidence** to open the consolidated configurator, or **Insert evidence
 dashboard** to add the current release evidence table to the active Markdown
 document for review packets and stakeholder handoff.
+The same release view now derives **Production readiness work orders** with
+priority, owner, command, and acceptance evidence for every open lane. Use
+**Insert work orders** when the release owner needs assignable next steps
+instead of a passive status summary.
 
 NEditor stays conservative: credentialed integrations, cross-platform package
 smoke checks, Homebrew audit output, signing proof, and notarization proof must

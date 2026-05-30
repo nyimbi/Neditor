@@ -282,7 +282,7 @@ import {
   releaseChecklistHelp,
   releaseReadinessAuditMarkdown,
 } from "../src/lib/releaseReadiness.js";
-import { buildReleaseEvidenceDashboard, releaseEvidenceDashboardMarkdown } from "../src/lib/releaseEvidenceDashboard.js";
+import { buildReleaseEvidenceDashboard, buildReleaseEvidenceWorkOrders, releaseEvidenceDashboardMarkdown, releaseEvidenceWorkOrdersMarkdown } from "../src/lib/releaseEvidenceDashboard.js";
 import {
   applyTransformProbeFailureState,
   applyTransformProbeSuccessState,
@@ -4791,6 +4791,15 @@ test("release evidence dashboard separates blockers, stale evidence, credentials
   ok(blockedMarkdown.includes("## Release Evidence Dashboard"));
   ok(blockedMarkdown.includes("| stale | Sources and citation vault |"));
   ok(blockedMarkdown.includes("Homebrew, signing, and notarization"));
+  const workOrders = buildReleaseEvidenceWorkOrders(blocked);
+  ok(workOrders.length >= 6);
+  ok(workOrders.some((item) => item.priority === "blocker" && item.owner === "Evidence reviewer"));
+  ok(workOrders.some((item) => item.owner === "Platform release owner" && item.command.includes("platform package")));
+  ok(workOrders.every((item) => item.acceptanceEvidence.length > 40 && item.readyToSend === false));
+  const workOrderMarkdown = releaseEvidenceWorkOrdersMarkdown(workOrders, "2026-05-30T00:00:00.000Z");
+  ok(workOrderMarkdown.includes("## Production Readiness Work Orders"));
+  ok(workOrderMarkdown.includes("| Priority | Lane | Owner | Work order | Command | Acceptance evidence |"));
+  ok(workOrderMarkdown.includes("Release manager"));
 
   const readyChecklist = buildReleaseReadinessChecklist({
     text: [
@@ -4836,6 +4845,8 @@ test("release evidence dashboard separates blockers, stale evidence, credentials
   equal(ready.status, "ready");
   ok(ready.items.some((item) => item.id === "ready-to-send" && item.lane === "ready-to-send"));
   ok(releaseEvidenceDashboardMarkdown(ready).includes("Release target Client PDF has complete local, visual, accessibility, platform, and signing evidence."));
+  deepEqual(buildReleaseEvidenceWorkOrders(ready), []);
+  ok(releaseEvidenceWorkOrdersMarkdown([]).includes("No open production-readiness work orders"));
 });
 
 test("export metadata checklist validates publishing and ebook handoff readiness", () => {
@@ -8938,17 +8949,24 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Export visual QA dashboard"'));
   ok(app.includes('aria-label="Release evidence dashboard"'));
   ok(app.includes('aria-label="Release evidence lane counts"'));
+  ok(app.includes('aria-label="Production readiness work orders"'));
+  ok(app.includes('aria-label="Configurator production readiness work orders"'));
+  ok(app.includes('aria-label="Setup wizard production readiness work orders"'));
   ok(app.includes("printPreviewEnabled"));
   ok(app.includes("printPreviewReport"));
   ok(app.includes("exportVisualQaDashboard"));
   ok(app.includes("exportVisualQaCurrentRow"));
   ok(app.includes("insertExportVisualQaReport"));
   ok(app.includes("releaseEvidenceDashboard"));
+  ok(app.includes("productionReadinessWorkOrders"));
   ok(app.includes("insertReleaseEvidenceDashboard"));
+  ok(app.includes("insertProductionReadinessWorkOrders"));
   ok(app.includes("openExportVisualQaDashboard"));
   ok(app.includes("Open Visual QA Dashboard"));
   ok(app.includes("Insert Visual QA Report"));
   ok(app.includes("Insert release evidence dashboard"));
+  ok(app.includes("Insert work orders"));
+  ok(app.includes("Insert production work orders"));
   ok(app.includes("complete, blocked, manual, credentialed, cross-platform, stale, and ready-to-send"));
   ok(app.includes("Open export visual QA dashboard"));
   ok(app.includes("Insert export visual QA report"));

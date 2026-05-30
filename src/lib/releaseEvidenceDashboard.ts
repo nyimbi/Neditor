@@ -37,6 +37,17 @@ export interface ReleaseEvidenceDashboard {
   items: ReleaseEvidenceDashboardItem[];
 }
 
+export interface ReleaseEvidenceWorkOrder {
+  id: string;
+  priority: "blocker" | "high" | "medium";
+  lane: ReleaseEvidenceLane;
+  owner: string;
+  title: string;
+  command: string;
+  acceptanceEvidence: string;
+  readyToSend: boolean;
+}
+
 const lanes: ReleaseEvidenceLane[] = ["complete", "blocked", "manual", "credentialed", "cross-platform", "stale", "ready-to-send"];
 
 export function buildReleaseEvidenceDashboard(input: ReleaseEvidenceDashboardInput): ReleaseEvidenceDashboard {
@@ -150,6 +161,120 @@ export function releaseEvidenceDashboardMarkdown(dashboard: ReleaseEvidenceDashb
     ...dashboard.items.map((item) => `| ${item.lane} | ${escapeTableCell(item.label)} | ${escapeTableCell(item.detail)} | ${escapeTableCell(item.action)} |`),
     "",
   ].join("\n");
+}
+
+export function buildReleaseEvidenceWorkOrders(dashboard: ReleaseEvidenceDashboard): ReleaseEvidenceWorkOrder[] {
+  if (dashboard.status === "ready" && dashboard.counts["ready-to-send"] > 0) return [];
+  return dashboard.items
+    .filter((item) => item.lane !== "complete" && item.lane !== "ready-to-send")
+    .map((item) => {
+      const profile = workOrderProfileFor(item);
+      return {
+        id: `release-work-${item.id}`,
+        priority: workOrderPriorityFor(item.lane),
+        lane: item.lane,
+        owner: profile.owner,
+        title: profile.title,
+        command: profile.command,
+        acceptanceEvidence: profile.acceptanceEvidence,
+        readyToSend: false,
+      };
+    });
+}
+
+export function releaseEvidenceWorkOrdersMarkdown(workOrders: ReleaseEvidenceWorkOrder[], generatedAt = new Date().toISOString()) {
+  return [
+    "## Production Readiness Work Orders",
+    "",
+    `Generated: ${generatedAt}`,
+    `Open work orders: ${workOrders.length}`,
+    "",
+    "| Priority | Lane | Owner | Work order | Command | Acceptance evidence |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...(workOrders.length
+      ? workOrders.map((item) => `| ${item.priority} | ${item.lane} | ${escapeTableCell(item.owner)} | ${escapeTableCell(item.title)} | ${escapeTableCell(item.command)} | ${escapeTableCell(item.acceptanceEvidence)} |`)
+      : ["| complete | ready-to-send | Release manager | No open production-readiness work orders | Archive final evidence packet | Release evidence dashboard is ready-to-send |"]),
+    "",
+  ].join("\n");
+}
+
+function workOrderPriorityFor(lane: ReleaseEvidenceLane): ReleaseEvidenceWorkOrder["priority"] {
+  if (lane === "blocked" || lane === "stale") return "blocker";
+  if (lane === "credentialed" || lane === "cross-platform") return "high";
+  return "medium";
+}
+
+function workOrderProfileFor(item: ReleaseEvidenceDashboardItem) {
+  if (item.id === "local-release-metadata") {
+    return {
+      owner: "Document owner",
+      title: "Close local release metadata and approval audit",
+      command: "Prepare release metadata, resolve review comments, and insert release readiness audit",
+      acceptanceEvidence: "All release checklist rows complete and release audit inserted or exported",
+    };
+  }
+  if (item.id === "export-readiness-evidence") {
+    return {
+      owner: "Export owner",
+      title: "Generate target export readiness and visual QA proof",
+      command: "Run export readiness, export target artifacts, then insert export visual QA report",
+      acceptanceEvidence: "Readiness has zero errors and visual QA dashboard is ready or signed off",
+    };
+  }
+  if (item.id === "source-citation-evidence") {
+    return {
+      owner: "Evidence reviewer",
+      title: "Resolve source vault and citation blockers",
+      command: "Refresh source library, resolve citation TODOs, and insert source audit",
+      acceptanceEvidence: "No stale source files or unresolved citation TODOs remain",
+    };
+  }
+  if (item.id === "accessibility-evidence") {
+    return {
+      owner: "Accessibility reviewer",
+      title: "Complete accessibility and assistive-technology proof",
+      command: "Run accessibility QA and attach manual screen-reader sign-off when required",
+      acceptanceEvidence: "Accessibility QA is ready and any manual sign-off file validates for the current commit",
+    };
+  }
+  if (item.id === "credentialed-integrations") {
+    return {
+      owner: "Integration owner",
+      title: "Collect live credentialed integration evidence",
+      command: "Run Google Docs readback, live AI provider, publishing, or signing checks with approved credentials",
+      acceptanceEvidence: "Credentialed evidence report matches the current version, commit, and clean tree",
+    };
+  }
+  if (item.id === "cross-platform-packaging") {
+    return {
+      owner: "Platform release owner",
+      title: "Collect Windows, Linux, and packaged desktop proof",
+      command: "Run platform package collection on supported hosts and ingest the evidence kit",
+      acceptanceEvidence: "Platform evidence validates for the current version, commit, and clean tree",
+    };
+  }
+  if (item.id === "homebrew-signing") {
+    return {
+      owner: "Release manager",
+      title: "Finalize Homebrew, signing, checksum, and notarization proof",
+      command: "Build signed artifacts, collect signing evidence, generate cask, and run Homebrew checks",
+      acceptanceEvidence: "Signing, notarization, checksum, cask, and Homebrew audit evidence validate",
+    };
+  }
+  if (item.id === "working-tree-release-state") {
+    return {
+      owner: "Release manager",
+      title: "Refresh release evidence against a clean working tree",
+      command: "Commit verified work, rerun release evidence checks, and regenerate evidence kit",
+      acceptanceEvidence: "Working tree is clean and evidence reports match the current commit",
+    };
+  }
+  return {
+    owner: "Release manager",
+    title: item.label,
+    command: item.action,
+    acceptanceEvidence: item.detail,
+  };
 }
 
 function escapeTableCell(value: string) {
