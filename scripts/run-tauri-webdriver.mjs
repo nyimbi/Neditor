@@ -301,7 +301,6 @@ function prepareNativeGitWorkflowRepo() {
     const result = spawnSync(command, args, {
       cwd: directory,
       encoding: "utf8",
-      shell: process.platform === "win32",
     });
     if (result.status !== 0) {
       const detail = [result.stdout?.trim(), result.stderr?.trim()].filter(Boolean).join("\n");
