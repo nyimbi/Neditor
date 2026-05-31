@@ -17178,6 +17178,12 @@ async function emitNativeWorkflowMenuCommand(command: string, timeoutMs: number)
     timeoutMs,
   );
   let fallback = false;
+  if (!observed && nativeMenuCommandLast.command === command && nativeMenuCommandLast.status === "running") {
+    observed = await waitForNativeWorkflowCondition(
+      () => nativeMenuCommandSequence > beforeSequence && nativeMenuCommandLast.command === command && nativeMenuCommandLast.status !== "running",
+      Math.max(timeoutMs, 15000),
+    );
+  }
   if (!observed) {
     fallback = true;
     nativeMenuSmokeSuppressedCommands.set(command, Date.now() + Math.max(2500, timeoutMs + 1000));

@@ -683,10 +683,8 @@ fn emit_desktop_workflow_smoke_menu_command(app: AppHandle, command: String) -> 
     if !command.starts_with("neditor-") {
         return Err("desktop workflow smoke menu command must be an NEditor command".to_string());
     }
-    tauri::async_runtime::spawn(async move {
-        let _ = app.emit("neditor-menu-command", command);
-    });
-    Ok(())
+    app.emit("neditor-menu-command", command)
+        .map_err(|error| format!("failed to emit desktop workflow smoke menu command: {error}"))
 }
 
 fn desktop_workflow_smoke_artifact_path(
