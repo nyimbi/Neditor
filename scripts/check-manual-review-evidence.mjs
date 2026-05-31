@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
@@ -18,6 +18,7 @@ const specWorkOrdersPath = join(root, ".tmp", "spec-completion", "work-orders.js
 const signoffDir = resolve(process.env.NEDITOR_MANUAL_REVIEW_DIR || join(outputDir, "external"));
 const issues = [];
 
+rmSync(templateDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 mkdirSync(templateDir, { recursive: true });
 
 const specWorkOrders = readJson(specWorkOrdersPath, "spec-completion work-orders");
