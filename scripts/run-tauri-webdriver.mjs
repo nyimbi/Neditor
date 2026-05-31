@@ -20,6 +20,7 @@ const workflowReportPath = join(root, ".tmp", "desktop-webdriver", "native-workf
 const workflowFilePath = join(root, ".tmp", "desktop-webdriver", "native-workflow-file.md");
 const workflowRenamedPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-renamed.md");
 const workflowDuplicatePath = join(root, ".tmp", "desktop-webdriver", "native-workflow-duplicate.md");
+const workflowGitPath = join(root, ".tmp", "desktop-webdriver", "native-git-workflow.md");
 const workflowExportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-export.html");
 const workflowExportManifestPath = `${workflowExportPath}.manifest.json`;
 const macosFallbackSmokeReportPath = join(root, ".tmp", "desktop-smoke", "native-command-report.json");
@@ -206,9 +207,12 @@ async function runWebDriverSmoke() {
   rmSync(workflowFilePath, { force: true });
   rmSync(workflowRenamedPath, { force: true });
   rmSync(workflowDuplicatePath, { force: true });
+  rmSync(workflowGitPath, { force: true });
   rmSync(workflowExportPath, { force: true });
   rmSync(workflowExportManifestPath, { force: true });
   rmSync(workflowReportPath, { force: true });
+  rmSync(join(root, ".tmp", "desktop-webdriver", ".git"), { recursive: true, force: true });
+  prepareNativeGitWorkflowRepo();
 
   tauriDriver = spawn("tauri-driver", [], {
     cwd: root,
@@ -278,6 +282,33 @@ async function runWebDriverSmoke() {
       }
     }
     throw new Error(`timed out waiting for tauri-driver at ${serverUrl}.${driverFailureDetail()}`);
+  }
+}
+
+function prepareNativeGitWorkflowRepo() {
+  const directory = dirname(workflowGitPath);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(workflowGitPath, "# Native Git Workflow\n\nInitial native Git version.\n");
+  writeFileSync(join(directory, ".gitignore"), "*\n!.gitignore\n!native-git-workflow.md\n.neditor/\n");
+  const commands = [
+    ["git", ["init"]],
+    ["git", ["config", "user.email", "neditor-webdriver@example.test"]],
+    ["git", ["config", "user.name", "NEditor WebDriver Smoke"]],
+    ["git", ["add", ".gitignore", "native-git-workflow.md"]],
+    ["git", ["commit", "-m", "Initial native Git workflow document"]],
+  ];
+  for (const [command, args] of commands) {
+    const result = spawnSync(command, args, {
+      cwd: directory,
+      encoding: "utf8",
+      shell: process.platform === "win32",
+    });
+    if (result.status !== 0) {
+      const detail = [result.stdout?.trim(), result.stderr?.trim()].filter(Boolean).join("\n");
+      throw new Error(
+        `failed to prepare native Git workflow repo with ${command} ${args.join(" ")}${detail ? `:\n${detail}` : ""}`,
+      );
+    }
   }
 }
 
