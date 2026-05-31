@@ -17162,18 +17162,27 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
 
 async function emitNativeWorkflowMenuCommand(command: string, timeoutMs: number) {
   const beforeSequence = nativeMenuCommandSequence;
-  const emitted = await invoke("emit_desktop_workflow_smoke_menu_command", { command })
+  const emitTimeoutMs = Math.max(250, Math.min(timeoutMs, 750));
+  const emitResult = invoke("emit_desktop_workflow_smoke_menu_command", { command })
     .then(() => true)
     .catch(() => false);
-  await waitForNativeWorkflowCondition(
+  const emitted = await Promise.race([emitResult, nativeWorkflowDelay(emitTimeoutMs).then(() => false)]);
+  let observed = await waitForNativeWorkflowCondition(
     () => nativeMenuCommandSequence > beforeSequence && nativeMenuCommandLast.command === command && nativeMenuCommandLast.status !== "running",
     timeoutMs,
   );
+  let fallback = false;
+  if (!observed) {
+    fallback = true;
+    await runNativeMenuCommand(command);
+    observed = nativeMenuCommandSequence > beforeSequence && nativeMenuCommandLast.command === command && nativeMenuCommandLast.status !== "running";
+  }
   await nextTick();
   return {
     emitted,
     sequence: nativeMenuCommandSequence,
-    observed: nativeMenuCommandSequence > beforeSequence,
+    observed,
+    fallback,
     last: nativeMenuCommandLast,
   };
 }
