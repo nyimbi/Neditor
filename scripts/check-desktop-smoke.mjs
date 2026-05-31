@@ -16,6 +16,7 @@ const nativeWorkflowFilePath = join(root, ".tmp", "desktop-smoke", "native-workf
 const nativeWorkflowIncludePath = join(root, ".tmp", "desktop-smoke", "native-workflow-file.include");
 const nativeWorkflowExportPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.html");
 const nativeWorkflowCopyPath = join(root, ".tmp", "desktop-smoke", "native-workflow-export.md");
+const nativeWorkflowGitPath = join(root, ".tmp", "desktop-smoke", "native-git-workflow.md");
 const nativeSmokeHomePath = join(root, ".tmp", "desktop-smoke", "home");
 const issues = [];
 
@@ -189,9 +190,12 @@ async function launchDesktopAttempt(path, attempt) {
     rmSync(nativeWorkflowIncludePath, { force: true });
     rmSync(nativeWorkflowExportPath, { force: true });
     rmSync(nativeWorkflowCopyPath, { force: true });
+    rmSync(nativeWorkflowGitPath, { force: true });
+    rmSync(join(root, ".tmp", "desktop-smoke", ".git"), { recursive: true, force: true });
     rmSync(`${nativeWorkflowExportPath}.manifest.json`, { force: true });
     rmSync(nativeSmokeHomePath, { recursive: true, force: true });
     mkdirSync(nativeSmokeHomePath, { recursive: true });
+    prepareNativeGitWorkflowRepo();
     const child = spawn(path, [], {
       cwd: root,
       env: {
@@ -439,6 +443,11 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow created and listed project-local snapshot",
     "native workflow dirtied document before project-local snapshot restore",
     "native workflow restored project-local snapshot",
+    "native workflow detected native Git status",
+    "native workflow rendered native Git diff",
+    "native workflow committed native Git document",
+    "native workflow tagged native Git release",
+    "native workflow restored native Git revision",
     "native workflow reloaded clean external watcher change",
     "native workflow restored clean watcher reload",
     "native workflow watched included file with native driver",
@@ -485,6 +494,11 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow jumped toc preview link to source",
     "native workflow parsed front matter YAML data-source edge cases",
     "native workflow inventoried front matter YAML variable edge cases",
+    "native workflow reported missing external engine path diagnostic",
+    "native workflow cleared transform trust after path change",
+    "native workflow blocked untrusted external transform probe",
+    "native workflow reported non-executable engine path",
+    "native workflow surfaced disabled external transform state",
     "native workflow opened command palette",
     "native workflow found dose template",
     "native workflow inserted calc template into source",
@@ -896,6 +910,40 @@ function validateNativeWorkflowReport(launchReport) {
   ) {
     issues.push(`native workflow report did not include project-local snapshot restore evidence: ${JSON.stringify(snapshotEvidence)}`);
   }
+  const gitEvidence = payload.gitVersioningEvidence || {};
+  const gitWorkflowPath = nativeWorkflowGitPath.replaceAll("\\", "/");
+  if (
+    String(gitEvidence.path || "").replaceAll("\\", "/") !== gitWorkflowPath ||
+    gitEvidence.status?.insideRepo !== true ||
+    gitEvidence.status?.dirtyBeforeCommit !== true ||
+    gitEvidence.diff?.containsDeletion !== true ||
+    gitEvidence.diff?.containsAddition !== true ||
+    Number(gitEvidence.history?.before || 0) < 1 ||
+    Number(gitEvidence.history?.afterCommit || 0) < Number(gitEvidence.history?.before || 0) + 1 ||
+    gitEvidence.commit?.dirtyAfterCommit !== false ||
+    !String(gitEvidence.tag?.tag || "").startsWith("native-workflow-") ||
+    gitEvidence.restore?.containsMutation !== false ||
+    !String(gitEvidence.restore?.text || "").includes("Initial native Git version")
+  ) {
+    issues.push(`native workflow report did not include native Git versioning evidence: ${JSON.stringify(gitEvidence)}`);
+  }
+  const transformSafety = payload.transformEngineSafetyEvidence || {};
+  if (
+    !transformSafety.engine ||
+    transformSafety.missingPath?.ok !== false ||
+    !String(transformSafety.missingPath?.message || "").toLowerCase().includes("missing engine path") ||
+    transformSafety.trustCleared?.trustedAfterPathChange !== false ||
+    transformSafety.untrustedProbe?.ok !== false ||
+    !String(transformSafety.untrustedProbe?.message || "").toLowerCase().includes("trust") ||
+    transformSafety.nonExecutable?.ok !== false ||
+    !String(transformSafety.nonExecutable?.message || "").toLowerCase().includes("executable") ||
+    transformSafety.disabledState?.status !== "disabled" ||
+    transformSafety.restored?.path !== (transformSafety.original?.path || "") ||
+    transformSafety.restored?.trusted !== Boolean(transformSafety.original?.trusted) ||
+    transformSafety.restored?.disabled !== Boolean(transformSafety.original?.disabled)
+  ) {
+    issues.push(`native workflow report did not include transform engine safety evidence: ${JSON.stringify(transformSafety)}`);
+  }
   const exportProfileEvidence = payload.exportProfileEvidence || {};
   if (
     exportProfileEvidence.saved?.exportTarget !== "pdf" ||
@@ -1026,6 +1074,32 @@ function writeLaunchReport(report) {
   const directory = join(root, ".tmp", "desktop-smoke");
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, "launch-report.json"), `${JSON.stringify(report, null, 2)}\n`);
+}
+
+function prepareNativeGitWorkflowRepo() {
+  const directory = dirname(nativeWorkflowGitPath);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(nativeWorkflowGitPath, "# Native Git Workflow\n\nInitial native Git version.\n");
+  writeFileSync(join(directory, ".gitignore"), "*\n!.gitignore\n!native-git-workflow.md\n.neditor/\n");
+  const commands = [
+    ["git", ["init"]],
+    ["git", ["config", "user.email", "neditor-smoke@example.test"]],
+    ["git", ["config", "user.name", "NEditor Native Smoke"]],
+    ["git", ["add", ".gitignore", "native-git-workflow.md"]],
+    ["git", ["commit", "-m", "Initial native Git workflow document"]],
+  ];
+  for (const [command, args] of commands) {
+    const result = spawnSync(command, args, {
+      cwd: directory,
+      encoding: "utf8",
+      shell: process.platform === "win32",
+    });
+    if (result.status !== 0) {
+      const detail = [result.stdout?.trim(), result.stderr?.trim()].filter(Boolean).join("\n");
+      issues.push(`failed to prepare native Git workflow repo with ${command} ${args.join(" ")}${detail ? `:\n${detail}` : ""}`);
+      return;
+    }
+  }
 }
 
 function collectNativeAutomationReport(launchReport, pid) {

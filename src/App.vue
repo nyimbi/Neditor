@@ -16448,6 +16448,9 @@ async function runDesktopWorkflowSmoke() {
     const snapshotEvidence = await collectNativeSnapshotEvidence(record);
     smokePhase = "snapshots";
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence });
+    const gitVersioningEvidence = await collectNativeGitVersioningEvidence(record);
+    smokePhase = "git-versioning";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, gitVersioningEvidence });
     const modeEvidence = await collectNativeModeEvidence(record);
     smokePhase = "modes";
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence });
@@ -16475,6 +16478,9 @@ async function runDesktopWorkflowSmoke() {
     const frontMatterManagerEvidence = await collectNativeFrontMatterManagerEvidence(record);
     smokePhase = "front-matter-manager";
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence });
+    const transformEngineSafetyEvidence = await collectNativeTransformEngineSafetyEvidence(record);
+    smokePhase = "transform-engine-safety";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, gitVersioningEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence, transformEngineSafetyEvidence });
 
     commandPaletteOpen.value = true;
     await nextTick();
@@ -16505,7 +16511,7 @@ async function runDesktopWorkflowSmoke() {
 
     const aiProvenanceEvidence = await collectNativeAiProvenanceEvidence(record);
     smokePhase = "ai-provenance";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence, aiProvenanceEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, gitVersioningEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence, transformEngineSafetyEvidence, aiProvenanceEvidence });
 
     store.activeExportProfileId = "";
     store.exportTarget = "html";
@@ -16646,6 +16652,7 @@ async function runDesktopWorkflowSmoke() {
       title: document.title,
       fileWorkflow,
       snapshotEvidence,
+      gitVersioningEvidence,
       mode: store.mode,
       sidebar: store.sidebar,
       modeEvidence,
@@ -16657,6 +16664,7 @@ async function runDesktopWorkflowSmoke() {
       previewSourceMapEvidence,
       tocNavigationEvidence,
       frontMatterManagerEvidence,
+      transformEngineSafetyEvidence,
       aiProvenanceEvidence,
       editorSnippet,
       previewSnippet,
@@ -16777,6 +16785,197 @@ async function collectNativeSnapshotEvidence(record: (name: string, passed: bool
     appData: { created: appDataCreated, restored: appDataRestored },
     projectLocal: { created: projectLocalCreated, restored: projectLocalRestored },
   };
+}
+
+async function collectNativeGitVersioningEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const originalPath = active.value.path;
+  const evidence: Record<string, unknown> = {};
+  const gitPath = await invoke<string | null>("desktop_workflow_smoke_named_path", { fileStem: "native-git-workflow", extension: "md" }).catch(() => null);
+  evidence.path = gitPath || "";
+  if (!gitPath) {
+    record("native workflow resolved native Git workflow path", false);
+    return evidence;
+  }
+
+  try {
+    await store.openPath(gitPath);
+    const initialText = active.value.text;
+    await store.refreshGitStatus();
+    await store.refreshGitHistory();
+    const historyBefore = [...store.gitHistory];
+    const statusBefore = {
+      insideRepo: Boolean(store.gitStatus?.inside_repo),
+      branch: store.gitStatus?.branch || "",
+      dirty: Boolean(store.gitStatus?.dirty),
+      historyCount: historyBefore.length,
+    };
+
+    await setNativeWorkflowText(initialText.replace("Initial native Git version.", "Native Git mutation from desktop workflow."));
+    await store.saveActive(gitPath);
+    await store.refreshGitStatus();
+    await store.refreshGitDiff();
+    const diffText = store.gitDiffText || "";
+    evidence.status = {
+      ...statusBefore,
+      dirtyBeforeCommit: Boolean(store.gitStatus?.dirty),
+      summary: store.gitStatus?.summary || [],
+    };
+    evidence.diff = {
+      containsDeletion: diffText.includes("-Initial native Git version"),
+      containsAddition: diffText.includes("+Native Git mutation from desktop workflow."),
+      length: diffText.length,
+    };
+    record(
+      "native workflow detected native Git status",
+      Boolean(store.gitStatus?.inside_repo && store.gitStatus?.dirty && historyBefore.length >= 1),
+      JSON.stringify(evidence.status),
+    );
+    record(
+      "native workflow rendered native Git diff",
+      Boolean((evidence.diff as { containsDeletion?: boolean; containsAddition?: boolean }).containsDeletion && (evidence.diff as { containsDeletion?: boolean; containsAddition?: boolean }).containsAddition),
+      JSON.stringify(evidence.diff),
+    );
+
+    await store.commitActive("Native workflow Git proof");
+    await store.refreshGitHistory();
+    const historyAfterCommit = [...store.gitHistory];
+    evidence.history = { before: historyBefore.length, afterCommit: historyAfterCommit.length };
+    evidence.commit = {
+      dirtyAfterCommit: Boolean(store.gitStatus?.dirty),
+      latestSubject: historyAfterCommit[0]?.subject || "",
+      latestRevision: historyAfterCommit[0]?.revision || "",
+    };
+    record(
+      "native workflow committed native Git document",
+      Boolean(!store.gitStatus?.dirty && historyAfterCommit.length >= historyBefore.length + 1 && historyAfterCommit[0]?.subject === "Native workflow Git proof"),
+      JSON.stringify(evidence.commit),
+    );
+
+    const tagName = `native-workflow-${Date.now().toString(36)}`;
+    await store.tagActiveRelease(tagName);
+    evidence.tag = { tag: tagName, statusMessage: store.statusMessage };
+    record("native workflow tagged native Git release", store.statusMessage.includes(tagName), JSON.stringify(evidence.tag));
+
+    const initialRevision = historyBefore[historyBefore.length - 1]?.revision || historyAfterCommit[historyAfterCommit.length - 1]?.revision || "";
+    await setNativeWorkflowText(`${active.value.text.trim()}\n\nPost-tag restore mutation.\n`);
+    await store.saveActive(gitPath);
+    await store.restoreGitRevision(initialRevision);
+    evidence.restore = {
+      revision: initialRevision,
+      text: active.value.text,
+      containsMutation: active.value.text.includes("Native Git mutation") || active.value.text.includes("Post-tag restore mutation"),
+      statusMessage: store.statusMessage,
+    };
+    record(
+      "native workflow restored native Git revision",
+      Boolean(initialRevision && !(evidence.restore as { containsMutation?: boolean }).containsMutation && active.value.text.includes("Initial native Git version")),
+      JSON.stringify(evidence.restore),
+    );
+  } catch (error) {
+    evidence.error = error instanceof Error ? error.message : String(error);
+    record("native workflow completed native Git evidence", false, JSON.stringify(evidence));
+  } finally {
+    if (originalPath) {
+      await store.openPath(originalPath).catch(() => undefined);
+    }
+  }
+  return evidence;
+}
+
+async function collectNativeTransformEngineSafetyEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const originalText = active.value.text;
+  const engine = store.externalTransformEngines.find((candidate) => candidate.name === "dot") || store.externalTransformEngines[0];
+  const evidence: Record<string, unknown> = { engine: engine?.name || "" };
+  if (!engine) {
+    record("native workflow resolved external transform engine", false);
+    return evidence;
+  }
+  const name = engine.name;
+  const original = {
+    path: store.transformEnginePaths[name] || "",
+    trusted: Boolean(store.trustedTransformEngines[name]),
+    disabled: Boolean(store.disabledTransformEngines[name]),
+    inputMode: store.transformInputModes[name] || "stdin",
+    timeoutMs: store.transformTimeoutMs,
+  };
+  evidence.original = original;
+
+  try {
+    await store.setTransformDisabled(name, false);
+    await store.setTransformEnginePath(name, "");
+    await store.setTransformTrust(name, true);
+    await setNativeWorkflowText(`${originalText.trim()}\n\n\`\`\`${name}\ndigraph NativeWorkflow { Missing -> Fallback }\n\`\`\`\n`);
+    await store.compileActive();
+    await store.testExternalTransform(name);
+    const missingPath = store.transformProbeResults[name] || null;
+    const diagnosticMessages = (active.value.compile?.diagnostics || []).map((diagnostic) => diagnostic.message || "");
+    evidence.missingPath = missingPath;
+    evidence.compileDiagnostics = diagnosticMessages.slice(0, 8);
+    record(
+      "native workflow reported missing external engine path diagnostic",
+      Boolean(
+        missingPath?.ok === false &&
+          `${missingPath.message}\n${diagnosticMessages.join("\n")}`.toLowerCase().includes("missing engine path"),
+      ),
+      JSON.stringify({ missingPath, diagnostics: evidence.compileDiagnostics }),
+    );
+
+    const nonExecutablePath = active.value.path || original.path;
+    await store.setTransformEnginePath(name, nonExecutablePath);
+    evidence.trustCleared = {
+      path: store.transformEnginePaths[name] || "",
+      trustedAfterPathChange: Boolean(store.trustedTransformEngines[name]),
+      probe: store.transformProbeResults[name] || null,
+    };
+    record(
+      "native workflow cleared transform trust after path change",
+      Boolean(nonExecutablePath && !store.trustedTransformEngines[name] && store.transformProbeResults[name]?.message.includes("Probe required")),
+      JSON.stringify(evidence.trustCleared),
+    );
+
+    await store.testExternalTransform(name);
+    const untrustedProbe = store.transformProbeResults[name] || null;
+    evidence.untrustedProbe = untrustedProbe;
+    record(
+      "native workflow blocked untrusted external transform probe",
+      Boolean(untrustedProbe?.ok === false && untrustedProbe.message.toLowerCase().includes("trust")),
+      JSON.stringify(untrustedProbe),
+    );
+
+    await store.setTransformTrust(name, true);
+    await store.testExternalTransform(name);
+    const nonExecutable = store.transformProbeResults[name] || null;
+    evidence.nonExecutable = nonExecutable;
+    record(
+      "native workflow reported non-executable engine path",
+      Boolean(nonExecutable?.ok === false && nonExecutable.message.toLowerCase().includes("executable")),
+      JSON.stringify(nonExecutable),
+    );
+
+    await store.setTransformDisabled(name, true);
+    const disabledState = externalEngineSetupStatus(engine);
+    evidence.disabledState = disabledState;
+    record("native workflow surfaced disabled external transform state", disabledState.status === "disabled", JSON.stringify(disabledState));
+  } catch (error) {
+    evidence.error = error instanceof Error ? error.message : String(error);
+    record("native workflow completed transform engine safety evidence", false, JSON.stringify(evidence));
+  } finally {
+    await setNativeWorkflowText(originalText);
+    await store.setTransformEnginePath(name, original.path);
+    await store.setTransformTrust(name, original.trusted);
+    await store.setTransformDisabled(name, original.disabled);
+    await store.setTransformInputMode(name, original.inputMode);
+    await store.setTransformTimeout(original.timeoutMs);
+    await store.compileActive();
+    evidence.restored = {
+      path: store.transformEnginePaths[name] || "",
+      trusted: Boolean(store.trustedTransformEngines[name]),
+      disabled: Boolean(store.disabledTransformEngines[name]),
+      inputMode: store.transformInputModes[name] || "stdin",
+      timeoutMs: store.transformTimeoutMs,
+    };
+  }
+  return evidence;
 }
 
 interface NativeAiProvenanceEvidence {

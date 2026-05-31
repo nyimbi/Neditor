@@ -268,12 +268,16 @@ function evaluateWebdriverReport(spec) {
   const requiredNativeAssertions = Array.isArray(nativeWorkflow.requiredAssertions) ? nativeWorkflow.requiredAssertions : [];
   for (const requiredAssertion of [
     "native workflow restored project-local snapshot",
+    "native workflow committed native Git document",
+    "native workflow restored native Git revision",
     "native workflow continued markdown list in editor",
     "native workflow inserted paired bracket in editor",
     "native workflow applied Emacs keybinding mode",
     "native workflow edited with Vim operator motions",
     "native workflow loaded source table from native writing tools menu",
     "native workflow jumped preview table artifact to source",
+    "native workflow reported missing external engine path diagnostic",
+    "native workflow blocked untrusted external transform probe",
     "native workflow wrote html export artifact",
   ]) {
     requireValue(requiredNativeAssertions.includes(requiredAssertion), problems, `nativeWorkflowArtifacts.requiredAssertions missing ${requiredAssertion}`);
@@ -281,6 +285,8 @@ function evaluateWebdriverReport(spec) {
   requireValue(nativeWorkflow.hasEditorErgonomicsEvidence === true, problems, "nativeWorkflowArtifacts.hasEditorErgonomicsEvidence must be true");
   requireValue(nativeWorkflow.hasKeybindingEvidence === true, problems, "nativeWorkflowArtifacts.hasKeybindingEvidence must be true");
   requireValue(nativeWorkflow.hasTableEvidence === true, problems, "nativeWorkflowArtifacts.hasTableEvidence must be true");
+  requireValue(nativeWorkflow.hasGitVersioningEvidence === true, problems, "nativeWorkflowArtifacts.hasGitVersioningEvidence must be true");
+  requireValue(nativeWorkflow.hasTransformSafetyEvidence === true, problems, "nativeWorkflowArtifacts.hasTransformSafetyEvidence must be true");
   requireValue(Number(nativeWorkflow.modeCount) >= 5, problems, "nativeWorkflowArtifacts.modeCount must cover multiple desktop modes");
 
   if (problems.length > 0) {
@@ -414,18 +420,24 @@ function writeTemplates() {
             passedAssertionCount: 100,
             requiredAssertions: [
               "native workflow restored project-local snapshot",
+              "native workflow committed native Git document",
+              "native workflow restored native Git revision",
               "native workflow continued markdown list in editor",
               "native workflow inserted paired bracket in editor",
               "native workflow applied Emacs keybinding mode",
               "native workflow edited with Vim operator motions",
               "native workflow loaded source table from native writing tools menu",
               "native workflow jumped preview table artifact to source",
+              "native workflow reported missing external engine path diagnostic",
+              "native workflow blocked untrusted external transform probe",
               "native workflow wrote html export artifact",
             ],
             modeCount: 5,
             hasEditorErgonomicsEvidence: true,
             hasKeybindingEvidence: true,
             hasTableEvidence: true,
+            hasGitVersioningEvidence: true,
+            hasTransformSafetyEvidence: true,
           },
           fileArtifacts: {
             bytes: 1234,

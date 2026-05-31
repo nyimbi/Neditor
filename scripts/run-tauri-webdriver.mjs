@@ -629,6 +629,11 @@ async function assertNativeWorkflowEvidenceBundle(session) {
   const requiredNativeAssertions = [
     "native workflow created and listed app-data snapshot",
     "native workflow restored project-local snapshot",
+    "native workflow detected native Git status",
+    "native workflow rendered native Git diff",
+    "native workflow committed native Git document",
+    "native workflow tagged native Git release",
+    "native workflow restored native Git revision",
     "native workflow rendered outline mode structure only",
     "native workflow continued markdown list in editor",
     "native workflow inserted paired bracket in editor",
@@ -637,6 +642,11 @@ async function assertNativeWorkflowEvidenceBundle(session) {
     "native workflow opened table editor from native writing tools menu",
     "native workflow loaded source table from native writing tools menu",
     "native workflow jumped preview table artifact to source",
+    "native workflow reported missing external engine path diagnostic",
+    "native workflow cleared transform trust after path change",
+    "native workflow blocked untrusted external transform probe",
+    "native workflow reported non-executable engine path",
+    "native workflow surfaced disabled external transform state",
     "native workflow prepared html export readiness",
     "native workflow wrote html export artifact",
     "native workflow exported html from native menu command",
@@ -657,10 +667,13 @@ async function assertNativeWorkflowEvidenceBundle(session) {
     exportPath: workflow.exportResult?.outputPath || "",
     exportManifestPath: workflow.exportResult?.manifestPath || "",
     snapshotProjectPath: workflow.snapshotEvidence?.projectLocal?.snapshotPath || "",
+    gitWorkflowPath: workflow.gitVersioningEvidence?.path || "",
     modeCount: Array.isArray(workflow.modeEvidence) ? workflow.modeEvidence.length : 0,
     hasEditorErgonomicsEvidence: Boolean(workflow.editorErgonomicsEvidence),
     hasKeybindingEvidence: Boolean(workflow.editorKeybindingEvidence),
     hasTableEvidence: Boolean(workflow.previewSourceMapEvidence?.table || workflow.nativeMenuCommandEvidence?.tableEditor),
+    hasGitVersioningEvidence: Boolean(workflow.gitVersioningEvidence?.commit && workflow.gitVersioningEvidence?.restore),
+    hasTransformSafetyEvidence: Boolean(workflow.transformEngineSafetyEvidence?.missingPath && workflow.transformEngineSafetyEvidence?.disabledState),
   };
   if (workflow.status !== "passed" || missing.length > 0) {
     throw new Error(
@@ -1486,6 +1499,10 @@ function collectMacosNativeProof() {
     "native workflow inventoried front matter YAML variable edge cases",
     "native workflow restored workspace tabs with active pinned and scroll state",
     "native workflow restored project-local snapshot",
+    "native workflow committed native Git document",
+    "native workflow restored native Git revision",
+    "native workflow reported missing external engine path diagnostic",
+    "native workflow blocked untrusted external transform probe",
   ]) {
     if (!passedAssertions.some((assertion) => assertion.name === requiredAssertion)) {
       issues.push(`native workflow is missing assertion: ${requiredAssertion}`);
@@ -1528,6 +1545,30 @@ function collectMacosNativeProof() {
     !frontMatterKeys.includes("review.summary")
   ) {
     issues.push("native workflow did not record front matter manager edge-case evidence");
+  }
+  const gitEvidence = workflow.gitVersioningEvidence || {};
+  if (
+    gitEvidence.status?.insideRepo !== true ||
+    gitEvidence.status?.dirtyBeforeCommit !== true ||
+    gitEvidence.diff?.containsAddition !== true ||
+    gitEvidence.diff?.containsDeletion !== true ||
+    gitEvidence.commit?.dirtyAfterCommit !== false ||
+    gitEvidence.restore?.containsMutation !== false
+  ) {
+    issues.push("native workflow did not record native Git status/diff/commit/restore evidence");
+  }
+  const transformSafety = workflow.transformEngineSafetyEvidence || {};
+  if (
+    transformSafety.missingPath?.ok !== false ||
+    !String(transformSafety.missingPath?.message || "").toLowerCase().includes("missing engine path") ||
+    transformSafety.trustCleared?.trustedAfterPathChange !== false ||
+    transformSafety.untrustedProbe?.ok !== false ||
+    !String(transformSafety.untrustedProbe?.message || "").toLowerCase().includes("trust") ||
+    transformSafety.nonExecutable?.ok !== false ||
+    !String(transformSafety.nonExecutable?.message || "").toLowerCase().includes("executable") ||
+    transformSafety.disabledState?.status !== "disabled"
+  ) {
+    issues.push("native workflow did not record transform engine safety diagnostics");
   }
   return {
     status: issues.length === 0 ? "passed" : "incomplete",
