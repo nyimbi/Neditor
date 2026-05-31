@@ -16619,24 +16619,7 @@ async function runDesktopWorkflowSmoke() {
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
     smokePhase = "theme-accessibility";
-    await writeNativeWorkflowProgress(smokePhase, assertions, {
-      fileWorkflow,
-      snapshotEvidence,
-      modeEvidence,
-      editorErgonomicsEvidence,
-      splitSourcePaneEvidence,
-      editorKeybindingEvidence,
-      outlineNavigationEvidence,
-      diagnosticNavigationEvidence,
-      previewSourceMapEvidence,
-      tocNavigationEvidence,
-      frontMatterManagerEvidence,
-      aiProvenanceEvidence,
-      exportResult,
-      nativeMenuExportResult,
-      exportProfileEvidence,
-      themeAccessibility,
-    });
+    await writeNativeWorkflowCheckpoint(smokePhase, assertions);
     smokePhase = "native-menu-commands-start";
     await writeNativeWorkflowCheckpoint(smokePhase, assertions);
     let nativeMenuCommandEvidence: Record<string, unknown>;
