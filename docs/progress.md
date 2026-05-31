@@ -7086,10 +7086,19 @@ longer contained `Renamed` because later preview/watch status text had replaced
 it. The durable rename proof now relies on active path, file existence, old
 path removal, and preserved editor content instead of transient status text.
 
+The current-commit hosted run then passed Linux package/WebDriver evidence and
+advanced Windows beyond the earlier Edge script-timeout failure. Windows now
+reaches the full native workflow bundle and fails only because the harness's
+own request abort fired after 180 seconds. The harness now has an explicit
+native-workflow timeout, defaults it to six minutes, records it in the report,
+sets the WebDriver session script timeout to the same larger budget, and emits
+a clear timeout message when the HTTP request itself aborts.
+
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `gh run view 26703698194 --log-failed` | Fail analyzed | Windows failed in `Run Windows Tauri WebDriver workflow` with Edge WebDriver `script timeout` during `assertNativeWorkflowEvidenceBundle`; packaging had already passed. |
 | `gh run download 26704073363 -n neditor-platform-evidence-linux-json -D /private/tmp/neditor-run-26704073363/linux-json` | Fail analyzed | Linux v2 WebDriver report showed the full native workflow bundle passed with 118 assertions before the rename predicate timed out on transient status text despite the active renamed path being present. |
+| `gh run download 26704406417 -n neditor-platform-evidence-win32-json -D /private/tmp/neditor-run-26704406417/win32-json` | Fail analyzed | Windows v2 WebDriver report reached `assertNativeWorkflowEvidenceBundle`; Edge no longer returned `script timeout`, but the harness request aborted after 180 seconds. |
 | `node --check scripts/run-tauri-webdriver.mjs` | Pass | The WebDriver harness remains syntactically valid after adding explicit session timeouts. |
 | `pnpm run check:platform-evidence` | Partial pass | Local platform evidence now accepts current Linux package/WebDriver proof and leaves only Windows stale evidence for the current commit. |
 

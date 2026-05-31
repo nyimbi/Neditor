@@ -9,7 +9,8 @@ const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
 const serverUrl = process.env.NEDITOR_TAURI_WEBDRIVER_URL || "http://127.0.0.1:4444";
 const required = process.argv.includes("--strict") || process.env.NEDITOR_TAURI_WEBDRIVER_REQUIRED === "1";
 const timeoutMs = Number(process.env.NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS || 30_000);
-const scriptTimeoutMs = Math.max(timeoutMs, 180_000);
+const scriptTimeoutMs = Number(process.env.NEDITOR_TAURI_WEBDRIVER_SCRIPT_TIMEOUT_MS || Math.max(timeoutMs, 360_000));
+const nativeWorkflowTimeoutMs = Number(process.env.NEDITOR_TAURI_NATIVE_WORKFLOW_TIMEOUT_MS || scriptTimeoutMs);
 const application = desktopBinaryPath();
 const reportPath = join(root, ".tmp", "desktop-webdriver", "report.json");
 const workflowReportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-report.json");
@@ -48,6 +49,7 @@ const report = {
   serverUrl,
   timeoutMs,
   scriptTimeoutMs,
+  nativeWorkflowTimeoutMs,
   required,
   status: "pending",
   supportedDesktopPlatforms: ["linux", "win32"],
@@ -571,7 +573,7 @@ async function assertNativeWorkflowEvidenceBundle(session) {
       }
       return hook.runNativeWorkflowSmoke();
     `,
-    Math.max(timeoutMs, 180_000),
+    nativeWorkflowTimeoutMs,
   );
   if (hookResult.value?.status !== "completed") {
     throw new Error(`desktop native workflow hook did not complete: ${JSON.stringify(hookResult.value)}`);
@@ -1229,12 +1231,20 @@ async function webdriver(method, path, body, requestTimeoutMs = timeoutMs) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
   try {
-    const response = await fetch(`${serverUrl}${path}`, {
-      method,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
-      signal: controller.signal,
-    });
+    let response;
+    try {
+      response = await fetch(`${serverUrl}${path}`, {
+        method,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: body === undefined ? undefined : { "content-type": "application/json" },
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw new Error(`${method} ${path} timed out after ${requestTimeoutMs}ms`);
+      }
+      throw error;
+    }
     const text = await response.text();
     const payload = text ? JSON.parse(text) : {};
     if (!response.ok) {
