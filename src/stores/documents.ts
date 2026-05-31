@@ -77,6 +77,13 @@ import {
   titleFromPath,
 } from "../lib/fileLifecycle";
 import { isAiSourceFenceOpener, rewriteAiAssistedMarker, rewriteAiSourceReviewBlock } from "../lib/provenanceReview";
+import {
+  applyPreviewCompileFailureState,
+  applyPreviewCompileSuccessState,
+  beginPreviewCompileState,
+  cancelPreviewCompileState,
+  finishPreviewCompileState,
+} from "../lib/previewCompileState";
 import { appendChangeNoteMarker, appendReviewCommentMarker, resolveReviewCommentAtLine } from "../lib/reviewMarkers";
 import {
   applyTransformProbeFailureState,
@@ -890,8 +897,7 @@ export const useDocumentsStore = defineStore("documents", {
       if (!doc) return;
       const snapshot = beginLatestDocumentTask(this.compileTaskGate, doc);
       const startedAt = performance.now();
-      this.compileBusy = true;
-      this.compileProgress = "Compiling preview";
+      Object.assign(this, beginPreviewCompileState());
       try {
         const compile = await invoke<CompileResponse>("compile_document_with_options", {
           request: { text: snapshot.text, file_path: doc.path, options: this.compileOptionsForActive() },
@@ -901,34 +907,30 @@ export const useDocumentsStore = defineStore("documents", {
         }
         doc.compile = compile;
         doc.title = String(doc.compile.semantic.title || titleFromPath(doc.path));
-        this.lastPreviewCompileDurationMs = Math.max(0, Math.round(performance.now() - startedAt));
-        this.lastPreviewCompiledCharacters = snapshot.text.length;
-        this.lastPreviewCompiledAt = new Date().toISOString();
-        this.statusMessage = `${doc.compile.diagnostics.length} diagnostics`;
-        this.lastError = "";
+        Object.assign(
+          this,
+          applyPreviewCompileSuccessState({
+            startedAtMs: startedAt,
+            finishedAtMs: performance.now(),
+            textLength: snapshot.text.length,
+            diagnosticCount: doc.compile.diagnostics.length,
+          }),
+        );
         await this.syncFileWatcher();
       } catch (error) {
         if (isLatestDocumentTaskCurrent(this.compileTaskGate, snapshot, this.activeDocument)) {
-          if (isMissingTauriBackendError(error)) {
-            this.lastError = "";
-            this.statusMessage = "Editing locally; preview backend unavailable in browser";
-          } else {
-            this.lastError = errorText(error);
-          }
+          Object.assign(this, applyPreviewCompileFailureState(error, isMissingTauriBackendError(error)));
         }
       } finally {
         if (isLatestDocumentTaskCurrent(this.compileTaskGate, snapshot, this.activeDocument)) {
-          this.compileBusy = false;
-          this.compileProgress = "";
+          Object.assign(this, finishPreviewCompileState());
         }
       }
     },
     cancelActiveCompile() {
       if (!this.compileBusy) return;
       cancelLatestDocumentTask(this.compileTaskGate);
-      this.compileBusy = false;
-      this.compileProgress = "";
-      this.statusMessage = "Cancelled preview compile";
+      Object.assign(this, cancelPreviewCompileState());
     },
     async syncFileWatcher() {
       const doc = this.activeDocument;

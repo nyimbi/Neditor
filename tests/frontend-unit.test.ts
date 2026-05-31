@@ -223,6 +223,13 @@ import {
 } from "../src/lib/exportWorkflowState.js";
 import { applyExportProfileState, deleteExportProfileState, saveExportProfileState } from "../src/lib/exportProfiles.js";
 import {
+  applyPreviewCompileFailureState,
+  applyPreviewCompileSuccessState,
+  beginPreviewCompileState,
+  cancelPreviewCompileState,
+  finishPreviewCompileState,
+} from "../src/lib/previewCompileState.js";
+import {
   applyRenamedDocumentState,
   applyRevertedDocumentState,
   applySavedDocumentState,
@@ -771,6 +778,37 @@ test("export workflow state helpers preserve progress success failure and readin
   const blockedReport = { ready: false, error_count: 2, warning_count: 3 } as never;
   equal(applyExportReadinessState(readyReport).statusMessage, "Document is ready for export");
   equal(applyExportReadinessState(blockedReport).statusMessage, "2 errors, 3 warnings before export");
+});
+
+test("preview compile state helpers preserve busy success failure and cancel state", () => {
+  deepEqual(beginPreviewCompileState(), { compileBusy: true, compileProgress: "Compiling preview" });
+  deepEqual(finishPreviewCompileState(), { compileBusy: false, compileProgress: "" });
+  deepEqual(cancelPreviewCompileState(), {
+    compileBusy: false,
+    compileProgress: "",
+    statusMessage: "Cancelled preview compile",
+  });
+  deepEqual(
+    applyPreviewCompileSuccessState({
+      startedAtMs: 10,
+      finishedAtMs: 42.4,
+      textLength: 123.8,
+      diagnosticCount: 2.7,
+      compiledAt: "2026-05-31T10:00:00.000Z",
+    }),
+    {
+      lastPreviewCompileDurationMs: 32,
+      lastPreviewCompiledCharacters: 123,
+      lastPreviewCompiledAt: "2026-05-31T10:00:00.000Z",
+      statusMessage: "2 diagnostics",
+      lastError: "",
+    },
+  );
+  deepEqual(applyPreviewCompileFailureState(new Error("compiler offline")), { lastError: "compiler offline" });
+  deepEqual(applyPreviewCompileFailureState(new Error("Cannot read properties of undefined (reading 'invoke')"), true), {
+    lastError: "",
+    statusMessage: "Editing locally; preview backend unavailable in browser",
+  });
 });
 
 test("versioning state helpers preserve snapshot and git restore semantics", () => {
@@ -11509,6 +11547,9 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("native launch did not survive the bounded smoke window"));
   ok(script.includes("native workflow rendered outline mode structure only"));
   ok(script.includes("native workflow navigated outline heading to source"));
+  ok(script.includes("native workflow parsed front matter YAML data-source edge cases"));
+  ok(script.includes("native workflow inventoried front matter YAML variable edge cases"));
+  ok(script.includes("frontMatterManagerEvidence"));
   ok(script.includes("outlineModeTitles"));
   ok(script.includes("native workflow exported html from native menu command"));
   ok(script.includes("native workflow restored workspace tabs with active pinned and scroll state"));
@@ -11641,6 +11682,9 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("collectNativeTocNavigationEvidence"));
   ok(app.includes("native workflow rendered numbered toc from marker and front matter"));
   ok(app.includes("native workflow jumped toc preview link to source"));
+  ok(app.includes("collectNativeFrontMatterManagerEvidence"));
+  ok(app.includes("native workflow parsed front matter YAML data-source edge cases"));
+  ok(app.includes("native workflow inventoried front matter YAML variable edge cases"));
   ok(smoke.includes("native workflow report did not include editor ergonomics evidence"));
   ok(smoke.includes("foldedPlaceholderCount"));
   ok(smoke.includes("native workflow report did not include split source pane evidence"));
@@ -11649,6 +11693,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native workflow report did not include diagnostic navigation evidence"));
   ok(smoke.includes("native workflow report did not include preview source-map evidence"));
   ok(smoke.includes("native workflow report did not include toc navigation evidence"));
+  ok(smoke.includes("native workflow report did not include front matter manager edge-case evidence"));
   ok(smoke.includes("native workflow report did not include AI provenance evidence"));
   ok(smoke.includes("native workflow report did not include rendered outline-mode structure"));
   ok(smoke.includes("native workflow report did not include rendered export-mode content"));

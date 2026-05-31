@@ -483,6 +483,8 @@ function validateNativeWorkflowReport(launchReport) {
     "native workflow keyboard jumped preview equation artifact to source",
     "native workflow rendered numbered toc from marker and front matter",
     "native workflow jumped toc preview link to source",
+    "native workflow parsed front matter YAML data-source edge cases",
+    "native workflow inventoried front matter YAML variable edge cases",
     "native workflow opened command palette",
     "native workflow found dose template",
     "native workflow inserted calc template into source",
@@ -820,6 +822,36 @@ function validateNativeWorkflowReport(launchReport) {
     ).includes("# Native TOC Navigation")
   ) {
     issues.push(`native workflow report did not include toc navigation evidence: ${JSON.stringify(tocNavigationEvidence)}`);
+  }
+  const frontMatterManagerEvidence = payload.frontMatterManagerEvidence || {};
+  const frontMatterDataRows = Array.isArray(frontMatterManagerEvidence.dataSources?.rows)
+    ? frontMatterManagerEvidence.dataSources.rows
+    : [];
+  const frontMatterVariableKeys = Array.isArray(frontMatterManagerEvidence.variables?.keys)
+    ? frontMatterManagerEvidence.variables.keys
+    : [];
+  const hasDataRow = (predicate) => frontMatterDataRows.some(predicate);
+  if (
+    Number(frontMatterManagerEvidence.dataSources?.count || 0) < 5 ||
+    !String(frontMatterManagerEvidence.dataSources?.summary || "").includes("local data sources") ||
+    !hasDataRow((row) => row?.name === "Revenue, CSV" && row?.kind === "csv" && row?.path === "data/revenue.csv") ||
+    !hasDataRow((row) => row?.name === "Tagged workbook" && row?.kind === "xlsx" && row?.sheetName === "Assumptions, Base") ||
+    !hasDataRow((row) => row?.path === "../secrets.csv" && row?.status === "blocked-path") ||
+    frontMatterDataRows.filter((row) => row?.kind === "yaml").length < 2 ||
+    Number(frontMatterManagerEvidence.variables?.count || 0) < 8 ||
+    !frontMatterVariableKeys.includes("client.name") ||
+    !frontMatterVariableKeys.includes("client.segment") ||
+    !frontMatterVariableKeys.includes("client.region") ||
+    !frontMatterVariableKeys.includes("review.summary") ||
+    !frontMatterVariableKeys.includes("review.matrix.1.1") ||
+    frontMatterManagerEvidence.variables?.clientName !== "Acme, Inc." ||
+    frontMatterManagerEvidence.variables?.clientSegment !== "Enterprise" ||
+    frontMatterManagerEvidence.variables?.clientRegion !== "EMEA" ||
+    !String(frontMatterManagerEvidence.variables?.foldedSummary || "").includes("Folded native workflow front matter summary.") ||
+    frontMatterManagerEvidence.variables?.matrixLeaf !== "4" ||
+    Number(frontMatterManagerEvidence.editor?.frontMatterDecorationCount || 0) < 1
+  ) {
+    issues.push(`native workflow report did not include front matter manager edge-case evidence: ${JSON.stringify(frontMatterManagerEvidence)}`);
   }
   const aiProvenanceEvidence = payload.aiProvenanceEvidence || {};
   if (

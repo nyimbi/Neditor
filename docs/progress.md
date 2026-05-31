@@ -6930,6 +6930,29 @@ manually cross-reading the roadmap, spec matrix, progress log, and README.
 | `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving after documenting `ned improvements`. |
 | `git diff --check` | Pass | No whitespace errors are present in the 100-improvement audit slice. |
 
+## 2026-05-31 Local Spec Gap Closure Slice
+
+The two locally closable spec-completion rows now have direct implementation
+and proof hooks. Preview compile state transitions moved from the document
+store into `src/lib/previewCompileState.ts` with focused unit coverage for
+busy/progress, success metrics, backend-unavailable failure, ordinary failure,
+finish, and cancel behavior. The native workflow smoke now creates a front
+matter document with custom YAML tags, anchors, merge aliases, comma-containing
+values, XLSX sheet metadata, YAML aliases, blocked parent paths, folded
+scalars, matrix values, and front-matter editor decoration proof. The desktop
+smoke and Tauri WebDriver validators require those assertions before accepting
+native workflow evidence.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run test:unit` | Pass | 135 frontend/static tests passed, including preview compile state helper coverage and native-smoke/static validator guards for front matter manager evidence. |
+| `node --check scripts/check-desktop-smoke.mjs` | Pass | Desktop smoke validator syntax is valid after adding required front matter manager evidence checks. |
+| `node --check scripts/run-tauri-webdriver.mjs` | Pass | Tauri WebDriver/native fallback validator syntax is valid after adding front matter manager evidence checks. |
+| `pnpm run check` | Pass | Vue typecheck passed after wiring preview compile state helpers and native workflow front matter proof. |
+| `pnpm run check:docs` | Pass | 26 Markdown files checked with local links resolving. |
+| `pnpm run check:spec-completion` | Pass | Local-proof and local-implementation work orders are now zero; remaining 66 open rows are manual/external/cross-platform/release-credential evidence lanes. |
+| `git diff --check` | Pass | No whitespace errors are present in the local spec gap closure slice. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

@@ -16421,6 +16421,9 @@ async function runDesktopWorkflowSmokeIfEnabled() {
     const tocNavigationEvidence = await collectNativeTocNavigationEvidence(record);
     smokePhase = "toc-navigation";
     await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence });
+    const frontMatterManagerEvidence = await collectNativeFrontMatterManagerEvidence(record);
+    smokePhase = "front-matter-manager";
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence });
 
     commandPaletteOpen.value = true;
     await nextTick();
@@ -16451,7 +16454,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
 
     const aiProvenanceEvidence = await collectNativeAiProvenanceEvidence(record);
     smokePhase = "ai-provenance";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence, aiProvenanceEvidence });
 
     store.activeExportProfileId = "";
     store.exportTarget = "html";
@@ -16541,7 +16544,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       JSON.stringify(nativeMenuExportResult),
     );
     smokePhase = "html-export";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult });
     const editorSnippet = smokeSnippetAround(active.value.text, "weight_kg = 72");
     const previewSnippet = text("#live-preview").slice(0, 2000);
     const exportReadinessEvidence = store.exportReadiness
@@ -16554,12 +16557,12 @@ async function runDesktopWorkflowSmokeIfEnabled() {
         }
       : null;
     smokePhase = "export-profile-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult });
     const exportProfileEvidence = await collectNativeExportProfileEvidence(record);
     smokePhase = "export-profile";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     smokePhase = "theme-accessibility-start";
-    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
+    await writeNativeWorkflowProgress(smokePhase, assertions, { fileWorkflow, snapshotEvidence, modeEvidence, editorErgonomicsEvidence, splitSourcePaneEvidence, editorKeybindingEvidence, outlineNavigationEvidence, diagnosticNavigationEvidence, previewSourceMapEvidence, tocNavigationEvidence, frontMatterManagerEvidence, aiProvenanceEvidence, exportResult, nativeMenuExportResult, exportProfileEvidence });
     const themeAccessibility = await collectNativeThemeAccessibilityEvidence(record);
     smokePhase = "theme-accessibility";
     await writeNativeWorkflowProgress(smokePhase, assertions, {
@@ -16573,6 +16576,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       diagnosticNavigationEvidence,
       previewSourceMapEvidence,
       tocNavigationEvidence,
+      frontMatterManagerEvidence,
       aiProvenanceEvidence,
       exportResult,
       nativeMenuExportResult,
@@ -16609,6 +16613,7 @@ async function runDesktopWorkflowSmokeIfEnabled() {
       diagnosticNavigationEvidence,
       previewSourceMapEvidence,
       tocNavigationEvidence,
+      frontMatterManagerEvidence,
       aiProvenanceEvidence,
       editorSnippet,
       previewSnippet,
@@ -18868,6 +18873,119 @@ async function collectNativeTocNavigationEvidence(record: (name: string, passed:
       JSON.stringify(evidence.sourceJump),
     );
 
+    return evidence;
+  } finally {
+    store.mode = original.mode;
+    store.sidebar = original.sidebar;
+    await setNativeWorkflowText(original.text);
+    await store.compileActive();
+    await nextTick();
+  }
+}
+
+async function collectNativeFrontMatterManagerEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
+  const original = {
+    text: active.value.text,
+    mode: store.mode,
+    sidebar: store.sidebar,
+  };
+  const evidence: Record<string, unknown> = {};
+  try {
+    await setNativeWorkflowText(
+      [
+        "---",
+        "title: Native Front Matter YAML Edge Cases",
+        "status: in-review",
+        "clientDefaults: &clientDefaults { name: \"Acme, Inc.\", segment: !docs!channel Enterprise }",
+        "client:",
+        "  <<: *clientDefaults",
+        "  region: EMEA",
+        "review:",
+        "  summary: >",
+        "    Folded native workflow",
+        "    front matter summary.",
+        "  matrix: [[1, 2], [3, 4]]",
+        "dataDefaults: &dataDefaults { type: csv, path: data/revenue.csv }",
+        "dataSources:",
+        "  - <<: *dataDefaults",
+        "    name: \"Revenue, CSV\"",
+        "  - !docs!source { name: \"Tagged workbook\", path: data/model.xlsx, type: xlsx, sheet: \"Assumptions, Base\" }",
+        "  - { name: Unsafe, path: ../secrets.csv, type: csv }",
+        "yamlFiles: !docs!sources [data/context.yml, data/notes.yaml]",
+        "---",
+        "",
+        "# Native Front Matter YAML Edge Cases",
+        "",
+        "Client: {{client.name}}",
+        "",
+        "This native smoke keeps quote-aware commas, custom tags, anchors, merges, aliases, folded scalars, and blocked local paths visible to the front matter manager.",
+      ].join("\n"),
+    );
+    await store.compileActive();
+    store.mode = "split";
+    store.sidebar = "references";
+    await nextTick();
+    await nextTick();
+
+    const dataRows = frontMatterDataSourceRows.value;
+    const variableRows = frontMatterVariableRows.value;
+    const variableMap = new Map(variableRows.map((row) => [row.key, row.value]));
+    const workbook = dataRows.find((row) => row.name === "Tagged workbook");
+    const revenue = dataRows.find((row) => row.name === "Revenue, CSV");
+    const blocked = dataRows.find((row) => row.status === "blocked-path");
+    const yamlRows = dataRows.filter((row) => row.kind === "yaml");
+    const frontMatterDecorationCount = document.querySelectorAll(".cm-neditor-front-matter").length;
+    evidence.dataSources = {
+      count: dataRows.length,
+      summary: dataSourceManagerSummary.value,
+      rows: dataRows.map((row) => ({
+        name: row.name,
+        path: row.path,
+        kind: row.kind,
+        sheetName: row.sheetName || "",
+        status: row.status,
+        source: row.source,
+      })),
+    };
+    evidence.variables = {
+      count: variableRows.length,
+      summary: documentVariableManagerSummary.value,
+      keys: variableRows.map((row) => row.key),
+      clientName: variableMap.get("client.name") || "",
+      clientSegment: variableMap.get("client.segment") || "",
+      clientRegion: variableMap.get("client.region") || "",
+      foldedSummary: variableMap.get("review.summary") || "",
+      matrixLeaf: variableMap.get("review.matrix.1.1") || "",
+    };
+    evidence.editor = {
+      frontMatterDecorationCount,
+      sidebar: store.sidebar,
+      mode: store.mode,
+    };
+    record(
+      "native workflow parsed front matter YAML data-source edge cases",
+      Boolean(
+        revenue?.path === "data/revenue.csv" &&
+          revenue.kind === "csv" &&
+          workbook?.kind === "xlsx" &&
+          workbook.sheetName === "Assumptions, Base" &&
+          blocked?.path === "../secrets.csv" &&
+          yamlRows.length >= 2,
+      ),
+      JSON.stringify(evidence.dataSources),
+    );
+    record(
+      "native workflow inventoried front matter YAML variable edge cases",
+      Boolean(
+        variableMap.get("client.name") === "Acme, Inc." &&
+          variableMap.get("client.segment") === "Enterprise" &&
+          variableMap.get("client.region") === "EMEA" &&
+          String(variableMap.get("review.summary") || "").includes("Folded native workflow front matter summary.") &&
+          variableMap.get("review.matrix.1.1") === "4" &&
+          frontMatterDecorationCount > 0,
+      ),
+      JSON.stringify({ variables: evidence.variables, editor: evidence.editor }),
+    );
     return evidence;
   } finally {
     store.mode = original.mode;

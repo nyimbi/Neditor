@@ -1305,6 +1305,8 @@ function collectMacosNativeProof() {
     "native workflow exported html from native menu command",
     "native workflow rendered outline mode structure only",
     "native workflow navigated outline heading to source",
+    "native workflow parsed front matter YAML data-source edge cases",
+    "native workflow inventoried front matter YAML variable edge cases",
     "native workflow restored workspace tabs with active pinned and scroll state",
     "native workflow restored project-local snapshot",
   ]) {
@@ -1333,6 +1335,22 @@ function collectMacosNativeProof() {
     !String(outlineNavigation.selectedText || "").includes("## Native Outline Target")
   ) {
     issues.push("native workflow did not record outline sidebar navigation to CodeMirror source");
+  }
+  const frontMatterManager = workflow.frontMatterManagerEvidence || {};
+  const frontMatterRows = Array.isArray(frontMatterManager.dataSources?.rows) ? frontMatterManager.dataSources.rows : [];
+  const frontMatterKeys = Array.isArray(frontMatterManager.variables?.keys) ? frontMatterManager.variables.keys : [];
+  if (
+    !frontMatterRows.some((row) => row?.name === "Revenue, CSV" && row?.kind === "csv" && row?.path === "data/revenue.csv") ||
+    !frontMatterRows.some((row) => row?.name === "Tagged workbook" && row?.kind === "xlsx" && row?.sheetName === "Assumptions, Base") ||
+    !frontMatterRows.some((row) => row?.status === "blocked-path" && row?.path === "../secrets.csv") ||
+    frontMatterRows.filter((row) => row?.kind === "yaml").length < 2 ||
+    frontMatterManager.variables?.clientName !== "Acme, Inc." ||
+    frontMatterManager.variables?.clientSegment !== "Enterprise" ||
+    frontMatterManager.variables?.clientRegion !== "EMEA" ||
+    frontMatterManager.variables?.matrixLeaf !== "4" ||
+    !frontMatterKeys.includes("review.summary")
+  ) {
+    issues.push("native workflow did not record front matter manager edge-case evidence");
   }
   return {
     status: issues.length === 0 ? "passed" : "incomplete",
