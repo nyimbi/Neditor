@@ -9,6 +9,7 @@ const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
 const serverUrl = process.env.NEDITOR_TAURI_WEBDRIVER_URL || "http://127.0.0.1:4444";
 const required = process.argv.includes("--strict") || process.env.NEDITOR_TAURI_WEBDRIVER_REQUIRED === "1";
 const timeoutMs = Number(process.env.NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS || 30_000);
+const scriptTimeoutMs = Math.max(timeoutMs, 180_000);
 const application = desktopBinaryPath();
 const reportPath = join(root, ".tmp", "desktop-webdriver", "report.json");
 const workflowReportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-report.json");
@@ -46,6 +47,7 @@ const report = {
   application: relative(application),
   serverUrl,
   timeoutMs,
+  scriptTimeoutMs,
   required,
   status: "pending",
   supportedDesktopPlatforms: ["linux", "win32"],
@@ -1209,6 +1211,11 @@ async function createSession() {
   if (!session) {
     throw new Error(`tauri-driver did not return a session id: ${JSON.stringify(response)}`);
   }
+  await webdriver("POST", `/session/${session}/timeouts`, {
+    script: scriptTimeoutMs,
+    pageLoad: timeoutMs,
+    implicit: 0,
+  });
   return session;
 }
 

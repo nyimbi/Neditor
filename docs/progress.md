@@ -7063,6 +7063,27 @@ beyond bounded smoke artifacts.
 | `pnpm run ingest:evidence -- --source /private/tmp/neditor-run-26702884282` | Partial pass | Ingest copied 22 recognized browser/engine evidence items; the only validation run was external-engine evidence and it passed. Missing entries are unrelated evidence classes not present in this hosted return directory. |
 | `pnpm run check:engines` | Pass | Probe report status is `complete`, accepts `darwin/arm64`, `linux/x64`, and `win32/x64`, and reports zero unresolved optional-engine evidence gaps. |
 
+## 2026-05-31 Windows WebDriver Script Timeout Fix
+
+Hosted release evidence run `26703698194` proved the Linux package and v2
+Tauri WebDriver native workflow evidence bundle, then exposed a Windows-only
+WebDriver harness timeout. The Windows runner built the packaged Tauri app and
+started the full native workflow hook, but Microsoft Edge WebDriver returned a
+session-level `script timeout` before the long-running native evidence bundle
+could complete.
+
+The WebDriver harness now sets the W3C session `script` timeout immediately
+after session creation and records that timeout in the report. This aligns the
+browser driver's own script limit with the existing long request timeout used
+for the full native workflow bundle, without weakening any required native
+assertions.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `gh run view 26703698194 --log-failed` | Fail analyzed | Windows failed in `Run Windows Tauri WebDriver workflow` with Edge WebDriver `script timeout` during `assertNativeWorkflowEvidenceBundle`; packaging had already passed. |
+| `node --check scripts/run-tauri-webdriver.mjs` | Pass | The WebDriver harness remains syntactically valid after adding explicit session timeouts. |
+| `pnpm run check:platform-evidence` | Partial pass | Local platform evidence now accepts current Linux package/WebDriver proof and leaves only Windows stale evidence for the current commit. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
