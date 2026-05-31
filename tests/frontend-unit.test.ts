@@ -11177,9 +11177,13 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceIngest.includes("NEDITOR_ACCESSIBILITY_SIGNOFF"));
   ok(evidenceIngest.includes("external-engine-pikchr"));
   ok(evidenceIngest.includes("external-engines/external/pikchr.json"));
+  ok(evidenceIngest.includes("external-engine-<platform>-<engine>"));
+  ok(evidenceIngest.includes(".tmp/external-engines/external/${platform}/${engine}.json"));
   ok(evidenceIngest.includes("check:engines"));
   ok(externalEngineProbe.includes("--write-evidence"));
   ok(externalEngineProbe.includes("writeExternalEvidence"));
+  ok(externalEngineProbe.includes("externalEvidencePathsForEngine"));
+  ok(externalEngineProbe.includes("sourceTreeClean"));
   ok(evidenceIngest.includes("pnpm"));
   ok(evidenceIngest.includes("check:release-signing"));
   ok(evidenceIngest.includes("check:ai-provider"));
@@ -11188,12 +11192,15 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCi.includes("neditor.release-ci-workflow-report.v1"));
   ok(releaseCi.includes("browser-workflows:"));
   ok(releaseCi.includes("platform-proof:"));
+  ok(releaseCi.includes("optional-engine-proof:"));
   ok(releaseCi.includes("rendered-export-review:"));
   ok(releaseCi.includes("accessibility-review:"));
   ok(releaseCi.includes("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"));
   ok(releaseCi.includes("NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS"));
   ok(releaseCi.includes("xvfb-run -a pnpm run test:tauri-webdriver -- --strict"));
   ok(releaseCi.includes("pnpm tauri build --bundles ${{ matrix.bundles }}"));
+  ok(releaseCi.includes("pnpm run collect:engine-evidence -- --require-installed"));
+  ok(releaseCi.includes(".tmp/external-engines/external/linux/**"));
   ok(releaseCi.includes(".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json"));
   ok(releaseCi.includes(".tmp/rendered-export-audit/**"));
   const platformRunbook = readFileSync("runbooks/platform-evidence.md", "utf8");
@@ -11433,6 +11440,8 @@ test("external engine probe records render smoke artifacts", () => {
   ok(script.includes("missingNeedles"));
   ok(script.includes("neditor.external-engine-evidence.v1"));
   ok(script.includes("NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR"));
+  ok(script.includes("externalEvidenceItems"));
+  ok(script.includes("acceptedExternalEnginePlatforms"));
   ok(script.includes("externalEvidence"));
   ok(script.includes("invalidExternalEvidence"));
   ok(script.includes("missingEvidence"));

@@ -138,8 +138,11 @@ NEDITOR_TEST_PIKCHR=/absolute/path/to/pikchr pnpm run collect:engine-evidence
 
 The collector writes validator-ready
 `neditor.external-engine-evidence.v1` files under
-`.tmp/external-engines/external/`. A later `pnpm run check:engines` accepts
-those files so a release host can prove optional engines without retyping JSON.
+`.tmp/external-engines/external/<platform>/`, while also keeping a flat
+`<engine>.json` compatibility copy for current-host workflows. A later
+`pnpm run check:engines` accepts all platform-qualified evidence files so a
+release host can prove optional engines without retyping JSON or overwriting
+another platform's proof.
 
 ## Engine Defaults
 

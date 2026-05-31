@@ -186,6 +186,8 @@ if (listOnly) {
   }
   console.log("- manual-review-<work-order-id>: .tmp/manual-review/external/<work-order-id>/signoff.json");
   console.log("  candidates: any returned neditor.manual-review.signoff.v1 JSON file, with optional sibling artifacts/ directory");
+  console.log("- external-engine-<platform>-<engine>: .tmp/external-engines/external/<platform>/<engine>.json");
+  console.log("  candidates: any returned neditor.external-engine-evidence.v1 JSON file");
   process.exit(0);
 }
 
@@ -242,6 +244,26 @@ for (const found of findManualReviewSignoffs(sourceDir)) {
     dryRun,
   });
   categories.add("manual-review");
+}
+
+for (const found of findExternalEngineEvidence(sourceDir)) {
+  const engine = safeSegment(String(found.data.engine || "").trim());
+  const platform = safeSegment(String(found.data.platform || "unknown").trim() || "unknown");
+  if (!engine) continue;
+  const destination = join(root, ".tmp", "external-engines", "external", platform, `${engine}.json`);
+  if (!dryRun) {
+    mkdirSync(dirname(destination), { recursive: true });
+    cpSync(found.path, destination);
+  }
+  copied.push({
+    id: `external-engine-${platform}-${engine}`,
+    category: "external-engine",
+    source: relative(found.path),
+    destination: `.tmp/external-engines/external/${platform}/${engine}.json`,
+    bytes: statSync(found.path).size,
+    dryRun,
+  });
+  categories.add("external-engine");
 }
 
 const validations = validate ? runValidations(categories) : [];
@@ -357,6 +379,20 @@ function findManualReviewSignoffs(dir) {
   });
 }
 
+function findExternalEngineEvidence(dir) {
+  if (!existsSync(dir)) return [];
+  return walkJson(dir).flatMap((path) => {
+    let data;
+    try {
+      data = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      return [];
+    }
+    if (data?.schema !== "neditor.external-engine-evidence.v1" || !data.engine) return [];
+    return [{ path, data }];
+  });
+}
+
 function walkJson(dir) {
   const entries = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -372,6 +408,14 @@ function walkJson(dir) {
 
 function command(label, cmd, args, env = {}) {
   return { label, cmd, args, env };
+}
+
+function safeSegment(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^a-z0-9_.-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
 }
 
 function missingEntry(entry, detail) {

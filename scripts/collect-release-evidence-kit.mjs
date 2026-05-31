@@ -299,10 +299,10 @@ const runbooks = [
       "pnpm install --frozen-lockfile",
       "Install or build the missing optional engine, such as Pikchr or sqlite3, on the verifier host.",
       "Run pnpm run collect:engine-evidence with the engine path environment variable when needed, for example NEDITOR_TEST_PIKCHR=/absolute/path/to/pikchr NEDITOR_TEST_SQLITE3=/absolute/path/to/sqlite3 pnpm run collect:engine-evidence.",
-      "Copy the generated proof from .tmp/external-engines/external/, for example pikchr.json or sqlite.json.",
+      "Copy the generated proof from .tmp/external-engines/external/<platform>/, for example linux/pikchr.json or win32/sqlite.json.",
       "NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR=.tmp/external-engines/external pnpm run check:engines",
     ],
-    returns: [".tmp/external-engines/external/pikchr.json", ".tmp/external-engines/external/sqlite.json"],
+    returns: [".tmp/external-engines/external/<platform>/<engine>.json"],
   },
   {
     file: "runbooks/spec-completion-closure.md",
@@ -500,7 +500,8 @@ function copyOptionalManualAsset(source, destinationPath) {
 }
 
 function copyTemplates() {
-  return templateCopies.map(([from, to]) => {
+  const allTemplateCopies = uniqueTemplateCopies([...templateCopies, ...externalEngineTemplateCopies()]);
+  return allTemplateCopies.map(([from, to]) => {
     const source = join(root, from);
     const destination = join(outputDir, to);
     const copied = existsSync(source);
@@ -516,6 +517,23 @@ function copyTemplates() {
       freshness,
     };
   });
+}
+
+function externalEngineTemplateCopies() {
+  const sourceDir = join(root, ".tmp", "external-engines", "templates");
+  if (!existsSync(sourceDir)) return [];
+  return readdirSync(sourceDir)
+    .filter((name) => name.endsWith(".template.json"))
+    .sort()
+    .map((name) => [`.tmp/external-engines/templates/${name}`, `templates/external-engines/${name}`]);
+}
+
+function uniqueTemplateCopies(copies) {
+  const byDestination = new Map();
+  for (const copy of copies) {
+    byDestination.set(copy[1], copy);
+  }
+  return [...byDestination.values()];
 }
 
 function copySpecWorkOrders() {

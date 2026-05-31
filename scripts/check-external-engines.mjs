@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 const requireInstalled = process.argv.includes("--require-installed");
 const writeEvidence = process.argv.includes("--write-evidence") || process.argv.includes("--collect-evidence");
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const currentSourceCommit = gitCommit();
+const currentSourceTreeClean = gitTreeClean();
 const reportPath = join(root, ".tmp", "external-engines", "probe-report.json");
 const artifactDir = join(root, ".tmp", "external-engines", "artifacts");
 const evidenceDir = resolve(process.env.NEDITOR_EXTERNAL_ENGINE_EVIDENCE_DIR || join(root, ".tmp", "external-engines", "external"));
@@ -294,51 +297,114 @@ function probeEngine(engine) {
 
 function writeExternalEvidence(engine, proof) {
   mkdirSync(evidenceDir, { recursive: true });
-  const evidencePath = join(evidenceDir, `${engine.key}.json`);
-  writeFileSync(
-    evidencePath,
-    `${JSON.stringify(
-      {
-        schema: "neditor.external-engine-evidence.v1",
-        engine: engine.key,
-        status: "passed",
-        generatedAt: new Date().toISOString(),
-        platform: process.platform,
-        arch: process.arch,
-        command: proof.command,
-        path: proof.path,
-        version: proof.version,
-        adapter: {
-          smokeKind: engine.smoke?.kind || "none",
-          versionArgs: engine.versionArgs || [],
-        },
-        smoke: {
-          status: "passed",
-          artifact: proof.smoke.artifact || "",
-          bytes: proof.smoke.bytes || 0,
-          sha256: proof.smoke.sha256 || "",
-          needles: engine.smoke?.needles || [],
-        },
-        unresolvedBlockers: [],
-        notes:
-          "Collected by pnpm run collect:engine-evidence after the installed engine produced the required smoke artifact.",
-      },
-      null,
-      2,
-    )}\n`,
-  );
+  const evidence = {
+    schema: "neditor.external-engine-evidence.v1",
+    engine: engine.key,
+    status: "passed",
+    generatedAt: new Date().toISOString(),
+    appVersion: packageJson.version,
+    sourceCommit: currentSourceCommit,
+    sourceTreeClean: currentSourceTreeClean,
+    platform: process.platform,
+    arch: process.arch,
+    command: proof.command,
+    path: proof.path,
+    version: proof.version,
+    adapter: {
+      smokeKind: engine.smoke?.kind || "none",
+      versionArgs: engine.versionArgs || [],
+    },
+    smoke: {
+      status: "passed",
+      artifact: proof.smoke.artifact || "",
+      bytes: proof.smoke.bytes || 0,
+      sha256: proof.smoke.sha256 || "",
+      needles: engine.smoke?.needles || [],
+    },
+    unresolvedBlockers: [],
+    notes:
+      "Collected by pnpm run collect:engine-evidence after the installed engine produced the required smoke artifact.",
+  };
+  const evidenceJson = `${JSON.stringify(evidence, null, 2)}\n`;
+  const platformEvidenceDir = join(evidenceDir, process.platform);
+  mkdirSync(platformEvidenceDir, { recursive: true });
+  writeFileSync(join(evidenceDir, `${engine.key}.json`), evidenceJson);
+  writeFileSync(join(platformEvidenceDir, `${engine.key}.json`), evidenceJson);
 }
 
 function evaluateExternalEvidence(engine) {
-  const path = join(evidenceDir, `${engine.key}.json`);
-  if (!existsSync(path)) {
+  const paths = externalEvidencePathsForEngine(engine);
+  if (paths.length === 0) {
     return {
       status: "missing",
-      path: relative(path),
+      path: relative(join(evidenceDir, `${engine.key}.json`)),
+      items: [],
+      accepted: [],
+      invalid: [],
       detail: `No copied external evidence supplied for ${engine.name}.`,
     };
   }
 
+  const items = paths.map((path) => evaluateExternalEvidenceFile(engine, path));
+  const invalid = items.filter((item) => item.status === "invalid");
+  const accepted = items.filter((item) => item.status === "accepted");
+  if (invalid.length > 0) {
+    return {
+      status: "invalid",
+      path: invalid.map((item) => item.path).join(", "),
+      items,
+      accepted,
+      invalid,
+      detail: invalid.map((item) => `${item.path}: ${item.detail}`).join("; "),
+    };
+  }
+  if (accepted.length > 0) {
+    const platforms = accepted.map((item) => `${item.platform}/${item.arch}`).join(", ");
+    return {
+      status: "accepted",
+      path: accepted.map((item) => item.path).join(", "),
+      generatedAt: accepted.map((item) => item.generatedAt).sort().at(-1),
+      platform: accepted.map((item) => item.platform).join(", "),
+      arch: accepted.map((item) => item.arch).join(", "),
+      command: accepted.map((item) => item.command).join(", "),
+      version: accepted.map((item) => item.version).join(" | "),
+      smoke: accepted[0].smoke,
+      items,
+      accepted,
+      invalid,
+      detail: `${engine.name} evidence accepted from ${platforms}.`,
+    };
+  }
+  return {
+    status: "missing",
+    path: relative(join(evidenceDir, `${engine.key}.json`)),
+    items,
+    accepted,
+    invalid,
+    detail: `No accepted copied external evidence supplied for ${engine.name}.`,
+  };
+}
+
+function externalEvidencePathsForEngine(engine) {
+  const filename = `${engine.key}.json`;
+  const paths = [];
+  collectExternalEvidencePaths(evidenceDir, filename, paths, 0);
+  return Array.from(new Set(paths)).sort();
+}
+
+function collectExternalEvidencePaths(dir, filename, paths, depth) {
+  if (depth > 3 || !existsSync(dir)) return;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectExternalEvidencePaths(path, filename, paths, depth + 1);
+    } else if (entry.isFile() && entry.name === filename) {
+      paths.push(path);
+    }
+  }
+}
+
+function evaluateExternalEvidenceFile(engine, path) {
   let evidence;
   try {
     evidence = JSON.parse(readFileSync(path, "utf8"));
@@ -355,6 +421,9 @@ function evaluateExternalEvidence(engine) {
   requireValue(evidence.engine === engine.key, problems, `engine must be ${engine.key}`);
   requireValue(evidence.status === "passed", problems, "status must be passed");
   requireValue(isIsoDate(evidence.generatedAt), problems, "generatedAt must be an ISO timestamp");
+  if ("appVersion" in evidence) requireValue(Boolean(String(evidence.appVersion || "").trim()), problems, "appVersion must be non-empty when supplied");
+  if ("sourceCommit" in evidence) requireValue(Boolean(String(evidence.sourceCommit || "").trim()), problems, "sourceCommit must be non-empty when supplied");
+  if ("sourceTreeClean" in evidence) requireValue(typeof evidence.sourceTreeClean === "boolean", problems, "sourceTreeClean must be boolean when supplied");
   requireValue(Boolean(String(evidence.platform || "").trim()), problems, "platform is required");
   requireValue(Boolean(String(evidence.arch || "").trim()), problems, "arch is required");
   requireValue(Boolean(String(evidence.command || "").trim()), problems, "command is required");
@@ -382,6 +451,9 @@ function evaluateExternalEvidence(engine) {
     status: "accepted",
     path: relative(path),
     generatedAt: evidence.generatedAt,
+    appVersion: evidence.appVersion || null,
+    sourceCommit: evidence.sourceCommit || null,
+    sourceTreeClean: evidence.sourceTreeClean ?? null,
     platform: evidence.platform,
     arch: evidence.arch,
     command: evidence.command,
@@ -510,11 +582,16 @@ function firstLine(text) {
 function writeReport(rows, missing, invalidExternalEvidence) {
   mkdirSync(dirname(reportPath), { recursive: true });
   const externalEvidence = rows.map((row) => row.externalEvidence).filter(Boolean);
+  const externalEvidenceItems = flattenEvidenceItems(rows);
+  const acceptedExternalEvidence = externalEvidenceItems.filter((item) => item.status === "accepted");
   writeFileSync(
     reportPath,
     `${JSON.stringify(
       {
         generatedAt: new Date().toISOString(),
+        appVersion: packageJson.version,
+        sourceCommit: currentSourceCommit,
+        sourceTreeClean: currentSourceTreeClean,
         platform: process.platform,
         arch: process.arch,
         requireInstalled,
@@ -531,7 +608,8 @@ function writeReport(rows, missing, invalidExternalEvidence) {
           installed: rows.filter((row) => row.status === "installed").length,
           missingLocal: missing.length,
           incompatible: incompatible.length,
-          acceptedExternalEvidence: externalEvidence.filter((evidence) => evidence.status === "accepted").length,
+          acceptedExternalEvidence: acceptedExternalEvidence.length,
+          acceptedExternalEnginePlatforms: acceptedExternalEvidencePlatforms(acceptedExternalEvidence),
           invalidExternalEvidence: invalidExternalEvidence.length,
           unresolvedMissingEvidence: missing.filter((row) => row.externalEvidence?.status !== "accepted").length,
         },
@@ -544,12 +622,35 @@ function writeReport(rows, missing, invalidExternalEvidence) {
           .filter((row) => row.status === "incompatible")
           .map((row) => row.command),
         externalEvidence,
+        externalEvidenceItems,
         invalidExternalEvidence,
       },
       null,
       2,
     )}\n`,
   );
+}
+
+function flattenEvidenceItems(rows) {
+  return rows.flatMap((row) => {
+    const items = Array.isArray(row.externalEvidence?.items) ? row.externalEvidence.items : [];
+    return items.map((item) => ({
+      engine: row.key,
+      name: row.name,
+      ...item,
+    }));
+  });
+}
+
+function acceptedExternalEvidencePlatforms(items) {
+  return Array.from(
+    new Set(
+      items
+        .filter((item) => item.status === "accepted")
+        .map((item) => `${item.platform}/${item.arch}`)
+        .filter(Boolean),
+    ),
+  ).sort();
 }
 
 function writeEvidenceTemplates() {
@@ -604,6 +705,24 @@ function isSha256(value) {
 
 function sha256File(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function gitCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+  });
+  return result.status === 0 ? result.stdout.trim() : "";
+}
+
+function gitTreeClean() {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+  });
+  return result.status === 0 && result.stdout.trim().length === 0;
 }
 
 function relative(path) {

@@ -28,6 +28,35 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-31 Platform-Qualified Optional Engine Evidence
+
+The optional external-engine evidence path is now platform-aware. The engine
+collector still writes legacy flat files for current-host compatibility, but it
+also writes `.tmp/external-engines/external/<platform>/<engine>.json` evidence
+with app version, source commit, clean-tree state, platform, architecture,
+engine command, version, smoke artifact hash, and zero-blocker metadata. The
+engine checker now discovers both flat and nested evidence files and aggregates
+accepted evidence by engine/platform instead of allowing Linux, Windows, and
+macOS proof for the same engine to overwrite each other.
+
+Release evidence ingestion now recognizes any returned
+`neditor.external-engine-evidence.v1` file and routes it to the platform
+qualified evidence directory. The release evidence kit copies every generated
+external-engine template rather than only the previous Pikchr/SQLite examples.
+The hosted release evidence workflow now has a Linux optional-engine job that
+installs Graphviz, Java/PlantUML, SQLite, D2, and Pikchr CLI, runs the required
+installed-engine collector, validates `pnpm run check:engines`, and uploads the
+Linux evidence artifact for ingestion.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/check-external-engines.mjs` | Pass | Engine checker syntax is valid after adding platform-qualified evidence discovery and metadata. |
+| `node --check scripts/ingest-release-evidence.mjs` | Pass | Evidence ingest syntax is valid after adding dynamic external-engine evidence routing. |
+| `node --check scripts/collect-release-evidence-kit.mjs` | Pass | Evidence kit collector syntax is valid after copying all external-engine templates. |
+| `node --check scripts/check-release-ci-workflow.mjs` | Pass | Release CI checker syntax is valid after adding the optional-engine job assertions. |
+| `pnpm run check:release-ci` | Pass | `.github/workflows/neditor-release-evidence.yml` now includes the Linux optional-engine proof job and artifact upload contract. |
+| `pnpm run check:engines` | Pass | Current-host engine probe still accepts existing macOS evidence and writes `.tmp/external-engines/probe-report.json`. |
+
 ## 2026-05-31 Release Handoff CLI Help
 
 The release-evidence handoff commands are now self-documenting from the CLI.

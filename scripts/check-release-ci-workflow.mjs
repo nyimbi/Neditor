@@ -39,6 +39,7 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS", "workflow must allow enough time for hosted Tauri WebDriver startup");
   requireIncludes(workflow, "browser-workflows:", "workflow must include browser workflow proof job");
   requireIncludes(workflow, "platform-proof:", "workflow must include platform proof job");
+  requireIncludes(workflow, "optional-engine-proof:", "workflow must include optional engine proof job");
   requireIncludes(workflow, "rendered-export-review:", "workflow must include rendered export review job");
   requireIncludes(workflow, "accessibility-review:", "workflow must include accessibility review job");
   requireIncludes(workflow, "ubuntu-latest", "workflow must run Linux proof on ubuntu-latest");
@@ -66,6 +67,8 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, ".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json", "WebDriver evidence must be uploaded");
   requireIncludes(workflow, "${{ matrix.artifact }}-json", "platform JSON evidence must be uploaded separately for lightweight ingest");
   requireIncludes(workflow, "src-tauri/target/release/bundle/**", "built package artifacts must be uploaded for inspection");
+  requireIncludes(workflow, "pnpm run collect:engine-evidence -- --require-installed", "optional engine job must collect required installed-engine evidence");
+  requireIncludes(workflow, ".tmp/external-engines/external/linux/**", "optional engine job must upload platform-qualified Linux engine evidence");
   requireIncludes(workflow, "pnpm run test:rendered-exports", "rendered export job must run the rendered export audit");
   requireIncludes(workflow, "poppler-utils", "rendered export job must install Poppler proof tools");
   requireIncludes(workflow, "libwebkit2gtk-4.1-dev", "rendered export job must install Tauri Linux build libraries");

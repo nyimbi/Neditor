@@ -41,9 +41,29 @@ blockers. Malformed supplied evidence fails the probe; absent optional engines
 without copied proof remain explicit release-readiness gaps.
 
 `pnpm run collect:engine-evidence` uses the same smoke proof but writes accepted
-`neditor.external-engine-evidence.v1` JSON under
-`.tmp/external-engines/external/`, avoiding hand-authored proof files for hosts
-where the engine is actually installed.
+`neditor.external-engine-evidence.v1` JSON under both the legacy flat
+`.tmp/external-engines/external/<engine>.json` path and the platform-qualified
+`.tmp/external-engines/external/<platform>/<engine>.json` path. The validator
+accepts either shape and aggregates multiple platform files for the same
+engine, so Linux and Windows evidence can be ingested without overwriting the
+macOS proof for that engine.
+
+The release evidence workflow now includes a Linux optional-engine proof job.
+It installs Graphviz, Java/PlantUML, SQLite, D2, and Pikchr CLI, runs:
+
+```sh
+pnpm run collect:engine-evidence -- --require-installed
+pnpm run check:engines
+```
+
+and uploads `.tmp/external-engines/external/linux/*.json` plus the smoke
+artifacts and probe report as `neditor-optional-engine-evidence-linux`.
+Release owners can ingest that artifact directly:
+
+```sh
+pnpm run ingest:evidence -- --source /path/to/neditor-optional-engine-evidence-linux
+pnpm run check:engines
+```
 
 Use:
 
@@ -164,6 +184,8 @@ Interpretation:
 ## Remaining Platform Evidence Gaps
 
 - Refresh Linux installed-engine evidence locally when those engines are
-  available outside retired remote workflows.
+  available outside retired remote workflows, or ingest the
+  `neditor-optional-engine-evidence-linux` artifact from the current release
+  evidence workflow.
 - Add Windows evidence for Graphviz, D2, PlantUML, Java, Pikchr, and SQLite
   executable paths, including package-manager shims.

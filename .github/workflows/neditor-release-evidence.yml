@@ -166,6 +166,66 @@ jobs:
             .tmp/platform-evidence/report.json
             .tmp/desktop-webdriver/report.json
 
+  optional-engine-proof:
+    name: Linux optional transform engine proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux optional transform engines
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            curl \
+            default-jre \
+            graphviz \
+            plantuml \
+            sqlite3
+          curl -fsSL https://d2lang.com/install.sh | sh -s --
+          cargo install pikchr-cli --locked
+          {
+            echo "$HOME/.local/bin"
+            echo "$HOME/.d2/bin"
+            echo "$HOME/bin"
+            echo "$HOME/.cargo/bin"
+          } >> "$GITHUB_PATH"
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Collect Linux optional engine evidence
+        run: pnpm run collect:engine-evidence -- --require-installed
+
+      - name: Validate optional engine evidence contract
+        run: pnpm run check:engines
+
+      - name: Upload optional engine evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: neditor-optional-engine-evidence-linux
+          if-no-files-found: error
+          path: |
+            .tmp/external-engines/probe-report.json
+            .tmp/external-engines/artifacts/**
+            .tmp/external-engines/external/linux/**
+
   rendered-export-review:
     name: Rendered export review package
     runs-on: ubuntu-latest
