@@ -998,6 +998,11 @@ async function assertHtmlExportWriteWorkflow(session) {
     const target = controlByLabel('Target', 'select');
     target.value = 'html';
     target.dispatchEvent(new Event('change', { bubbles: true }));
+    const manifest = controlByLabel('Export manifest', 'input');
+    if (!manifest.checked) {
+      manifest.checked = true;
+      manifest.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     const normalized = (value) => value.replace(/\\s+/g, ' ').trim();
     const exportButton = [...document.querySelectorAll('button')].find((item) => normalized(item.textContent || '') === 'Export HTML');
     if (!exportButton) throw new Error('Export HTML button was not visible in the desktop export panel');

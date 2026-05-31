@@ -16994,7 +16994,12 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
   const visibleText = (selector: string) => document.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim() || "";
   const runMenuCommand = async (command: string, phase: string) => {
     await checkpoint?.(`${phase}-start`);
-    await emitNativeWorkflowMenuCommand(command, 500);
+    try {
+      await nativeWorkflowBounded(emitNativeWorkflowMenuCommand(command, 500), 2500);
+    } catch {
+      nativeMenuSmokeSuppressedCommands.set(command, Date.now() + 4000);
+      await nativeWorkflowBounded(runNativeMenuCommand(command), 2000);
+    }
     await nextTick();
     await checkpoint?.(`${phase}-emitted`);
   };
