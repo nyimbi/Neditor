@@ -7012,6 +7012,33 @@ stable across SQLite CLI builds.
 | `pnpm run test:unit` | Pass | 135 frontend/static tests passed, including release CI guards for the Windows optional-engine artifact and dynamic evidence path. |
 | `git diff --check` | Pass | No whitespace errors are present in the Windows optional-engine evidence lane slice. |
 
+## 2026-05-31 Hosted Optional Engine Evidence Ingest
+
+Hosted release evidence run `26702884282` completed both optional external
+transform proof jobs. The Linux job returned accepted evidence for Graphviz
+`dot`, `circo`, `neato`, `fdp`, `osage`, `twopi`, D2, PlantUML, Pikchr CLI,
+and SQLite. The Windows job returned the same engine set, including D2 through
+the resolved release-archive executable path and a header-stable SQLite CSV
+artifact. The returned artifacts were downloaded into
+`/private/tmp/neditor-run-26702884282` and ingested with the normal release
+evidence ingest command.
+
+`pnpm run check:engines` now accepts 30 external evidence records across
+`darwin/arm64`, `linux/x64`, and `win32/x64`, with zero invalid records and zero
+unresolved optional-engine evidence gaps. The external transform setup matrix
+now marks macOS, Linux, Windows, and engine-default setup rows complete, while
+diagram feature rows remain partial where the remaining work is rendered/manual
+visual QA, PlantUML PNG installed-engine proof, or deeper grammar fidelity
+beyond bounded smoke artifacts.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `gh run view 26702884282 --json status,conclusion,jobs` | In progress | Browser workflow, rendered export review, accessibility review, Linux optional engine proof, and Windows optional engine proof were successful; Linux/Windows package and WebDriver proof jobs were still building when the engine evidence was ingested. |
+| `gh run download 26702884282 -n neditor-optional-engine-evidence-linux -D /private/tmp/neditor-run-26702884282/engines-linux` | Pass | Downloaded Linux optional-engine `probe-report.json`, SVG/CSV smoke artifacts, and `.tmp/external-engines/external/linux/*.json` evidence. |
+| `gh run download 26702884282 -n neditor-optional-engine-evidence-win32 -D /private/tmp/neditor-run-26702884282/engines-win32` | Pass | Downloaded Windows optional-engine `probe-report.json`, SVG/CSV smoke artifacts, and `.tmp/external-engines/external/win32/*.json` evidence. |
+| `pnpm run ingest:evidence -- --source /private/tmp/neditor-run-26702884282` | Partial pass | Ingest copied 22 recognized browser/engine evidence items; the only validation run was external-engine evidence and it passed. Missing entries are unrelated evidence classes not present in this hosted return directory. |
+| `pnpm run check:engines` | Pass | Probe report status is `complete`, accepts `darwin/arm64`, `linux/x64`, and `win32/x64`, and reports zero unresolved optional-engine evidence gaps. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

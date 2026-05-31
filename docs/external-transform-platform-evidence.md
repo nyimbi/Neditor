@@ -1,6 +1,6 @@
 # External Transform Platform Evidence
 
-Updated: 2026-05-25
+Updated: 2026-05-31
 
 NEditor keeps external transform engines optional. This page records current
 platform evidence for configured local engines and the repeatable command used
@@ -48,10 +48,11 @@ accepts either shape and aggregates multiple platform files for the same
 engine, so Linux and Windows evidence can be ingested without overwriting the
 macOS proof for that engine.
 
-The release evidence workflow now includes Linux and Windows optional-engine
-proof jobs. The Linux job installs Graphviz, Java/PlantUML, SQLite, D2, and
-Pikchr CLI. The Windows job installs Graphviz, D2, PlantUML, and SQLite through
-Chocolatey, then installs Pikchr CLI through Cargo. Both jobs run:
+The release evidence workflow includes Linux and Windows optional-engine proof
+jobs. The Linux job installs Graphviz, Java/PlantUML, SQLite, D2, and Pikchr
+CLI. The Windows job installs Graphviz, PlantUML, and SQLite through Chocolatey,
+installs Pikchr CLI through Cargo, and resolves D2 either from Chocolatey or the
+official Windows release archive fallback. Both jobs run:
 
 ```sh
 pnpm run collect:engine-evidence -- --require-installed
@@ -68,6 +69,11 @@ pnpm run ingest:evidence -- --source /path/to/neditor-optional-engine-evidence-l
 pnpm run ingest:evidence -- --source /path/to/neditor-optional-engine-evidence-win32
 pnpm run check:engines
 ```
+
+Hosted release evidence run `26702884282` has been ingested for both Linux and
+Windows. After ingest, `pnpm run check:engines` accepts 30 external evidence
+records across `darwin/arm64`, `linux/x64`, and `win32/x64` with zero invalid
+records and zero unresolved optional-engine evidence gaps.
 
 Use:
 
@@ -185,11 +191,21 @@ Interpretation:
   `NEDITOR_TEST_PIKCHR` because the executable lives under `.tmp/pikchr-build/`
   rather than on `PATH`.
 
-## Remaining Platform Evidence Gaps
+## Current Cross-Platform Status
 
-- Ingest the `neditor-optional-engine-evidence-linux` and
-  `neditor-optional-engine-evidence-win32` artifacts from the current release
-  evidence workflow after every source commit that changes release evidence
-  provenance.
+- Linux hosted proof is current for Graphviz `dot`, `circo`, `neato`, `fdp`,
+  `osage`, `twopi`, D2, PlantUML, Pikchr CLI, and SQLite.
+- Windows hosted proof is current for Graphviz `dot`, `circo`, `neato`, `fdp`,
+  `osage`, `twopi`, D2, PlantUML, Pikchr CLI, and SQLite. D2 is verified
+  through the resolved release-archive executable path when the package-manager
+  install does not expose `d2.exe` on `PATH`.
+- macOS local proof is current for Graphviz `dot`, `circo`, `neato`, `fdp`,
+  `osage`, `twopi`, D2, PlantUML, Pikchr, and SQLite.
+
+## Remaining Platform Evidence Maintenance
+
+- Re-ingest `neditor-optional-engine-evidence-linux` and
+  `neditor-optional-engine-evidence-win32` artifacts after source commits that
+  change release evidence provenance or external-engine probe semantics.
 - Keep Windows package-manager shim proof current for Graphviz, D2, PlantUML,
   Pikchr CLI, and SQLite when Chocolatey, Cargo, or hosted-runner paths change.
