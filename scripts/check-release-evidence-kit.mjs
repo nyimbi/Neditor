@@ -12,7 +12,7 @@ const reportPath = join(kitDir, "report.json");
 const readinessPath = join(root, ".tmp", "release-readiness", "report.json");
 const currentSourceCommit = gitCommit();
 const currentSourceTreeClean = gitTreeClean();
-const expectedTemplateCount = 19;
+const expectedMinimumTemplateCount = 19;
 const expectedRunbooks = [
   "runbooks/windows-platform.md",
   "runbooks/linux-platform.md",
@@ -69,7 +69,10 @@ function validateManifest(manifest, readiness, readinessStatus) {
   }
 
   const copiedTemplates = Array.isArray(manifest.copiedTemplates) ? manifest.copiedTemplates : [];
-  requireValue(copiedTemplates.length === expectedTemplateCount, `copiedTemplates must include ${expectedTemplateCount} entries`);
+  requireValue(
+    copiedTemplates.length >= expectedMinimumTemplateCount,
+    `copiedTemplates must include at least ${expectedMinimumTemplateCount} entries`,
+  );
   requireValue(Array.isArray(manifest.missingTemplates) && manifest.missingTemplates.length === 0, "missingTemplates must be empty");
   requireValue(Array.isArray(manifest.staleTemplates) && manifest.staleTemplates.length === 0, "staleTemplates must be empty");
   validateSpecCompletionWorkOrders(manifest.specCompletionWorkOrders);

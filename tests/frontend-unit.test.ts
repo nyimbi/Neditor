@@ -11040,11 +11040,11 @@ test("local verification scripts expose local baseline checks", () => {
   ok(evidenceKitChecker.includes("runbooks/independent-security-review.md"));
   ok(evidenceKitChecker.includes("runbooks/homebrew-release.md"));
   ok(evidenceKitChecker.includes("runbooks/release-device-performance-profile.md"));
-  ok(evidenceKitChecker.includes("const expectedTemplateCount = 19"));
+  ok(evidenceKitChecker.includes("const expectedMinimumTemplateCount = 19"));
   ok(evidenceKitChecker.includes("runbooks/table-editor-human-review.md"));
   ok(evidenceKitChecker.includes("runbooks/optional-external-engines.md"));
   ok(evidenceKitChecker.includes("runbooks/spec-completion-closure.md"));
-  ok(evidenceKitChecker.includes("copiedTemplates must include ${expectedTemplateCount} entries"));
+  ok(evidenceKitChecker.includes("copiedTemplates must include at least ${expectedMinimumTemplateCount} entries"));
   ok(evidenceKitChecker.includes("report.json"));
   ok(evidenceKitChecker.includes("sourceTreeClean must be true"));
   ok(evidenceKitChecker.includes("current source tree must be clean"));
