@@ -16945,10 +16945,16 @@ async function collectNativeTransformEngineSafetyEvidence(record: (name: string,
     await store.setTransformTrust(name, true);
     await store.testExternalTransform(name);
     const nonExecutable = store.transformProbeResults[name] || null;
+    const nonExecutableDiagnostic = `${nonExecutable?.message || ""}\n${(nonExecutable?.diagnostics || []).join("\n")}`.toLowerCase();
     evidence.nonExecutable = nonExecutable;
     record(
       "native workflow reported non-executable engine path",
-      Boolean(nonExecutable?.ok === false && nonExecutable.message.toLowerCase().includes("executable")),
+      Boolean(
+        nonExecutable?.ok === false &&
+          (nonExecutableDiagnostic.includes("executable") ||
+            nonExecutableDiagnostic.includes("not a valid win32 application") ||
+            nonExecutableDiagnostic.includes("os error 193")),
+      ),
       JSON.stringify(nonExecutable),
     );
 
