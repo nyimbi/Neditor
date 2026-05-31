@@ -152,7 +152,7 @@ function evaluatePackageArtifacts(spec) {
   requireValue(report.appVersion === packageJson.version, problems, `appVersion must match package.json version ${packageJson.version}`);
   requireValue(report.sourceCommit === currentSourceCommit, problems, `sourceCommit must match current git commit ${currentSourceCommit}`);
   requireValue(report.sourceTreeClean === true, problems, "sourceTreeClean must be true");
-  requireValue(String(report.command || "").includes("tauri build"), problems, "command must identify the Tauri package build");
+  requireValue(identifiesTauriPackageBuild(report.command), problems, "command must identify the Tauri package build");
   const artifacts = Array.isArray(report.artifacts) ? report.artifacts : [];
   requireValue(artifacts.length > 0, problems, "artifacts must include at least one package artifact");
   for (const artifact of artifacts) {
@@ -314,6 +314,11 @@ function readJsonEvidence(path, id, relativePath) {
   } catch (error) {
     return invalid(id, relativePath, `${relativePath} is not valid JSON: ${error.message}`);
   }
+}
+
+function identifiesTauriPackageBuild(command) {
+  const normalized = String(command || "").replaceAll("\\", "/");
+  return normalized.includes("tauri build") || normalized.includes("scripts/run-tauri-build.mjs");
 }
 
 function missingEvidence(id, path, detail) {

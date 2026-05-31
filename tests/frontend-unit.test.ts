@@ -10923,6 +10923,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(platformEvidence.includes("appVersion must match package.json version"));
   ok(platformEvidence.includes("sourceCommit must match current git commit"));
   ok(platformEvidence.includes("sourceTreeClean must be true"));
+  ok(platformEvidence.includes("identifiesTauriPackageBuild"));
+  ok(platformEvidence.includes("scripts/run-tauri-build.mjs"));
   ok(platformEvidence.includes("win32/tauri-webdriver-report.json"));
   ok(platformEvidence.includes("linux/package-artifacts.json"));
   ok(platformEvidence.includes("pending-external-evidence"));
