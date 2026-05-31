@@ -59,5 +59,6 @@ dependency.
 | `chrono` | `0.4` | MIT/Apache-2.0 | Export/snapshot timestamps | Linked library | SystemTime formatting manually possible | Metadata only |
 | `pulldown-cmark` | `0.13` | MIT | Markdown-to-HTML preview/export | Linked library | In-house Markdown parser is not practical | HTML output must escape safely |
 | `sha2` | `0.10` | MIT/Apache-2.0 | Source/include/export hashes | Linked library | In-house SHA-256 is inappropriate | Manifest integrity |
+| `getrandom` | `0.2` | MIT/Apache-2.0 | OS-backed OAuth state and PKCE verifier entropy | Linked library | Timestamp/counter-derived tokens are predictable; platform-specific `/dev/urandom` code would weaken Windows support | Prevents predictable OAuth callback state and verifier material |
 | `zip` | `2.4` | MIT | Minimal DOCX/PPTX package writing | Linked library | Handwriting ZIP is inappropriate | Export artifact integrity |
 | `notify` | `8.2.0` | CC0-1.0 | Rust watcher backend for root/include refresh when the `native-watch` feature is enabled | Optional linked library, disabled by default | Tauri fs watcher remains the default UI path; Rust watcher gives the backend an event source for packaged/native workflows | Local filesystem events only; verify with `cargo check --locked --features native-watch` |
