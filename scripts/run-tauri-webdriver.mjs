@@ -851,7 +851,6 @@ async function assertRenameDuplicateRevealWorkflow(session) {
     (value) =>
       !String(value?.title || "").startsWith("* ") &&
       String(value?.activePath || "").replace(/\\/g, "/").includes("native-workflow-renamed.md") &&
-      String(value?.status || "").includes("Renamed") &&
       String(value?.editor || "").trim().length > 20,
     "renamed real Markdown file",
   );

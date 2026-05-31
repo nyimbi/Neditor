@@ -7078,9 +7078,18 @@ browser driver's own script limit with the existing long request timeout used
 for the full native workflow bundle, without weakening any required native
 assertions.
 
+The follow-up hosted rerun reached the Linux v2 WebDriver flow and proved the
+full native workflow evidence bundle, but exposed a brittle rename predicate:
+the active document path had already changed to `native-workflow-renamed.md`
+and the file content was present, while the transient status-bar text no
+longer contained `Renamed` because later preview/watch status text had replaced
+it. The durable rename proof now relies on active path, file existence, old
+path removal, and preserved editor content instead of transient status text.
+
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `gh run view 26703698194 --log-failed` | Fail analyzed | Windows failed in `Run Windows Tauri WebDriver workflow` with Edge WebDriver `script timeout` during `assertNativeWorkflowEvidenceBundle`; packaging had already passed. |
+| `gh run download 26704073363 -n neditor-platform-evidence-linux-json -D /private/tmp/neditor-run-26704073363/linux-json` | Fail analyzed | Linux v2 WebDriver report showed the full native workflow bundle passed with 118 assertions before the rename predicate timed out on transient status text despite the active renamed path being present. |
 | `node --check scripts/run-tauri-webdriver.mjs` | Pass | The WebDriver harness remains syntactically valid after adding explicit session timeouts. |
 | `pnpm run check:platform-evidence` | Partial pass | Local platform evidence now accepts current Linux package/WebDriver proof and leaves only Windows stale evidence for the current commit. |
 
