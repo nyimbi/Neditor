@@ -7102,6 +7102,36 @@ a clear timeout message when the HTTP request itself aborts.
 | `node --check scripts/run-tauri-webdriver.mjs` | Pass | The WebDriver harness remains syntactically valid after adding explicit session timeouts. |
 | `pnpm run check:platform-evidence` | Partial pass | Local platform evidence now accepts current Linux package/WebDriver proof and leaves only Windows stale evidence for the current commit. |
 
+## 2026-05-31 Native Workflow Evidence Artifact Fix
+
+Hosted release evidence run `26704800088` showed two remaining platform-proof
+failures. Linux completed the app-authored native workflow and wrote a final
+report, but the outer WebDriver report only exposed `status: failed`,
+`phase: final`, `assertionCount: 118`, and no missing required assertions.
+Windows started the same native workflow but held a long WebDriver
+`execute/sync` request open until the HTTP client hit an Undici headers timeout.
+
+The WebDriver harness now starts the native workflow asynchronously inside the
+Tauri webview and polls the app-written evidence report on disk. This avoids
+long blocked WebDriver HTTP calls on Windows, keeps the same native workflow
+timeout budget, and preserves failed native assertion names/details in the
+outer report when the nested workflow fails. The release workflow now uploads
+`.tmp/desktop-webdriver/native-workflow-report.json` in the JSON evidence
+artifact so the next hosted run has enough evidence to close or diagnose
+platform gaps without downloading the large package bundle. The package
+artifact upload now includes only distributable installer/package files instead
+of the whole AppImage working directory, avoiding duplicate-path extraction
+failures in artifact downloads.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `gh run view 26704800088 --json status,conclusion,jobs` | Fail analyzed | Browser, accessibility, rendered-export, and optional-engine jobs passed; Linux and Windows package/WebDriver jobs failed in the native workflow evidence lane. |
+| `gh run download 26704800088 -n neditor-platform-evidence-linux-json -D /private/tmp/neditor-run-26704800088/linux-json-current` | Fail analyzed | Linux report reached the full native workflow bundle but lacked nested failed-assertion detail because the JSON artifact did not include `native-workflow-report.json`. |
+| `gh run download 26704800088 -n neditor-platform-evidence-win32-json -D /private/tmp/neditor-run-26704800088/win32-json-current` | Fail analyzed | Windows report failed with `fetch failed`; job logs identify the cause as Undici `HeadersTimeoutError` during the long native workflow `execute/sync` request. |
+| `node --check scripts/run-tauri-webdriver.mjs` | Pass | The asynchronous native workflow polling changes are syntactically valid. |
+| `pnpm run check:release-ci` | Pass | The release evidence workflow remains structurally valid after uploading the nested native workflow report and limiting package artifacts to distributables. |
+| `git diff --check` | Pass | The current evidence-harness patch has no whitespace errors. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,

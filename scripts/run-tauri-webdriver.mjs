@@ -571,18 +571,39 @@ async function assertNativeWorkflowEvidenceBundle(session) {
       if (!hook?.runNativeWorkflowSmoke) {
         throw new Error('Desktop workflow smoke hook is not available');
       }
-      return hook.runNativeWorkflowSmoke();
+      const stateKey = '__NEDITOR_NATIVE_WORKFLOW_ASYNC_STATE__';
+      if (!window[stateKey]) {
+        window[stateKey] = { status: 'running', startedAt: Date.now() };
+        Promise.resolve()
+          .then(() => hook.runNativeWorkflowSmoke())
+          .then((result) => {
+            window[stateKey] = { status: 'completed', completedAt: Date.now(), result };
+          })
+          .catch((error) => {
+            window[stateKey] = {
+              status: 'failed',
+              completedAt: Date.now(),
+              error: error instanceof Error ? error.message : String(error),
+            };
+          });
+      }
+      return window[stateKey];
     `,
-    nativeWorkflowTimeoutMs,
+    timeoutMs,
   );
-  if (hookResult.value?.status !== "completed") {
-    throw new Error(`desktop native workflow hook did not complete: ${JSON.stringify(hookResult.value)}`);
+  if (!["running", "completed"].includes(String(hookResult.value?.status || ""))) {
+    throw new Error(`desktop native workflow hook did not start: ${JSON.stringify(hookResult.value)}`);
   }
-  await waitForPathExists(workflowReportPath, "full native workflow evidence bundle");
-  const envelope = JSON.parse(readFileSync(workflowReportPath, "utf8"));
+  const envelope = await waitForNativeWorkflowReport();
   const workflow = envelope.payload || envelope;
   const assertions = Array.isArray(workflow.assertions) ? workflow.assertions : [];
   const passedAssertions = assertions.filter((assertion) => assertion?.passed === true);
+  const failedAssertions = assertions
+    .filter((assertion) => assertion?.passed === false)
+    .map((assertion) => ({
+      name: assertion.name || "",
+      detail: assertion.detail || "",
+    }));
   const requiredNativeAssertions = [
     "native workflow created and listed app-data snapshot",
     "native workflow restored project-local snapshot",
@@ -599,22 +620,16 @@ async function assertNativeWorkflowEvidenceBundle(session) {
     "native workflow exported html from native menu command",
   ];
   const missing = requiredNativeAssertions.filter((name) => !passedAssertions.some((assertion) => assertion.name === name));
-  if (workflow.status !== "passed" || missing.length > 0) {
-    throw new Error(
-      `native workflow evidence bundle was incomplete: ${JSON.stringify({
-        status: workflow.status,
-        phase: workflow.phase,
-        assertionCount: assertions.length,
-        missing,
-      })}`,
-    );
-  }
   report.nativeWorkflowArtifacts = {
     status: workflow.status,
     phase: workflow.phase,
     assertionCount: assertions.length,
     passedAssertionCount: passedAssertions.length,
+    failedAssertionCount: failedAssertions.length,
+    failedAssertions,
     requiredAssertions: requiredNativeAssertions,
+    missingRequiredAssertions: missing,
+    error: workflow.error || "",
     filePath: workflow.fileWorkflow?.filePath || "",
     exportTarget: workflow.exportResult?.target || "",
     exportPath: workflow.exportResult?.outputPath || "",
@@ -625,6 +640,20 @@ async function assertNativeWorkflowEvidenceBundle(session) {
     hasKeybindingEvidence: Boolean(workflow.editorKeybindingEvidence),
     hasTableEvidence: Boolean(workflow.previewSourceMapEvidence?.table || workflow.nativeMenuCommandEvidence?.tableEditor),
   };
+  if (workflow.status !== "passed" || missing.length > 0) {
+    throw new Error(
+      `native workflow evidence bundle was incomplete: ${JSON.stringify({
+        status: workflow.status,
+        phase: workflow.phase,
+        assertionCount: assertions.length,
+        passedAssertionCount: passedAssertions.length,
+        failedAssertionCount: failedAssertions.length,
+        missing,
+        failedAssertions: failedAssertions.slice(0, 12),
+        error: workflow.error || "",
+      })}`,
+    );
+  }
   recordAssertion("desktop WebDriver runs full native workflow evidence bundle");
 }
 
@@ -1184,6 +1213,41 @@ async function waitForPathExists(path, description) {
     await delay(250);
   }
   throw new Error(`timed out waiting for ${description}: ${relative(path)}`);
+}
+
+async function waitForNativeWorkflowReport() {
+  const started = Date.now();
+  let lastStatus = null;
+  let lastError = null;
+  while (Date.now() - started < nativeWorkflowTimeoutMs) {
+    if (existsSync(workflowReportPath)) {
+      try {
+        const envelope = JSON.parse(readFileSync(workflowReportPath, "utf8"));
+        const workflow = envelope.payload || envelope;
+        const assertions = Array.isArray(workflow.assertions) ? workflow.assertions : [];
+        lastStatus = {
+          status: workflow.status || "",
+          phase: workflow.phase || "",
+          assertionCount: assertions.length,
+          failedAssertionCount: assertions.filter((assertion) => assertion?.passed === false).length,
+          error: workflow.error || "",
+        };
+        if (["passed", "failed"].includes(String(workflow.status || ""))) {
+          return envelope;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+      }
+    }
+    await delay(1000);
+  }
+  throw new Error(
+    `timed out waiting for completed native workflow evidence bundle after ${nativeWorkflowTimeoutMs}ms: ${JSON.stringify({
+      reportPath: relative(workflowReportPath),
+      lastStatus,
+      lastError,
+    })}`,
+  );
 }
 
 function preferencesMatch(actual, expected) {

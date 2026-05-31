@@ -152,7 +152,12 @@ jobs:
             .tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json
             .tmp/platform-evidence/report.json
             .tmp/desktop-webdriver/report.json
-            src-tauri/target/release/bundle/**
+            .tmp/desktop-webdriver/native-workflow-report.json
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
 
       - name: Upload platform evidence JSON
         if: always()
@@ -165,6 +170,7 @@ jobs:
             .tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json
             .tmp/platform-evidence/report.json
             .tmp/desktop-webdriver/report.json
+            .tmp/desktop-webdriver/native-workflow-report.json
 
   optional-engine-proof:
     name: ${{ matrix.label }} optional transform engine proof
