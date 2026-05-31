@@ -9134,6 +9134,12 @@ const nativeMenuExportTargets: Record<string, ExportTarget> = {
 };
 let unlistenNativeMenuCommand: UnlistenFn | null = null;
 let docsLiveRecognition: SpeechRecognitionLike | null = null;
+let nativeMenuCommandSequence = 0;
+let nativeMenuCommandLast = {
+  command: "",
+  status: "idle" as "idle" | "running" | "completed" | "failed",
+  error: "",
+};
 
 const active = computed(() => store.activeDocument);
 const activeExportProfile = computed(() => store.exportProfiles.find((profile) => profile.id === store.activeExportProfileId) || null);
@@ -15743,101 +15749,104 @@ async function bindNativeMenuCommands() {
 }
 
 async function runNativeMenuCommand(command: string) {
-  const exportTarget = nativeMenuExportTargets[command];
-  if (exportTarget) {
-    await exportDocumentAs(exportTarget);
-    return;
-  }
+  nativeMenuCommandLast = { command, status: "running", error: "" };
+  try {
+    const exportTarget = nativeMenuExportTargets[command];
+    if (exportTarget) {
+      await exportDocumentAs(exportTarget);
+      nativeMenuCommandLast = { command, status: "completed", error: "" };
+      return;
+    }
 
-  switch (command) {
-    case "neditor-new-document":
-      store.newDocument();
-      break;
-    case "neditor-open-document":
-      await openDocument();
-      break;
-    case "neditor-save-document":
-      await saveDocument();
-      break;
-    case "neditor-save-document-as":
-      await saveDocumentAs();
-      break;
-    case "neditor-prepare-export":
-      await prepareForExport();
-      store.sidebar = "exports";
-      break;
-    case "neditor-open-publishing-handoff":
-      openPublishingHandoff();
-      break;
-    case "neditor-prepare-publishing-handoff":
-      await preparePublishingHandoff();
-      break;
-    case "neditor-copy-publishing-payload":
-      await copyPublishingPayload();
-      break;
-    case "neditor-copy-publishing-content":
-      await copyPublishingContent();
-      break;
-    case "neditor-export-current":
-      await exportDocument();
-      break;
-    case "neditor-configure-google-docs":
-      store.sidebar = "settings";
-      selectConfigurationSection("google-auth");
-      break;
-    case "neditor-sign-in-google":
-      await startGoogleSignIn();
-      break;
-    case "neditor-import-google-docs":
-      await importCurrentDocumentToGoogleDocs();
-      break;
-    case "neditor-open-folder":
-      await openFolder();
-      break;
-    case "neditor-save-workspace":
-      await saveWorkspace();
-      break;
-    case "neditor-deploy-cli":
-      await deployCliGlobally();
-      break;
-    case "neditor-rename-document":
-      await renameDocument();
-      break;
-    case "neditor-duplicate-document":
-      await duplicateDocument();
-      break;
-    case "neditor-create-snapshot":
-      await snapshotActive();
-      break;
-    case "neditor-open-search":
-      runEditorCommand(openSearchPanel);
-      break;
-    case "neditor-mode-split":
-      store.mode = "split";
-      break;
-    case "neditor-mode-source":
-      store.mode = "source";
-      break;
-    case "neditor-mode-preview":
-      store.mode = "preview";
-      break;
-    case "neditor-mode-focus":
-      store.mode = "focus";
-      break;
-    case "neditor-mode-outline":
-      store.mode = "outline";
-      store.sidebar = "outline";
-      break;
-    case "neditor-mode-export":
-      store.mode = "export";
-      store.sidebar = "exports";
-      break;
-    case "neditor-maximize-writing-space":
-      maximizeWritingSpace();
-      break;
-    case "neditor-restore-writing-layout":
-      restoreWritingSpace();
-      break;
+    switch (command) {
+      case "neditor-new-document":
+        store.newDocument();
+        break;
+      case "neditor-open-document":
+        await openDocument();
+        break;
+      case "neditor-save-document":
+        await saveDocument();
+        break;
+      case "neditor-save-document-as":
+        await saveDocumentAs();
+        break;
+      case "neditor-prepare-export":
+        await prepareForExport();
+        store.sidebar = "exports";
+        break;
+      case "neditor-open-publishing-handoff":
+        openPublishingHandoff();
+        break;
+      case "neditor-prepare-publishing-handoff":
+        await preparePublishingHandoff();
+        break;
+      case "neditor-copy-publishing-payload":
+        await copyPublishingPayload();
+        break;
+      case "neditor-copy-publishing-content":
+        await copyPublishingContent();
+        break;
+      case "neditor-export-current":
+        await exportDocument();
+        break;
+      case "neditor-configure-google-docs":
+        store.sidebar = "settings";
+        selectConfigurationSection("google-auth");
+        break;
+      case "neditor-sign-in-google":
+        await startGoogleSignIn();
+        break;
+      case "neditor-import-google-docs":
+        await importCurrentDocumentToGoogleDocs();
+        break;
+      case "neditor-open-folder":
+        await openFolder();
+        break;
+      case "neditor-save-workspace":
+        await saveWorkspace();
+        break;
+      case "neditor-deploy-cli":
+        await deployCliGlobally();
+        break;
+      case "neditor-rename-document":
+        await renameDocument();
+        break;
+      case "neditor-duplicate-document":
+        await duplicateDocument();
+        break;
+      case "neditor-create-snapshot":
+        await snapshotActive();
+        break;
+      case "neditor-open-search":
+        runEditorCommand(openSearchPanel);
+        break;
+      case "neditor-mode-split":
+        store.mode = "split";
+        break;
+      case "neditor-mode-source":
+        store.mode = "source";
+        break;
+      case "neditor-mode-preview":
+        store.mode = "preview";
+        break;
+      case "neditor-mode-focus":
+        store.mode = "focus";
+        break;
+      case "neditor-mode-outline":
+        store.mode = "outline";
+        store.sidebar = "outline";
+        break;
+      case "neditor-mode-export":
+        store.mode = "export";
+        store.sidebar = "exports";
+        break;
+      case "neditor-maximize-writing-space":
+        maximizeWritingSpace();
+        break;
+      case "neditor-restore-writing-layout":
+        restoreWritingSpace();
+        break;
     case "neditor-show-outline":
       store.sidebar = "outline";
       break;
@@ -15971,6 +15980,17 @@ async function runNativeMenuCommand(command: string) {
     case "neditor-help-shortcuts":
       openHelp("keyboard-shortcuts");
       break;
+    }
+    nativeMenuCommandLast = { command, status: "completed", error: "" };
+  } catch (error) {
+    nativeMenuCommandLast = {
+      command,
+      status: "failed",
+      error: error instanceof Error ? error.message : String(error),
+    };
+    throw error;
+  } finally {
+    nativeMenuCommandSequence += 1;
   }
 }
 
@@ -16533,11 +16553,12 @@ async function runDesktopWorkflowSmoke() {
         JSON.stringify(aiProvenanceEvidence.htmlAppendix),
       );
     }
+    await waitForNativeWorkflowCondition(() => !store.exportBusy, 2400);
     store.lastExportOutputPath = "";
     store.lastExportManifestPath = "";
     store.lastExportProgressSteps = [];
     store.lastExportDiagnostics = [];
-    await emitNativeWorkflowMenuCommand("neditor-export-html", 500);
+    const nativeMenuExportCommand = await emitNativeWorkflowMenuCommand("neditor-export-html", 5000);
     await waitForNativeWorkflowCondition(
       () =>
         Boolean(
@@ -16553,6 +16574,8 @@ async function runDesktopWorkflowSmoke() {
     const nativeMenuExportResult = {
       target: store.exportTarget,
       sidebar: store.sidebar,
+      command: nativeMenuExportCommand,
+      exportBusy: store.exportBusy,
       outputPath: store.lastExportOutputPath,
       manifestPath: store.lastExportManifestPath,
       progressSteps: store.lastExportProgressSteps.map((step) => `${step.id}:${step.state}`),
@@ -17138,9 +17161,21 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
 }
 
 async function emitNativeWorkflowMenuCommand(command: string, timeoutMs: number) {
-  void invoke("emit_desktop_workflow_smoke_menu_command", { command }).catch(() => undefined);
-  await nativeWorkflowDelay(timeoutMs);
+  const beforeSequence = nativeMenuCommandSequence;
+  const emitted = await invoke("emit_desktop_workflow_smoke_menu_command", { command })
+    .then(() => true)
+    .catch(() => false);
+  await waitForNativeWorkflowCondition(
+    () => nativeMenuCommandSequence > beforeSequence && nativeMenuCommandLast.command === command && nativeMenuCommandLast.status !== "running",
+    timeoutMs,
+  );
   await nextTick();
+  return {
+    emitted,
+    sequence: nativeMenuCommandSequence,
+    observed: nativeMenuCommandSequence > beforeSequence,
+    last: nativeMenuCommandLast,
+  };
 }
 
 async function collectNativeWorkspaceTabEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
@@ -17800,57 +17835,63 @@ async function collectNativeThemeAccessibilityEvidence(record: (name: string, pa
     previewFontSize: store.previewFontSize,
     previewLineHeight: store.previewLineHeight,
   };
-  store.theme = "dark";
-  store.previewTheme = "dark";
-  store.highContrast = true;
-  store.reducedMotion = true;
-  store.editorFontSize = 18;
-  store.previewFontSize = 19;
-  store.previewLineHeight = 1.9;
-  await nextTick();
-  await nextTick();
+  try {
+    store.theme = "dark";
+    store.previewTheme = "dark";
+    store.highContrast = true;
+    store.reducedMotion = true;
+    store.editorFontSize = 18;
+    store.previewFontSize = 19;
+    store.previewLineHeight = 1.9;
+    await nextTick();
+    await nextTick();
 
-  const shell = document.querySelector(".app-shell") as HTMLElement | null;
-  const commandButton = Array.from(document.querySelectorAll("#main-commands button")).find((button) =>
-    button.textContent?.replace(/\s+/g, " ").trim().includes("Commands"),
-  ) as HTMLElement | undefined;
-  const editorContent = document.querySelector(".cm-content") as HTMLElement | null;
-  const previewPane = document.querySelector(".preview-pane") as HTMLElement | null;
-  const previewDocument = document.querySelector(".preview-document") as HTMLElement | null;
-  const shellStyle = shell ? getComputedStyle(shell) : null;
-  const buttonStyle = commandButton ? getComputedStyle(commandButton) : null;
-  const editorStyle = editorContent ? getComputedStyle(editorContent) : null;
-  const evidence = {
-    shellTheme: shell?.dataset.theme || "",
-    highContrast: shell?.dataset.highContrast || "",
-    reducedMotion: shell?.dataset.reducedMotion || "",
-    previewTheme: previewPane?.dataset.previewTheme || "",
-    shellBackgroundColor: shellStyle?.backgroundColor || "",
-    commandBorderColor: buttonStyle?.borderTopColor || "",
-    editorTransitionDuration: editorStyle?.transitionDuration || "",
-    editorFontSize: editorStyle?.fontSize || "",
-    previewStyle: previewDocument?.getAttribute("style") || "",
-  };
-  record("native workflow applied dark theme attribute", evidence.shellTheme === "dark", evidence.shellTheme);
-  record("native workflow applied high contrast attributes and colors", evidence.highContrast === "true" && evidence.commandBorderColor === "rgb(0, 0, 0)", JSON.stringify(evidence));
-  record("native workflow applied reduced motion", evidence.reducedMotion === "true" && evidence.editorTransitionDuration === "0s", evidence.editorTransitionDuration);
-  record("native workflow applied editor typography", evidence.editorFontSize === "18px", evidence.editorFontSize);
-  record(
-    "native workflow applied preview theme and typography",
-    evidence.previewTheme === "dark" && evidence.previewStyle.includes("font-size: 19px") && evidence.previewStyle.includes("line-height: 1.9"),
-    evidence.previewStyle,
-  );
-
-  store.theme = original.theme;
-  store.previewTheme = original.previewTheme;
-  store.highContrast = original.highContrast;
-  store.reducedMotion = original.reducedMotion;
-  store.editorFontSize = original.editorFontSize;
-  store.previewFontSize = original.previewFontSize;
-  store.previewLineHeight = original.previewLineHeight;
-  await nextTick();
-  await store.persistWorkspace();
-  return evidence;
+    const shell = document.querySelector(".app-shell") as HTMLElement | null;
+    const commandButton = Array.from(document.querySelectorAll("#main-commands button")).find((button) =>
+      button.textContent?.replace(/\s+/g, " ").trim().includes("Commands"),
+    ) as HTMLElement | undefined;
+    const editorContent = document.querySelector(".cm-content") as HTMLElement | null;
+    const previewPane = document.querySelector(".preview-pane") as HTMLElement | null;
+    const previewDocument = document.querySelector(".preview-document") as HTMLElement | null;
+    const shellStyle = shell ? getComputedStyle(shell) : null;
+    const buttonStyle = commandButton ? getComputedStyle(commandButton) : null;
+    const editorStyle = editorContent ? getComputedStyle(editorContent) : null;
+    const evidence = {
+      shellTheme: shell?.dataset.theme || "",
+      highContrast: shell?.dataset.highContrast || "",
+      reducedMotion: shell?.dataset.reducedMotion || "",
+      previewTheme: previewPane?.dataset.previewTheme || "",
+      shellBackgroundColor: shellStyle?.backgroundColor || "",
+      commandBorderColor: buttonStyle?.borderTopColor || "",
+      editorTransitionDuration: editorStyle?.transitionDuration || "",
+      editorFontSize: editorStyle?.fontSize || "",
+      previewStyle: previewDocument?.getAttribute("style") || "",
+    };
+    record("native workflow applied dark theme attribute", evidence.shellTheme === "dark", evidence.shellTheme);
+    record(
+      "native workflow applied high contrast attributes and colors",
+      evidence.highContrast === "true" && evidence.commandBorderColor === "rgb(0, 0, 0)",
+      JSON.stringify(evidence),
+    );
+    record("native workflow applied reduced motion", evidence.reducedMotion === "true" && evidence.editorTransitionDuration === "0s", evidence.editorTransitionDuration);
+    record("native workflow applied editor typography", evidence.editorFontSize === "18px", evidence.editorFontSize);
+    record(
+      "native workflow applied preview theme and typography",
+      evidence.previewTheme === "dark" && evidence.previewStyle.includes("font-size: 19px") && evidence.previewStyle.includes("line-height: 1.9"),
+      evidence.previewStyle,
+    );
+    return evidence;
+  } finally {
+    store.theme = original.theme;
+    store.previewTheme = original.previewTheme;
+    store.highContrast = original.highContrast;
+    store.reducedMotion = original.reducedMotion;
+    store.editorFontSize = original.editorFontSize;
+    store.previewFontSize = original.previewFontSize;
+    store.previewLineHeight = original.previewLineHeight;
+    await nextTick();
+    await Promise.race([store.persistWorkspace(), nativeWorkflowDelay(1500)]);
+  }
 }
 
 async function collectNativeEditorErgonomicsEvidence(record: (name: string, passed: boolean, detail?: string) => void) {

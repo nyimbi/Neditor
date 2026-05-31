@@ -28,6 +28,28 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-31 Windows Native Menu Workflow Stabilization
+
+The Windows supported-host WebDriver artifact from release evidence run
+`26705276068` showed that the full native workflow no longer blocked on the
+outer WebDriver request, but it still raced the app-authored native menu HTML
+export. The nested workflow report stayed at `theme-accessibility-start` with
+one failed assertion: `native workflow exported html from native menu command`
+recorded no output path, no manifest, and no progress steps.
+
+The native menu command bridge now records command execution state inside the
+Vue app, and the desktop workflow smoke waits for the emitted command to finish
+before asserting export output. The theme/accessibility proof also restores
+preferences inside a `finally` block and bounds persistence on the native smoke
+path, so a platform store delay cannot strand the workflow after the visual
+preference assertions have already been collected.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check` | Pass | Vue type checking passed after adding native menu command completion tracking and bounded native preference restore. |
+| `pnpm run collect:evidence-kit` | Pass with expected dirty-tree warning | The evidence kit collector wrote `.tmp/release-evidence-kit` but correctly warned that the kit must be regenerated from a clean checkout after this source change is committed. |
+| `git diff --check` | Pass | No whitespace errors are present in the native menu workflow stabilization diff. |
+
 ## 2026-05-31 Supported-Host Native Workflow Evidence V2
 
 The Windows/Linux platform evidence contract now requires more than package
