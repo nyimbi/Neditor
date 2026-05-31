@@ -130,6 +130,7 @@ jobs:
         if: runner.os == 'Windows'
         env:
           MSEDGEDRIVER_TELEMETRY_OPTOUT: "1"
+          NEDITOR_TAURI_NATIVE_WORKFLOW_TIMEOUT_MS: "900000"
         run: pnpm run test:tauri-webdriver -- --strict
 
       - name: Collect platform evidence
