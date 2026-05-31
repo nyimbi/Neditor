@@ -230,6 +230,14 @@ jobs:
             "$env:ProgramData\chocolatey\bin",
             "$env:USERPROFILE\.cargo\bin"
           ) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $d2Path = (Get-Command d2 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+          if (-not $d2Path) {
+            $d2Path = Get-ChildItem "$env:ProgramData\chocolatey" -Filter d2.exe -File -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+          if ($d2Path) {
+            "NEDITOR_TEST_D2=$d2Path" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile

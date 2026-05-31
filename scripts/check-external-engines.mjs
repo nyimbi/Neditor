@@ -151,7 +151,7 @@ const engines = [
     smoke: {
       kind: "sqlite",
       source:
-        "WITH RECURSIVE n(value) AS (VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 12) SELECT 'NEditor SQL smoke' AS marker, value, printf('row-%02d-read-only-sql-transform-proof', value) AS detail FROM n;",
+        "WITH RECURSIVE n(value) AS (VALUES(1) UNION ALL SELECT value + 1 FROM n WHERE value < 12) SELECT 'marker' AS marker, 'value' AS value, 'detail' AS detail UNION ALL SELECT 'NEditor SQL smoke', value, printf('row-%02d-read-only-sql-transform-proof', value) FROM n;",
       artifact: "sqlite.csv",
       needles: ["marker,value,detail", "NEditor SQL smoke", "read-only-sql-transform-proof"],
     },

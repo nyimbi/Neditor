@@ -70,6 +70,7 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "pnpm run collect:engine-evidence -- --require-installed", "optional engine job must collect required installed-engine evidence");
   requireIncludes(workflow, "graphviz d2 plantuml sqlite", "Windows optional engine job must install Graphviz, D2, PlantUML, and SQLite");
   requireIncludes(workflow, "cargo install pikchr-cli --locked", "optional engine job must install Pikchr CLI");
+  requireIncludes(workflow, "NEDITOR_TEST_D2", "Windows optional engine job must pass discovered D2 executable path to the probe");
   requireIncludes(workflow, ".tmp/external-engines/external/${{ matrix.platform }}/**", "optional engine job must upload platform-qualified matrix engine evidence");
   requireIncludes(workflow, "neditor-optional-engine-evidence-win32", "optional engine job must upload Windows engine evidence artifact");
   requireIncludes(workflow, "pnpm run test:rendered-exports", "rendered export job must run the rendered export audit");

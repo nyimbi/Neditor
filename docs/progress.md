@@ -6995,10 +6995,18 @@ Pikchr CLI on the hosted runner, runs the same
 guard and external-transform docs now require the dynamic matrix artifact path
 instead of a Linux-only proof path.
 
+The first hosted Windows attempt proved the Chocolatey install path but exposed
+two Windows-specific probe issues: D2 was installed outside the active `PATH`,
+and the SQLite shell returned CSV data rows without a header line. The workflow
+now discovers `d2.exe` under Chocolatey and passes it through
+`NEDITOR_TEST_D2`, while the SQLite smoke query emits its own `marker,value,detail`
+header row so the artifact contract is stable across SQLite CLI builds.
+
 | Command | Result | Evidence |
 | --- | --- | --- |
 | `pnpm run check:release-ci` | Pass | Release CI workflow guard passed after adding the Linux/Windows optional-engine matrix, Windows install commands, and dynamic platform-qualified artifact path. |
 | `pnpm run check:external-transform-docs` | Pass | External transform documentation check passed after documenting the Linux and Windows optional-engine evidence artifacts and ingest commands. |
+| `pnpm run check:engines` | Pass | Local engine probe passed after the SQLite smoke query was made header-stable across platforms; Pikchr remains accepted through external Linux/macOS evidence on this host. |
 | `pnpm run test:unit` | Pass | 135 frontend/static tests passed, including release CI guards for the Windows optional-engine artifact and dynamic evidence path. |
 | `git diff --check` | Pass | No whitespace errors are present in the Windows optional-engine evidence lane slice. |
 
