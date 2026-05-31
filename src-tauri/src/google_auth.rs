@@ -4,10 +4,7 @@ use std::{
     collections::HashMap,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -15,8 +12,7 @@ use std::{
 const GOOGLE_AUTH_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const CALLBACK_PATH: &str = "/google-oauth-callback";
 const SESSION_TTL_SECONDS: u64 = 300;
-
-static TOKEN_COUNTER: AtomicU64 = AtomicU64::new(1);
+const OAUTH_TOKEN_BYTES: usize = 32;
 
 #[derive(Clone, Default)]
 pub(crate) struct GoogleAuthState {
@@ -82,8 +78,8 @@ pub(crate) fn start_google_oauth_sign_in(
         .map_err(|err| format!("Could not read Google OAuth callback address: {err}"))?
         .port();
     let redirect_uri = format!("http://127.0.0.1:{port}{CALLBACK_PATH}");
-    let state_id = token_material("state");
-    let code_verifier = token_material("verifier");
+    let state_id = token_material()?;
+    let code_verifier = token_material()?;
     let code_challenge = pkce_code_challenge(&code_verifier);
     let created_at_ms = epoch_ms();
 
@@ -331,10 +327,11 @@ fn google_authorization_url(
     format!("{GOOGLE_AUTH_ENDPOINT}?{query}")
 }
 
-fn token_material(prefix: &str) -> String {
-    let counter = TOKEN_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let material = format!("{prefix}:{}:{}:{counter}", epoch_ms(), std::process::id());
-    crate::sha256_hex(material.as_bytes())
+fn token_material() -> Result<String, String> {
+    let mut bytes = [0_u8; OAUTH_TOKEN_BYTES];
+    getrandom::getrandom(&mut bytes)
+        .map_err(|err| format!("Could not create secure OAuth token material: {err}"))?;
+    Ok(base64url_no_pad(&bytes))
 }
 
 fn pkce_code_challenge(verifier: &str) -> String {
@@ -465,13 +462,25 @@ mod tests {
 
     #[test]
     fn google_oauth_pkce_material_is_url_safe() {
-        let verifier = token_material("test");
+        let verifier = token_material().expect("secure token material");
         let challenge = pkce_code_challenge(&verifier);
         assert!(verifier.len() >= 43);
+        assert!(verifier
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_'));
         assert_eq!(challenge.len(), 43);
         assert!(challenge
             .chars()
             .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_'));
+    }
+
+    #[test]
+    fn google_oauth_token_material_is_not_deterministic() {
+        let first = token_material().expect("first token");
+        let second = token_material().expect("second token");
+        assert_ne!(first, second);
+        assert_eq!(first.len(), 43);
+        assert_eq!(second.len(), 43);
     }
 
     #[test]

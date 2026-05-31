@@ -8,6 +8,8 @@ use std::{
     process::Command,
 };
 
+const MAX_CITATION_SOURCE_DOWNLOAD_BYTES: usize = 25 * 1024 * 1024;
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct CitationSearchRequest {
     pub(crate) query: String,
@@ -212,10 +214,13 @@ fn search_searxng(
     searxng_url: Option<&str>,
     limit: usize,
 ) -> Result<Vec<CitationSearchResult>, String> {
-    let base = searxng_url
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("http://127.0.0.1:8080");
+    let base = validate_http_url(
+        searxng_url
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("http://127.0.0.1:8080"),
+        "SearXNG URL",
+    )?;
     let endpoint = format!(
         "{}/search?q={}&format=json",
         base.trim_end_matches('/'),
@@ -423,16 +428,24 @@ fn curl_text(url: &str) -> Result<String, String> {
 }
 
 fn curl_bytes(url: &str) -> Result<Vec<u8>, String> {
+    let url = validate_http_url(url, "Citation source URL")?;
     let output = Command::new("curl")
         .args([
             "--location",
             "--silent",
             "--show-error",
+            "--fail",
             "--max-time",
             "30",
+            "--proto",
+            "=http,https",
+            "--proto-redir",
+            "=http,https",
+            "--max-filesize",
+            &MAX_CITATION_SOURCE_DOWNLOAD_BYTES.to_string(),
             "--user-agent",
             "NEditor citation acquisition",
-            url,
+            &url,
         ])
         .output()
         .map_err(|err| format!("Could not run curl for citation source acquisition: {err}"))?;
@@ -442,6 +455,13 @@ fn curl_bytes(url: &str) -> Result<Vec<u8>, String> {
             "Citation source request failed with status {}: {}",
             output.status,
             stderr.trim()
+        ));
+    }
+    if output.stdout.len() > MAX_CITATION_SOURCE_DOWNLOAD_BYTES {
+        return Err(format!(
+            "Citation source response is {} bytes, above the {} byte limit.",
+            output.stdout.len(),
+            MAX_CITATION_SOURCE_DOWNLOAD_BYTES
         ));
     }
     Ok(output.stdout)
@@ -758,6 +778,20 @@ fn is_http_url(value: &str) -> bool {
     lower.starts_with("https://") || lower.starts_with("http://")
 }
 
+fn validate_http_url(value: &str, label: &str) -> Result<String, String> {
+    let trimmed = value.trim();
+    if !is_http_url(trimmed) {
+        return Err(format!("{label} must be an http:// or https:// URL."));
+    }
+    if trimmed
+        .chars()
+        .any(|character| character == '\0' || character == '\n' || character == '\r')
+    {
+        return Err(format!("{label} cannot contain control characters."));
+    }
+    Ok(trimmed.to_string())
+}
+
 fn search_engine_label(value: &Value) -> Option<String> {
     value
         .as_str()
@@ -988,6 +1022,25 @@ mod tests {
             "//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpaper.pdf&rut=abc",
         );
         assert_eq!(url, "https://example.com/paper.pdf");
+    }
+
+    #[test]
+    fn citation_fetch_urls_must_be_http_without_control_characters() {
+        assert_eq!(
+            validate_http_url(" https://example.com/source.pdf ", "Citation source URL").unwrap(),
+            "https://example.com/source.pdf"
+        );
+        assert!(
+            validate_http_url("file:///etc/passwd", "Citation source URL")
+                .expect_err("file URL rejected")
+                .contains("http:// or https://")
+        );
+        assert!(validate_http_url(
+            "https://example.com/source.pdf\nX-Test: injected",
+            "Citation source URL"
+        )
+        .expect_err("control characters rejected")
+        .contains("control characters"));
     }
 
     #[test]

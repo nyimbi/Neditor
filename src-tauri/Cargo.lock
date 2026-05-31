@@ -2136,6 +2136,7 @@ name = "neditor"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "getrandom 0.2.17",
  "notify",
  "pulldown-cmark",
  "serde",

@@ -37,5 +37,6 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "serd
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 serde_yaml = "0.9"
 sha2 = "0.10"
+getrandom = "0.2"
 zip = { version = "2.4", default-features = false, features = ["deflate"] }
 notify = { version = "8.2.0", optional = true }

@@ -9,6 +9,8 @@ use std::{
 };
 use zip::ZipArchive;
 
+const MAX_RFP_URL_DOWNLOAD_BYTES: usize = 35 * 1024 * 1024;
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct ImportRfpSourceRequest {
     pub(crate) source_type: String,
@@ -379,6 +381,12 @@ fn import_url(
         .map(str::trim)
         .filter(|url| url.starts_with("https://") || url.starts_with("http://"))
         .ok_or_else(|| "Enter an http:// or https:// RFP URL.".to_string())?;
+    if url
+        .chars()
+        .any(|character| character == '\0' || character == '\n' || character == '\r')
+    {
+        return Err("RFP URL cannot contain control characters.".to_string());
+    }
     let output = Command::new("curl")
         .args([
             "--location",
@@ -387,6 +395,12 @@ fn import_url(
             "--fail",
             "--silent",
             "--show-error",
+            "--proto",
+            "=http,https",
+            "--proto-redir",
+            "=http,https",
+            "--max-filesize",
+            &MAX_RFP_URL_DOWNLOAD_BYTES.to_string(),
             url,
         ])
         .stdout(Stdio::piped())
@@ -400,6 +414,13 @@ fn import_url(
         ));
     }
     let body = output.stdout;
+    if body.len() > MAX_RFP_URL_DOWNLOAD_BYTES {
+        return Err(format!(
+            "RFP URL response is {} bytes, above the {} byte limit.",
+            body.len(),
+            MAX_RFP_URL_DOWNLOAD_BYTES
+        ));
+    }
     match infer_url_rfp_body_kind(url, &body) {
         UrlRfpBodyKind::Pdf => {
             let text = extract_pdf_text_from_bytes(&body, url, warnings)?;
@@ -813,6 +834,24 @@ mod tests {
         .expect_err("unsupported RFP source type");
 
         assert!(error.contains("Unsupported RFP source type"));
+    }
+
+    #[test]
+    fn import_rfp_url_rejects_control_characters_before_fetch() {
+        let mut warnings = Vec::new();
+        let error = import_url(
+            &ImportRfpSourceRequest {
+                source_type: "url".to_string(),
+                path: None,
+                url: Some("https://example.com/rfp.pdf\r\nHeader: injected".to_string()),
+                text: None,
+            },
+            &mut warnings,
+        )
+        .expect_err("control characters rejected");
+
+        assert!(error.contains("control characters"));
+        assert!(warnings.is_empty());
     }
 
     #[test]
