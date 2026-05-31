@@ -9,6 +9,8 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS: "90000"
+  NEDITOR_TAURI_NATIVE_WORKFLOW_TIMEOUT_MS: "900000"
+  NEDITOR_TAURI_RUN_TIMEOUT_MS: "1200000"
 
 concurrency:
   group: neditor-release-evidence-${{ github.ref }}
@@ -130,7 +132,6 @@ jobs:
         if: runner.os == 'Windows'
         env:
           MSEDGEDRIVER_TELEMETRY_OPTOUT: "1"
-          NEDITOR_TAURI_NATIVE_WORKFLOW_TIMEOUT_MS: "900000"
         run: pnpm run test:tauri-webdriver -- --strict
 
       - name: Collect platform evidence

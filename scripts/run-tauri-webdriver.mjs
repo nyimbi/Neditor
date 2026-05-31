@@ -11,6 +11,9 @@ const required = process.argv.includes("--strict") || process.env.NEDITOR_TAURI_
 const timeoutMs = Number(process.env.NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS || 30_000);
 const scriptTimeoutMs = Number(process.env.NEDITOR_TAURI_WEBDRIVER_SCRIPT_TIMEOUT_MS || Math.max(timeoutMs, 360_000));
 const nativeWorkflowTimeoutMs = Number(process.env.NEDITOR_TAURI_NATIVE_WORKFLOW_TIMEOUT_MS || scriptTimeoutMs);
+const runTimeoutMs = Number(
+  process.env.NEDITOR_TAURI_RUN_TIMEOUT_MS || Math.max(nativeWorkflowTimeoutMs + timeoutMs * 4 + 60_000, 600_000),
+);
 const application = desktopBinaryPath();
 const reportPath = join(root, ".tmp", "desktop-webdriver", "report.json");
 const workflowReportPath = join(root, ".tmp", "desktop-webdriver", "native-workflow-report.json");
@@ -50,6 +53,7 @@ const report = {
   timeoutMs,
   scriptTimeoutMs,
   nativeWorkflowTimeoutMs,
+  runTimeoutMs,
   required,
   status: "pending",
   supportedDesktopPlatforms: ["linux", "win32"],
@@ -166,6 +170,23 @@ if (process.platform === "win32") {
   requireCommand("msedgedriver", "Install Microsoft Edge WebDriver and ensure msedgedriver.exe is on PATH.");
 }
 
+const runWatchdog = setTimeout(() => {
+  const message = `Tauri WebDriver smoke exceeded hard run timeout after ${runTimeoutMs}ms`;
+  report.status = "failed";
+  report.error = message;
+  report.timeout = {
+    timeoutMs,
+    scriptTimeoutMs,
+    nativeWorkflowTimeoutMs,
+    runTimeoutMs,
+  };
+  writeReport();
+  tauriDriver?.kill("SIGKILL");
+  console.error(message);
+  process.exit(124);
+}, runTimeoutMs);
+runWatchdog.unref?.();
+
 try {
   await runWebDriverSmoke();
   report.status = "passed";
@@ -177,6 +198,7 @@ try {
   writeReport();
   throw error;
 } finally {
+  clearTimeout(runWatchdog);
   tauriDriver?.kill();
 }
 
