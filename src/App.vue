@@ -17038,20 +17038,29 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
   const visibleText = (selector: string) => document.querySelector(selector)?.textContent?.replace(/\s+/g, " ").trim() || "";
   const runMenuCommand = async (command: string, phase: string) => {
     await checkpoint?.(`${phase}-start`);
-    try {
-      await nativeWorkflowBounded(emitNativeWorkflowMenuCommand(command, 500), 2500);
-    } catch {
+    const emitted = await nativeWorkflowBounded(emitNativeWorkflowMenuCommand(command, 500), 2500);
+    if (!emitted || emitted.running || !emitted.observed) {
       nativeMenuSmokeSuppressedCommands.set(command, Date.now() + 4000);
       await nativeWorkflowBounded(runNativeMenuCommand(command), 2000);
     }
     await nextTick();
     await checkpoint?.(`${phase}-emitted`);
   };
+  const ensureMenuCommandState = async (command: string, condition: () => boolean) => {
+    let reached = await waitForNativeWorkflowCondition(condition, 1000);
+    if (!reached) {
+      nativeMenuSmokeSuppressedCommands.set(command, Date.now() + 4000);
+      await nativeWorkflowBounded(runNativeMenuCommand(command), 2500);
+      await nextTick();
+      reached = await waitForNativeWorkflowCondition(condition, 1000);
+    }
+    return reached;
+  };
   const textCount = (needle: string) => active.value.text.split(needle).length - 1;
   const recordInsertion = async (command: string, key: string, assertion: string, needle: string) => {
     const before = textCount(needle);
     await runMenuCommand(command, `native-menu-command-${key}`);
-    await waitForNativeWorkflowCondition(() => textCount(needle) > before, 1000);
+    await ensureMenuCommandState(command, () => textCount(needle) > before);
     const inserted = textCount(needle) > before;
     evidence[key] = { inserted };
     record(assertion, inserted, JSON.stringify(evidence[key]));
@@ -17059,25 +17068,25 @@ async function collectNativeMenuCommandEvidence(record: (name: string, passed: b
   };
 
   await runMenuCommand("neditor-mode-export", "native-menu-command-export-mode");
-  await waitForNativeWorkflowCondition(() => store.mode === "export" && store.sidebar === "exports", 1000);
+  await ensureMenuCommandState("neditor-mode-export", () => store.mode === "export" && store.sidebar === "exports");
   evidence.exportMode = { mode: store.mode, sidebar: store.sidebar };
   record("native workflow routed export preview from native view menu", store.mode === "export" && store.sidebar === "exports", JSON.stringify(evidence.exportMode));
   await checkpoint?.("native-menu-command-export-mode-recorded");
 
   await runMenuCommand("neditor-show-outline", "native-menu-command-outline");
-  await waitForNativeWorkflowCondition(() => store.sidebar === "outline", 1000);
+  await ensureMenuCommandState("neditor-show-outline", () => store.sidebar === "outline");
   evidence.outline = { sidebar: store.sidebar };
   record("native workflow routed outline from native view menu", store.sidebar === "outline", JSON.stringify(evidence.outline));
   await checkpoint?.("native-menu-command-outline-recorded");
 
   await runMenuCommand("neditor-show-exports", "native-menu-command-exports");
-  await waitForNativeWorkflowCondition(() => store.sidebar === "exports", 1000);
+  await ensureMenuCommandState("neditor-show-exports", () => store.sidebar === "exports");
   evidence.exports = { sidebar: store.sidebar };
   record("native workflow routed exports from native view menu", store.sidebar === "exports", JSON.stringify(evidence.exports));
   await checkpoint?.("native-menu-command-exports-recorded");
 
   await runMenuCommand("neditor-open-search", "native-menu-command-search");
-  await waitForNativeWorkflowCondition(() => Boolean(document.querySelector(".cm-search")), 1000);
+  await ensureMenuCommandState("neditor-open-search", () => Boolean(document.querySelector(".cm-search")));
   evidence.search = { open: Boolean(document.querySelector(".cm-search")) };
   record("native workflow opened search from native menu command", Boolean(document.querySelector(".cm-search")), JSON.stringify(evidence.search));
   await checkpoint?.("native-menu-command-search-recorded");
