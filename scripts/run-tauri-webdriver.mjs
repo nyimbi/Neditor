@@ -295,6 +295,18 @@ async function assertModeSwitchAndCommandPalette(session) {
 
 async function assertTransformTemplateWorkflow(session) {
   await setViewMode(session, "split", "desktop split mode before transform template insertion");
+  await waitForValue(
+    session,
+    `
+      return {
+        sourceVisible: Boolean(document.querySelector('#markdown-source')?.offsetParent),
+        editorReady: Boolean(document.querySelector('.cm-editor, .cm-content')),
+        textLength: window.__NEDITOR_DESKTOP_WORKFLOW__?.activeDocumentText?.().length || 0,
+      };
+    `,
+    (value) => value?.sourceVisible === true && value?.editorReady === true && Number(value?.textLength || 0) > 20,
+    "desktop source editor ready for transform template insertion",
+  );
   await showSidebar(session, "templates", ["Category", "Transform", "Search"]);
   await setTransformTemplateFilters(session, { category: "Science", transform: "calc", search: "dose" });
   const inserted = await waitForValue(
