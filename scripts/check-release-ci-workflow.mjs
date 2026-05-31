@@ -80,6 +80,8 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "poppler-utils", "rendered export job must install Poppler proof tools");
   requireIncludes(workflow, "libwebkit2gtk-4.1-dev", "rendered export job must install Tauri Linux build libraries");
   requireIncludes(workflow, ".tmp/rendered-export-audit/**", "rendered export review package must be uploaded");
+  requireIncludes(workflow, "Install Chromium for accessibility runtime", "accessibility job must avoid the slower host dependency installer");
+  requireIncludes(workflow, "pnpm exec playwright install chromium", "accessibility job must install only the browser cache");
   requireIncludes(workflow, "pnpm run check:a11y", "accessibility job must run static accessibility checks");
   requireIncludes(workflow, "pnpm run check:a11y:runtime", "accessibility job must run runtime accessibility checks");
   requireIncludes(workflow, "pnpm run check:a11y:manual", "accessibility job must generate the manual accessibility contract");

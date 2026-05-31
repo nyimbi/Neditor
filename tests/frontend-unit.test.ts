@@ -11238,6 +11238,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseWorkflow.includes("pnpm run test:rendered-exports"));
   ok(releaseWorkflow.includes("neditor-rendered-export-review-package"));
   ok(releaseWorkflow.includes("Accessibility review package"));
+  ok(releaseWorkflow.includes("Install Chromium for accessibility runtime"));
+  ok(releaseWorkflow.includes("PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install chromium"));
   ok(releaseWorkflow.includes("pnpm run check:a11y:runtime"));
   ok(releaseWorkflow.includes("pnpm run check:a11y:manual"));
   ok(releaseWorkflow.includes("neditor-accessibility-review-package"));

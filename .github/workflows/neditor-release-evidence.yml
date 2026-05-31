@@ -348,8 +348,8 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Chromium with host dependencies
-        run: PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install --with-deps chromium
+      - name: Install Chromium for accessibility runtime
+        run: PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install chromium
 
       - name: Run static accessibility checks
         run: pnpm run check:a11y
