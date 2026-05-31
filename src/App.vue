@@ -9140,6 +9140,7 @@ let nativeMenuCommandLast = {
   status: "idle" as "idle" | "running" | "completed" | "failed",
   error: "",
 };
+const nativeMenuSmokeSuppressedCommands = new Map<string, number>();
 
 const active = computed(() => store.activeDocument);
 const activeExportProfile = computed(() => store.exportProfiles.find((profile) => profile.id === store.activeExportProfileId) || null);
@@ -15741,6 +15742,11 @@ const commandAgentRouteSuggestions = computed<CommandAgentRouteSuggestion[]>(() 
 async function bindNativeMenuCommands() {
   try {
     unlistenNativeMenuCommand = await listen<string>("neditor-menu-command", (event) => {
+      const suppressedUntil = nativeMenuSmokeSuppressedCommands.get(event.payload) || 0;
+      if (suppressedUntil > Date.now()) {
+        nativeMenuSmokeSuppressedCommands.delete(event.payload);
+        return;
+      }
       void runNativeMenuCommand(event.payload);
     });
   } catch {
@@ -16916,7 +16922,7 @@ async function collectNativeExportProfileEvidence(record: (name: string, passed:
   store.brandProfileDefaults.footer = "Native confidential";
   await nextTick();
   const profile = store.saveCurrentExportProfile("Native client PDF");
-  await store.persistWorkspace();
+  await nativeWorkflowBounded(store.persistWorkspace(), 1500);
   record(
     "native workflow saved export profile",
     Boolean(profile.id && profile.exportTarget === "pdf" && profile.brandProfileDefaults.name === "Native Board"),
@@ -16931,7 +16937,7 @@ async function collectNativeExportProfileEvidence(record: (name: string, passed:
   store.bibliographyDefaults.citationStyle = "title";
   store.brandProfileDefaults.name = "";
   store.brandProfileDefaults.footer = "";
-  await store.applyExportProfile(profile.id);
+  await nativeWorkflowBounded(store.applyExportProfile(profile.id), 2500);
   const applied = {
     id: store.activeExportProfileId,
     target: String(store.exportTarget),
@@ -16955,11 +16961,11 @@ async function collectNativeExportProfileEvidence(record: (name: string, passed:
       applied.brandName === "Native Board",
     JSON.stringify(applied),
   );
-  await store.persistWorkspace();
+  await nativeWorkflowBounded(store.persistWorkspace(), 1500);
 
   store.exportProfiles = [];
   store.activeExportProfileId = "";
-  await store.loadPreferences();
+  await nativeWorkflowBounded(store.loadPreferences(), 2500);
   const reloadedProfile = store.exportProfiles.find((item) => item.id === profile.id);
   const reloaded = {
     profileCount: store.exportProfiles.length,
@@ -17174,6 +17180,7 @@ async function emitNativeWorkflowMenuCommand(command: string, timeoutMs: number)
   let fallback = false;
   if (!observed) {
     fallback = true;
+    nativeMenuSmokeSuppressedCommands.set(command, Date.now() + Math.max(2500, timeoutMs + 1000));
     await runNativeMenuCommand(command);
     observed = nativeMenuCommandSequence > beforeSequence && nativeMenuCommandLast.command === command && nativeMenuCommandLast.status !== "running";
   }
@@ -17367,6 +17374,10 @@ async function writeDesktopWorkflowSmokeReport(payload: Record<string, unknown>)
 
 function nativeWorkflowDelay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function nativeWorkflowBounded<T>(promise: Promise<T>, timeoutMs: number): Promise<T | undefined> {
+  return Promise.race([promise.catch(() => undefined), nativeWorkflowDelay(timeoutMs).then(() => undefined)]);
 }
 
 async function collectNativeFileWorkflowEvidence(record: (name: string, passed: boolean, detail?: string) => void) {
