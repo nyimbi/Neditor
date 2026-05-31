@@ -17184,10 +17184,11 @@ async function emitNativeWorkflowMenuCommand(command: string, timeoutMs: number)
       Math.max(timeoutMs, 15000),
     );
   }
-  if (!observed) {
+  const nativeCommandStillRunning = nativeMenuCommandLast.command === command && nativeMenuCommandLast.status === "running";
+  if (!observed && !nativeCommandStillRunning) {
     fallback = true;
     nativeMenuSmokeSuppressedCommands.set(command, Date.now() + Math.max(2500, timeoutMs + 1000));
-    await runNativeMenuCommand(command);
+    await nativeWorkflowBounded(runNativeMenuCommand(command), Math.max(timeoutMs, 3000));
     observed = nativeMenuCommandSequence > beforeSequence && nativeMenuCommandLast.command === command && nativeMenuCommandLast.status !== "running";
   }
   await nextTick();
@@ -17196,6 +17197,7 @@ async function emitNativeWorkflowMenuCommand(command: string, timeoutMs: number)
     sequence: nativeMenuCommandSequence,
     observed,
     fallback,
+    running: nativeMenuCommandLast.command === command && nativeMenuCommandLast.status === "running",
     last: nativeMenuCommandLast,
   };
 }
