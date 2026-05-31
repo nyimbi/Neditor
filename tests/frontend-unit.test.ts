@@ -11228,6 +11228,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseWorkflow.includes("bundles: deb rpm appimage"));
   ok(releaseWorkflow.includes("cargo install tauri-driver --locked"));
   ok(releaseWorkflow.includes("webkit2gtk-driver"));
+  ok(releaseWorkflow.includes("timeout-minutes: 25"));
+  ok(releaseWorkflow.includes("NEDITOR_TAURI_PROGRESS_LOG"));
   ok(releaseWorkflow.includes("choco install selenium-chromium-edge-driver"));
   ok(releaseWorkflow.includes("MSEDGEDRIVER_TELEMETRY_OPTOUT"));
   ok(releaseWorkflow.includes("pnpm run collect:platform-evidence"));

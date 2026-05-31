@@ -58,6 +58,8 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "xvfb-run -a pnpm run test:tauri-webdriver -- --strict", "Linux job must run strict WebDriver workflow under xvfb");
   requireIncludes(workflow, "choco install selenium-chromium-edge-driver", "Windows job must install Edge WebDriver");
   requireIncludes(workflow, "MSEDGEDRIVER_TELEMETRY_OPTOUT", "Windows WebDriver job must opt out of EdgeDriver telemetry");
+  requireIncludes(workflow, "NEDITOR_TAURI_PROGRESS_LOG", "Windows WebDriver job must emit progress checkpoints for hosted diagnosis");
+  requireIncludes(workflow, "timeout-minutes: 25", "Windows WebDriver step must have a narrow timeout inside the broader platform proof job");
   requireIncludes(workflow, "pnpm run test:tauri-webdriver -- --strict", "Windows job must run strict WebDriver workflow");
   requireIncludes(workflow, "pnpm tauri build --bundles ${{ matrix.bundles }}", "platform job must build matrix-supported Tauri package targets");
   requireIncludes(workflow, "NEDITOR_PLATFORM_EVIDENCE_PLATFORM: ${{ matrix.platform }}", "platform job must set evidence platform");

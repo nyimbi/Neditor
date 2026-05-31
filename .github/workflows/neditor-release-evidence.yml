@@ -130,8 +130,10 @@ jobs:
 
       - name: Run Windows Tauri WebDriver workflow
         if: runner.os == 'Windows'
+        timeout-minutes: 25
         env:
           MSEDGEDRIVER_TELEMETRY_OPTOUT: "1"
+          NEDITOR_TAURI_PROGRESS_LOG: "1"
         run: pnpm run test:tauri-webdriver -- --strict
 
       - name: Collect platform evidence

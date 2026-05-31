@@ -189,6 +189,8 @@ const runWatchdog = setTimeout(() => {
 runWatchdog.unref?.();
 
 try {
+  writeReport();
+  progress(`starting Tauri WebDriver workflow with hard timeout ${runTimeoutMs}ms`);
   await runWebDriverSmoke();
   report.status = "passed";
   writeReport();
@@ -1437,6 +1439,14 @@ function recordAssertion(name) {
     status: "passed",
     elapsedMs: Date.now() - Date.parse(report.generatedAt),
   });
+  progress(`passed: ${name}`);
+  writeReport();
+}
+
+function progress(message) {
+  if (process.env.NEDITOR_TAURI_PROGRESS_LOG === "1") {
+    console.log(`[neditor-tauri-webdriver] ${message}`);
+  }
 }
 
 function writeReport() {
