@@ -68,7 +68,10 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "${{ matrix.artifact }}-json", "platform JSON evidence must be uploaded separately for lightweight ingest");
   requireIncludes(workflow, "src-tauri/target/release/bundle/**", "built package artifacts must be uploaded for inspection");
   requireIncludes(workflow, "pnpm run collect:engine-evidence -- --require-installed", "optional engine job must collect required installed-engine evidence");
-  requireIncludes(workflow, ".tmp/external-engines/external/linux/**", "optional engine job must upload platform-qualified Linux engine evidence");
+  requireIncludes(workflow, "graphviz d2 plantuml sqlite", "Windows optional engine job must install Graphviz, D2, PlantUML, and SQLite");
+  requireIncludes(workflow, "cargo install pikchr-cli --locked", "optional engine job must install Pikchr CLI");
+  requireIncludes(workflow, ".tmp/external-engines/external/${{ matrix.platform }}/**", "optional engine job must upload platform-qualified matrix engine evidence");
+  requireIncludes(workflow, "neditor-optional-engine-evidence-win32", "optional engine job must upload Windows engine evidence artifact");
   requireIncludes(workflow, "pnpm run test:rendered-exports", "rendered export job must run the rendered export audit");
   requireIncludes(workflow, "poppler-utils", "rendered export job must install Poppler proof tools");
   requireIncludes(workflow, "libwebkit2gtk-4.1-dev", "rendered export job must install Tauri Linux build libraries");

@@ -11200,7 +11200,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCi.includes("xvfb-run -a pnpm run test:tauri-webdriver -- --strict"));
   ok(releaseCi.includes("pnpm tauri build --bundles ${{ matrix.bundles }}"));
   ok(releaseCi.includes("pnpm run collect:engine-evidence -- --require-installed"));
-  ok(releaseCi.includes(".tmp/external-engines/external/linux/**"));
+  ok(releaseCi.includes("graphviz d2 plantuml sqlite"));
+  ok(releaseCi.includes("cargo install pikchr-cli --locked"));
+  ok(releaseCi.includes("neditor-optional-engine-evidence-win32"));
+  ok(releaseCi.includes(".tmp/external-engines/external/${{ matrix.platform }}/**"));
   ok(releaseCi.includes(".tmp/platform-evidence/external/${{ matrix.platform }}/tauri-webdriver-report.json"));
   ok(releaseCi.includes(".tmp/rendered-export-audit/**"));
   const platformRunbook = readFileSync("runbooks/platform-evidence.md", "utf8");

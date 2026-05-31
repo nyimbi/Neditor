@@ -48,20 +48,24 @@ accepts either shape and aggregates multiple platform files for the same
 engine, so Linux and Windows evidence can be ingested without overwriting the
 macOS proof for that engine.
 
-The release evidence workflow now includes a Linux optional-engine proof job.
-It installs Graphviz, Java/PlantUML, SQLite, D2, and Pikchr CLI, runs:
+The release evidence workflow now includes Linux and Windows optional-engine
+proof jobs. The Linux job installs Graphviz, Java/PlantUML, SQLite, D2, and
+Pikchr CLI. The Windows job installs Graphviz, D2, PlantUML, and SQLite through
+Chocolatey, then installs Pikchr CLI through Cargo. Both jobs run:
 
 ```sh
 pnpm run collect:engine-evidence -- --require-installed
 pnpm run check:engines
 ```
 
-and uploads `.tmp/external-engines/external/linux/*.json` plus the smoke
-artifacts and probe report as `neditor-optional-engine-evidence-linux`.
-Release owners can ingest that artifact directly:
+and upload `.tmp/external-engines/external/<platform>/*.json` plus the smoke
+artifacts and probe report as `neditor-optional-engine-evidence-linux` or
+`neditor-optional-engine-evidence-win32`. Release owners can ingest either
+artifact directly:
 
 ```sh
 pnpm run ingest:evidence -- --source /path/to/neditor-optional-engine-evidence-linux
+pnpm run ingest:evidence -- --source /path/to/neditor-optional-engine-evidence-win32
 pnpm run check:engines
 ```
 
@@ -183,9 +187,9 @@ Interpretation:
 
 ## Remaining Platform Evidence Gaps
 
-- Refresh Linux installed-engine evidence locally when those engines are
-  available outside retired remote workflows, or ingest the
-  `neditor-optional-engine-evidence-linux` artifact from the current release
-  evidence workflow.
-- Add Windows evidence for Graphviz, D2, PlantUML, Java, Pikchr, and SQLite
-  executable paths, including package-manager shims.
+- Ingest the `neditor-optional-engine-evidence-linux` and
+  `neditor-optional-engine-evidence-win32` artifacts from the current release
+  evidence workflow after every source commit that changes release evidence
+  provenance.
+- Keep Windows package-manager shim proof current for Graphviz, D2, PlantUML,
+  Pikchr CLI, and SQLite when Chocolatey, Cargo, or hosted-runner paths change.

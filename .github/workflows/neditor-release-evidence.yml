@@ -167,9 +167,21 @@ jobs:
             .tmp/desktop-webdriver/report.json
 
   optional-engine-proof:
-    name: Linux optional transform engine proof
-    runs-on: ubuntu-latest
+    name: ${{ matrix.label }} optional transform engine proof
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Linux
+            os: ubuntu-latest
+            platform: linux
+            artifact: neditor-optional-engine-evidence-linux
+          - label: Windows
+            os: windows-latest
+            platform: win32
+            artifact: neditor-optional-engine-evidence-win32
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -189,6 +201,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install Linux optional transform engines
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -206,10 +219,22 @@ jobs:
             echo "$HOME/.cargo/bin"
           } >> "$GITHUB_PATH"
 
+      - name: Install Windows optional transform engines
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install graphviz d2 plantuml sqlite -y --no-progress
+          cargo install pikchr-cli --locked
+          @(
+            "$env:ProgramFiles\Graphviz\bin",
+            "$env:ProgramData\chocolatey\bin",
+            "$env:USERPROFILE\.cargo\bin"
+          ) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Collect Linux optional engine evidence
+      - name: Collect optional engine evidence
         run: pnpm run collect:engine-evidence -- --require-installed
 
       - name: Validate optional engine evidence contract
@@ -219,12 +244,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: neditor-optional-engine-evidence-linux
+          name: ${{ matrix.artifact }}
           if-no-files-found: error
           path: |
             .tmp/external-engines/probe-report.json
             .tmp/external-engines/artifacts/**
-            .tmp/external-engines/external/linux/**
+            .tmp/external-engines/external/${{ matrix.platform }}/**
 
   rendered-export-review:
     name: Rendered export review package

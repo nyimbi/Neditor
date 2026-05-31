@@ -144,6 +144,18 @@ The collector writes validator-ready
 release host can prove optional engines without retyping JSON or overwriting
 another platform's proof.
 
+The release evidence workflow publishes the same proof as
+`neditor-optional-engine-evidence-linux` and
+`neditor-optional-engine-evidence-win32` artifacts. Ingest both artifacts after
+a hosted release-evidence run when closing Linux and Windows optional-engine
+release gates:
+
+```sh
+pnpm run ingest:evidence -- --source /path/to/neditor-optional-engine-evidence-linux
+pnpm run ingest:evidence -- --source /path/to/neditor-optional-engine-evidence-win32
+pnpm run check:engines
+```
+
 ## Engine Defaults
 
 | Engine | Input Mode | Expected Output | Notes |

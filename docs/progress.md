@@ -6982,6 +6982,26 @@ native workflow evidence.
 | `pnpm run check:spec-completion` | Pass | Local-proof and local-implementation work orders are now zero; remaining 66 open rows are manual/external/cross-platform/release-credential evidence lanes. |
 | `git diff --check` | Pass | No whitespace errors are present in the local spec gap closure slice. |
 
+## 2026-05-31 Windows Optional Engine Evidence Lane
+
+The release evidence workflow now collects optional external-transform engine
+proof on Windows as well as Linux. The optional-engine job is a
+Linux/Windows matrix, installs Windows Graphviz, D2, PlantUML, SQLite, and
+Pikchr CLI on the hosted runner, runs the same
+`pnpm run collect:engine-evidence -- --require-installed` and
+`pnpm run check:engines` contract, and uploads
+`neditor-optional-engine-evidence-win32` with platform-qualified
+`.tmp/external-engines/external/win32/*.json` proof. The release CI workflow
+guard and external-transform docs now require the dynamic matrix artifact path
+instead of a Linux-only proof path.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:release-ci` | Pass | Release CI workflow guard passed after adding the Linux/Windows optional-engine matrix, Windows install commands, and dynamic platform-qualified artifact path. |
+| `pnpm run check:external-transform-docs` | Pass | External transform documentation check passed after documenting the Linux and Windows optional-engine evidence artifacts and ingest commands. |
+| `pnpm run test:unit` | Pass | 135 frontend/static tests passed, including release CI guards for the Windows optional-engine artifact and dynamic evidence path. |
+| `git diff --check` | Pass | No whitespace errors are present in the Windows optional-engine evidence lane slice. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
@@ -6994,7 +7014,8 @@ native workflow evidence.
 4. Continue expanding browser coverage for remaining preview modes, AI
    review-state workflows, export progress edge cases, table export modes, and
    cross-platform shortcut/tab-pointer accelerators.
-5. Add macOS/Windows optional transform engine evidence.
+5. Ingest current Linux/Windows optional transform engine artifacts from the
+   release evidence workflow, then refresh optional-engine readiness reports.
 6. Only after behavior is locked, modularize oversized frontend/store/backend
    modules.
 
