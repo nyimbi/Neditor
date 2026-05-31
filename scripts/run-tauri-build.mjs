@@ -17,7 +17,7 @@ const reportPath = resolve(args["report"] || join(root, ".tmp", "tauri-build", "
 const bundleRoot = resolve(args["bundle-root"] || join(root, "src-tauri", "target", "release", "bundle"));
 const startedAt = new Date();
 const command = {
-  executable: process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+  executable: "pnpm",
   args: ["tauri", "build", "--bundles", ...bundles],
 };
 const outputTail = [];
@@ -42,22 +42,35 @@ writeReport({
 
 console.log(`[tauri-build] starting ${renderCommand(command)} with timeout ${timeoutMs}ms`);
 
-child = spawn(command.executable, command.args, {
-  cwd: root,
-  env: process.env,
-  stdio: ["ignore", "pipe", "pipe"],
-});
-
-child.stdout.on("data", (chunk) => forwardOutput("stdout", chunk));
-child.stderr.on("data", (chunk) => forwardOutput("stderr", chunk));
-child.on("error", (error) => {
+try {
+  child = spawn(command.executable, command.args, {
+    cwd: root,
+    env: process.env,
+    shell: process.platform === "win32",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+} catch (error) {
   finish({
     status: "failed",
     exitCode: null,
     signal: null,
-    error: error.message,
+    error: error instanceof Error ? error.message : String(error),
   });
-});
+  process.exit(1);
+}
+
+if (child) {
+  child.stdout.on("data", (chunk) => forwardOutput("stdout", chunk));
+  child.stderr.on("data", (chunk) => forwardOutput("stderr", chunk));
+  child.on("error", (error) => {
+    finish({
+      status: "failed",
+      exitCode: null,
+      signal: null,
+      error: error.message,
+    });
+  });
+}
 
 progressTimer = setInterval(() => {
   const elapsedMs = Date.now() - startedAt.getTime();
@@ -78,18 +91,21 @@ progressTimer = setInterval(() => {
 timeoutTimer = setTimeout(() => {
   timedOut = true;
   console.error(`[tauri-build] timeout after ${timeoutMs}ms; terminating build`);
+  if (!child) return;
   child.kill("SIGTERM");
   setTimeout(() => {
     if (!child.killed) child.kill("SIGKILL");
   }, 10_000).unref();
 }, timeoutMs);
 
-child.on("close", (exitCode, signal) => {
-  clearInterval(progressTimer);
-  clearTimeout(timeoutTimer);
-  const status = exitCode === 0 && !timedOut ? "passed" : timedOut ? "timed-out" : "failed";
-  finish({ status, exitCode, signal, error: null });
-});
+if (child) {
+  child.on("close", (exitCode, signal) => {
+    clearInterval(progressTimer);
+    clearTimeout(timeoutTimer);
+    const status = exitCode === 0 && !timedOut ? "passed" : timedOut ? "timed-out" : "failed";
+    finish({ status, exitCode, signal, error: null });
+  });
+}
 
 function finish({ status, exitCode, signal, error }) {
   if (finished) return;

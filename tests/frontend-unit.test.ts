@@ -10633,6 +10633,7 @@ test("local verification scripts expose local baseline checks", () => {
   const evidenceIngest = readFileSync("scripts/ingest-release-evidence.mjs", "utf8");
   const homebrewPackaging = readFileSync("scripts/check-homebrew-packaging.mjs", "utf8");
   const releaseCi = readFileSync("scripts/check-release-ci-workflow.mjs", "utf8");
+  const tauriBuildRunner = readFileSync("scripts/run-tauri-build.mjs", "utf8");
   const releaseWorkflow = readFileSync(".github/workflows/neditor-release-evidence.yml", "utf8");
   const platformPackaging = readFileSync("scripts/check-platform-packaging.mjs", "utf8");
   const platformEvidence = readFileSync("scripts/check-platform-evidence.mjs", "utf8");
@@ -11201,6 +11202,9 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCi.includes("xvfb-run -a pnpm run test:tauri-webdriver -- --strict"));
   ok(releaseCi.includes("node scripts/run-tauri-build.mjs --bundles"));
   ok(releaseCi.includes(".tmp/tauri-build/report.json"));
+  ok(tauriBuildRunner.includes('schema: "neditor.tauri-build-report.v1"'));
+  ok(tauriBuildRunner.includes("shell: process.platform === \"win32\""));
+  ok(tauriBuildRunner.includes("process.exit(1)"));
   ok(releaseCi.includes("pnpm run collect:engine-evidence -- --require-installed"));
   ok(releaseCi.includes("graphviz d2 plantuml sqlite"));
   ok(releaseCi.includes("cargo install pikchr-cli --locked"));
