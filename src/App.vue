@@ -18428,6 +18428,9 @@ async function collectNativeOutlineNavigationEvidence(record: (name: string, pas
     text: active.value.text,
     mode: store.mode,
     sidebar: store.sidebar,
+    documentMapFilter: documentMapFilter.value,
+    documentMapQuery: documentMapQuery.value,
+    documentMapBlockersOnly: documentMapBlockersOnly.value,
   };
   const evidence: Record<string, unknown> = {};
   try {
@@ -18454,15 +18457,27 @@ async function collectNativeOutlineNavigationEvidence(record: (name: string, pas
     await store.compileActive();
     store.mode = "split";
     store.sidebar = "outline";
+    documentMapBlockersOnly.value = false;
+    documentMapFilter.value = "structure";
+    documentMapQuery.value = "Native Outline Target";
     await nextTick();
     await nextTick();
+    await waitForNativeWorkflowCondition(
+      () =>
+        outlineHeadings.value.some((heading) => heading.text === "Native Outline Target") &&
+        filteredDocumentMapItems.value.some((item) => item.kind === "heading" && item.label === "Native Outline Target"),
+      2400,
+    );
 
     const target = outlineHeadings.value.find((heading) => heading.text === "Native Outline Target");
-    const outlineButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("#document-sidebar .outline-row"));
+    const outlineButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("#document-sidebar .document-map-row, #document-sidebar .outline-row"));
     const targetButton = outlineButtons.find((button) => button.textContent?.replace(/\s+/g, " ").includes("Native Outline Target"));
     targetButton?.click();
-    await nextTick();
-    await nextTick();
+    await waitForNativeWorkflowCondition(() => {
+      if (!target || !editorView) return false;
+      const line = editorView.state.doc.lineAt(editorView.state.selection.main.from);
+      return line.number === target.line && line.text.includes("## Native Outline Target");
+    }, 1600);
 
     const selectionLine = editorView ? editorView.state.doc.lineAt(editorView.state.selection.main.from) : null;
     evidence.outline = {
@@ -18471,6 +18486,10 @@ async function collectNativeOutlineNavigationEvidence(record: (name: string, pas
       buttonFound: Boolean(targetButton),
       buttonLabel: targetButton?.textContent?.replace(/\s+/g, " ").trim() || "",
       targetLine: target?.line || 0,
+      mapFilter: documentMapFilter.value,
+      mapQuery: documentMapQuery.value,
+      mapBlockersOnly: documentMapBlockersOnly.value,
+      mapItemFound: filteredDocumentMapItems.value.some((item) => item.kind === "heading" && item.label === "Native Outline Target"),
       selectedLine: selectionLine?.number || 0,
       selectedText: selectionLine?.text || "",
       editorFocused: editorView?.hasFocus || false,
@@ -18492,6 +18511,9 @@ async function collectNativeOutlineNavigationEvidence(record: (name: string, pas
   } finally {
     store.mode = original.mode;
     store.sidebar = original.sidebar;
+    documentMapFilter.value = original.documentMapFilter;
+    documentMapQuery.value = original.documentMapQuery;
+    documentMapBlockersOnly.value = original.documentMapBlockersOnly;
     await setNativeWorkflowText(original.text);
     await store.compileActive();
     await nextTick();
