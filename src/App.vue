@@ -7807,6 +7807,11 @@ type DesktopWorkflowTestHooks = {
   activeDocumentPath(): string | null;
   activeDocumentText(): string;
   activeDocumentTitle(): string;
+  runNativeWorkflowSmoke(): Promise<{
+    status: "completed" | "disabled";
+    activeDocumentTitle: string;
+    activeDocumentPath: string | null;
+  }>;
 };
 type ImportedRfpSource = {
   source_type: RfpSourceKind;
@@ -15976,6 +15981,22 @@ async function installDesktopWorkflowTestHooks() {
     activeDocumentPath: () => active.value.path,
     activeDocumentText: () => active.value.text,
     activeDocumentTitle: () => active.value.title,
+    runNativeWorkflowSmoke: async () => {
+      const smokeEnabled = await invoke<boolean>("desktop_workflow_smoke_enabled").catch(() => false);
+      if (!smokeEnabled) {
+        return {
+          status: "disabled",
+          activeDocumentTitle: active.value.title,
+          activeDocumentPath: active.value.path,
+        };
+      }
+      await runDesktopWorkflowSmoke();
+      return {
+        status: "completed",
+        activeDocumentTitle: active.value.title,
+        activeDocumentPath: active.value.path,
+      };
+    },
   };
 }
 
@@ -16377,6 +16398,10 @@ async function reportDesktopUiSmoke() {
 async function runDesktopWorkflowSmokeIfEnabled() {
   const enabled = await invoke<boolean>("desktop_workflow_smoke_autorun_enabled").catch(() => false);
   if (!enabled) return;
+  await runDesktopWorkflowSmoke();
+}
+
+async function runDesktopWorkflowSmoke() {
   desktopWorkflowSmokeActive.value = true;
 
   const assertions: Array<{ name: string; passed: boolean; detail?: string }> = [];

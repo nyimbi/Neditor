@@ -32,6 +32,7 @@ const requiredWebdriverAssertions = [
   "native WebDriver switches modes and opens command palette",
   "desktop WebDriver inserts calc and chart templates from packaged templates panel",
   "desktop WebDriver edits document structure in outline mode",
+  "desktop WebDriver runs full native workflow evidence bundle",
   "native title exposes dirty document state",
   "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
   "desktop WebDriver renames, duplicates, and exposes reveal affordance for real Markdown files",
@@ -202,6 +203,14 @@ function evaluateWebdriverReport(spec) {
       report.sourceCommit,
     );
   }
+  if (report.schema !== "neditor.tauri-webdriver-report.v2") {
+    return stale(
+      "tauri-webdriver",
+      spec.webdriverPath,
+      `${spec.name} Tauri WebDriver evidence must be regenerated with the v2 native workflow bundle contract.`,
+      report.sourceCommit || "",
+    );
+  }
   const problems = [];
   requireValue(report.platform === spec.platform, problems, `platform must be ${spec.platform}`);
   requireValue(report.status === "passed", problems, "status must be passed");
@@ -248,6 +257,31 @@ function evaluateWebdriverReport(spec) {
     problems,
     "exportArtifacts.progressEvidence must include a completed render step",
   );
+  const nativeWorkflow = report.nativeWorkflowArtifacts || {};
+  requireValue(nativeWorkflow.status === "passed", problems, "nativeWorkflowArtifacts.status must be passed");
+  requireValue(Number(nativeWorkflow.assertionCount) >= 100, problems, "nativeWorkflowArtifacts.assertionCount must prove the full native workflow bundle");
+  requireValue(
+    Number(nativeWorkflow.passedAssertionCount) === Number(nativeWorkflow.assertionCount),
+    problems,
+    "nativeWorkflowArtifacts.passedAssertionCount must equal assertionCount",
+  );
+  const requiredNativeAssertions = Array.isArray(nativeWorkflow.requiredAssertions) ? nativeWorkflow.requiredAssertions : [];
+  for (const requiredAssertion of [
+    "native workflow restored project-local snapshot",
+    "native workflow continued markdown list in editor",
+    "native workflow inserted paired bracket in editor",
+    "native workflow applied Emacs keybinding mode",
+    "native workflow edited with Vim operator motions",
+    "native workflow loaded source table from native writing tools menu",
+    "native workflow jumped preview table artifact to source",
+    "native workflow wrote html export artifact",
+  ]) {
+    requireValue(requiredNativeAssertions.includes(requiredAssertion), problems, `nativeWorkflowArtifacts.requiredAssertions missing ${requiredAssertion}`);
+  }
+  requireValue(nativeWorkflow.hasEditorErgonomicsEvidence === true, problems, "nativeWorkflowArtifacts.hasEditorErgonomicsEvidence must be true");
+  requireValue(nativeWorkflow.hasKeybindingEvidence === true, problems, "nativeWorkflowArtifacts.hasKeybindingEvidence must be true");
+  requireValue(nativeWorkflow.hasTableEvidence === true, problems, "nativeWorkflowArtifacts.hasTableEvidence must be true");
+  requireValue(Number(nativeWorkflow.modeCount) >= 5, problems, "nativeWorkflowArtifacts.modeCount must cover multiple desktop modes");
 
   if (problems.length > 0) {
     return invalid("tauri-webdriver", spec.webdriverPath, `${spec.name} Tauri WebDriver evidence is invalid: ${problems.join("; ")}`);
@@ -350,6 +384,7 @@ function writeTemplates() {
       webdriverTemplatePath,
       `${JSON.stringify(
         {
+          schema: "neditor.tauri-webdriver-report.v2",
           generatedAt: new Date().toISOString(),
           platform: spec.platform,
           status: "passed",
@@ -371,6 +406,26 @@ function writeTemplates() {
             sourceHasChartTemplate: true,
             previewHasDoseResult: true,
             doseFillFields: "weight_kg tablet_strength_mg",
+          },
+          nativeWorkflowArtifacts: {
+            status: "passed",
+            phase: "final",
+            assertionCount: 100,
+            passedAssertionCount: 100,
+            requiredAssertions: [
+              "native workflow restored project-local snapshot",
+              "native workflow continued markdown list in editor",
+              "native workflow inserted paired bracket in editor",
+              "native workflow applied Emacs keybinding mode",
+              "native workflow edited with Vim operator motions",
+              "native workflow loaded source table from native writing tools menu",
+              "native workflow jumped preview table artifact to source",
+              "native workflow wrote html export artifact",
+            ],
+            modeCount: 5,
+            hasEditorErgonomicsEvidence: true,
+            hasKeybindingEvidence: true,
+            hasTableEvidence: true,
           },
           fileArtifacts: {
             bytes: 1234,

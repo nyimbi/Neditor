@@ -27,6 +27,7 @@ const webdriverWorkflowPlan = [
   "native WebDriver switches modes and opens command palette",
   "desktop WebDriver inserts calc and chart templates from packaged templates panel",
   "desktop WebDriver edits document structure in outline mode",
+  "desktop WebDriver runs full native workflow evidence bundle",
   "native title exposes dirty document state",
   "desktop WebDriver saves and reopens real Markdown file through dialog-free smoke path",
   "desktop WebDriver renames, duplicates, and exposes reveal affordance for real Markdown files",
@@ -35,6 +36,7 @@ const webdriverWorkflowPlan = [
   "desktop preferences apply in packaged WebDriver session",
 ];
 const report = {
+  schema: "neditor.tauri-webdriver-report.v2",
   generatedAt: new Date().toISOString(),
   platform: process.platform,
   arch: process.arch,
@@ -54,6 +56,7 @@ const report = {
   assertions: [],
   outlineArtifacts: null,
   transformTemplateArtifacts: null,
+  nativeWorkflowArtifacts: null,
   fileArtifacts: null,
   exportArtifacts: null,
   preferenceArtifacts: null,
@@ -214,6 +217,7 @@ async function runWebDriverSmoke() {
     await assertModeSwitchAndCommandPalette(session);
     await assertTransformTemplateWorkflow(session);
     await assertOutlineModeWorkflow(session);
+    await assertNativeWorkflowEvidenceBundle(session);
     await assertDirtyTitleWorkflow(session);
     await assertFileSaveOpenWorkflow(session);
     await assertRenameDuplicateRevealWorkflow(session);
@@ -552,6 +556,72 @@ async function assertOutlineModeWorkflow(session) {
     },
   };
   recordAssertion("desktop WebDriver edits document structure in outline mode");
+}
+
+async function assertNativeWorkflowEvidenceBundle(session) {
+  rmSync(workflowReportPath, { force: true });
+  const hookResult = await execute(
+    session,
+    `
+      const hook = window.__NEDITOR_DESKTOP_WORKFLOW__;
+      if (!hook?.runNativeWorkflowSmoke) {
+        throw new Error('Desktop workflow smoke hook is not available');
+      }
+      return hook.runNativeWorkflowSmoke();
+    `,
+    Math.max(timeoutMs, 180_000),
+  );
+  if (hookResult.value?.status !== "completed") {
+    throw new Error(`desktop native workflow hook did not complete: ${JSON.stringify(hookResult.value)}`);
+  }
+  await waitForPathExists(workflowReportPath, "full native workflow evidence bundle");
+  const envelope = JSON.parse(readFileSync(workflowReportPath, "utf8"));
+  const workflow = envelope.payload || envelope;
+  const assertions = Array.isArray(workflow.assertions) ? workflow.assertions : [];
+  const passedAssertions = assertions.filter((assertion) => assertion?.passed === true);
+  const requiredNativeAssertions = [
+    "native workflow created and listed app-data snapshot",
+    "native workflow restored project-local snapshot",
+    "native workflow rendered outline mode structure only",
+    "native workflow continued markdown list in editor",
+    "native workflow inserted paired bracket in editor",
+    "native workflow applied Emacs keybinding mode",
+    "native workflow edited with Vim operator motions",
+    "native workflow opened table editor from native writing tools menu",
+    "native workflow loaded source table from native writing tools menu",
+    "native workflow jumped preview table artifact to source",
+    "native workflow prepared html export readiness",
+    "native workflow wrote html export artifact",
+    "native workflow exported html from native menu command",
+  ];
+  const missing = requiredNativeAssertions.filter((name) => !passedAssertions.some((assertion) => assertion.name === name));
+  if (workflow.status !== "passed" || missing.length > 0) {
+    throw new Error(
+      `native workflow evidence bundle was incomplete: ${JSON.stringify({
+        status: workflow.status,
+        phase: workflow.phase,
+        assertionCount: assertions.length,
+        missing,
+      })}`,
+    );
+  }
+  report.nativeWorkflowArtifacts = {
+    status: workflow.status,
+    phase: workflow.phase,
+    assertionCount: assertions.length,
+    passedAssertionCount: passedAssertions.length,
+    requiredAssertions: requiredNativeAssertions,
+    filePath: workflow.fileWorkflow?.filePath || "",
+    exportTarget: workflow.exportResult?.target || "",
+    exportPath: workflow.exportResult?.outputPath || "",
+    exportManifestPath: workflow.exportResult?.manifestPath || "",
+    snapshotProjectPath: workflow.snapshotEvidence?.projectLocal?.snapshotPath || "",
+    modeCount: Array.isArray(workflow.modeEvidence) ? workflow.modeEvidence.length : 0,
+    hasEditorErgonomicsEvidence: Boolean(workflow.editorErgonomicsEvidence),
+    hasKeybindingEvidence: Boolean(workflow.editorKeybindingEvidence),
+    hasTableEvidence: Boolean(workflow.previewSourceMapEvidence?.table || workflow.nativeMenuCommandEvidence?.tableEditor),
+  };
+  recordAssertion("desktop WebDriver runs full native workflow evidence bundle");
 }
 
 async function assertDirtyTitleWorkflow(session) {
@@ -1142,11 +1212,11 @@ async function createSession() {
   return session;
 }
 
-async function execute(session, script) {
+async function execute(session, script, requestTimeoutMs = timeoutMs) {
   return webdriver("POST", `/session/${session}/execute/sync`, {
     script,
     args: [],
-  });
+  }, requestTimeoutMs);
 }
 
 async function webdriver(method, path, body, requestTimeoutMs = timeoutMs) {

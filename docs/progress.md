@@ -28,6 +28,30 @@ progress records prove the requested end state.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
 
+## 2026-05-31 Supported-Host Native Workflow Evidence V2
+
+The Windows/Linux platform evidence contract now requires more than package
+startup and basic export proof. `scripts/run-tauri-webdriver.mjs` exposes the
+guarded in-app native workflow smoke through the desktop workflow hook, runs it
+inside the supported-host Tauri WebDriver session, and records a v2 WebDriver
+report with the full native workflow bundle summary.
+
+`pnpm run check:platform-evidence` now requires that v2 report before accepting
+Windows/Linux supported-host evidence. The accepted report must prove the native
+workflow bundle passed, include 100+ native assertions, and specifically carry
+snapshot restore, Markdown list continuation, bracket pairing, Emacs/Vim
+keybindings, table-editor/source-map, and HTML export assertions. Existing v1
+reports are classified as pending stale evidence instead of release-ready proof,
+so the next hosted release evidence run must regenerate the artifacts before
+those rows are closed.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `node --check scripts/run-tauri-webdriver.mjs` | Pass | WebDriver runner syntax is valid after adding the v2 schema and native workflow bundle assertion. |
+| `node --check scripts/check-platform-evidence.mjs` | Pass | Platform evidence checker syntax is valid after adding v2 WebDriver validation. |
+| `pnpm run check` | Pass | Vue type checking passes after exposing the guarded native workflow hook to the WebDriver session. |
+| `pnpm run check:platform-evidence` | Pass with pending external evidence | Existing current-commit Windows/Linux v1 artifacts are now treated as pending regeneration until the hosted workflow returns v2 reports. |
+
 ## 2026-05-31 Platform-Qualified Optional Engine Evidence
 
 The optional external-engine evidence path is now platform-aware. The engine
