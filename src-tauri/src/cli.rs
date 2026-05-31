@@ -623,8 +623,16 @@ pub(crate) fn run_cli_with_args_and_stdin(
         return run_open_command(&args[1..]);
     }
     match command {
-        "-h" | "--help" | "help" => Ok(CliOutcome {
+        "-h" | "--help" => Ok(CliOutcome {
             message: help_text(),
+            exit_code: 0,
+        }),
+        "help" => Ok(CliOutcome {
+            message: args
+                .get(2)
+                .map(|topic| command_help_text(topic))
+                .transpose()?
+                .unwrap_or_else(help_text),
             exit_code: 0,
         }),
         "-V" | "--version" | "version" => Ok(CliOutcome {
@@ -8358,6 +8366,13 @@ fn read_aloud_text_report(report: &Value) -> String {
 }
 
 fn run_evidence_packet_command(args: &[String]) -> Result<CliOutcome, String> {
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        return Ok(CliOutcome {
+            message: evidence_packet_help_text(),
+            exit_code: 0,
+        });
+    }
+
     let mut json_output = false;
     let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut readiness_report_path = PathBuf::from(".tmp/release-readiness/report.json");
@@ -8529,6 +8544,13 @@ fn run_release_candidate_command(args: &[String]) -> Result<CliOutcome, String> 
 }
 
 fn run_support_bundle_command(args: &[String]) -> Result<CliOutcome, String> {
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        return Ok(CliOutcome {
+            message: support_bundle_help_text(),
+            exit_code: 0,
+        });
+    }
+
     let mut json_output = false;
     let mut workspace = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut readiness_report_path = PathBuf::from(".tmp/release-readiness/report.json");
@@ -20517,6 +20539,85 @@ fn help_text() -> String {
             "Targets: {}, or all. Use comma-separated targets for delivery packs.",
             SUPPORTED_EXPORT_TARGETS.join(", ")
         ),
+    ]
+    .join("\n")
+}
+
+fn command_help_text(topic: &str) -> Result<String, String> {
+    match topic {
+        "evidence-packet" | "evidence-return-packet" | "release-evidence-packet" => {
+            Ok(evidence_packet_help_text())
+        }
+        "support" | "support-bundle" => Ok(support_bundle_help_text()),
+        "-h" | "--help" | "help" => Ok(help_text()),
+        other => Err(format!(
+            "Unknown ned help topic '{other}'.\n\n{}",
+            help_text()
+        )),
+    }
+}
+
+fn evidence_packet_help_text() -> String {
+    vec![
+        "ned evidence-packet - create a release evidence return packet".to_string(),
+        "".to_string(),
+        "Usage:".to_string(),
+        "  ned evidence-packet [--output release-evidence.md] [--json] [--workspace path]".to_string(),
+        "  ned evidence-return-packet [--output release-evidence.md] [--json]".to_string(),
+        "  ned release-evidence-packet [--output release-evidence.md] [--json]".to_string(),
+        "".to_string(),
+        "Purpose:".to_string(),
+        "  Builds a sendable Markdown packet for release managers, supported-host QA owners, credentialed operators, and manual reviewers.".to_string(),
+        "  The packet lists release evidence gaps, spec/manual work orders, return paths, validator commands, and secret-handling rules.".to_string(),
+        "".to_string(),
+        "Options:".to_string(),
+        "  --json                         Print the packet payload as JSON, including the Markdown body.".to_string(),
+        "  --output, -o <path>             Write the Markdown packet to a file.".to_string(),
+        "  --workspace <path>              Workspace root used for support-bundle context. Defaults to the current directory.".to_string(),
+        "  --readiness-report <path>       Release readiness JSON. Defaults to .tmp/release-readiness/report.json.".to_string(),
+        "  --spec-report <path>            Spec completion report JSON. Defaults to .tmp/spec-completion/report.json.".to_string(),
+        "  --spec-work-orders <path>       Spec work-order JSON. Defaults beside the spec report.".to_string(),
+        "  --release-candidate-dir <path>  Release candidate directory. Defaults to .tmp/release-candidate.".to_string(),
+        "  --engine-report <path>          External engine probe report. Defaults to .tmp/external-engines/probe-report.json.".to_string(),
+        "  --evidence-root <path>          Evidence root used to find returned evidence. Defaults to .tmp.".to_string(),
+        "  --evidence-kit <path>           Evidence kit directory or manifest. Defaults to .tmp/release-evidence-kit/manifest.json.".to_string(),
+        "".to_string(),
+        "Examples:".to_string(),
+        "  ned evidence-packet --output release-evidence.md".to_string(),
+        "  ned evidence-packet --json --workspace .".to_string(),
+        "  ned help evidence-packet".to_string(),
+    ]
+    .join("\n")
+}
+
+fn support_bundle_help_text() -> String {
+    vec![
+        "ned support-bundle - summarize readiness, setup, and release handoff state".to_string(),
+        "".to_string(),
+        "Usage:".to_string(),
+        "  ned support-bundle [--json] [--output support.json] [--workspace path]".to_string(),
+        "  ned support [--json]".to_string(),
+        "".to_string(),
+        "Purpose:".to_string(),
+        "  Produces a redaction-safe support summary for help desks, internal IT, release managers, and non-technical users.".to_string(),
+        "  It includes release readiness, evidence gaps, spec work orders, release-candidate state, transform health, and next commands.".to_string(),
+        "".to_string(),
+        "Options:".to_string(),
+        "  --json                         Print the full support bundle as JSON.".to_string(),
+        "  --output, -o <path>             Write the JSON support bundle to a file.".to_string(),
+        "  --workspace <path>              Workspace root used for local context. Defaults to the current directory.".to_string(),
+        "  --readiness-report <path>       Release readiness JSON. Defaults to .tmp/release-readiness/report.json.".to_string(),
+        "  --spec-report <path>            Spec completion report JSON. Defaults to .tmp/spec-completion/report.json.".to_string(),
+        "  --spec-work-orders <path>       Spec work-order JSON. Defaults beside the spec report.".to_string(),
+        "  --release-candidate-dir <path>  Release candidate directory. Defaults to .tmp/release-candidate.".to_string(),
+        "  --engine-report <path>          External engine probe report. Defaults to .tmp/external-engines/probe-report.json.".to_string(),
+        "  --evidence-root <path>          Evidence root used to find returned evidence. Defaults to .tmp.".to_string(),
+        "  --evidence-kit <path>           Evidence kit directory or manifest. Defaults to .tmp/release-evidence-kit/manifest.json.".to_string(),
+        "".to_string(),
+        "Examples:".to_string(),
+        "  ned support-bundle".to_string(),
+        "  ned support-bundle --json --output support.json".to_string(),
+        "  ned help support-bundle".to_string(),
     ]
     .join("\n")
 }

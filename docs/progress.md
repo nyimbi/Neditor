@@ -1,6 +1,6 @@
 # NEditor Goal Progress Log
 
-Updated: 2026-05-30
+Updated: 2026-05-31
 
 ## Active Goal
 
@@ -27,6 +27,30 @@ progress records prove the requested end state.
 - `docs/todo.md`: current prioritized completion backlog.
 - `docs/spec-completion-matrix.md`: conservative spec-to-evidence matrix.
 - `docs/progress.md`: this committed progress log.
+
+## 2026-05-31 Release Handoff CLI Help
+
+The release-evidence handoff commands are now self-documenting from the CLI.
+`ned evidence-packet --help`, `ned help evidence-packet`,
+`ned help release-evidence-packet`, and `ned support-bundle -h` explain the
+purpose, options, default report paths, examples, and intended release/support
+audience for the remaining evidence-return workflows instead of failing with an
+unsupported-option error.
+
+This directly supports the remaining production-readiness work: external QA
+owners, credentialed release operators, manual reviewers, and help desks can now
+discover how to produce or route the packets that close signing, platform,
+manual-review, provider, and other external evidence gaps.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | Pass | Rust formatting is clean after adding topic help. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_release_handoff_commands_have_topic_help --lib` | Pass | Focused CLI test proves direct `evidence-packet --help`, `ned help release-evidence-packet`, and `support-bundle -h` output. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli_help_names_supported_conversion_targets --lib` | Pass | Existing top-level help coverage still passes. |
+| `cargo build --manifest-path src-tauri/Cargo.toml --locked --bin ned` | Pass | Rebuilt the debug `ned` binary with the help changes. |
+| `src-tauri/target/debug/ned evidence-packet --help` | Pass | Actual CLI prints release-evidence packet purpose, options, defaults, and examples. |
+| `src-tauri/target/debug/ned help support-bundle` | Pass | Actual CLI prints support-bundle purpose, options, defaults, and examples. |
+| `git diff --check` | Pass | No whitespace errors are present in this release-handoff help slice. |
 
 ## 2026-05-30 Spec Manual Review Signoff Collector
 

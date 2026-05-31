@@ -5014,6 +5014,49 @@ fn ned_cli_help_names_supported_conversion_targets() {
     assert!(outcome.message.contains("--coverage-output coverage.md"));
 }
 
+#[test]
+fn ned_cli_release_handoff_commands_have_topic_help() {
+    let evidence_help = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "evidence-packet".to_string(),
+        "--help".to_string(),
+    ])
+    .expect("evidence-packet help");
+    assert_eq!(evidence_help.exit_code, 0);
+    assert!(evidence_help
+        .message
+        .contains("create a release evidence return packet"));
+    assert!(evidence_help.message.contains("--readiness-report"));
+    assert!(evidence_help.message.contains("--spec-work-orders"));
+    assert!(evidence_help.message.contains("--evidence-kit"));
+    assert!(evidence_help.message.contains("supported-host QA owners"));
+
+    let evidence_topic = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "help".to_string(),
+        "release-evidence-packet".to_string(),
+    ])
+    .expect("release evidence topic help");
+    assert_eq!(evidence_topic.exit_code, 0);
+    assert!(evidence_topic
+        .message
+        .contains("ned release-evidence-packet"));
+    assert!(evidence_topic.message.contains("validator commands"));
+
+    let support_help = crate::cli::run_cli_with_args(&[
+        "ned".to_string(),
+        "support-bundle".to_string(),
+        "-h".to_string(),
+    ])
+    .expect("support-bundle help");
+    assert_eq!(support_help.exit_code, 0);
+    assert!(support_help
+        .message
+        .contains("summarize readiness, setup, and release handoff state"));
+    assert!(support_help.message.contains("--release-candidate-dir"));
+    assert!(support_help.message.contains("transform health"));
+}
+
 fn temp_markdown_path(label: &str) -> std::path::PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
