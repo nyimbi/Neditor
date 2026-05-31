@@ -235,6 +235,15 @@ jobs:
             $d2Path = Get-ChildItem "$env:ProgramData\chocolatey" -Filter d2.exe -File -Recurse -ErrorAction SilentlyContinue |
               Select-Object -First 1 -ExpandProperty FullName
           }
+          if (-not $d2Path) {
+            $d2Root = Join-Path $env:RUNNER_TEMP "d2-windows"
+            $d2Archive = Join-Path $env:RUNNER_TEMP "d2-v0.7.1-windows-amd64.tar.gz"
+            New-Item -ItemType Directory -Force -Path $d2Root | Out-Null
+            Invoke-WebRequest -Uri "https://github.com/terrastruct/d2/releases/download/v0.7.1/d2-v0.7.1-windows-amd64.tar.gz" -OutFile $d2Archive
+            tar -xzf $d2Archive -C $d2Root
+            $d2Path = Get-ChildItem $d2Root -Filter d2.exe -File -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
           if ($d2Path) {
             "NEDITOR_TEST_D2=$d2Path" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           }

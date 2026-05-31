@@ -11202,6 +11202,7 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCi.includes("pnpm run collect:engine-evidence -- --require-installed"));
   ok(releaseCi.includes("graphviz d2 plantuml sqlite"));
   ok(releaseCi.includes("cargo install pikchr-cli --locked"));
+  ok(releaseCi.includes("d2-v0.7.1-windows-amd64.tar.gz"));
   ok(releaseCi.includes("NEDITOR_TEST_D2"));
   ok(releaseCi.includes("neditor-optional-engine-evidence-win32"));
   ok(releaseCi.includes(".tmp/external-engines/external/${{ matrix.platform }}/**"));

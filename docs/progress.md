@@ -6995,12 +6995,14 @@ Pikchr CLI on the hosted runner, runs the same
 guard and external-transform docs now require the dynamic matrix artifact path
 instead of a Linux-only proof path.
 
-The first hosted Windows attempt proved the Chocolatey install path but exposed
-two Windows-specific probe issues: D2 was installed outside the active `PATH`,
-and the SQLite shell returned CSV data rows without a header line. The workflow
-now discovers `d2.exe` under Chocolatey and passes it through
-`NEDITOR_TEST_D2`, while the SQLite smoke query emits its own `marker,value,detail`
-header row so the artifact contract is stable across SQLite CLI builds.
+The first hosted Windows attempts proved the Chocolatey install path but exposed
+two Windows-specific probe issues: D2 was not exposed as a discoverable
+executable after package installation, and the SQLite shell returned CSV data
+rows without a header line. The workflow now discovers `d2.exe` under
+Chocolatey, falls back to the official D2 Windows release archive when needed,
+and passes the resolved path through `NEDITOR_TEST_D2`. The SQLite smoke query
+also emits its own `marker,value,detail` header row so the artifact contract is
+stable across SQLite CLI builds.
 
 | Command | Result | Evidence |
 | --- | --- | --- |
