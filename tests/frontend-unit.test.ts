@@ -11197,8 +11197,10 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseCi.includes("accessibility-review:"));
   ok(releaseCi.includes("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"));
   ok(releaseCi.includes("NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS"));
+  ok(releaseCi.includes("NEDITOR_TAURI_BUILD_TIMEOUT_MS"));
   ok(releaseCi.includes("xvfb-run -a pnpm run test:tauri-webdriver -- --strict"));
-  ok(releaseCi.includes("pnpm tauri build --bundles ${{ matrix.bundles }}"));
+  ok(releaseCi.includes("node scripts/run-tauri-build.mjs --bundles"));
+  ok(releaseCi.includes(".tmp/tauri-build/report.json"));
   ok(releaseCi.includes("pnpm run collect:engine-evidence -- --require-installed"));
   ok(releaseCi.includes("graphviz d2 plantuml sqlite"));
   ok(releaseCi.includes("cargo install pikchr-cli --locked"));
@@ -11218,6 +11220,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseWorkflow.includes("workflow_dispatch:"));
   ok(releaseWorkflow.includes('FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"'));
   ok(releaseWorkflow.includes('NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS: "90000"'));
+  ok(releaseWorkflow.includes('NEDITOR_TAURI_BUILD_TIMEOUT_MS: "2400000"'));
+  ok(releaseWorkflow.includes('NEDITOR_TAURI_BUILD_PROGRESS_MS: "60000"'));
   ok(releaseWorkflow.includes("Browser workflow proof"));
   ok(releaseWorkflow.includes("PLAYWRIGHT_BROWSERS_PATH=.tmp/ms-playwright pnpm exec playwright install --with-deps chromium"));
   ok(releaseWorkflow.includes("pnpm run check:e2e-env"));
@@ -11228,6 +11232,8 @@ test("local verification scripts expose local baseline checks", () => {
   ok(releaseWorkflow.includes("bundles: deb rpm appimage"));
   ok(releaseWorkflow.includes("cargo install tauri-driver --locked"));
   ok(releaseWorkflow.includes("webkit2gtk-driver"));
+  ok(releaseWorkflow.includes("node scripts/run-tauri-build.mjs --bundles"));
+  ok(releaseWorkflow.includes(".tmp/tauri-build/report.json"));
   ok(releaseWorkflow.includes("timeout-minutes: 25"));
   ok(releaseWorkflow.includes("NEDITOR_TAURI_PROGRESS_LOG"));
   ok(releaseWorkflow.includes("choco install selenium-chromium-edge-driver"));

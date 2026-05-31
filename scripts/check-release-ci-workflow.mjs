@@ -39,6 +39,8 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "NEDITOR_TAURI_WEBDRIVER_TIMEOUT_MS", "workflow must allow enough time for hosted Tauri WebDriver startup");
   requireIncludes(workflow, "NEDITOR_TAURI_NATIVE_WORKFLOW_TIMEOUT_MS", "workflow must allow enough time for hosted native workflow evidence");
   requireIncludes(workflow, "NEDITOR_TAURI_RUN_TIMEOUT_MS", "workflow must hard-bound hosted WebDriver proof hangs");
+  requireIncludes(workflow, "NEDITOR_TAURI_BUILD_TIMEOUT_MS", "workflow must hard-bound hosted Tauri package build hangs");
+  requireIncludes(workflow, "NEDITOR_TAURI_BUILD_PROGRESS_MS", "workflow must emit hosted Tauri package build progress checkpoints");
   requireIncludes(workflow, "browser-workflows:", "workflow must include browser workflow proof job");
   requireIncludes(workflow, "platform-proof:", "workflow must include platform proof job");
   requireIncludes(workflow, "optional-engine-proof:", "workflow must include optional engine proof job");
@@ -61,7 +63,9 @@ function validateWorkflow(workflow) {
   requireIncludes(workflow, "NEDITOR_TAURI_PROGRESS_LOG", "Windows WebDriver job must emit progress checkpoints for hosted diagnosis");
   requireIncludes(workflow, "timeout-minutes: 25", "Windows WebDriver step must have a narrow timeout inside the broader platform proof job");
   requireIncludes(workflow, "pnpm run test:tauri-webdriver -- --strict", "Windows job must run strict WebDriver workflow");
-  requireIncludes(workflow, "pnpm tauri build --bundles ${{ matrix.bundles }}", "platform job must build matrix-supported Tauri package targets");
+  requireIncludes(workflow, "node scripts/run-tauri-build.mjs --bundles", "platform job must build matrix-supported Tauri package targets through the diagnostic wrapper");
+  requireIncludes(workflow, "timeout-minutes: 45", "Tauri package build step must have a bounded hosted timeout inside the broader platform proof job");
+  requireIncludes(workflow, ".tmp/tauri-build/report.json", "platform job must upload Tauri build diagnostics");
   requireIncludes(workflow, "NEDITOR_PLATFORM_EVIDENCE_PLATFORM: ${{ matrix.platform }}", "platform job must set evidence platform");
   requireIncludes(workflow, "pnpm run collect:platform-evidence", "platform job must collect validator-ready evidence");
   requireIncludes(workflow, "pnpm run check:platform-evidence", "platform job must validate collected evidence");
