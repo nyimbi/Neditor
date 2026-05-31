@@ -189,22 +189,35 @@ function summarizeRows(rows) {
 }
 
 function classifyOpenRow(row) {
-  const text = `${row.evidence} ${row.remainingGap}`.toLowerCase();
+  const remainingGap = row.remainingGap.toLowerCase();
+  const evidence = row.evidence.toLowerCase();
+  const classification = classifyGapText(remainingGap);
+  if (classification) return classification;
+  const fallbackClassification = classifyGapText(`${remainingGap} ${evidence}`);
+  if (fallbackClassification) return fallbackClassification;
+  return "needs-triage";
+}
+
+function classifyGapText(text) {
   if (/\b(signing|notarization|notarized|credential|certificate|attestation)\b/.test(text)) return "release-credentials";
   if (/\b(homebrew|cask|sha256|artifact proof)\b/.test(text)) return "distribution-artifacts";
-  if (/\b(windows|linux|cross-platform|supported host|supported-host|other os|platform evidence|package artifact)\b/.test(text)) {
-    return "cross-platform-evidence";
-  }
   if (/\b(human|manual|screen-reader|assistive|native viewer|visual qa|review sign-off|sign-off|signoff)\b/.test(text)) {
     return "manual-review";
   }
-  if (/\b(live provider|real device|google docs live|authorized drive|external evidence|independent security|release-device|credentialed)\b/.test(text)) {
+  if (
+    /\b(live provider|live audible|actual model download|model download|real device|native runtime|google docs live|authorized drive|external evidence|independent security|release-device|credentialed)\b/.test(
+      text,
+    )
+  ) {
     return "external-evidence";
+  }
+  if (/\b(windows|linux|cross-platform|supported host|supported-host|other os|platform evidence|package artifact)\b/.test(text)) {
+    return "cross-platform-evidence";
   }
   if (/\b(document|sync|matrix|todo|progress|docs|runbook|guide)\b/.test(text)) return "documentation-proof";
   if (/\b(test|workflow|coverage|proof|verify|native proof|browser proof|evidence)\b/.test(text)) return "local-proof";
   if (/\b(modular|split|refactor|implementation|implement|deeper|broader|edge case)\b/.test(text)) return "local-implementation";
-  return "needs-triage";
+  return "";
 }
 
 function nextActionForOpenRow(row) {

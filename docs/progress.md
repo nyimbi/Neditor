@@ -52,6 +52,27 @@ manual-review, provider, and other external evidence gaps.
 | `src-tauri/target/debug/ned help support-bundle` | Pass | Actual CLI prints support-bundle purpose, options, defaults, and examples. |
 | `git diff --check` | Pass | No whitespace errors are present in this release-handoff help slice. |
 
+## 2026-05-31 Spec Gap Routing Refresh
+
+The spec completion matrix and work-order classifier now reflect the current
+hosted Windows/Linux package evidence instead of carrying stale "run the
+WebDriver harness" wording after the supported-host proof has already been
+ingested for commit `f77c7b1`.
+
+Packaging and acceptance rows now keep the true remaining blockers visible:
+credentialed signing/notarization, final Homebrew artifact proof, live Google
+Docs/provider/runtime evidence, release-device performance evidence,
+independent security review, native-viewer/accessibility/table human sign-offs,
+and spec manual-review work-order sign-offs. The file-operations row now routes
+to manual review for truly picker-driven file-dialog coverage instead of
+supported-host platform proof. The generated spec work-order classifier now
+classifies from the remaining gap first and uses evidence text only as fallback,
+so completed evidence does not distort the next owner assignment.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run check:spec-completion` | Pass with release risks | Regenerated `.tmp/spec-completion/report.json`, gap plan, and work orders; gap triage now shows 2 locally closable rows and 66 external/manual/distribution evidence rows. |
+
 ## 2026-05-30 Spec Manual Review Signoff Collector
 
 NEditor now has a collector for the 33 spec manual-review work orders generated
