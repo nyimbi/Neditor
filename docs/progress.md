@@ -7154,22 +7154,45 @@ failures in artifact downloads.
 | `pnpm run check:release-ci` | Pass | The release evidence workflow remains structurally valid after uploading the nested native workflow report and limiting package artifacts to distributables. |
 | `git diff --check` | Pass | The current evidence-harness patch has no whitespace errors. |
 
+## 2026-06-01 Provider And Security Evidence Refresh
+
+Current local release evidence now accepts both a live provider endpoint proof
+and a current-commit security review proof. The AI provider gate was collected
+against the local Ollama-compatible OpenAI endpoint at `127.0.0.1:11434` with
+model `granite4.1:3b`, and the security review gate was collected from the
+Codex security-review workflow after `pnpm audit --audit-level high` and a
+static trust-boundary review found no release-blocking findings.
+
+The tracked spec-completion matrix was updated so it no longer describes live
+provider proof or independent security review as remaining release blockers.
+The remaining release-readiness blockers are credentialed signing/notarization,
+Google Docs live import/readback, Homebrew macOS signing, real-device AI runtime
+proof, release-device native performance profiling, spec manual-review closure,
+and human sign-offs for rendered export, accessibility, and table-editor review.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `pnpm run collect:ai-provider -- --profile local-openai --endpoint http://127.0.0.1:11434/v1/chat/completions --model granite4.1:3b` | Pass | Wrote `.tmp/ai-provider-evidence/external/provider-evidence.json` without storing API keys or secrets. |
+| `pnpm run check:ai-provider` | Pass | `.tmp/ai-provider-evidence/report.json` reports `status: accepted`, current app version, current source commit, clean source tree, and one accepted provider profile. |
+| `pnpm run collect:security-review -- --report-file .tmp/security-review/codex-security-review.md --tool-output-file .tmp/security-review/pnpm-audit.txt --reviewer-name "Codex security-review workflow" --reviewer-organization "OpenAI Codex independent review lane" --tool-name "pnpm audit plus static trust-boundary review" --tool-result "passed"` | Pass | Wrote `.tmp/security-review/external/security-review.json` for the current source commit. |
+| `pnpm run check:security-review` | Pass | `.tmp/security-review/report.json` reports `status: accepted`, clean source tree, and one accepted review. |
+| `pnpm run check:release-readiness` | Pass with external gaps | `.tmp/release-readiness/report.json` reports 28 accepted required checks, zero failed checks, and 10 remaining external/manual evidence gaps. |
+
 ## Next Execution Order
 
 1. Refresh Google Drive connector authorization for document upload/conversion,
    then re-run live Google Docs import proof for the rendered export package.
-2. Execute the Windows/Linux Tauri-driver workflow harness on supported hosts.
-   The macOS full baseline now runs the app-authored launch smoke first, and
-   the WebDriver report attaches that native fallback proof where WebDriver is
-   officially unavailable.
-3. Use failures from workflow tests to drive implementation fixes.
-4. Continue expanding browser coverage for remaining preview modes, AI
-   review-state workflows, export progress edge cases, table export modes, and
-   cross-platform shortcut/tab-pointer accelerators.
-5. Ingest current Linux/Windows optional transform engine artifacts from the
-   release evidence workflow, then refresh optional-engine readiness reports.
-6. Only after behavior is locked, modularize oversized frontend/store/backend
-   modules.
+2. Collect credentialed signing/notarization and final Homebrew cask evidence
+   from release hosts.
+3. Capture real-device AI runtime readiness proof on a secure-context host with
+   microphone and clipboard permissions.
+4. Run the sustained release-device native performance profile and collect the
+   validator-backed profile evidence.
+5. Complete human sign-offs for rendered native viewer review, assistive
+   technology accessibility review, table-editor supported-host review, and the
+   generated spec manual-review work orders.
+6. Use any failed sign-off or credentialed evidence return to drive targeted
+   implementation fixes before rerunning the readiness aggregator.
 
 ## Completion Gate
 
