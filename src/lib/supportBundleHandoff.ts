@@ -62,7 +62,15 @@ export interface SupportBundleHandoffReport {
     nextSteps?: string[];
   };
   improvementAudit?: {
+    implementationReady?: boolean;
     productionReady?: boolean;
+    releaseReadiness?: {
+      status?: string;
+      releaseReady?: boolean;
+      evidenceGaps?: number;
+      failed?: number;
+      blockers?: string[];
+    };
     total?: number;
     summary?: {
       implementedEvidencePresent?: number;
@@ -310,7 +318,7 @@ export function supportBundleHandoffMarkdown(report: SupportBundleHandoffReport,
     `| Evidence reports | ${cell(evidenceStatus(evidenceSummary))} | ${cell(`${evidenceSummary.ready || 0} ready, ${evidenceSummary.attention || 0} attention, ${evidenceSummary.missing || 0} missing, ${evidenceSummary.failed || 0} failed`)} |`,
     `| Transform engines | ${cell(report.engineProbe?.status || "unknown")} | ${cell(`${report.engineProbe?.summary?.installed || 0} installed, ${report.engineProbe?.summary?.missingLocal || 0} missing, ${report.engineProbe?.summary?.incompatible || 0} incompatible`)} |`,
     `| Release candidate | ${cell(releaseCandidate?.status || "unknown")} | ${cell(releaseCandidate ? `${releaseCandidate.releaseable ? "releaseable" : "not releaseable"}, ${releaseCandidate.summary?.artifacts || 0} artifact(s), ${releaseCandidate.summary?.evidenceGaps || 0} evidence gap(s)` : "No release candidate report attached")} |`,
-    `| 100 improvements | ${cell(improvementAudit?.productionReady ? "production-ready" : "open")} | ${cell(improvementAudit ? `${improvementAudit.summary?.implementedEvidencePresent || 0}/${improvementAudit.total || 0} evidenced, ${improvementAudit.summary?.open || 0} open item(s)` : "No improvement audit attached")} |`,
+    `| 100 improvements | ${cell(improvementAudit?.implementationReady ? "implementation-ready" : "open")} | ${cell(improvementAudit ? `${improvementAudit.summary?.implementedEvidencePresent || 0}/${improvementAudit.total || 0} evidenced, production ${improvementAudit.productionReady ? "ready" : "blocked"}` : "No improvement audit attached")} |`,
     "",
     "### Recommended Actions",
     "",
@@ -350,10 +358,16 @@ export function supportBundleHandoffMarkdown(report: SupportBundleHandoffReport,
     "",
     ...(improvementAudit
       ? [
+          `- Implementation ready: ${improvementAudit.implementationReady ? "yes" : "no"}`,
           `- Production ready: ${improvementAudit.productionReady ? "yes" : "no"}`,
+          `- Release readiness: ${improvementAudit.releaseReadiness?.status || "not-checked"}`,
+          `- Release evidence gaps: ${improvementAudit.releaseReadiness?.evidenceGaps || 0}`,
           `- Evidenced: ${improvementAudit.summary?.implementedEvidencePresent || 0}/${improvementAudit.total || 0}`,
           `- Partial/external: ${improvementAudit.summary?.partialOrExternal || 0}`,
           `- Needs implementation evidence: ${improvementAudit.summary?.needsImplementationEvidence || 0}`,
+          ...(improvementAudit.releaseReadiness?.blockers || [])
+            .slice(0, 8)
+            .map((item) => `- Release blocker: ${item}`),
           ...(improvementAudit.items || [])
             .filter((item) => item.status !== "implemented-evidence-present")
             .slice(0, 8)

@@ -4290,13 +4290,14 @@
             <section v-if="supportBundleReport?.improvementAudit" class="support-bundle-action-plan" aria-label="100 improvements coverage">
               <h5>100 improvements coverage</h5>
               <article>
-                <strong>{{ supportBundleReport.improvementAudit.productionReady ? "production-ready" : "open roadmap work" }}</strong>
+                <strong>{{ supportBundleReport.improvementAudit.implementationReady ? "implementation-ready" : "open roadmap work" }}</strong>
                 <span>
                   {{ supportBundleReport.improvementAudit.summary?.implementedEvidencePresent || 0 }} evidenced,
                   {{ supportBundleReport.improvementAudit.summary?.partialOrExternal || 0 }} partial/external,
-                  {{ supportBundleReport.improvementAudit.summary?.needsImplementationEvidence || 0 }} need implementation evidence
+                  {{ supportBundleReport.improvementAudit.summary?.needsImplementationEvidence || 0 }} need implementation evidence,
+                  production {{ supportBundleReport.improvementAudit.productionReady ? "ready" : "blocked" }}
                 </span>
-                <small>Use <code>ned improvements --output improvement-coverage.md</code> for the full item-by-item audit.</small>
+                <small>{{ supportBundleReport.improvementAudit.releaseReadiness?.status || "release readiness not checked" }} | {{ supportBundleReport.improvementAudit.releaseReadiness?.evidenceGaps || 0 }} release evidence gap(s) | <code>ned improvements --json</code> | <code>ned improvements --output improvement-coverage.md</code></small>
               </article>
               <article v-for="item in (supportBundleReport.improvementAudit.items || []).filter((entry) => entry.status !== 'implemented-evidence-present').slice(0, 5)" :key="item.number">
                 <strong>#{{ item.number }} {{ item.title }}</strong>
@@ -4431,13 +4432,14 @@
               <section v-if="supportBundleReport?.improvementAudit" class="support-bundle-action-plan" aria-label="Configurator 100 improvements coverage">
                 <h5>100 improvements coverage</h5>
                 <article>
-                  <strong>{{ supportBundleReport.improvementAudit.productionReady ? "production-ready" : "not complete" }}</strong>
+                  <strong>{{ supportBundleReport.improvementAudit.implementationReady ? "implementation-ready" : "not complete" }}</strong>
                   <span>
                     {{ supportBundleReport.improvementAudit.summary?.implementedEvidencePresent || 0 }} evidenced,
                     {{ supportBundleReport.improvementAudit.summary?.partialOrExternal || 0 }} partial/external,
-                    {{ supportBundleReport.improvementAudit.summary?.needsImplementationEvidence || 0 }} need implementation evidence
+                    {{ supportBundleReport.improvementAudit.summary?.needsImplementationEvidence || 0 }} need implementation evidence,
+                    production {{ supportBundleReport.improvementAudit.productionReady ? "ready" : "blocked" }}
                   </span>
-                  <small>Run <code>ned improvements --json</code> or save the full Markdown audit for item-level closure work.</small>
+                  <small>{{ supportBundleReport.improvementAudit.releaseReadiness?.status || "release readiness not checked" }} | {{ supportBundleReport.improvementAudit.releaseReadiness?.evidenceGaps || 0 }} release evidence gap(s) | <code>ned improvements --json</code> | <code>ned improvements --output improvement-coverage.md</code></small>
                 </article>
               </section>
               <p class="sidebar-hint">Use this support artifact when a non-technical user needs help configuring NEditor, validating release readiness, or handing setup evidence to internal IT without sharing document content or secrets.</p>
@@ -8015,7 +8017,15 @@ type SupportBundleReport = {
     nextSteps?: string[];
   };
   improvementAudit?: {
+    implementationReady?: boolean;
     productionReady?: boolean;
+    releaseReadiness?: {
+      status?: string;
+      releaseReady?: boolean;
+      evidenceGaps?: number;
+      failed?: number;
+      blockers?: string[];
+    };
     total?: number;
     summary?: {
       implementedEvidencePresent?: number;

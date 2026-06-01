@@ -3295,7 +3295,12 @@ fn ned_cli_creates_redaction_safe_support_bundles() {
         "neditor.100-improvements-audit.v1"
     );
     assert_eq!(bundle["improvementAudit"]["total"], 100);
-    assert_eq!(bundle["improvementAudit"]["productionReady"], true);
+    assert_eq!(bundle["improvementAudit"]["implementationReady"], true);
+    assert_eq!(bundle["improvementAudit"]["productionReady"], false);
+    assert_eq!(
+        bundle["improvementAudit"]["releaseReadiness"]["releaseReady"],
+        false
+    );
     assert_eq!(bundle["improvementAudit"]["summary"]["open"], 0);
     assert_eq!(bundle["engineProbe"]["status"], "complete");
     assert_eq!(bundle["engineProbe"]["summary"]["installed"], 3);
@@ -3789,7 +3794,9 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
     assert_eq!(report["schema"], "neditor.100-improvements-audit.v1");
     assert_eq!(report["source"], "docs/100-improve.md");
     assert_eq!(report["total"], 100);
-    assert_eq!(report["productionReady"], true);
+    assert_eq!(report["implementationReady"], true);
+    assert_eq!(report["productionReady"], false);
+    assert_eq!(report["releaseReadiness"]["releaseReady"], false);
     assert!(
         report["summary"]["implementedEvidencePresent"]
             .as_u64()
@@ -3894,7 +3901,8 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
     }
     assert_eq!(report["summary"]["implementedEvidencePresent"], 100);
     assert_eq!(report["summary"]["open"], 0);
-    assert_eq!(report["productionReady"], true);
+    assert_eq!(report["implementationReady"], true);
+    assert_eq!(report["productionReady"], false);
 
     let markdown = fs::read_to_string(&output).expect("improvements markdown");
     assert!(markdown.contains("# NEditor 100 Improvements Coverage Audit"));
@@ -3908,7 +3916,7 @@ fn ned_cli_audits_100_improvements_as_actionable_work_orders() {
         "--strict".to_string(),
     ])
     .expect("strict improvements");
-    assert_eq!(strict.exit_code, 0);
+    assert_eq!(strict.exit_code, 1);
     assert!(strict
         .message
         .contains("NEditor 100 Improvements Coverage Audit"));

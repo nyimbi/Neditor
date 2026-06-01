@@ -5034,7 +5034,7 @@ test("support bundle handoff summarizes setup release and spec assignments", () 
   ok(markdown.includes("## NEditor Support And Release Handoff"));
   ok(markdown.includes("| Release action plan | ready | 1/1 work item(s) ready to send |"));
   ok(markdown.includes("| Spec closure | ready | 3 open spec row(s), 1/2 work order(s) ready |"));
-  ok(markdown.includes("| 100 improvements | open | 61/100 evidenced, 39 open item(s) |"));
+  ok(markdown.includes("| 100 improvements | open | 61/100 evidenced, production blocked |"));
   ok(markdown.includes("### 100 Improvements Coverage"));
   ok(markdown.includes("#83 Read selected text aloud"));
   ok(markdown.includes("release-windows-package"));

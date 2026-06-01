@@ -10677,13 +10677,21 @@ fn build_improvements_audit_report() -> Value {
     let missing = *status_counts
         .get("needs-implementation-evidence")
         .unwrap_or(&0);
-    let production_ready = items.len() == implemented as usize;
+    let implementation_ready = items.len() == implemented as usize;
+    let release_readiness = improvements_release_readiness_summary();
+    let release_ready = release_readiness
+        .get("releaseReady")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let production_ready = implementation_ready && release_ready;
     json!({
         "schema": "neditor.100-improvements-audit.v1",
         "generatedAtUnixSeconds": unix_timestamp_seconds(),
         "source": "docs/100-improve.md",
         "total": items.len(),
+        "implementationReady": implementation_ready,
         "productionReady": production_ready,
+        "releaseReadiness": release_readiness,
         "summary": {
             "implementedEvidencePresent": implemented,
             "partialOrExternal": partial,
@@ -10698,8 +10706,51 @@ fn build_improvements_audit_report() -> Value {
             "pnpm run check:spec-completion",
             "pnpm run check:release-readiness"
         ],
-        "note": "This audit is intentionally conservative. It turns docs/100-improve.md into an actionable product coverage checklist, but it does not replace requirement-specific tests, platform evidence, credentialed proof, or human sign-off."
+        "note": "This audit is intentionally conservative. Implementation coverage can be complete while production readiness remains blocked by targeted tests, platform evidence, credentialed proof, or human sign-off."
     })
+}
+
+fn improvements_release_readiness_summary() -> Value {
+    let report_path = Path::new(".tmp/release-readiness/report.json");
+    let report_path_display = path_to_display(report_path);
+    match read_json_report(report_path) {
+        Ok(report) => {
+            let status = readiness_string_field(&report, "status").unwrap_or("unknown");
+            let summary = report.get("summary").unwrap_or(&Value::Null);
+            let required_checks = number_field_u64(summary, "requiredChecks");
+            let accepted = number_field_u64(summary, "accepted");
+            let failed = number_field_u64(summary, "failed");
+            let evidence_gaps = number_field_u64(summary, "evidenceGaps");
+            let release_ready = status == "ready" && failed == 0 && evidence_gaps == 0;
+            let blocker_ids = readiness_array_field(&report, "evidenceGaps")
+                .iter()
+                .filter_map(|gap| readiness_string_field(gap, "id").map(str::to_string))
+                .collect::<Vec<_>>();
+            json!({
+                "status": status,
+                "reportPath": report_path_display,
+                "releaseReady": release_ready,
+                "requiredChecks": required_checks,
+                "accepted": accepted,
+                "failed": failed,
+                "evidenceGaps": evidence_gaps,
+                "blockers": blocker_ids,
+                "nextCommand": "pnpm run check:release-readiness"
+            })
+        }
+        Err(error) => json!({
+            "status": "not-checked",
+            "reportPath": report_path_display,
+            "releaseReady": false,
+            "requiredChecks": 0,
+            "accepted": 0,
+            "failed": 0,
+            "evidenceGaps": 0,
+            "blockers": [],
+            "issue": error,
+            "nextCommand": "pnpm run check:release-readiness"
+        }),
+    }
 }
 
 #[derive(Debug)]
@@ -10915,12 +10966,27 @@ fn improvements_audit_markdown(report: &Value) -> String {
         .get("productionReady")
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    let implementation_ready = report
+        .get("implementationReady")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let release_readiness = report.get("releaseReadiness").unwrap_or(&Value::Null);
     let mut lines = vec![
         "# NEditor 100 Improvements Coverage Audit".to_string(),
         "".to_string(),
         format!("Source: {}", readiness_string_field(report, "source").unwrap_or("docs/100-improve.md")),
         format!("Total improvements: {total}"),
+        format!(
+            "Implementation ready: {}",
+            if implementation_ready { "yes" } else { "no" }
+        ),
         format!("Production ready: {}", if production_ready { "yes" } else { "no" }),
+        format!(
+            "Release readiness: {} ({} evidence gap(s), {} failed check(s))",
+            readiness_string_field(release_readiness, "status").unwrap_or("not-checked"),
+            number_field_u64(release_readiness, "evidenceGaps"),
+            number_field_u64(release_readiness, "failed"),
+        ),
         format!(
             "Summary: {} implemented evidence present, {} partial/external, {} need implementation evidence, {} open",
             number_field_u64(summary, "implementedEvidencePresent"),
@@ -10929,13 +10995,24 @@ fn improvements_audit_markdown(report: &Value) -> String {
             number_field_u64(summary, "open"),
         ),
         "".to_string(),
-        "> This audit is conservative. It makes the 100-item roadmap actionable, but it does not replace targeted tests, platform evidence, credentialed proof, or human sign-off.".to_string(),
+        "> This audit is conservative. It makes the 100-item roadmap actionable, but production readiness still depends on targeted tests, platform evidence, credentialed proof, and human sign-off.".to_string(),
         "".to_string(),
+    ];
+    let blockers = readiness_array_field(release_readiness, "blockers");
+    if !blockers.is_empty() {
+        lines.push("Release blockers:".to_string());
+        for blocker in blockers.iter().filter_map(Value::as_str) {
+            lines.push(format!("  - {blocker}"));
+        }
+        lines.push("".to_string());
+    }
+    lines.extend([
         "## Category Summary".to_string(),
         "".to_string(),
-        "| Category | Total | Implemented evidence | Partial/external | Needs evidence |".to_string(),
+        "| Category | Total | Implemented evidence | Partial/external | Needs evidence |"
+            .to_string(),
         "| --- | ---: | ---: | ---: | ---: |".to_string(),
-    ];
+    ]);
     if let Some(categories) = report.get("categorySummary").and_then(Value::as_object) {
         for (category, counts) in categories {
             lines.push(format!(
