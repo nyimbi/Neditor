@@ -131,12 +131,19 @@ const runbooks = [
     gaps: ["google-docs-live-import-readback"],
     commands: [
       "pnpm run test:rendered-exports",
-      "Import .tmp/rendered-export-audit/rendered-export-audit.docx into native Google Docs with an authorized Drive session.",
-      "Read back required document text markers and export DOCX from Google Docs.",
+      "Preferred one-command path: NEDITOR_GOOGLE_ACCESS_TOKEN=<session-token> pnpm run collect:google-docs-live -- --keep-document",
+      "Alternative token refresh path: NEDITOR_GOOGLE_REFRESH_TOKEN=<refresh-token> NEDITOR_GOOGLE_CLIENT_ID=<desktop-client-id> pnpm run collect:google-docs-live -- --keep-document",
+      "Manual fallback: import .tmp/rendered-export-audit/rendered-export-audit.docx into native Google Docs with an authorized Drive session.",
+      "Manual fallback: read back required document text markers and export DOCX from Google Docs.",
       "Run pnpm run collect:google-docs-import with --document-id, --document-title, --readback-text-file, and --exported-docx.",
       "pnpm run check:google-docs-import",
     ],
-    returns: [".tmp/google-docs-import/external/import-evidence.json"],
+    returns: [
+      ".tmp/google-docs-import/external/import-evidence.json",
+      ".tmp/google-docs-import/external/exported-google-docs.docx",
+      ".tmp/google-docs-import/external/readback.txt",
+      ".tmp/google-docs-import/live-import-report.json",
+    ],
   },
   {
     file: "runbooks/ai-provider-endpoint.md",

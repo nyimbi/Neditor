@@ -1036,7 +1036,13 @@ still depends on external proof.
 
 Use `ned google-docs-import --json` to prepare a Google Docs import/readback
 handoff packet with local DOCX/package artifacts, required evidence schema,
-step-by-step import workflow, and validator commands. Use
+step-by-step import workflow, and validator commands. For release evidence, a
+credentialed operator can run
+`NEDITOR_GOOGLE_ACCESS_TOKEN=<session-token> pnpm run collect:google-docs-live -- --keep-document`
+after `pnpm run test:rendered-exports`; the collector uploads the rendered DOCX,
+reads text back from Google Docs, exports DOCX from Drive, hashes the returned
+artifact, and writes validator-ready import evidence without storing the token.
+Use
 `ned homebrew-release --json` to prepare the Homebrew cask release path,
 materializer, checksum flow, signing/notarization expectations, and audit
 commands before publishing a tap.

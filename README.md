@@ -153,6 +153,7 @@ pnpm run check:release-readiness
 pnpm run collect:evidence-kit
 pnpm run check:evidence-kit
 ned evidence-packet --output release-evidence-return-packet.md
+NEDITOR_GOOGLE_ACCESS_TOKEN=<session-token> pnpm run collect:google-docs-live -- --keep-document
 pnpm run check:platform-packaging
 pnpm run check:release-signing
 pnpm run check:homebrew

@@ -266,6 +266,39 @@ Typical returned evidence includes:
 Release readiness rejects stale evidence when it was collected for a different
 source commit or when the current source tree is dirty.
 
+### Google Docs Live Import Evidence
+
+The Google Docs gap must be closed from a credentialed Google Drive session. A
+release operator can use the in-app Google sign-in flow and copy the
+session-only access token, or provide a desktop OAuth refresh token and client
+ID through environment variables. NEditor does not write OAuth tokens to the
+evidence files.
+
+Preferred one-command collection:
+
+```sh
+pnpm run test:rendered-exports
+NEDITOR_GOOGLE_ACCESS_TOKEN=<session-token> \
+  pnpm run collect:google-docs-live -- --keep-document
+pnpm run check:google-docs-import
+```
+
+Refresh-token variant for a desktop OAuth client:
+
+```sh
+NEDITOR_GOOGLE_REFRESH_TOKEN=<refresh-token> \
+NEDITOR_GOOGLE_CLIENT_ID=<desktop-client-id> \
+  pnpm run collect:google-docs-live -- --keep-document
+pnpm run check:google-docs-import
+```
+
+The collector imports `.tmp/rendered-export-audit/rendered-export-audit.docx`
+as a native Google Doc, reads back the required text markers, exports DOCX back
+from Drive, writes `.tmp/google-docs-import/external/import-evidence.json`, and
+stores the returned DOCX plus readback text beside it for audit. If a release
+operator performs the upload manually, use `pnpm run collect:google-docs-import`
+with the returned document ID, title, readback text, and exported DOCX.
+
 ### AI Runtime Device Evidence
 
 The AI runtime gap must be closed from a real browser or packaged Tauri WebView

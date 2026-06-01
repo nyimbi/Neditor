@@ -39,6 +39,7 @@
     "collect:ai-provider": "node scripts/collect-ai-provider-evidence.mjs",
     "collect:ai-runtime": "node scripts/collect-ai-runtime-evidence.mjs",
     "collect:google-docs-import": "node scripts/collect-google-docs-import-evidence.mjs",
+    "collect:google-docs-live": "node scripts/collect-google-docs-live-import.mjs",
     "collect:engine-evidence": "node scripts/check-external-engines.mjs --write-evidence",
     "collect:platform-evidence": "node scripts/collect-platform-evidence.mjs",
     "collect:performance-profile": "node scripts/collect-performance-profile-evidence.mjs",

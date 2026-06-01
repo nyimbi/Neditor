@@ -7485,15 +7485,17 @@ fn build_google_docs_import_handoff_report() -> Value {
         "importWorkflow": [
             "Export the document as the Google Docs package or DOCX handoff.",
             "Use Settings > Google Docs to sign in with Google and keep the access token session-only.",
-            "Upload/import document.docx or rendered-export-audit.docx into native Google Docs.",
-            "Read back document text and verify required markers, paragraph count, title, and URL.",
-            "Export the imported Google Doc back to DOCX and record its size and SHA-256.",
+            "For release evidence, prefer pnpm run collect:google-docs-live with a session-only Google access token so upload, readback, DOCX export, hashing, and evidence JSON are collected in one step.",
+            "Manual fallback: upload/import document.docx or rendered-export-audit.docx into native Google Docs.",
+            "Manual fallback: Read back document text and verify required markers, paragraph count, title, and URL.",
+            "Manual fallback: export the imported Google Doc back to DOCX and record its size and SHA-256.",
             "Save neditor.google-docs-import-evidence.v1 and rerun pnpm run check:google-docs-import."
         ],
         "evidenceContract": evidence,
         "templateSchema": "neditor.google-docs-import-evidence.v1",
         "nextCommands": [
             "pnpm run test:rendered-exports",
+            "NEDITOR_GOOGLE_ACCESS_TOKEN=<session-token> pnpm run collect:google-docs-live -- --keep-document",
             "pnpm run collect:google-docs-import -- --document-id <id> --document-title <title> --readback-text-file <file> --exported-docx <file>",
             "pnpm run check:google-docs-import",
             "ned google-docs-import --json"
