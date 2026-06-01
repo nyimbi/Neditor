@@ -2700,6 +2700,64 @@ fn ned_release_dashboard_distinguishes_provider_and_runtime_evidence() {
 }
 
 #[test]
+fn ned_release_dashboard_reflects_platform_evidence_state() {
+    let complete_platform = serde_json::json!({
+        "status": "complete",
+        "summary": {
+            "requiredPlatforms": 2,
+            "completePlatforms": 2,
+            "missingEvidence": 0,
+            "invalidEvidence": 0,
+            "staleEvidence": 0
+        }
+    });
+    let stale_platform = serde_json::json!({
+        "status": "pending-external-evidence",
+        "summary": {
+            "requiredPlatforms": 2,
+            "completePlatforms": 1,
+            "missingEvidence": 0,
+            "invalidEvidence": 0,
+            "staleEvidence": 1
+        }
+    });
+    let failed_platform = serde_json::json!({
+        "status": "failed",
+        "summary": {
+            "requiredPlatforms": 2,
+            "completePlatforms": 1,
+            "missingEvidence": 0,
+            "invalidEvidence": 1,
+            "staleEvidence": 0
+        }
+    });
+
+    let (lane, detail) =
+        crate::cli::release_dashboard_platform_state_from_report(Some(&complete_platform));
+    assert_eq!(lane, "complete");
+    assert!(
+        detail.contains("accepted for all 2 supported host"),
+        "complete platform detail should acknowledge accepted supported-host evidence: {detail}"
+    );
+
+    let (lane, detail) =
+        crate::cli::release_dashboard_platform_state_from_report(Some(&stale_platform));
+    assert_eq!(lane, "stale");
+    assert!(
+        detail.contains("stale for the current Git commit"),
+        "stale platform detail should tell the release operator how to refresh evidence: {detail}"
+    );
+
+    let (lane, detail) =
+        crate::cli::release_dashboard_platform_state_from_report(Some(&failed_platform));
+    assert_eq!(lane, "blocked");
+    assert!(
+        detail.contains("invalid"),
+        "failed platform detail should expose invalid evidence count: {detail}"
+    );
+}
+
+#[test]
 fn ned_cli_exposes_final_release_handoff_surfaces() {
     let ai_runtime = crate::cli::run_cli_with_args(&[
         "ned".to_string(),

@@ -6714,6 +6714,7 @@ fn build_release_dashboard_report() -> Value {
     let (provider_runtime_lane, provider_runtime_detail) =
         release_dashboard_provider_runtime_state();
     let (homebrew_lane, homebrew_detail) = release_dashboard_homebrew_state();
+    let (platform_lane, platform_detail) = release_dashboard_platform_state();
     let mut items =
         vec![
         release_dashboard_item(
@@ -6757,28 +6758,27 @@ fn build_release_dashboard_report() -> Value {
         ),
         release_dashboard_item(
             "platform-packaging",
-            "cross-platform",
+            &platform_lane,
             "Windows/Linux package evidence",
-            "Requires supported-host package execution and current-source platform evidence.",
+            &platform_detail,
             "pnpm run check:platform-evidence",
         ),
     ];
-    let has_open = open_improvements > 0
-        || items.iter().any(|item| {
-            !matches!(
-                readiness_string_field(item, "lane"),
-                Some("complete" | "ready-to-send")
-            )
-        });
+    let open_release_labels = release_dashboard_open_labels(&items);
+    let has_open = open_improvements > 0 || !open_release_labels.is_empty();
+    let ready_to_send_detail = if has_open {
+        format!(
+            "Release remains blocked until these lanes are current: {}.",
+            open_release_labels.join(", ")
+        )
+    } else {
+        "All release evidence lanes are complete and ready to send.".to_string()
+    };
     items.push(release_dashboard_item(
         "ready-to-send",
         if has_open { "blocked" } else { "ready-to-send" },
         "Ready to send release",
-        if has_open {
-            "Release remains blocked until credentialed, manual, platform, Homebrew, Google Docs, and AI runtime evidence are current."
-        } else {
-            "All release evidence lanes are complete and ready to send."
-        },
+        &ready_to_send_detail,
         "pnpm run check:release-readiness",
     ));
     let counts = release_dashboard_lane_counts(&items);
@@ -6925,6 +6925,71 @@ fn release_dashboard_homebrew_state() -> (String, String) {
     )
 }
 
+fn release_dashboard_platform_state() -> (String, String) {
+    let report = read_json_report(Path::new(".tmp/platform-evidence/report.json")).ok();
+    release_dashboard_platform_state_from_report(report.as_ref())
+}
+
+pub(crate) fn release_dashboard_platform_state_from_report(
+    report: Option<&Value>,
+) -> (String, String) {
+    let Some(report) = report else {
+        return (
+            "cross-platform".to_string(),
+            "Requires supported-host package execution and current-source platform evidence."
+                .to_string(),
+        );
+    };
+
+    let status = readiness_string_field(report, "status").unwrap_or("unknown");
+    let summary = report.get("summary").unwrap_or(&Value::Null);
+    let required = number_field_u64(summary, "requiredPlatforms");
+    let complete = number_field_u64(summary, "completePlatforms");
+    let missing = number_field_u64(summary, "missingEvidence");
+    let invalid = number_field_u64(summary, "invalidEvidence");
+    let stale = number_field_u64(summary, "staleEvidence");
+
+    if status == "complete"
+        && required > 0
+        && complete >= required
+        && missing == 0
+        && invalid == 0
+        && stale == 0
+    {
+        return (
+            "complete".to_string(),
+            format!(
+                "Current-source package and Tauri WebDriver evidence is accepted for all {required} supported host(s)."
+            ),
+        );
+    }
+
+    if status == "failed" || invalid > 0 {
+        return (
+            "blocked".to_string(),
+            format!(
+                "Supported-host evidence is invalid: {invalid} invalid, {stale} stale, {missing} missing item(s)."
+            ),
+        );
+    }
+
+    if stale > 0 {
+        return (
+            "stale".to_string(),
+            format!(
+                "Supported-host evidence exists but {stale} item(s) are stale for the current Git commit; rerun the release evidence workflow and ingest artifacts."
+            ),
+        );
+    }
+
+    (
+        "cross-platform".to_string(),
+        format!(
+            "Requires supported-host package/WebDriver evidence: {complete}/{required} platform(s) complete, {missing} missing item(s)."
+        ),
+    )
+}
+
 fn release_dashboard_item(id: &str, lane: &str, label: &str, detail: &str, command: &str) -> Value {
     json!({
         "id": id,
@@ -6934,6 +6999,19 @@ fn release_dashboard_item(id: &str, lane: &str, label: &str, detail: &str, comma
         "command": command,
         "readyToSend": lane == "complete" || lane == "ready-to-send",
     })
+}
+
+fn release_dashboard_open_labels(items: &[Value]) -> Vec<String> {
+    items
+        .iter()
+        .filter(|item| {
+            !matches!(
+                readiness_string_field(item, "lane"),
+                Some("complete" | "ready-to-send")
+            )
+        })
+        .filter_map(|item| readiness_string_field(item, "label").map(str::to_string))
+        .collect()
 }
 
 fn release_dashboard_lane_counts(items: &[Value]) -> BTreeMap<String, u64> {
