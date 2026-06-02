@@ -1016,9 +1016,13 @@ pub(crate) fn lookup_doi(request: DoiLookupRequest) -> Result<String, String> {
     let doi = request.doi.trim().trim_start_matches("https://doi.org/").trim_start_matches("doi:");
     let url = format!("https://api.crossref.org/works/{}/transform/application/x-bibtex", doi);
     let output = std::process::Command::new("curl")
-        .args(["-sL", "--max-time", "10", "--user-agent", "NEditor/0.1 (mailto:support@neditor.app)", &url])
+        .args(["-sL", "--fail", "--max-time", "10", "--user-agent", "NEditor/0.1 (mailto:support@neditor.app)", &url])
         .output()
         .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("DOI lookup failed for '{doi}': {stderr}"));
+    }
     let bibtex = String::from_utf8_lossy(&output.stdout).to_string();
     if bibtex.trim().is_empty() || !bibtex.contains('@') {
         return Err(format!("No BibTeX found for DOI: {doi}. Check the DOI is correct."));

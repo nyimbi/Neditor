@@ -7,6 +7,47 @@ pub struct MailMergeRequest {
     pub data_path: String,   // CSV or JSON file path
     pub output_dir: String,
     pub filename_field: String, // which CSV column to use as output filename
+    pub workspace_root: Option<String>, // when set, all paths must be contained within it
+}
+
+/// RFC 4180-compliant CSV/TSV field parser.
+fn parse_delimited_line(line: &str, sep: char) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' if !in_quotes => { in_quotes = true; }
+            '"' if in_quotes => {
+                if chars.peek() == Some(&'"') {
+                    chars.next(); // escaped double-quote inside quoted field
+                    current.push('"');
+                } else {
+                    in_quotes = false;
+                }
+            }
+            c if c == sep && !in_quotes => {
+                fields.push(current.trim().to_string());
+                current = String::new();
+            }
+            _ => { current.push(c); }
+        }
+    }
+    fields.push(current.trim().to_string());
+    fields
+}
+
+fn safe_path(path: &str, workspace_root: &Option<String>) -> Result<PathBuf, String> {
+    let p = PathBuf::from(path);
+    let canonical = p.canonicalize().unwrap_or_else(|_| p.clone());
+    if let Some(root) = workspace_root {
+        let root_canon = PathBuf::from(root).canonicalize().unwrap_or_else(|_| PathBuf::from(root));
+        if !canonical.starts_with(&root_canon) {
+            return Err(format!("Path '{}' is outside the workspace root.", path));
+        }
+    }
+    Ok(p)
 }
 
 #[derive(Debug, Serialize)]
@@ -18,17 +59,22 @@ pub struct MailMergeResult {
 
 #[tauri::command]
 pub(crate) fn run_mail_merge(request: MailMergeRequest) -> Result<MailMergeResult, String> {
-    let template = fs::read_to_string(&request.template_path)
+    let template_path = safe_path(&request.template_path, &request.workspace_root)?;
+    let data_path_safe = safe_path(&request.data_path, &request.workspace_root)?;
+    let out_dir_safe = safe_path(&request.output_dir, &request.workspace_root)?;
+
+    let template = fs::read_to_string(&template_path)
         .map_err(|e| format!("Cannot read template: {e}"))?;
-    let data_path = PathBuf::from(&request.data_path);
+    let data_path = PathBuf::from(&data_path_safe);
     let ext = data_path.extension().and_then(|e| e.to_str()).unwrap_or_default();
     let records: Vec<std::collections::HashMap<String, String>> = if ext == "csv" || ext == "tsv" {
-        let sep = if ext == "tsv" { b'\t' } else { b',' };
+        let sep = if ext == "tsv" { '\t' } else { ',' };
         let content = fs::read_to_string(&data_path).map_err(|e| e.to_string())?;
         let mut lines = content.lines();
-        let headers: Vec<String> = lines.next().unwrap_or_default().split(sep as char).map(|s| s.trim().to_string()).collect();
+        let headers = parse_delimited_line(lines.next().unwrap_or_default(), sep);
         lines.map(|line| {
-            headers.iter().zip(line.split(sep as char).map(|s| s.trim().to_string()))
+            let values = parse_delimited_line(line, sep);
+            headers.iter().zip(values.into_iter().chain(std::iter::repeat(String::new())))
                 .map(|(k, v)| (k.clone(), v)).collect()
         }).collect()
     } else if ext == "json" {
@@ -37,7 +83,7 @@ pub(crate) fn run_mail_merge(request: MailMergeRequest) -> Result<MailMergeResul
     } else {
         return Err(format!("Unsupported data format: .{ext}. Use CSV or JSON."));
     };
-    let out_dir = PathBuf::from(&request.output_dir);
+    let out_dir = out_dir_safe;
     fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
     let mut output_paths = Vec::new();
     let mut errors = Vec::new();

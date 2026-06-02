@@ -34,12 +34,13 @@ pub(crate) fn get_humanize_prompt(request: HumanizeRequest) -> Result<HumanizeRe
         ("delve into ", "explore "),
         ("In conclusion, ", ""),
         ("To summarize, ", ""),
-        ("In summary, ", "To summarize, "),
+        ("In summary, ", ""),      // remove directly; avoids producing "To summarize, " after it was already erased
         ("leveraging ", "using "),
         ("Leveraging ", "Using "),
+        ("utilize the ", "use the "),  // specific pattern before the general "utilize " match
+        ("Utilize the ", "Use the "),
         ("utilize ", "use "),
         ("Utilize ", "Use "),
-        ("utilize the ", "use the "),
         ("multifaceted ", "complex "),
         ("robust ", "strong "),
         ("comprehensive ", "complete "),

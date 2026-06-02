@@ -37,6 +37,13 @@ pub(crate) fn compare_documents(request: CompareRequest) -> Result<CompareRespon
     let lines_a: Vec<&str> = text_a.lines().collect();
     let lines_b: Vec<&str> = text_b.lines().collect();
 
+    const MAX_LINES: usize = 5_000;
+    if lines_a.len() > MAX_LINES || lines_b.len() > MAX_LINES {
+        return Err(format!(
+            "Files too large to compare (max {MAX_LINES} lines each). A: {} lines, B: {} lines.",
+            lines_a.len(), lines_b.len()
+        ));
+    }
     // Simple LCS-based diff
     let diff = lcs_diff(&lines_a, &lines_b);
     let added = diff.iter().filter(|d| d.kind == "added").count();

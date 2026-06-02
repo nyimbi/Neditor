@@ -24,6 +24,8 @@ fn find_in_dir(root: &PathBuf, dir: &PathBuf, target: &str, results: &mut Vec<Ba
         let path = entry.path();
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
         if name.starts_with('.') { continue; }
+        // Skip symlinks to prevent infinite recursion on cyclic symlinks
+        if path.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) { continue; }
         if path.is_dir() { find_in_dir(root, &path, target, results); continue; }
         if path.extension().and_then(|e| e.to_str()) != Some("md") { continue; }
         let Ok(content) = fs::read_to_string(&path) else { continue };
@@ -44,7 +46,9 @@ pub(crate) fn check_document_approval(path: String) -> Result<bool, String> {
     let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let locked = content.lines().take(30).any(|l| {
         let l = l.trim().to_ascii_lowercase();
-        l.starts_with("status:") && (l.contains("approved") || l.contains("signed") || l.contains("locked"))
+        if !l.starts_with("status:") { return false; }
+        let val = l["status:".len()..].trim();
+        val == "approved" || val == "signed" || val == "locked"
     });
     Ok(locked)
 }

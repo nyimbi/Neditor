@@ -723,7 +723,12 @@ pub(crate) fn run_serve_mode(port: u16) {
             }
             ("POST", "/compile") => {
                 let mut body = String::new();
-                if request.as_reader().read_to_string(&mut body).is_ok() {
+                const MAX_BODY: u64 = 16 * 1024 * 1024; // 16 MB
+                let read_ok = {
+                    use std::io::Read;
+                    request.as_reader().take(MAX_BODY).read_to_string(&mut body).is_ok()
+                };
+                if read_ok {
                     if let Ok(req) = serde_json::from_str::<serde_json::Value>(&body) {
                         let text = req["text"].as_str().unwrap_or("").to_string();
                         let file_path = req["file_path"].as_str().map(String::from);

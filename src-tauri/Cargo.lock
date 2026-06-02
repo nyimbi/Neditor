@@ -2170,6 +2170,7 @@ dependencies = [
  "tauri-plugin-store",
  "tauri-plugin-window-state",
  "tiny_http",
+ "toml 0.8.2",
  "zip",
 ]
 

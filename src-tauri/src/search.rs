@@ -51,8 +51,15 @@ fn search_dir(root: &PathBuf, dir: &PathBuf, query: &str, case_sensitive: bool, 
                 if results.len() >= max { return; }
                 let haystack = if case_sensitive { line.to_string() } else { line.to_ascii_lowercase() };
                 if let Some(col) = haystack.find(query) {
-                    let start = col.saturating_sub(40);
-                    let end = (col + query.len() + 40).min(line.len());
+                    // Clamp to nearest UTF-8 char boundary to avoid panic on multi-byte chars
+                    let start = {
+                        let raw = col.saturating_sub(40);
+                        (0..=raw).rev().find(|&i| line.is_char_boundary(i)).unwrap_or(0)
+                    };
+                    let end = {
+                        let raw = (col + query.len() + 40).min(line.len());
+                        (raw..=line.len()).find(|&i| line.is_char_boundary(i)).unwrap_or(line.len())
+                    };
                     let excerpt = format!("…{}…", &line[start..end]);
                     results.push(SearchMatch {
                         path: rel.clone(),
