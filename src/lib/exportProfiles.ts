@@ -43,7 +43,7 @@ export function createExportProfileId() {
 
 export function saveExportProfileState(
   profiles: ExportProfile[],
-  activeExportProfileId: string,
+  activeExportProfileId: string | null,
   name: string,
   snapshot: ExportProfileSnapshot,
   createId: () => string = createExportProfileId,
@@ -53,6 +53,8 @@ export function saveExportProfileState(
   const existing = activeExportProfileId
     ? normalizedProfiles.find((profile) => profile.id === activeExportProfileId)
     : null;
+  // Detect stale ID: non-empty but not found in current profiles
+  const staleId = activeExportProfileId && !existing ? activeExportProfileId : null;
   const profile: ExportProfile = {
     id: existing?.id || createId(),
     name: profileName,
@@ -64,11 +66,14 @@ export function saveExportProfileState(
   const nextProfiles = existing
     ? normalizedProfiles.map((item) => (item.id === existing.id ? profile : item))
     : normalizeExportProfiles([...normalizedProfiles, profile]);
+  const statusMessage = staleId
+    ? `Saved export profile "${profile.name}" (previous profile ID "${staleId}" not found; created new profile)`
+    : `Saved export profile "${profile.name}"`;
   return {
     profile,
     profiles: nextProfiles,
     activeExportProfileId: profile.id,
-    statusMessage: `Saved export profile "${profile.name}"`,
+    statusMessage,
   };
 }
 

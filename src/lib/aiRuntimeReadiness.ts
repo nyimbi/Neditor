@@ -22,6 +22,7 @@ export interface AiRuntimeReadinessEnvironment {
   queryPermission?: (name: "microphone" | "clipboard-read" | "clipboard-write") => Promise<PermissionState | "unknown">;
   readClipboard?: () => Promise<{ kind: "rich" | "plain"; length: number } | null>;
   canWriteClipboard?: boolean;
+  clipboardTimeoutMs?: number;
 }
 
 export async function inspectAiRuntimeReadiness(environment: AiRuntimeReadinessEnvironment = {}): Promise<AiRuntimeReadinessReport> {
@@ -106,8 +107,9 @@ async function probeClipboardRead(environment: AiRuntimeReadinessEnvironment) {
         }
       | undefined;
     if (!clipboard) return null;
+    const timeoutMs = environment.clipboardTimeoutMs ?? 400;
     if (clipboard.read) {
-      const items = await bounded(clipboard.read());
+      const items = await bounded(clipboard.read(), timeoutMs);
       for (const item of items || []) {
         const type = ["text/html", "text/plain"].find((candidate) => item.types.includes(candidate));
         if (!type) continue;
@@ -116,7 +118,7 @@ async function probeClipboardRead(environment: AiRuntimeReadinessEnvironment) {
       }
     }
     if (clipboard.readText) {
-      const text = await bounded(clipboard.readText());
+      const text = await bounded(clipboard.readText(), timeoutMs);
       return text ? { kind: "plain" as const, length: text.length } : null;
     }
   } catch {
@@ -125,8 +127,8 @@ async function probeClipboardRead(environment: AiRuntimeReadinessEnvironment) {
   return null;
 }
 
-function bounded<T>(task: Promise<T>) {
-  return Promise.race<T | null>([task, new Promise((resolve) => window.setTimeout(() => resolve(null), 400))]);
+function bounded<T>(task: Promise<T>, timeoutMs = 400) {
+  return Promise.race<T | null>([task, new Promise((resolve) => globalThis.setTimeout(() => resolve(null), timeoutMs))]);
 }
 
 function runtimeSecureContext() {

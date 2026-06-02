@@ -22,6 +22,7 @@ export function finishExportWorkflowState() {
   return {
     exportBusy: false,
     exportProgress: "",
+    lastExportProgressSteps: [] as ExportProgressStep[],
   };
 }
 
@@ -35,6 +36,7 @@ export function applyExportSuccessState(response: ExportDocumentResponse) {
     lastExportManifestPath: response.manifest_path || "",
     lastExportDiagnostics: response.diagnostics || [],
     lastExportProgressSteps: response.progress_steps || [],
+    lastError: "",
     statusMessage: `Exported ${response.output_path}${response.manifest_path ? ` with manifest ${response.manifest_path}` : ""}`,
   };
 }

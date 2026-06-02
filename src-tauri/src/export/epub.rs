@@ -56,7 +56,7 @@ pub(crate) fn render_epub_bytes(
 
     for item in &media {
         zip.start_file(
-            format!("OEBPS/assets/{}", safe_bundle_path(&item.path)),
+            format!("OEBPS/assets/{}", safe_bundle_path(&item.source)),
             deflated,
         )
         .map_err(|err| err.to_string())?;
@@ -88,7 +88,7 @@ fn epub_content_opf(
             format!(
                 r#"<item id="asset-{}" href="assets/{}" media-type="{}"/>"#,
                 index + 1,
-                escape_xml(&safe_bundle_path(&item.path)),
+                escape_xml(&safe_bundle_path(&item.source)),
                 escape_xml(&item.content_type)
             )
         })
@@ -187,7 +187,7 @@ fn epub_body_html(
             &format!(r#"src="{}""#, escape_html(&item.source)),
             &format!(
                 r#"src="assets/{}""#,
-                escape_xml(&safe_bundle_path(&item.path))
+                escape_xml(&safe_bundle_path(&item.source))
             ),
         );
     }

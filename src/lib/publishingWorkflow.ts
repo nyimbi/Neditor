@@ -182,7 +182,8 @@ export function buildPublishingPreflightReport(
   input: PublishingEndpointInput & { destinationName?: string; dryRun?: boolean },
 ): PublishingPreflightReport {
   const targetKind = input.targetKind;
-  const dryRun = input.dryRun !== false;
+  // dryRun defaults to false; callers must explicitly set dryRun: true to suppress sending.
+  const dryRun = input.dryRun === true;
   const checklistIssues = handoff.checklist
     .filter((item) => item.status !== "ready")
     .map((item) => `${item.label}: ${item.detail}`);
@@ -224,9 +225,9 @@ export function buildPublishingPreflightReport(
     {
       id: "secrets",
       label: "Secret handling",
-      status: preview.headers.Authorization || Object.keys(preview.headers).some((header) => !/^content-type$/i.test(header)) ? "needs-review" : "ready",
-      detail: preview.headers.Authorization || Object.keys(preview.headers).some((header) => !/^content-type$/i.test(header))
-        ? "A session-only auth header is present; confirm the token is not saved in the document or workspace."
+      status: secretHeaderPresent(input.authHeaderName, input.authToken) ? "needs-review" : "ready",
+      detail: secretHeaderPresent(input.authHeaderName, input.authToken)
+        ? `A session-only auth header (${input.authHeaderName || "unknown"}) is present; confirm the token is not saved in the document or workspace.`
         : "No session auth token is attached to the preview.",
     },
     {
@@ -374,6 +375,15 @@ function publishingAuditMetadata(handoff: PublishingHandoff) {
   };
 }
 
+const KNOWN_SECRET_HEADER_PATTERN = /^(authorization|x-api-key|api-key|x-auth-token|x-access-token|x-secret|private-token|x-github-token|x-gitlab-token|x-amz-security-token|x-forwarded-authorization)$/i;
+
+function secretHeaderPresent(headerName: string | undefined, authToken: string | undefined): boolean {
+  const name = (headerName || "").trim();
+  if (!name) return false;
+  if (authToken && (authToken || "").trim()) return true;
+  return KNOWN_SECRET_HEADER_PATTERN.test(name);
+}
+
 function isAllowedPublishingUrl(value: string) {
   try {
     const url = new URL(value);
@@ -434,7 +444,8 @@ function markdownToPlainText(markdown: string) {
     .replace(/!\[[^\]]*]\([^)]*\)/g, "")
     .replace(/\[([^\]]+)]\([^)]*\)/g, "$1")
     .replace(/^#{1,6}\s+/gm, "")
-    .replace(/[*_~>#-]/g, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/[*_~>#]/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

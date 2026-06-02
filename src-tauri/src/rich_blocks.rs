@@ -6,12 +6,12 @@ use crate::{
 };
 
 pub(crate) fn render_figures(markdown: &str) -> String {
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     markdown
         .lines()
         .map(|line| {
-            if let Some(marker) = fence_marker {
-                if line.trim_start().starts_with(marker) {
+            if let Some(ref marker) = fence_marker {
+                if line.trim_start().starts_with(marker.as_str()) {
                     fence_marker = None;
                 }
                 return line.to_string();
@@ -117,13 +117,13 @@ pub(crate) fn render_equations(markdown: &str) -> String {
     let lines = markdown.lines().collect::<Vec<_>>();
     let mut index = 0usize;
     let mut equation_number = 1usize;
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     while index < lines.len() {
         let line = lines[index];
-        if let Some(marker) = fence_marker {
+        if let Some(ref marker) = fence_marker {
             output.push_str(line);
             output.push('\n');
-            if line.trim_start().starts_with(marker) {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             index += 1;
@@ -168,11 +168,12 @@ pub(crate) fn render_equations(markdown: &str) -> String {
                 format!("Equation {equation_number}: {}", caption.trim())
             };
             output.push_str(&format!(
-                "<figure class=\"equation\" id=\"{}\" data-caption=\"{}\"><div class=\"math-rendered math-display\" role=\"math\" aria-label=\"{}\">{}</div><details class=\"math-source\"><summary>LaTeX</summary><pre><code>{}</code></pre></details><figcaption>{}</figcaption></figure>\n",
+                "<figure class=\"equation\" id=\"{}\" data-caption=\"{}\"><div class=\"math-rendered math-display\" data-katex=\"{}\" data-katex-display role=\"math\" aria-label=\"{}\">{}</div><details class=\"math-source\"><summary>LaTeX source</summary><pre><code>{}</code></pre></details><figcaption>{}</figcaption></figure>\n",
                 escape_html(&id),
                 escape_html(caption.trim()),
                 escape_html(latex),
-                render_latex_visual(latex),
+                escape_html(latex),
+                escape_html(latex),
                 escape_html(latex),
                 escape_html(&rendered_caption)
             ));
@@ -195,9 +196,10 @@ fn render_inline_math(line: &str) -> String {
         if let Some(end) = after_start.find("\\)") {
             let math = &after_start[..end];
             output.push_str(&format!(
-                "<span class=\"math math-inline\" role=\"math\" aria-label=\"{}\"><span class=\"math-rendered\">{}</span><code class=\"math-source-inline\">{}</code></span>",
+                "<span class=\"math math-inline\" role=\"math\" aria-label=\"{}\"><span class=\"math-rendered\" data-katex=\"{}\">{}</span><code class=\"math-source-inline\">{}</code></span>",
                 escape_html(math),
-                render_latex_visual(math),
+                escape_html(math),
+                escape_html(math),
                 escape_html(math)
             ));
             rest = &after_start[end + 2..];
@@ -210,375 +212,16 @@ fn render_inline_math(line: &str) -> String {
     output
 }
 
-fn render_latex_visual(input: &str) -> String {
-    render_latex_expr(input.trim())
-}
-
-fn render_latex_expr(input: &str) -> String {
-    if let Some(matrix) = render_latex_matrix(input) {
-        return matrix;
-    }
-    let mut output = String::new();
-    let mut index = 0usize;
-    while index < input.len() {
-        let rest = &input[index..];
-        if rest.starts_with("\\frac") {
-            if let Some((numerator, after_numerator)) =
-                parse_latex_braced(input, index + "\\frac".len())
-            {
-                if let Some((denominator, after_denominator)) =
-                    parse_latex_braced(input, after_numerator)
-                {
-                    output.push_str("<span class=\"math-frac\"><span>");
-                    output.push_str(&render_latex_expr(&numerator));
-                    output.push_str("</span><span>");
-                    output.push_str(&render_latex_expr(&denominator));
-                    output.push_str("</span></span>");
-                    index = after_denominator;
-                    continue;
-                }
-            }
-        } else if rest.starts_with("\\begin{") {
-            if let Some((matrix, after_matrix)) = render_latex_matrix_prefix(input, index) {
-                output.push_str(&matrix);
-                index = after_matrix;
-                continue;
-            }
-        } else if let Some((class_name, command_len)) = latex_wrapper_command(rest) {
-            if let Some((content, after_content)) = parse_latex_braced(input, index + command_len) {
-                output.push_str(&format!("<span class=\"{class_name}\">"));
-                output.push_str(&render_latex_expr(&content));
-                output.push_str("</span>");
-                index = after_content;
-                continue;
-            }
-        } else if rest.starts_with("\\sqrt") {
-            let after_command = index + "\\sqrt".len();
-            let (root_index, after_index) = parse_latex_bracketed(input, after_command)
-                .unwrap_or((String::new(), after_command));
-            if let Some((radicand, after_radicand)) = parse_latex_braced(input, after_index) {
-                output.push_str("<span class=\"math-sqrt\">");
-                if !root_index.trim().is_empty() {
-                    output.push_str("<sup class=\"math-root-index\">");
-                    output.push_str(&render_latex_expr(&root_index));
-                    output.push_str("</sup>");
-                }
-                output.push_str(&render_latex_expr(&radicand));
-                output.push_str("</span>");
-                index = after_radicand;
-                continue;
-            }
-        } else if rest.starts_with("\\text") {
-            if let Some((text, after_text)) = parse_latex_braced(input, index + "\\text".len()) {
-                output.push_str("<span class=\"math-text\">");
-                output.push_str(&escape_html(&text));
-                output.push_str("</span>");
-                index = after_text;
-                continue;
-            }
-        } else if let Some(command) = rest.strip_prefix('\\').and_then(latex_command) {
-            output.push_str(&escape_html(command.symbol));
-            index += command.consumed + 1;
-            continue;
-        }
-
-        let Some(ch) = rest.chars().next() else {
-            break;
-        };
-        if ch == '&' {
-            output.push_str("<span class=\"math-align-separator\"> </span>");
-            index += ch.len_utf8();
-            continue;
-        }
-        if ch == '^' || ch == '_' {
-            if let Some((script, after_script)) = parse_latex_script(input, index + ch.len_utf8()) {
-                output.push_str(if ch == '^' { "<sup>" } else { "<sub>" });
-                output.push_str(&render_latex_expr(&script));
-                output.push_str(if ch == '^' { "</sup>" } else { "</sub>" });
-                index = after_script;
-                continue;
-            }
-        }
-        output.push_str(&escape_html(&ch.to_string()));
-        index += ch.len_utf8();
-    }
-    output
-}
-
-fn latex_wrapper_command(input: &str) -> Option<(&'static str, usize)> {
-    let name = input
-        .strip_prefix('\\')?
-        .chars()
-        .take_while(|ch| ch.is_ascii_alphabetic())
-        .collect::<String>();
-    let class_name = match name.as_str() {
-        "hat" => "math-hat",
-        "vec" => "math-vec",
-        "bar" | "overline" => "math-overline",
-        "underline" => "math-underline",
-        "mathbb" => "math-blackboard",
-        "mathcal" => "math-calligraphic",
-        "mathrm" => "math-roman",
-        _ => return None,
-    };
-    Some((class_name, name.len() + 1))
-}
-
-fn render_latex_matrix(input: &str) -> Option<String> {
-    let trimmed = input.trim();
-    let (environment, body) = parse_latex_environment(trimmed)?;
-    let bracket_class = matrix_bracket_class(environment)?;
-    Some(render_latex_matrix_body(bracket_class, body))
-}
-
-fn render_latex_matrix_prefix(input: &str, start: usize) -> Option<(String, usize)> {
-    let (environment, body, after_environment) = parse_latex_environment_prefix(input, start)?;
-    let bracket_class = matrix_bracket_class(environment)?;
-    Some((
-        render_latex_matrix_body(bracket_class, body),
-        after_environment,
-    ))
-}
-
-fn matrix_bracket_class(environment: &str) -> Option<&'static str> {
-    match environment {
-        "matrix" => Some("matrix-none"),
-        "pmatrix" => Some("matrix-round"),
-        "bmatrix" => Some("matrix-square"),
-        "vmatrix" => Some("matrix-vertical"),
-        "cases" => Some("matrix-cases"),
-        _ => None,
-    }
-}
-
-fn render_latex_matrix_body(bracket_class: &str, body: &str) -> String {
-    let rows = body
-        .split("\\\\")
-        .map(str::trim)
-        .filter(|row| !row.is_empty())
-        .map(|row| {
-            row.split('&')
-                .map(str::trim)
-                .map(render_latex_expr)
-                .map(|cell| format!("<td>{cell}</td>"))
-                .collect::<Vec<_>>()
-                .join("")
-        })
-        .map(|row| format!("<tr>{row}</tr>"))
-        .collect::<Vec<_>>();
-    if rows.is_empty() {
-        String::new()
-    } else {
-        format!(
-            "<span class=\"math-matrix {bracket_class}\"><table><tbody>{}</tbody></table></span>",
-            rows.join("")
-        )
-    }
-}
-
-fn parse_latex_environment(input: &str) -> Option<(&str, &str)> {
-    let begin_marker = "\\begin{";
-    let after_begin = input.strip_prefix(begin_marker)?;
-    let (environment, after_environment) = after_begin.split_once('}')?;
-    let end_marker = format!("\\end{{{environment}}}");
-    let body = after_environment.strip_suffix(&end_marker)?;
-    Some((environment, body))
-}
-
-fn parse_latex_environment_prefix(input: &str, start: usize) -> Option<(&str, &str, usize)> {
-    let begin_marker = "\\begin{";
-    let after_begin_index = start + begin_marker.len();
-    let after_begin = input.get(after_begin_index..)?;
-    let (environment, after_environment) = after_begin.split_once('}')?;
-    let body_start = after_begin_index + environment.len() + 1;
-    let end_marker = format!("\\end{{{environment}}}");
-    let relative_end = after_environment.find(&end_marker)?;
-    let body = &after_environment[..relative_end];
-    let after_environment_index = body_start + relative_end + end_marker.len();
-    Some((environment, body, after_environment_index))
-}
-
-struct LatexCommand<'a> {
-    symbol: &'a str,
-    consumed: usize,
-}
-
-fn latex_command(input: &str) -> Option<LatexCommand<'_>> {
-    let name = input
-        .chars()
-        .take_while(|ch| ch.is_ascii_alphabetic())
-        .collect::<String>();
-    let symbol = match name.as_str() {
-        "alpha" => "α",
-        "beta" => "β",
-        "gamma" => "γ",
-        "delta" => "δ",
-        "epsilon" => "ε",
-        "lambda" => "λ",
-        "mu" => "μ",
-        "pi" => "π",
-        "sigma" => "σ",
-        "theta" => "θ",
-        "omega" => "ω",
-        "Omega" => "Ω",
-        "Delta" => "Δ",
-        "Sigma" => "Σ",
-        "Gamma" => "Γ",
-        "Lambda" => "Λ",
-        "Pi" => "Π",
-        "sum" => "∑",
-        "prod" => "∏",
-        "int" => "∫",
-        "infty" => "∞",
-        "partial" => "∂",
-        "nabla" => "∇",
-        "times" => "×",
-        "div" => "÷",
-        "cdot" => "·",
-        "pm" => "±",
-        "to" => "→",
-        "rightarrow" => "→",
-        "leftarrow" => "←",
-        "Rightarrow" => "⇒",
-        "Leftarrow" => "⇐",
-        "approx" => "≈",
-        "equiv" => "≡",
-        "forall" => "∀",
-        "exists" => "∃",
-        "in" => "∈",
-        "notin" => "∉",
-        "subset" => "⊂",
-        "subseteq" => "⊆",
-        "cup" => "∪",
-        "cap" => "∩",
-        "land" => "∧",
-        "lor" => "∨",
-        "neg" => "¬",
-        "cdots" => "⋯",
-        "ldots" => "…",
-        "sin" => "sin",
-        "cos" => "cos",
-        "tan" => "tan",
-        "log" => "log",
-        "ln" => "ln",
-        "lim" => "lim",
-        "min" => "min",
-        "max" => "max",
-        "Pr" => "Pr",
-        "left" | "right" => "",
-        "lt" => "&lt;",
-        "gt" => "&gt;",
-        "le" => "≤",
-        "leq" => "≤",
-        "ge" => "≥",
-        "geq" => "≥",
-        "neq" => "≠",
-        _ => return None,
-    };
-    Some(LatexCommand {
-        symbol,
-        consumed: name.len(),
-    })
-}
-
-fn parse_latex_bracketed(input: &str, start: usize) -> Option<(String, usize)> {
-    let mut index = skip_latex_whitespace(input, start);
-    if input[index..].chars().next()? != '[' {
-        return None;
-    }
-    index += 1;
-    let content_start = index;
-    let mut depth = 1usize;
-    while index < input.len() {
-        let ch = input[index..].chars().next()?;
-        if ch == '[' {
-            depth += 1;
-        } else if ch == ']' {
-            depth = depth.saturating_sub(1);
-            if depth == 0 {
-                return Some((
-                    input[content_start..index].to_string(),
-                    index + ch.len_utf8(),
-                ));
-            }
-        }
-        index += ch.len_utf8();
-    }
-    None
-}
-
-fn parse_latex_braced(input: &str, start: usize) -> Option<(String, usize)> {
-    let mut index = skip_latex_whitespace(input, start);
-    if input[index..].chars().next()? != '{' {
-        return None;
-    }
-    index += 1;
-    let content_start = index;
-    let mut depth = 1usize;
-    while index < input.len() {
-        let ch = input[index..].chars().next()?;
-        if ch == '{' {
-            depth += 1;
-        } else if ch == '}' {
-            depth = depth.saturating_sub(1);
-            if depth == 0 {
-                return Some((
-                    input[content_start..index].to_string(),
-                    index + ch.len_utf8(),
-                ));
-            }
-        }
-        index += ch.len_utf8();
-    }
-    None
-}
-
-fn parse_latex_script(input: &str, start: usize) -> Option<(String, usize)> {
-    let index = skip_latex_whitespace(input, start);
-    if input[index..].starts_with('{') {
-        return parse_latex_braced(input, index);
-    }
-    let ch = input[index..].chars().next()?;
-    if ch == '\\' {
-        let command_len = input[index + 1..]
-            .chars()
-            .take_while(|candidate| candidate.is_ascii_alphabetic())
-            .map(char::len_utf8)
-            .sum::<usize>();
-        if command_len > 0 {
-            return Some((
-                input[index..index + 1 + command_len].to_string(),
-                index + 1 + command_len,
-            ));
-        }
-    }
-    Some((ch.to_string(), index + ch.len_utf8()))
-}
-
-fn skip_latex_whitespace(input: &str, start: usize) -> usize {
-    let mut index = start.min(input.len());
-    while index < input.len() {
-        let Some(ch) = input[index..].chars().next() else {
-            break;
-        };
-        if !ch.is_whitespace() {
-            break;
-        }
-        index += ch.len_utf8();
-    }
-    index
-}
-
 pub(crate) fn render_callouts(markdown: &str) -> String {
     let lines = markdown.lines().collect::<Vec<_>>();
     let mut output = Vec::new();
     let mut index = 0;
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     while index < lines.len() {
         let line = lines[index];
-        if let Some(marker) = fence_marker {
+        if let Some(ref marker) = fence_marker {
             output.push(line.to_string());
-            if line.trim_start().starts_with(marker) {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             index += 1;
@@ -652,12 +295,12 @@ fn strip_callout_quote(line: &str) -> String {
 }
 
 pub(crate) fn render_layout_tokens(markdown: &str) -> String {
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     markdown
         .lines()
         .map(|line| {
-            if let Some(marker) = fence_marker {
-                if line.trim_start().starts_with(marker) {
+            if let Some(ref marker) = fence_marker {
+                if line.trim_start().starts_with(marker.as_str()) {
                     fence_marker = None;
                 }
                 return line.to_string();

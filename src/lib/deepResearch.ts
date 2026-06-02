@@ -1276,6 +1276,9 @@ function sourceLibraryAuditKeys(markdown: string) {
   return Array.from(keys);
 }
 
+const SOURCE_LIBRARY_AUDIT_TABLE_HEADER = "| Citation key | Title | Fit | Local file | SHA-256 prefix | Review notes | URL |";
+const SOURCE_LIBRARY_AUDIT_TABLE_DIVIDER = "| --- | --- | --- | --- | --- | --- | --- |";
+
 function sourceLibraryAuditRowsForKeys(markdown: string, keys: string[]) {
   const keySet = new Set(keys);
   const lines = markdown.split(/\r?\n/);
@@ -1288,7 +1291,7 @@ function sourceLibraryAuditRowsForKeys(markdown: string, keys: string[]) {
   if (!matchingRows.length) return "";
   const header = headerIndex >= 0 && dividerIndex < lines.length
     ? [lines[headerIndex], lines[dividerIndex]]
-    : ["| Citation key | Audit row |", "| --- | --- |"];
+    : [SOURCE_LIBRARY_AUDIT_TABLE_HEADER, SOURCE_LIBRARY_AUDIT_TABLE_DIVIDER];
   return [
     `Saved sources needing audit addendum: ${matchingRows.length}`,
     "",

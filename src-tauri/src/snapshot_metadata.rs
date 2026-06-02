@@ -25,6 +25,7 @@ pub(crate) fn snapshot_document_metadata(text: &str) -> SnapshotDocumentMetadata
 }
 
 fn snapshot_front_matter(text: &str) -> Option<Value> {
+    let text = text.replace("\r\n", "\n");
     if !text.starts_with("---\n") {
         return None;
     }

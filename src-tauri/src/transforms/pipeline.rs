@@ -23,7 +23,7 @@ where
     let mut lines = text.lines().enumerate().peekable();
     while let Some((line_index, line)) = lines.next() {
         if let Some(marker) = fenced_code_marker(line) {
-            let info = line.trim_start().strip_prefix(marker).unwrap_or("").trim();
+            let info = line.trim_start().strip_prefix(marker.as_str()).unwrap_or("").trim();
             let name = info.split_whitespace().next().unwrap_or("");
             if is_supported(name) {
                 let source_line = line_index + 1;
@@ -31,7 +31,7 @@ where
                 let fence_options = transform_fence_options(info);
                 let mut body = String::new();
                 for (body_line_index, body_line) in lines.by_ref() {
-                    if body_line.trim_start().starts_with(marker) {
+                    if body_line.trim_start().starts_with(marker.as_str()) {
                         end_source_line = body_line_index + 1;
                         break;
                     }
@@ -58,7 +58,7 @@ where
                 diagnostics.push(unknown_transform_diagnostic(
                     name,
                     info,
-                    marker,
+                    &marker,
                     line,
                     source_map,
                     source_line,
@@ -69,7 +69,7 @@ where
             for (_, body_line) in lines.by_ref() {
                 output.push_str(body_line);
                 output.push('\n');
-                if body_line.trim_start().starts_with(marker) {
+                if body_line.trim_start().starts_with(marker.as_str()) {
                     break;
                 }
             }
@@ -226,8 +226,9 @@ fn fence_name_range(line: &str, marker: &str, name: &str) -> Option<(usize, usiz
     let trimmed_start = line.len().saturating_sub(line.trim_start().len());
     let after_marker = trimmed_start + marker.len();
     let offset = line[after_marker..].find(name)?;
-    let column = after_marker + offset + 1;
-    Some((column, column + name.len()))
+    let byte_start = after_marker + offset;
+    let column = line[..byte_start].chars().count() + 1;
+    Some((column, column + name.chars().count()))
 }
 
 fn transform_fence_options(info: &str) -> Value {

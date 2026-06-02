@@ -2,6 +2,70 @@ use crate::{diag, escape_html, DocumentDiagnostic};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
+pub(crate) fn render_decision_table_html(
+    body: &str,
+    _artifact_diags: &mut Vec<DocumentDiagnostic>,
+    _diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let mut headers: Vec<String> = Vec::new();
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    for line in body.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        let cols: Vec<&str> = line.split('|').map(str::trim).filter(|c| !c.is_empty()).collect();
+        if headers.is_empty() {
+            headers = cols.iter().map(|c| escape_html(c)).collect();
+        } else {
+            rows.push(cols.iter().map(|c| escape_html(c)).collect());
+        }
+    }
+    if headers.is_empty() {
+        return "<section class=\"transform transform-decision-table\"><p>No decision table data.</p></section>".to_string();
+    }
+    let thead = format!("<tr>{}</tr>", headers.iter().map(|h| format!("<th>{h}</th>")).collect::<String>());
+    let tbody = rows.iter().map(|row| {
+        let cells = row.iter().enumerate().map(|(i, cell)| {
+            let class = if i == 0 { " class=\"decision-condition\"" } else { " class=\"decision-action\"" };
+            format!("<td{class}>{cell}</td>")
+        }).collect::<String>();
+        format!("<tr>{cells}</tr>")
+    }).collect::<String>();
+    format!("<section class=\"transform transform-decision-table\"><h3>Decision Table</h3><table><thead>{thead}</thead><tbody>{tbody}</tbody></table></section>")
+}
+
+pub(crate) fn render_toml_html(
+    body: &str,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    match toml::from_str::<toml::Value>(body) {
+        Ok(value) => {
+            let json_value: Value = serde_json::to_value(&value).unwrap_or(Value::Null);
+            if let Some(table) = render_structured_table("toml", &json_value) {
+                table
+            } else {
+                format!(
+                    "<section class=\"transform transform-toml structured-tree\">{}</section>",
+                    render_structured_tree("root", &json_value)
+                )
+            }
+        }
+        Err(error) => {
+            let diagnostic = diag(
+                "error",
+                format!("Invalid TOML transform input: {error}"),
+                None,
+                None,
+                Some("Check the TOML syntax."),
+            );
+            diagnostics.push(diagnostic.clone());
+            artifact_diags.push(diagnostic);
+            format!(
+                "<pre class=\"transform transform-toml transform-error\">{}</pre>",
+                escape_html(body)
+            )
+        }
+    }
+}
+
 pub(crate) fn render_structured_data_html(
     format: &str,
     body: &str,

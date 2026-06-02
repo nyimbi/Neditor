@@ -414,13 +414,6 @@ fn import_url(
         ));
     }
     let body = output.stdout;
-    if body.len() > MAX_RFP_URL_DOWNLOAD_BYTES {
-        return Err(format!(
-            "RFP URL response is {} bytes, above the {} byte limit.",
-            body.len(),
-            MAX_RFP_URL_DOWNLOAD_BYTES
-        ));
-    }
     match infer_url_rfp_body_kind(url, &body) {
         UrlRfpBodyKind::Pdf => {
             let text = extract_pdf_text_from_bytes(&body, url, warnings)?;

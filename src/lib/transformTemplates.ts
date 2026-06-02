@@ -198,7 +198,7 @@ npv = present_value - initial_investment
       `
 start_value = 1200000
 end_value = 1800000
-sqrt_growth_multiple = 1.2247
+sqrt_growth_multiple = 1.2247  # = sqrt(end_value/start_value); update this when changing start_value or end_value
 cagr = sqrt_growth_multiple - 1
 absolute_growth = end_value - start_value
 `,
@@ -1511,6 +1511,12 @@ export function blankCustomTransformTemplate(): CustomTransformTemplate {
   };
 }
 
+// Normalize fence style in a template body: replace ~~~-delimited fences with ```-delimited ones
+// so that fencePattern's \1 backreference always matches a single consistent style.
+function normalizeFenceStyle(body: string): string {
+  return body.replace(/^~~~([ \t]*[^\n]*)$/gm, "```$1");
+}
+
 export function normalizeCustomTransformTemplates(value: unknown): CustomTransformTemplate[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
@@ -1519,9 +1525,10 @@ export function normalizeCustomTransformTemplates(value: unknown): CustomTransfo
     if (!item || typeof item !== "object") continue;
     const record = item as Record<string, unknown>;
     const id = stringValue(record.id) || createCustomTransformTemplateId();
-    const body = stringValue(record.body);
-    if (!body || seen.has(id)) continue;
+    const rawBody = stringValue(record.body);
+    if (!rawBody || seen.has(id)) continue;
     seen.add(id);
+    const body = normalizeFenceStyle(rawBody);
     templates.push({
       id,
       name: stringValue(record.name) || "Custom transform",

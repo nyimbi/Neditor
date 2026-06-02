@@ -36,6 +36,9 @@ export interface QualityStepAssistanceInput {
   reviewNotes?: string | null;
 }
 
+// NOTE: These module-level singletons use the /g flag. They are safe with String.prototype.match()
+// (which resets lastIndex before each call) but are NOT safe with .exec()-in-a-loop patterns,
+// which rely on lastIndex state. Do not use these regexes with .exec() across iterations.
 const PLACEHOLDER_RE = /\{\{[^}]+\}\}|\b(?:TODO|TBD|FIXME)\b/gi;
 const CITATION_RE = /\[@[A-Za-z0-9_:.#$%&+?~/-]+\]/g;
 const BIBLIOGRAPHY_LANGUAGES = new Set(["bibtex", "hayagriva", "bibliography"]);
@@ -371,14 +374,15 @@ function stripFencedBlocksExceptLayout(text: string) {
   return kept.join("\n");
 }
 
-function wideMarkdownTableCount(text: string) {
-  const lines = stripFencedBlocksExceptLayout(text).split(/\r?\n/);
+/** Counts wide markdown tables. Accepts pre-stripped layout text (fenced blocks already removed). */
+function wideMarkdownTableCount(layoutText: string) {
+  const lines = layoutText.split(/\r?\n/);
   let count = 0;
   for (let index = 0; index < lines.length - 1; index += 1) {
     const headerCells = markdownTableCellCount(lines[index]);
     if (headerCells < 5) continue;
     const separatorCells = markdownTableSeparatorCellCount(lines[index + 1]);
-    if (separatorCells >= 2) count += 1;
+    if (separatorCells >= headerCells) count += 1;
   }
   return count;
 }

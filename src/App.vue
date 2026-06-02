@@ -5,6 +5,7 @@
       'has-trust-prompt': externalTransformTrustPrompts.length,
       'toolbars-collapsed': !hasExpandedToolbarRows,
       'writing-space-maximized': writingSpaceMaximized,
+      [`ui-mode-${store.uiMode}`]: true,
     }"
     :data-theme="store.theme"
     :data-toolbar-display="store.toolbarDisplay"
@@ -198,6 +199,12 @@
       </section>
 
       <section class="window-meta" aria-label="Document status">
+        <button
+          type="button"
+          class="ui-mode-btn"
+          :title="store.uiMode === 'writer' ? 'Switch to Pilot mode (⌘\\)' : 'Switch to Writer mode (⌘\\)'"
+          @click="toggleUiMode"
+        >{{ store.uiMode === 'writer' ? '⊞ Pilot' : '✍ Writer' }}</button>
         <section
           v-if="collapsedToolbarRows.length"
           class="collapsed-toolbar-tray titlebar-toolbar-tray"
@@ -527,6 +534,31 @@
         </section>
       </section>
 
+      <nav
+        v-if="store.uiMode === 'pilot' && store.mode !== 'outline' && !writingSpaceMaximized"
+        class="activity-bar"
+        aria-label="Panel navigation"
+      >
+        <button
+          v-for="group in ACTIVITY_GROUPS"
+          :key="group.id"
+          type="button"
+          class="activity-bar-btn"
+          :class="{ 'act-active': actGroupActive(group) }"
+          :title="group.label"
+          :aria-label="group.label"
+          @click="selectActivityGroup(group)"
+        >
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path v-for="path in toolbarIconPaths(group.icon)" :key="path" :d="path"></path>
+          </svg>
+          <span
+            v-if="activityBadges[group.id]"
+            class="activity-badge"
+            :aria-label="`${activityBadges[group.id]} items`"
+          >{{ activityBadges[group.id] > 9 ? '9+' : activityBadges[group.id] }}</span>
+        </button>
+      </nav>
       <aside
         v-show="store.mode !== 'outline' && !writingSpaceMaximized"
         id="document-sidebar"
@@ -536,8 +568,45 @@
         aria-label="Document workspace"
         tabindex="-1"
       >
+        <div
+          v-if="store.uiMode === 'pilot'"
+          class="sidebar-resize-handle"
+          title="Drag to resize"
+          @mousedown.prevent="onSidebarResizeStart"
+        ></div>
+        <header v-if="store.uiMode === 'pilot'" class="sidebar-panel-header" aria-label="Current panel">
+          <span class="sidebar-panel-name">{{ currentPanelLabel }}</span>
+        </header>
         <template v-if="store.sidebar === 'files'">
           <h2>Workspace</h2>
+          <div class="workspace-search-box">
+            <input
+              v-model="workspaceSearchQuery"
+              type="search"
+              placeholder="Search workspace..."
+              class="workspace-search-input"
+              @keydown.enter="runWorkspaceSearch"
+              aria-label="Search workspace files"
+            />
+            <button type="button" :disabled="workspaceSearchBusy" @click="runWorkspaceSearch">
+              {{ workspaceSearchBusy ? '…' : '↵' }}
+            </button>
+          </div>
+          <div v-if="workspaceSearchResults.length" class="workspace-search-results">
+            <div
+              v-for="result in workspaceSearchResults.slice(0, 50)"
+              :key="result.path + result.line"
+              class="ws-search-result"
+              role="button"
+              tabindex="0"
+              @click="openSearchResult(result)"
+              @keydown.enter="openSearchResult(result)"
+            >
+              <span class="ws-sr-path">{{ result.path }}</span>
+              <span class="ws-sr-line">:{{ result.line }}</span>
+              <span class="ws-sr-excerpt">{{ result.excerpt }}</span>
+            </div>
+          </div>
           <button type="button" @click="openFolder">Open folder</button>
           <button v-if="store.workspaceRoot" type="button" @click="store.refreshWorkspace">Refresh</button>
           <p v-if="store.workspaceRoot" class="workspace-root">{{ store.workspaceRoot }}</p>
@@ -4666,9 +4735,15 @@
         </template>
       </aside>
 
-      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" aria-label="Markdown source" tabindex="-1">
+      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" :class="{ 'focus-mode': writerFocusMode && store.uiMode === 'writer' }" aria-label="Markdown source" tabindex="-1">
+        <div v-if="store.uiMode === 'writer'" class="writer-doc-title" aria-hidden="true">
+          {{ active?.compile?.semantic.title || active?.title || '' }}
+        </div>
+        <div v-if="docLocked" class="doc-locked-banner" aria-live="polite">
+          🔒 This document is approved/locked. Editing is disabled. Change status in front matter to unlock.
+        </div>
         <div class="editor-split-grid" :data-split-source="store.splitSourcePanes ? 'true' : 'false'">
-          <div ref="editorHost" class="editor-host editor-host-primary" aria-label="Primary Markdown source pane"></div>
+          <div ref="editorHost" class="editor-host editor-host-primary" :class="{ 'editor-locked': docLocked }" aria-label="Primary Markdown source pane"></div>
           <div v-if="store.splitSourcePanes" ref="secondaryEditorHost" class="editor-host editor-host-secondary" aria-label="Secondary Markdown source pane"></div>
         </div>
       </section>
@@ -4751,9 +4826,95 @@
           v-html="previewHtmlWithDiagnostics"
         ></article>
       </section>
+      <aside
+        v-if="store.uiMode === 'pilot' && store.mode !== 'outline' && !writingSpaceMaximized"
+        class="inspector-pane"
+        :class="{ 'is-collapsed': inspectorCollapsed }"
+        aria-label="Document inspector"
+      >
+        <div
+          v-if="!inspectorCollapsed"
+          class="inspector-resize-handle"
+          title="Drag to resize"
+          @mousedown.prevent="onInspectorResizeStart"
+        ></div>
+        <header class="inspector-header">
+          <span class="inspector-kind">{{ inspectorCtxFull.kind }}</span>
+          <button
+            type="button"
+            class="inspector-collapse-btn"
+            :title="inspectorCollapsed ? 'Expand inspector' : 'Collapse inspector'"
+            :aria-label="inspectorCollapsed ? 'Expand inspector' : 'Collapse inspector'"
+            @click="inspectorCollapsed = !inspectorCollapsed"
+          >{{ inspectorCollapsed ? '▶' : '◀' }}</button>
+        </header>
+        <div v-if="!inspectorCollapsed" class="inspector-body">
+          <div class="inspector-row">
+            <span class="inspector-lbl">Title</span>
+            <span class="inspector-val">{{ inspectorCtxFull.title || '—' }}</span>
+          </div>
+          <div v-for="row in inspectorCtxFull.rows" :key="row.label" class="inspector-row">
+            <span class="inspector-lbl">{{ row.label }}</span>
+            <span class="inspector-val">{{ row.value }}</span>
+          </div>
+          <div v-if="inspectorCtxFull.actions.length" style="margin-top:10px;display:flex;flex-direction:column;gap:5px;">
+            <button
+              v-for="action in inspectorCtxFull.actions"
+              :key="action.label"
+              type="button"
+              class="inspector-act"
+              @click="action.run()"
+            >{{ action.label }}</button>
+          </div>
+        </div>
+      </aside>
     </main>
 
-    <footer v-show="!writingSpaceMaximized" id="document-status" class="status-bar" aria-label="Document status and progress" tabindex="-1">
+    <div
+      v-if="store.uiMode === 'writer' && !writingSpaceMaximized"
+      class="writer-status-strip"
+      :class="{ 'writer-strip-idle': writerStripIdle }"
+      aria-label="Document status"
+      @mousemove="resetWriterIdle"
+      @click="resetWriterIdle"
+    >
+      <span class="ws-seg">{{ store.statusMessage || active?.compile?.semantic.status || 'draft' }}</span>
+      <span class="ws-seg">{{ activeWordCount }} words</span>
+      <span v-if="writerWordGoal" class="ws-seg ws-seg-goal" :class="{ 'ws-seg-ready': writerWordGoal.done }" :title="`${writerWordGoal.current} / ${writerWordGoal.goal} words`">
+        <span class="ws-goal-bar" :style="{ width: writerWordGoal.pct + '%' }"></span>
+        <span class="ws-goal-label">{{ writerWordGoal.pct }}%</span>
+      </span>
+      <button
+        type="button"
+        class="ws-seg"
+        :class="[writerDiagSummary.cls, writerFlyover === 'diagnostics' ? 'ws-seg-active' : '']"
+        title="Diagnostics"
+        @click="toggleWriterFlyover('diagnostics')"
+      >{{ writerDiagSummary.text }}</button>
+      <button
+        type="button"
+        class="ws-seg"
+        :class="[writerExportSummary.cls, writerFlyover === 'export' ? 'ws-seg-active' : '']"
+        title="Export readiness"
+        @click="toggleWriterFlyover('export')"
+      >{{ writerExportSummary.text }}</button>
+      <span v-if="sessionWordsAdded !== null && sessionWordsAdded > 0" class="ws-seg ws-seg-session" :title="`+${sessionWordsAdded} words this session`">+{{ sessionWordsAdded }}</span>
+      <span v-if="store.gitStatus?.inside_repo" class="ws-seg">{{ store.gitStatus.branch || 'detached' }}</span>
+      <button
+        type="button"
+        class="ws-seg"
+        :class="{ 'ws-seg-active': writerFocusMode }"
+        :title="writerFocusMode ? 'Disable focus dimming' : 'Enable focus dimming (dim other lines)'"
+        @click="writerFocusMode = !writerFocusMode"
+      >◎</button>
+      <button
+        type="button"
+        class="ws-seg ws-seg-pilot"
+        title="Switch to Pilot mode (⌘\\)"
+        @click="toggleUiMode"
+      >⊞ Pilot</button>
+    </div>
+    <footer v-show="!writingSpaceMaximized && store.uiMode !== 'writer'" id="document-status" class="status-bar" aria-label="Document status and progress" tabindex="-1">
       <span
         class="status-message"
         role="status"
@@ -7175,6 +7336,212 @@
       </div>
     </section>
 
+    <!-- Transform picker palette -->
+    <div
+      v-if="transformPickerOpen"
+      class="transform-picker"
+      :class="{ 'transform-picker-min': transformPickerMinimized }"
+      :style="{ left: transformPickerPos.x + 'px', top: transformPickerPos.y + 'px' }"
+      role="dialog"
+      aria-label="Transform palette"
+    >
+      <header class="transform-picker-header" @mousedown.prevent="onTransformPickerDragStart">
+        <span class="transform-picker-title">⊞ Transforms</span>
+        <div class="transform-picker-controls">
+          <button type="button" class="tp-ctrl" :title="transformPickerMinimized ? 'Expand' : 'Minimize'" @click.stop="transformPickerMinimized = !transformPickerMinimized">{{ transformPickerMinimized ? '▲' : '▼' }}</button>
+          <button type="button" class="tp-ctrl" title="Close (⌘⇧T)" @click.stop="transformPickerOpen = false">×</button>
+        </div>
+      </header>
+      <div v-if="!transformPickerMinimized" class="transform-picker-body">
+        <div v-for="group in TRANSFORM_GROUPS" :key="group" class="tp-group">
+          <div class="tp-group-label">{{ group }}</div>
+          <div class="tp-cards">
+            <button
+              v-for="card in TRANSFORM_CARDS.filter(c => c.group === group)"
+              :key="card.name"
+              type="button"
+              class="tp-card"
+              :class="{ 'tp-card-ext': card.external }"
+              :title="`${card.label}${card.external ? ' — requires external engine' : ''}\nInserts a \`\`\`${card.name} block at cursor`"
+              @click="insertTransformFromPicker(card)"
+            >
+              <span class="tp-icon">{{ card.icon }}</span>
+              <span class="tp-label">{{ card.label }}</span>
+            </button>
+          </div>
+        </div>
+        <p class="tp-hint">Dashed border = external engine required. Configure in Settings → Transforms.</p>
+      </div>
+    </div>
+    <div v-if="writerFlyover" class="writer-flyover-backdrop" @click="writerFlyover = null"></div>
+    <div v-if="writerFlyover === 'diagnostics'" class="writer-flyover" role="dialog" aria-label="Diagnostics">
+      <header class="writer-flyover-header">
+        <span>Diagnostics</span>
+        <button type="button" class="writer-flyover-close" aria-label="Close" @click="writerFlyover = null">×</button>
+      </header>
+      <div class="writer-flyover-body">
+        <p v-if="!(active?.compile?.diagnostics?.length)" class="writer-flyover-empty">No issues — document is clean.</p>
+        <div
+          v-for="diag in (active?.compile?.diagnostics || [])"
+          :key="diag.message + diag.line"
+          class="writer-flyover-diag"
+          :class="`flyover-${diag.severity}`"
+        >
+          <span class="flyover-sev">{{ diag.severity }}</span>
+          <span class="flyover-msg">{{ diag.message }}</span>
+          <small v-if="diag.line" class="flyover-loc">line {{ diag.line }}</small>
+        </div>
+      </div>
+      <footer class="writer-flyover-footer">
+        <button type="button" @click="toggleUiMode(); store.sidebar = 'diagnostics'; writerFlyover = null">Full panel</button>
+      </footer>
+    </div>
+    <div v-if="writerFlyover === 'export'" class="writer-flyover" role="dialog" aria-label="Export readiness">
+      <header class="writer-flyover-header">
+        <span>Export readiness</span>
+        <button type="button" class="writer-flyover-close" aria-label="Close" @click="writerFlyover = null">×</button>
+      </header>
+      <div class="writer-flyover-body">
+        <p v-if="!store.exportReadiness" class="writer-flyover-empty">No readiness report yet.</p>
+        <template v-else>
+          <p class="flyover-summary" :class="store.exportReadiness.ready ? 'flyover-ok' : 'flyover-err'">
+            {{ store.exportReadiness.ready
+              ? '✓ Ready to export'
+              : `${store.exportReadiness.error_count} error${store.exportReadiness.error_count !== 1 ? 's' : ''}, ${store.exportReadiness.warning_count} warning${store.exportReadiness.warning_count !== 1 ? 's' : ''}` }}
+          </p>
+          <div
+            v-for="diag in (store.exportReadiness.diagnostics || []).slice(0, 10)"
+            :key="diag.message + diag.line"
+            class="writer-flyover-diag"
+            :class="`flyover-${diag.severity}`"
+          >
+            <span class="flyover-sev">{{ diag.severity }}</span>
+            <span class="flyover-msg">{{ diag.message }}</span>
+          </div>
+        </template>
+      </div>
+      <footer class="writer-flyover-footer">
+        <button type="button" :disabled="store.exportBusy" @click="prepareForExport">Check</button>
+        <button type="button" @click="toggleUiMode(); store.sidebar = 'exports'; writerFlyover = null">Full panel</button>
+      </footer>
+    </div>
+    <!-- AI Humanizer -->
+    <div v-if="humanizeOpen" class="slash-picker-backdrop" @click="humanizeOpen = false"></div>
+    <div v-if="humanizeOpen" class="humanize-modal" role="dialog" aria-label="AI Humanizer">
+      <header class="humanize-header">
+        <span>✍ AI Humanizer</span>
+        <button type="button" class="tp-ctrl" @click="humanizeOpen = false">×</button>
+      </header>
+      <div class="humanize-body">
+        <label class="humanize-label">Input text</label>
+        <textarea v-model="humanizeInput" class="humanize-textarea" rows="6" placeholder="Paste AI-generated text or select text in the editor first…"></textarea>
+        <button type="button" class="humanize-run-btn" :disabled="humanizeBusy || !humanizeInput.trim()" @click="runHumanize">
+          {{ humanizeBusy ? 'Humanizing…' : 'Humanize' }}
+        </button>
+        <template v-if="humanizeResult">
+          <label class="humanize-label">Result <small>({{ humanizeChanges.length }} change{{ humanizeChanges.length !== 1 ? 's' : '' }})</small></label>
+          <textarea v-model="humanizeResult" class="humanize-textarea" rows="6"></textarea>
+          <div v-if="humanizeChanges.length" class="humanize-changes">
+            <div v-for="c in humanizeChanges" :key="c" class="humanize-change">✓ {{ c }}</div>
+          </div>
+          <div class="humanize-actions">
+            <button type="button" @click="applyHumanized">Insert at cursor</button>
+            <button type="button" @click="humanizeResult = ''">Clear</button>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Document comparison -->
+    <div v-if="compareOpen" class="slash-picker-backdrop" @click="compareOpen = false; compareResult = null"></div>
+    <div v-if="compareOpen" class="compare-modal" role="dialog" aria-label="Compare documents">
+      <header class="humanize-header">
+        <span>⊜ Compare Documents</span>
+        <button type="button" class="tp-ctrl" @click="compareOpen = false; compareResult = null">×</button>
+      </header>
+      <div class="humanize-body" v-if="!compareResult">
+        <label class="humanize-label">Document A path</label>
+        <input v-model="comparePathA" class="humanize-input" type="text" placeholder="/path/to/document-a.md" />
+        <label class="humanize-label">Document B path</label>
+        <input v-model="comparePathB" class="humanize-input" type="text" placeholder="/path/to/document-b.md" />
+        <button type="button" :disabled="compareBusy || !comparePathA || !comparePathB" @click="runCompare">
+          {{ compareBusy ? 'Comparing…' : 'Compare' }}
+        </button>
+      </div>
+      <div v-else class="compare-result">
+        <div class="compare-stats">
+          <span class="cmp-added">+{{ compareResult.added }} added</span>
+          <span class="cmp-removed">−{{ compareResult.removed }} removed</span>
+          <span class="cmp-unchanged">{{ compareResult.unchanged }} unchanged</span>
+          <button type="button" class="tp-ctrl" style="margin-left:auto" @click="compareResult = null">← Back</button>
+        </div>
+        <div class="compare-diff">
+          <div
+            v-for="(line, i) in compareResult.diff.slice(0, 500)"
+            :key="i"
+            class="diff-line"
+            :class="`diff-${line.kind}`"
+          >
+            <span class="diff-ln">{{ line.kind === 'added' ? line.line_b : line.line_a }}</span>
+            <span class="diff-text">{{ line.text || ' ' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="slashPickerOpen" class="slash-picker-backdrop" @click="closeSlashPicker"></div>
+    <div
+      v-if="slashPickerOpen"
+      class="slash-picker"
+      :class="{ 'slash-picker-anchored': slashPickerPos.top > 0 }"
+      :style="slashPickerPos.top > 0 ? { top: slashPickerPos.top + 'px', left: slashPickerPos.left + 'px' } : {}"
+      role="dialog"
+      aria-label="Insert block"
+      @keydown="handleSlashPickerKeydown"
+    >
+      <div class="slash-picker-input-row">
+        <span class="slash-picker-slash">/</span>
+        <input
+          ref="slashPickerInputEl"
+          v-model="slashPickerQuery"
+          class="slash-picker-input"
+          type="text"
+          placeholder="table, callout, cite, ai…"
+          autofocus
+          aria-label="Filter blocks"
+          @keydown="handleSlashPickerKeydown"
+        />
+      </div>
+      <div class="slash-picker-list" role="listbox" aria-label="Available blocks">
+        <template v-if="!slashPickerQuery && recentSlashIds.length">
+          <div class="slash-picker-divider">Recent</div>
+        </template>
+        <button
+          v-for="(cmd, idx) in filteredSlashCmds"
+          :key="cmd.id"
+          type="button"
+          role="option"
+          class="slash-picker-item"
+          :class="{ 'slash-sel': idx === slashPickerSelectedIdx }"
+          :aria-selected="idx === slashPickerSelectedIdx"
+          @click="runSlashCmd(cmd)"
+          @mouseenter="slashPickerSelectedIdx = idx"
+        >
+          <span class="slash-picker-icon">{{ cmd.icon }}</span>
+          <span>
+            <span class="slash-picker-name">{{ cmd.name }}</span>
+            <span class="slash-picker-desc">{{ cmd.desc }}</span>
+          </span>
+        </button>
+        <template v-if="!slashPickerQuery && recentSlashIds.length">
+          <div class="slash-picker-divider">All</div>
+        </template>
+        <p v-if="!filteredSlashCmds.length" class="slash-picker-empty">No matching blocks</p>
+      </div>
+      <div class="slash-picker-hint" aria-hidden="true">
+        <span>↑↓ navigate</span><span>↵ insert</span><span>Esc close</span>
+      </div>
+    </div>
     <section
       v-if="conflictOpen && store.externalConflict"
       ref="conflictDialog"
@@ -7278,6 +7645,8 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { homeDir } from "@tauri-apps/api/path";
@@ -8405,6 +8774,37 @@ const docsLiveRuntimeChecking = ref(false);
 const docsLiveRuntimeReport = ref<AiRuntimeReadinessReport | null>(null);
 const desktopWorkflowSmokeActive = ref(false);
 const commandPaletteOpen = ref(false);
+const slashPickerOpen = ref(false);
+const slashPickerQuery = ref('');
+const slashPickerSelectedIdx = ref(0);
+
+const workspaceSearchQuery = ref('');
+const workspaceSearchResults = ref<Array<{ path: string; line: number; excerpt: string; text: string }>>([]);
+const workspaceSearchBusy = ref(false);
+const humanizeOpen = ref(false);
+const humanizeInput = ref('');
+const humanizeBusy = ref(false);
+const humanizeResult = ref('');
+const humanizeChanges = ref<string[]>([]);
+const compareOpen = ref(false);
+const comparePathA = ref('');
+const comparePathB = ref('');
+const compareResult = ref<null | { label_a: string; label_b: string; diff: Array<{ kind: string; line_a?: number; line_b?: number; text: string }>; added: number; removed: number; unchanged: number }>(null);
+const compareBusy = ref(false);
+const docLocked = ref(false);
+
+const slashPickerInputEl = ref<HTMLInputElement | null>(null);
+const slashPickerPos = ref({ top: -1, left: -1 });
+const transformPickerOpen = ref(false);
+const transformPickerMinimized = ref(false);
+const transformPickerPos = ref({ x: 80, y: 120 });
+const editorCursorLine = ref(0);
+const writerFlyover = ref<null | 'diagnostics' | 'export'>(null);
+const inspectorCollapsed = ref(false);
+const inspectorWidth = ref(220);
+const sidebarWidth = ref(220);
+const writerFocusMode = ref(false);
+const sessionStartWords = ref<number | null>(null);
 const openAppMenuId = ref<string | null>(null);
 const toolbarVisibilityMenuOpen = ref(false);
 const writingSpaceMaximized = ref(false);
@@ -8778,7 +9178,8 @@ type ToolbarIconName =
   | "html"
   | "epub"
   | "pin"
-  | "close";
+  | "close"
+  | "versioning";
 
 type AgentMemoryInputKind =
   | "terminology"
@@ -8890,6 +9291,7 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   epub: ["M5 5h7a4 4 0 0 1 4 4v10H9a4 4 0 0 0-4-4z", "M19 5h-7a4 4 0 0 0-4 4v10h7a4 4 0 0 1 4-4z", "M8 9h4", "M12 9h4", "M8 13h4", "M12 13h4"],
   pin: ["M14 4l6 6-4 1-4 6-1 3-1-1-3-3-3-3-1-1 3-1 6-4z", "M9 15l-5 5"],
   close: ["M6 6l12 12", "M18 6L6 18"],
+  versioning: ["M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", "M18 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", "M6 9v2a6 6 0 0 0 6 6h3"],
 };
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
@@ -9194,6 +9596,8 @@ const printPreviewReport = computed(() =>
 );
 const appShellStyle = computed(() => ({
   "--toolbar-font-size": `${clampToolbarTextSize(store.toolbarTextSize)}px`,
+  "--inspector-width": `${inspectorCollapsed.value ? 32 : inspectorWidth.value}px`,
+  "--sidebar-panel-width": `${sidebarWidth.value}px`,
 }));
 const buttonHelpStyle = computed<CSSProperties>(() => ({
   left: `${buttonHelp.value.x}px`,
@@ -9490,6 +9894,30 @@ const previewDiagnostics = computed<PreviewDiagnosticItem[]>(() => {
 const previewHtmlWithDiagnostics = computed(() =>
   annotatePreviewSourceAnchors(inlinePreviewDiagnostics(active.value.compile?.html || "", previewDiagnostics.value)),
 );
+
+async function renderKatex(): Promise<void> {
+  await nextTick();
+  const container = previewPane.value?.querySelector(".preview-document");
+  if (!container) return;
+  for (const el of container.querySelectorAll<HTMLElement>("[data-katex]")) {
+    const latex = el.dataset.katex ?? "";
+    if (!latex) continue;
+    const displayMode = el.hasAttribute("data-katex-display");
+    try {
+      el.innerHTML = katex.renderToString(latex, {
+        displayMode,
+        throwOnError: false,
+        output: "html",
+        trust: false,
+        strict: "ignore",
+      });
+    } catch {
+      // leave the raw LaTeX fallback text intact
+    }
+  }
+}
+
+watch(previewHtmlWithDiagnostics, renderKatex);
 const compilerOutputInventory = computed<CompilerOutputInventoryItem[]>(() => {
   const compile = active.value.compile;
   const metadataKeys = Object.keys(compile?.metadata || {});
@@ -9673,11 +10101,23 @@ const transformPreviewItems = computed<TransformPreviewItem[]>(() =>
 );
 const workspaceStyle = computed(() => ({ "--editor-ratio": String(store.editorPaneRatio) }));
 const paneSplitterVisible = computed(() => !["source", "focus", "preview", "export", "outline"].includes(store.mode));
-const wordStats = computed(() => {
+const activeWordCount = computed(() => {
   const text = active.value?.text || "";
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return text.trim().split(/\s+/).filter(Boolean).length;
+});
+
+const wordStats = computed(() => {
+  const words = activeWordCount.value;
+  const text = active.value?.text || "";
   const minutes = words ? Math.max(1, Math.ceil(words / 220)) : 0;
   return `${words} words | ${text.length} characters | ${minutes} min read`;
+});
+
+const writerWordGoal = computed(() => {
+  const goal = active.value?.compile?.metadata?.wordGoal;
+  if (!goal || typeof goal !== 'number' || goal <= 0) return null;
+  const current = activeWordCount.value;
+  return { goal, current, pct: Math.min(100, Math.round((current / goal) * 100)), done: current >= goal };
 });
 const editorKeymapStatus = computed(() => {
   if (store.editorKeymapMode === "vim") return `Vim ${vimInputMode.value} mode`;
@@ -19457,6 +19897,16 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
     ]),
     EditorView.domEventHandlers({
       keydown: (event, view) => {
+        if (event.key === '/' && !event.metaKey && !event.ctrlKey && !event.altKey && store.uiMode === 'writer') {
+          const sel = view.state.selection.main;
+          const line = view.state.doc.lineAt(sel.head);
+          const textBefore = view.state.sliceDoc(line.from, sel.head);
+          if (!textBefore.trim()) {
+            event.preventDefault();
+            openSlashPicker();
+            return true;
+          }
+        }
         if (store.editorKeymapMode !== "vim" || vimInputMode.value !== "normal") return false;
         return handleVimNormalKey(event, view, vimKeybindingController);
       },
@@ -19472,7 +19922,17 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
     EditorView.updateListener.of((update) => {
       if (update.docChanged || update.selectionSet) {
         refreshTableCursorCellPreview(update.view);
-        if (update.selectionSet) syncTableEditorFromSourceCursor("selection");
+        if (update.selectionSet) {
+          syncTableEditorFromSourceCursor("selection");
+          const head = update.state.selection.main.head;
+          const newLine = update.state.doc.lineAt(head).number;
+          const prevLine = editorCursorLine.value;
+          editorCursorLine.value = newLine;
+          // Typewriter scrolling: only re-center when cursor moves to a different line
+          if (store.uiMode === 'writer' && newLine !== prevLine) {
+            update.view.dispatch({ effects: EditorView.scrollIntoView(head, { y: 'center', yMargin: 0 }) });
+          }
+        }
       }
       if (!update.docChanged) return;
       if (syncingEditorFromStore) return;
@@ -25445,6 +25905,20 @@ function handlePreviewClick(event: MouseEvent) {
     }
     return;
   }
+  const wikiLink = target.closest('.wiki-link') as HTMLElement | null;
+  if (wikiLink) {
+    event.preventDefault();
+    const docTarget = wikiLink.dataset.wikiTarget;
+    if (docTarget && store.workspaceRoot) {
+      const candidates = [docTarget + '.md', docTarget + '/index.md'];
+      for (const c of candidates) {
+        const fullPath = store.workspaceRoot + '/' + c;
+        void store.openPath(fullPath);
+        return;
+      }
+    }
+    return;
+  }
   const sourceTarget = previewSourceTargetForElement(target);
   if (!sourceTarget?.line) return;
   event.preventDefault();
@@ -25530,7 +26004,715 @@ function setWorkbenchDestination(
   void nextTick(() => workspacePane.value?.focus());
 }
 
+// ── Writer / Pilot mode ──────────────────────────────────────────────────────
+
+function insertMarkdownAtCursor(text: string): void {
+  if (!editorView) return;
+  const cursor = editorView.state.selection.main.head;
+  editorView.dispatch({ changes: { from: cursor, insert: text }, selection: { anchor: cursor + text.length } });
+  editorView.focus();
+}
+
+interface SlashCmd { id: string; name: string; desc: string; icon: string; markdown: string | null; }
+
+const SLASH_CMDS: SlashCmd[] = [
+  { id: 'table',   name: 'Table',          desc: 'Insert a Markdown table',              icon: '⊞', markdown: '\n| Column 1 | Column 2 | Column 3 |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n' },
+  { id: 'callout', name: 'Callout',         desc: 'Note, warning, tip, or danger block',  icon: '📢', markdown: '\n::: note Title\n\nYour note here.\n:::' },
+  { id: 'code',    name: 'Code block',      desc: 'Fenced code or executable transform',  icon: '⚙', markdown: '\n```python exec\n# code here\n```' },
+  { id: 'figure',  name: 'Figure',          desc: 'Image with caption and ID',            icon: '🖼', markdown: '\n![Caption](image.png){#fig:id}' },
+  { id: 'toc',     name: 'Table of contents', desc: 'Auto-generated TOC marker',          icon: '📋', markdown: '\n{{ toc }}\n' },
+  { id: 'pagebreak', name: 'Page break',    desc: 'Section or page break directive',      icon: '⧉', markdown: '\n{{ section-break }}\n' },
+  { id: 'cite',    name: 'Citation',        desc: 'Inline citation reference',            icon: '📖', markdown: '[@key]' },
+  { id: 'equation', name: 'Equation',       desc: 'LaTeX display equation',               icon: '∑', markdown: '\n$$\nE = mc^2\n$$\n' },
+  { id: 'include', name: 'Include',         desc: 'Embed another Markdown file',          icon: '📎', markdown: '\n{{ include: path/to/file.md }}\n' },
+  { id: 'ai',      name: 'AI Draft',        desc: 'Open Docs Live AI drafting assistant', icon: '✦', markdown: null },
+  { id: 'review',  name: 'Review comment', desc: 'Insert a review annotation',            icon: '💬', markdown: '\n<!-- comment: unresolved | author: local | at: TODO | Review note. -->\n' },
+  { id: 'change',  name: 'Change note',    desc: 'Document an inline change',             icon: '📝', markdown: '\n<!-- change-note: | author: local | at: TODO | Changed because... -->\n' },
+  { id: 'variable', name: 'Variable',      desc: 'Reference a workspace variable',        icon: '{}', markdown: '{{variableName}}' },
+  { id: 'hr',      name: 'Divider',        desc: 'Horizontal rule',                       icon: '—', markdown: '\n---\n' },
+  { id: 'transforms', name: 'Transform palette', desc: 'Open the full transform picker (⌘⇧T)', icon: '⊞', markdown: null },
+];
+
+const recentSlashIds = ref<string[]>([]);
+
+// ── Transform picker palette ──────────────────────────────────────────────────
+interface TransformCard { name: string; label: string; icon: string; group: string; starter: string; external?: boolean; }
+
+const TRANSFORM_CARDS: TransformCard[] = [
+  // ── Calculate ────────────────────────────────────────────────────────────────
+  { name: 'calc',       label: 'Calc',      icon: '∑',  group: 'Calculate', starter: '\n```calc\nvalue = 100\nresult = value * 1.2\n```\n{{=result}}\n' },
+  // ── Charts ───────────────────────────────────────────────────────────────────
+  { name: 'waterfall', label: 'Waterfall',  icon: '⊢',  group: 'Charts', starter: '\n```chart\ntype: waterfall\ndata:\n  - label: Revenue\n    value: 500\n  - label: Costs\n    value: -180\n  - label: Tax\n    value: -60\n  - label: Net\n    value: 260\nvaluePrefix: "$"\n```\n' },
+  { name: 'stacked',   label: 'Stacked bar',icon: '⊟',  group: 'Charts', starter: '\n```chart\ntype: stacked\ndata:\n  - label: Q1\n    Product A: 120\n    Product B: 80\n  - label: Q2\n    Product A: 145\n    Product B: 95\n```\n' },
+  { name: 'donut',     label: 'Donut',      icon: '◎',  group: 'Charts', starter: '\n```chart\ntype: donut\ndata:\n  - label: Category A\n    value: 42\n  - label: Category B\n    value: 28\n  - label: Category C\n    value: 30\n```\n' },
+  { name: 'funnel',    label: 'Funnel',     icon: '▽',  group: 'Charts', starter: '\n```chart\ntype: funnel\ndata:\n  - label: Leads\n    value: 1000\n  - label: Qualified\n    value: 400\n  - label: Proposals\n    value: 180\n  - label: Won\n    value: 72\n```\n' },
+  { name: 'scatter',   label: 'Scatter',    icon: '⋮',  group: 'Charts', starter: '\n```chart\ntype: scatter\ndata:\n  - label: "10"\n    value: 28\n  - label: "20"\n    value: 45\n  - label: "30"\n    value: 38\n```\n' },
+  // ── Data ─────────────────────────────────────────────────────────────────────
+  { name: 'csv',        label: 'CSV',        icon: '⊞',  group: 'Data',      starter: '\n```csv\nName,Value\nItem A,100\nItem B,200\n```\n' },
+  { name: 'tsv',        label: 'TSV',        icon: '⊟',  group: 'Data',      starter: '\n```tsv\nName\tValue\nItem A\t100\nItem B\t200\n```\n' },
+  { name: 'sql',        label: 'SQL',        icon: '⛁',  group: 'Data',      starter: '\n```sql db=data.db\nSELECT * FROM table LIMIT 10;\n```\n' },
+  { name: 'json',       label: 'JSON',       icon: '{ }', group: 'Data',     starter: '\n```json\n{\n  "key": "value"\n}\n```\n' },
+  { name: 'yaml',       label: 'YAML',       icon: '—:',  group: 'Data',     starter: '\n```yaml\nkey: value\nitems:\n  - a\n  - b\n```\n' },
+  // ── Visualize ────────────────────────────────────────────────────────────────
+  { name: 'chart',      label: 'Chart',      icon: '▤',  group: 'Visualize', starter: '\n```chart\ntype: bar\ndata:\n  labels: [Q1, Q2, Q3]\n  values: [120, 145, 98]\n```\n' },
+  { name: 'vega-lite',  label: 'Vega-Lite',  icon: '📈', group: 'Visualize', starter: '\n```vega-lite\n{"$schema":"https://vega.github.io/schema/vega-lite/v5.json","data":{"values":[{"x":"A","y":10},{"x":"B","y":20}]},"mark":"bar","encoding":{"x":{"field":"x","type":"ordinal"},"y":{"field":"y","type":"quantitative"}}}\n```\n' },
+  { name: 'geojson',    label: 'GeoJSON',    icon: '🗺', group: 'Visualize', starter: '\n```geojson\n{"type":"FeatureCollection","features":[]}\n```\n' },
+  { name: 'stl',        label: 'STL',        icon: '⬡',  group: 'Visualize', starter: '\n```stl\n# Paste base64-encoded STL binary here\n```\n' },
+  { name: 'gauge',     label: 'Gauge',      icon: '◔',  group: 'Visualize', starter: '\n```chart\ntype: gauge\ndata:\n  - label: Revenue\n    value: 73\ntarget: 100\ntargetLabel: Goal\nvalueSuffix: "%"\n```\n' },
+  { name: 'heatmap',   label: 'Heatmap',    icon: '⊡',  group: 'Visualize', starter: '\n```chart\ntype: heatmap\ndata:\n  - label: Q1\n    series1: 45\n    series2: 78\n  - label: Q2\n    series1: 62\n    series2: 41\n```\n' },
+  // ── Diagram ──────────────────────────────────────────────────────────────────
+  { name: 'mermaid',    label: 'Mermaid',    icon: '⬡',  group: 'Diagram',   starter: '\n```mermaid\ngraph LR\n    A --> B --> C\n```\n' },
+  { name: 'dot',        label: 'Graphviz',   icon: '○',  group: 'Diagram',   starter: '\n```dot\ndigraph G {\n    A -> B -> C;\n}\n```\n', external: true },
+  { name: 'plantuml',   label: 'PlantUML',   icon: '⊷',  group: 'Diagram',   starter: '\n```plantuml\n@startuml\nA -> B : message\n@enduml\n```\n', external: true },
+  { name: 'pikchr',     label: 'Pikchr',     icon: '✎',  group: 'Diagram',   starter: '\n```pikchr\nbox "A" -> box "B"\n```\n', external: true },
+  { name: 'd2',         label: 'D2',         icon: '⟶',  group: 'Diagram',   starter: '\n```d2\na -> b -> c\n```\n', external: true },
+  // ── Structure ────────────────────────────────────────────────────────────────
+  { name: 'raci',           label: 'RACI',          icon: '⊞', group: 'Structure', starter: '\n```raci\nTask | Responsible | Accountable | Consulted | Informed\nRequirements | BA | PM | Legal | Exec\nDevelopment | Dev | TechLead | QA | PM\nRelease | DevOps | PM | Dev | Exec\n```\n' },
+  { name: 'comparison',     label: 'Comparison',    icon: '⊨', group: 'Structure', starter: '\n```comparison\nfeatures:\n  - Real-time sync\n  - Offline mode\n  - API access\nproducts:\n  - name: Our Product\n    values: [yes, yes, yes]\n  - name: Competitor A\n    values: [yes, no, partial]\n  - name: Competitor B\n    values: [no, yes, no]\n```\n' },
+  { name: 'status-table',   label: 'Status (RAG)',  icon: '🔴', group: 'Structure', starter: '\n```status-table\n- item: Budget\n  status: green\n  note: On track — $12k under budget\n- item: Timeline\n  status: amber\n  note: 2-week slip in phase 2\n- item: Scope\n  status: red\n  note: Requirements expanding — escalated\n```\n' },
+  { name: 'decision-table', label: 'Decision table',icon: '⊡', group: 'Structure', starter: '\n```decision-table\nconditions:\n  - Revenue > 1M\n  - Customer type: Enterprise\nactions:\n  - Apply 20% discount\n  - Assign account manager\nrules:\n  - [Y, Y, Y, Y]\n  - [Y, N, N, N]\n  - [N, -, Y, N]\n```\n' },
+  // ── Document ─────────────────────────────────────────────────────────────────
+  { name: 'timeline',   label: 'Timeline',   icon: '⏱',  group: 'Document',  starter: '\n```timeline\n2024-Q1: Phase 1\n2024-Q2: Beta\n2024-Q4: GA\n```\n' },
+  { name: 'roadmap',    label: 'Roadmap',    icon: '▶',  group: 'Document',  starter: '\n```roadmap\nFeature A | Q1 | Done\nFeature B | Q2 | In Progress\nFeature C | Q3 | Planned\n```\n' },
+  { name: 'diff',       label: 'Diff',       icon: '⊕',  group: 'Document',  starter: '\n```diff\n- Old text\n+ New text\n```\n' },
+  { name: 'qr',         label: 'QR Code',    icon: '⊟',  group: 'Document',  starter: '\n```qr\nhttps://example.com\n```\n' },
+  { name: 'glossary',   label: 'Glossary',   icon: 'Aa', group: 'Document',  starter: '\n```glossary\nTerm: Definition of the term.\n```\n' },
+  { name: 'adr',        label: 'ADR',        icon: '📋', group: 'Document',  starter: '\n```adr\ntitle: Decision title\nstatus: proposed\ncontext: |\n  Context here.\ndecision: |\n  Decision here.\nconsequences: |\n  Consequences here.\n```\n' },
+  { name: 'gantt',    label: 'Gantt',    icon: '⊪', group: 'Document', starter: '\n```gantt\nPhase 1: Planning | 0 | 20\nPhase 2: Design | 20 | 45\nPhase 3: Build | 40 | 80 | Engineering\nPhase 4: Test | 75 | 90 | QA\nPhase 5: Launch | 90 | 100 | All\n```\n' },
+  { name: 'kanban',   label: 'Kanban',   icon: '▦', group: 'Document', starter: '\n```kanban\ncolumns:\n  - name: Backlog\n    items: [Define requirements, Stakeholder review]\n  - name: In Progress\n    items: [Build feature X, Write tests]\n  - name: Review\n    items: [PR #42]\n  - name: Done\n    items: [Deploy to staging]\n```\n' },
+  { name: 'changelog', label: 'Changelog', icon: '📦', group: 'Document', starter: '\n```changelog\n## v1.2.0 — 2024-06-01\n### Added\n- Feature X with full API support\n- Dark mode support\n### Fixed\n- Crash on empty input\n### Changed\n- Improved load time by 40%\n## v1.1.0 — 2024-04-15\n### Added\n- Initial release\n```\n' },
+  { name: 'process',  label: 'Process',  icon: '⟳', group: 'Document', starter: '\n```process\n1. Receive RFP | Owner: BD | Duration: 1d\n2. Internal review | Owner: Leadership | Duration: 3d\n3. Draft response | Owner: Team | Duration: 7d\n4. Legal review | Owner: Legal | Duration: 2d\n5. Submit | Owner: BD | Duration: 1d\n```\n' },
+  { name: 'org',      label: 'Org chart', icon: '⊟', group: 'Document', starter: '\n```org\nCEO\n  VP Engineering\n    Lead Engineer\n    Lead QA\n  VP Sales\n    Account Manager\n  CFO\n```\n' },
+  // ── Reference ────────────────────────────────────────────────────────────────
+  { name: 'openapi',    label: 'OpenAPI',    icon: '↔',  group: 'Reference', starter: '\n```openapi\nopenapi: "3.0.0"\ninfo:\n  title: API\n  version: "1.0"\npaths: {}\n```\n' },
+  { name: 'json-schema', label: 'Schema',   icon: '{}', group: 'Reference', starter: '\n```json-schema\n{"type":"object","properties":{"name":{"type":"string"}}}\n```\n' },
+  { name: 'bibtex',     label: 'BibTeX',     icon: '📖', group: 'Reference', starter: '\n```bibtex\n@article{key2024,\n  title = {Article Title},\n  author = {Author, A.},\n  year = {2024}\n}\n```\n' },
+  { name: 'toml', label: 'TOML', icon: '⚙', group: 'Reference', starter: '\n```toml\n[package]\nname = "my-project"\nversion = "0.1.0"\n\n[dependencies]\nserde = "1.0"\n```\n' },
+  // ── External ─────────────────────────────────────────────────────────────────
+  { name: 'python',  label: 'Python',   icon: '🐍', group: 'External', starter: '\n```python\nimport sys\n# Output SVG or HTML to stdout\nprint(\'<div class=\"transform\">Python output here</div>\')\n```\n', external: true },
+  { name: 'r',       label: 'R',        icon: 'R',  group: 'External', starter: '\n```r\n# R code — output SVG to stdout\ncat(\'<div>R output</div>\')\n```\n', external: true },
+  { name: 'ditaa',   label: 'Ditaa',    icon: '⊞',  group: 'External', starter: '\n```ditaa\n+--------+   +-------+\n| Client |-->| Server|\n+--------+   +-------+\n```\n', external: true },
+  { name: 'gnuplot', label: 'Gnuplot',  icon: '〜', group: 'External', starter: '\n```gnuplot\nset terminal svg\nplot sin(x)\n```\n', external: true },
+];
+
+const TRANSFORM_GROUPS = [...new Set(TRANSFORM_CARDS.map(c => c.group))];
+
+function openTransformPicker(): void {
+  transformPickerOpen.value = true;
+  transformPickerMinimized.value = false;
+}
+
+function insertTransformFromPicker(card: TransformCard): void {
+  insertMarkdownAtCursor(card.starter);
+  // don't close — let users chain multiple transforms
+}
+
+function onTransformPickerDragStart(event: MouseEvent): void {
+  const startX = event.clientX - transformPickerPos.value.x;
+  const startY = event.clientY - transformPickerPos.value.y;
+  const onMove = (e: MouseEvent) => {
+    transformPickerPos.value = {
+      x: Math.max(0, Math.min(window.innerWidth - 320, e.clientX - startX)),
+      y: Math.max(0, Math.min(window.innerHeight - 48, e.clientY - startY)),
+    };
+  };
+  const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+
+const filteredSlashCmds = computed(() => {
+  const q = slashPickerQuery.value.toLowerCase().trim();
+  if (q) return SLASH_CMDS.filter(c => c.name.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q));
+  // No query: recently used first, then the rest in original order
+  const recentSet = new Set(recentSlashIds.value);
+  const recent = recentSlashIds.value.map(id => SLASH_CMDS.find(c => c.id === id)).filter(Boolean) as SlashCmd[];
+  return [...recent, ...SLASH_CMDS.filter(c => !recentSet.has(c.id))];
+});
+
+watch(slashPickerQuery, () => { slashPickerSelectedIdx.value = 0; });
+watch(slashPickerOpen, async (open) => { if (open) { await nextTick(); slashPickerInputEl.value?.focus(); } });
+
+function toggleWriterFlyover(panel: 'diagnostics' | 'export'): void {
+  writerFlyover.value = writerFlyover.value === panel ? null : panel;
+}
+
+function onSidebarResizeStart(event: MouseEvent): void {
+  const startX = event.clientX;
+  const startW = sidebarWidth.value;
+  const onMove = (e: MouseEvent) => {
+    sidebarWidth.value = Math.max(160, Math.min(480, startW + (e.clientX - startX)));
+  };
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+  };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+
+function onInspectorResizeStart(event: MouseEvent): void {
+  const startX = event.clientX;
+  const startW = inspectorWidth.value;
+  const onMove = (e: MouseEvent) => {
+    // Dragging the left edge: moving left (negative delta) widens the inspector
+    inspectorWidth.value = Math.max(160, Math.min(480, startW - (e.clientX - startX)));
+  };
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+  };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+
+// Track session words when entering Writer mode
+watch(() => store.uiMode, (mode) => {
+  if (mode === 'writer' && sessionStartWords.value === null) {
+    sessionStartWords.value = activeWordCount.value;
+  }
+});
+
+const sessionWordsAdded = computed(() => {
+  if (sessionStartWords.value === null || store.uiMode !== 'writer') return null;
+  return Math.max(0, activeWordCount.value - sessionStartWords.value);
+});
+
+const PANEL_LABELS: Record<string, string> = {
+  files: 'Files', outline: 'Outline', diagnostics: 'Diagnostics', layout: 'Layout',
+  tables: 'Tables', templates: 'Templates', references: 'References',
+  exports: 'Export', versioning: 'Versioning', review: 'Review', help: 'Help', settings: 'Settings',
+};
+const currentPanelLabel = computed(() => PANEL_LABELS[store.sidebar as string] || String(store.sidebar));
+
+const activityBadges = computed(() => {
+  const diags = active.value?.compile?.diagnostics || [];
+  const errors = diags.filter(d => d.severity === 'error').length;
+  const warns  = diags.filter(d => d.severity === 'warning').length;
+  const unresolved = active.value?.compile?.semantic.comments?.filter(c => c.state !== 'resolved').length || 0;
+  const exportIssues = store.exportReadiness?.error_count || 0;
+  return {
+    document: errors + warns,
+    history:  unresolved,
+    exports:  exportIssues,
+  } as Record<string, number>;
+});
+
+function openSlashPicker(): void {
+  slashPickerQuery.value = '';
+  slashPickerSelectedIdx.value = 0;
+  // Position near CodeMirror cursor when available
+  if (editorView) {
+    const head = editorView.state.selection.main.head;
+    const coords = editorView.coordsAtPos(head);
+    if (coords) {
+      const W = 340, H = 360, GAP = 6;
+      const top = coords.bottom + GAP;
+      const adjustedTop = top + H > window.innerHeight ? Math.max(GAP, coords.top - H - GAP) : top;
+      const left = Math.max(GAP, Math.min(coords.left, window.innerWidth - W - GAP));
+      slashPickerPos.value = { top: adjustedTop, left };
+    } else {
+      slashPickerPos.value = { top: -1, left: -1 };
+    }
+  } else {
+    slashPickerPos.value = { top: -1, left: -1 };
+  }
+  slashPickerOpen.value = true;
+}
+
+function closeSlashPicker(): void {
+  slashPickerOpen.value = false;
+}
+
+function runSlashCmd(cmd: SlashCmd): void {
+  closeSlashPicker();
+  recentSlashIds.value = [cmd.id, ...recentSlashIds.value.filter(id => id !== cmd.id)].slice(0, 4);
+  if (cmd.id === 'ai') { openDocsLive(); return; }
+  if (cmd.id === 'transforms') { openTransformPicker(); return; }
+  if (cmd.markdown) insertMarkdownAtCursor(cmd.markdown);
+}
+
+function handleSlashPickerKeydown(event: KeyboardEvent): void {
+  const items = filteredSlashCmds.value;
+  if (event.key === 'Escape') { event.preventDefault(); closeSlashPicker(); }
+  else if (event.key === 'ArrowDown') { event.preventDefault(); slashPickerSelectedIdx.value = Math.min(slashPickerSelectedIdx.value + 1, items.length - 1); }
+  else if (event.key === 'ArrowUp') { event.preventDefault(); slashPickerSelectedIdx.value = Math.max(slashPickerSelectedIdx.value - 1, 0); }
+  else if (event.key === 'Enter') { event.preventDefault(); const c = items[slashPickerSelectedIdx.value]; if (c) runSlashCmd(c); }
+}
+
+// Activity bar
+interface ActivityGroup { id: string; label: string; icon: ToolbarIconName; panels: string[]; }
+const ACTIVITY_GROUPS: ActivityGroup[] = [
+  { id: 'files',    label: 'Files & Workspace',     icon: 'open',       panels: ['files'] },
+  { id: 'document', label: 'Document & Diagnostics', icon: 'layout',     panels: ['outline', 'diagnostics', 'layout'] },
+  { id: 'tables',   label: 'Tables & Structure',    icon: 'table',      panels: ['tables'] },
+  { id: 'content',  label: 'Templates & References', icon: 'templates',  panels: ['templates', 'references'] },
+  { id: 'exports',  label: 'Export & Publish',       icon: 'export',     panels: ['exports'] },
+  { id: 'history',  label: 'Review & History',       icon: 'versioning', panels: ['versioning', 'review'] },
+  { id: 'settings', label: 'Settings & Help',        icon: 'settings',   panels: ['settings', 'help'] },
+];
+
+function actGroupActive(group: ActivityGroup): boolean {
+  return group.panels.includes(store.sidebar as string);
+}
+
+function selectActivityGroup(group: ActivityGroup): void {
+  if (actGroupActive(group)) {
+    const idx = group.panels.indexOf(store.sidebar as string);
+    store.sidebar = group.panels[(idx + 1) % group.panels.length] as typeof store.sidebar;
+  } else {
+    store.sidebar = group.panels[0] as typeof store.sidebar;
+  }
+}
+
+// Inspector context
+const inspectorCtx = computed(() => {
+  type IRow = { label: string; value: string };
+  type IAction = { label: string; run: () => void };
+  const doc = active.value;
+  if (!doc?.compile) {
+    return { kind: 'Document', title: doc?.title || 'Untitled', rows: [] as IRow[], actions: [] as IAction[] };
+  }
+
+  const compile = doc.compile;
+  const line = editorCursorLine.value;
+  const blocks = compile.document_ast?.blocks || [];
+  const block = line > 0 ? blocks.find(b => line >= b.line && line <= b.end_line) : null;
+
+  if (block?.kind === 'table') {
+    return {
+      kind: 'Table',
+      title: (block as any).caption || `Table — line ${block.line}`,
+      rows: [
+        { label: 'Columns', value: String((block as any).headers?.length ?? 0) },
+        { label: 'Rows',    value: String((block as any).rows?.length ?? 0) },
+        { label: 'ID',      value: (block as any).id || '—' },
+        { label: 'Caption', value: (block as any).caption || '—' },
+      ] as IRow[],
+      actions: [{ label: 'Open table editor', run: () => { store.sidebar = 'tables' as typeof store.sidebar; } }] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'heading') {
+    return {
+      kind: `H${(block as any).level} Heading`,
+      title: (block as any).text || '',
+      rows: [
+        { label: 'Level',  value: `H${(block as any).level}` },
+        { label: 'Anchor', value: (block as any).anchor || '—' },
+        { label: 'Line',   value: String(block.line) },
+      ] as IRow[],
+      actions: [
+        { label: 'View outline', run: () => { store.sidebar = 'outline' as typeof store.sidebar; } },
+        ...((block as any).anchor ? [{ label: 'Copy anchor', run: () => { void navigator.clipboard.writeText(`#${(block as any).anchor}`); } }] : []),
+      ] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'code_block') {
+    const lang = (block as any).language;
+    const lines = ((block as any).code as string | undefined)?.split('\n').length ?? 0;
+    return {
+      kind: lang ? `Code · ${lang}` : 'Code block',
+      title: lang || 'Plain',
+      rows: [
+        { label: 'Language', value: lang || '—' },
+        { label: 'Lines',    value: String(lines) },
+      ] as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'transform') {
+    const b = block as any;
+    const artifact = compile.transform_artifacts?.find(
+      a => a.source_line != null && a.source_line >= block.line && a.source_line <= block.end_line,
+    );
+    const status = artifact
+      ? (artifact.diagnostics?.length ? `${artifact.diagnostics.length} issue(s)` : '✓ ok')
+      : 'not run';
+    return {
+      kind: `Transform · ${b.name}`,
+      title: b.name,
+      rows: [
+        { label: 'Engine',   value: b.name || '—' },
+        { label: 'Output',   value: b.output_kind || '—' },
+        { label: 'Status',   value: status },
+        { label: 'Duration', value: artifact?.duration_ms != null ? `${artifact.duration_ms}ms` : '—' },
+      ] as IRow[],
+      actions: [{ label: 'Transform settings', run: () => { store.sidebar = 'settings' as typeof store.sidebar; } }] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'figure') {
+    const b = block as any;
+    return {
+      kind: 'Figure',
+      title: b.caption || b.alt || '—',
+      rows: [
+        { label: 'Source',  value: b.src || '—' },
+        { label: 'Alt',     value: b.alt || '—' },
+        { label: 'Caption', value: b.caption || '—' },
+        { label: 'ID',      value: b.id || '—' },
+      ] as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'equation') {
+    const b = block as any;
+    return {
+      kind: 'Equation',
+      title: b.caption || 'Equation',
+      rows: [
+        { label: 'ID',      value: b.id || '—' },
+        { label: 'Caption', value: b.caption || '—' },
+      ] as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  // Paragraph: word count + inline citation lookup
+  if (block?.kind === 'paragraph') {
+    const text = ((block as any).text as string | undefined) || '';
+    const words = text.split(/\s+/).filter(Boolean).length;
+    const chars = text.length;
+    const inlines: Array<{ kind: string; key?: string; keys?: string[] }> = (block as any).inlines || [];
+    const citationKeys = inlines
+      .filter(i => i.kind === 'citation')
+      .flatMap(i => i.keys?.length ? i.keys : (i.key ? [i.key] : []));
+    const bibEntries = citationKeys
+      .map(k => compile.bibliography.find(b => b.key === k))
+      .filter(Boolean) as Array<{ key: string; title: string; author?: string | null; issued?: string | null }>;
+    const citationRows: IRow[] = bibEntries.map(b => ({
+      label: b.key,
+      value: (b.title || '—') + (b.author ? ` · ${b.author}` : '') + (b.issued ? ` (${b.issued.slice(0,4)})` : ''),
+    }));
+    return {
+      kind: citationKeys.length ? `Paragraph · ${citationKeys.length} citation${citationKeys.length > 1 ? 's' : ''}` : 'Paragraph',
+      title: text.slice(0, 55) + (text.length > 55 ? '…' : ''),
+      rows: [
+        { label: 'Words', value: String(words) },
+        { label: 'Chars', value: String(chars) },
+        ...citationRows,
+      ] as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'list') {
+    const b = block as any;
+    return {
+      kind: b.ordered ? 'Ordered list' : 'Unordered list',
+      title: `${(b.items as string[]).length} item${(b.items as string[]).length !== 1 ? 's' : ''}`,
+      rows: [
+        { label: 'Items', value: String((b.items as string[]).length) },
+        { label: 'Style', value: b.ordered ? 'Numbered' : 'Bulleted' },
+      ] as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'task_list') {
+    const items: Array<{ checked: boolean; text: string }> = (block as any).items || [];
+    const done = items.filter(i => i.checked).length;
+    const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+    return {
+      kind: 'Task list',
+      title: `${done}/${items.length} complete`,
+      rows: [
+        { label: 'Total',    value: String(items.length) },
+        { label: 'Done',     value: String(done) },
+        { label: 'Progress', value: `${pct}%` },
+      ] as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'block_quote') {
+    const text = ((block as any).text as string | undefined) || '';
+    const words = text.split(/\s+/).filter(Boolean).length;
+    return {
+      kind: 'Block quote',
+      title: text.slice(0, 55) + (text.length > 55 ? '…' : ''),
+      rows: [
+        { label: 'Words', value: String(words) },
+        { label: 'Line',  value: String(block.line) },
+      ] as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'layout') {
+    const b = block as any;
+    const s = b.settings as Record<string, unknown> || {};
+    return {
+      kind: `Layout · ${b.directive}`,
+      title: b.directive,
+      rows: [
+        { label: 'Page size',   value: String(s.page_size   ?? '—') },
+        { label: 'Orientation', value: String(s.orientation ?? '—') },
+        { label: 'Margins',     value: String(s.margins     ?? '—') },
+        { label: 'Columns',     value: String(s.columns     ?? '—') },
+      ].filter(r => r.value !== '—') as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'review_comment') {
+    const c = (block as any).comment as Record<string, unknown> || {};
+    return {
+      kind: 'Review comment',
+      title: String(c.text ?? '').slice(0, 55),
+      rows: [
+        { label: 'Author', value: String(c.author ?? '—') },
+        { label: 'State',  value: String(c.state ?? '—') },
+        { label: 'Date',   value: String(c.created_at ?? '—').slice(0, 10) || '—' },
+      ] as IRow[],
+      actions: [{ label: 'Review panel', run: () => { store.sidebar = 'review' as typeof store.sidebar; } }] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'ai_source') {
+    const p = (block as any).provenance as Record<string, unknown> || {};
+    return {
+      kind: 'AI source',
+      title: `${String(p.provider ?? '')} · ${String(p.model ?? '')}`,
+      rows: [
+        { label: 'Provider',    value: String(p.provider     ?? '—') },
+        { label: 'Model',       value: String(p.model        ?? '—') },
+        { label: 'Status',      value: String(p.status       ?? '—') },
+        { label: 'Reviewed by', value: String(p.reviewed_by  ?? '—') },
+        { label: 'Date',        value: String(p.reviewed_at  ?? '—').slice(0, 10) || '—' },
+      ] as IRow[],
+      actions: [{ label: 'AI governance panel', run: () => { store.sidebar = 'review' as typeof store.sidebar; } }] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'footnotes') {
+    const entries: Array<{ number: number; key: string; text: string }> = (block as any).entries || [];
+    return {
+      kind: 'Footnotes',
+      title: `${entries.length} footnote${entries.length !== 1 ? 's' : ''}`,
+      rows: entries.slice(0, 6).map(e => ({ label: `[${e.number}]`, value: e.text.slice(0, 70) + (e.text.length > 70 ? '…' : '') })) as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  // Front matter: cursor is above the first content block
+  if (line > 0 && !block && blocks.length > 0 && line < blocks[0].line) {
+    const s = compile.semantic;
+    const meta = compile.metadata as Record<string, unknown>;
+    const metaRows: IRow[] = [
+      { label: 'Title',   value: s.title || '—' },
+      { label: 'Status',  value: s.status || '—' },
+      { label: 'Author',  value: String(meta.author ?? '—') },
+      { label: 'Date',    value: String(meta.date ?? '—') },
+      { label: 'Version', value: String(meta.version ?? '—') },
+    ].filter(r => r.value !== '—');
+    return {
+      kind: 'Front Matter',
+      title: s.title || 'Metadata',
+      rows: metaRows,
+      actions: [] as IAction[],
+    };
+  }
+
+  if (block?.kind === 'callout') {
+    const b = block as any;
+    return {
+      kind: `Callout · ${b.callout_type}`,
+      title: b.title || b.callout_type,
+      rows: [
+        { label: 'Type',  value: b.callout_type || '—' },
+        { label: 'Title', value: b.title || '—' },
+      ] as IRow[],
+      actions: [] as IAction[],
+    };
+  }
+
+  // Default: document summary
+  const s = compile.semantic;
+  const diags = compile.diagnostics || [];
+  const errors = diags.filter(d => d.severity === 'error').length;
+  const warns  = diags.filter(d => d.severity === 'warning').length;
+  return {
+    kind: 'Document',
+    title: s.title || doc.title,
+    rows: [
+      { label: 'Status',    value: s.status || 'draft' },
+      { label: 'Words',     value: String(activeWordCount.value) },
+      { label: 'Read time', value: `${Math.max(1, Math.ceil(activeWordCount.value / 220))} min` },
+      { label: 'Headings',  value: String(s.headings?.length || 0) },
+      { label: 'Tables',    value: String(s.tables || 0) },
+      { label: 'Citations', value: String(s.citations?.length || 0) },
+      { label: 'Errors',    value: String(errors) },
+      { label: 'Warnings',  value: String(warns) },
+    ] as IRow[],
+    actions: [
+      ...(errors ? [{ label: 'View errors', run: () => { store.sidebar = 'diagnostics' as typeof store.sidebar; } }] : []),
+      { label: 'Export readiness', run: () => { store.sidebar = 'exports' as typeof store.sidebar; } },
+    ] as IAction[],
+  };
+});
+
+// Inspector: wrap with source-file attribution when block is from an included file
+const inspectorCtxFull = computed(() => {
+  const ctx = inspectorCtx.value;
+  const line = editorCursorLine.value;
+  const blocks = active.value?.compile?.document_ast?.blocks || [];
+  const block = line > 0 ? blocks.find(b => line >= b.line && line <= b.end_line) : null;
+  const src = block?.source?.source_file;
+  const mainPath = active.value?.path;
+  if (src && (!mainPath || !src.endsWith(mainPath))) {
+    const name = src.split('/').pop() || src;
+    return { ...ctx, rows: [...ctx.rows, { label: 'From', value: name }] };
+  }
+  return ctx;
+});
+
+// Writer status strip idle fade
+const writerStripIdle = ref(false);
+let writerIdleHandle: ReturnType<typeof setTimeout> | null = null;
+
+function resetWriterIdle(): void {
+  if (store.uiMode !== 'writer') return;
+  writerStripIdle.value = false;
+  if (writerIdleHandle !== null) clearTimeout(writerIdleHandle);
+  writerIdleHandle = setTimeout(() => { writerStripIdle.value = true; }, 3500);
+}
+
+watch([() => active.value?.text, editorCursorLine], resetWriterIdle);
+watch(() => store.uiMode, (m) => { if (m !== 'writer') { if (writerIdleHandle !== null) clearTimeout(writerIdleHandle); writerStripIdle.value = false; } });
+
+// Writer status strip
+const writerDiagSummary = computed(() => {
+  const diags = active.value?.compile?.diagnostics || [];
+  const e = diags.filter(d => d.severity === 'error').length;
+  const w = diags.filter(d => d.severity === 'warning').length;
+  if (e) return { text: `⚠ ${e} error${e>1?'s':''}`, cls: 'ws-seg-error' };
+  if (w) return { text: `${w} warning${w>1?'s':''}`, cls: '' };
+  return { text: '✓ clean', cls: 'ws-seg-ready' };
+});
+
+const writerExportSummary = computed(() => {
+  const r = store.exportReadiness;
+  if (!r) return { text: 'export', cls: '' };
+  return r.ready ? { text: '✓ ready', cls: 'ws-seg-ready' } : { text: `${r.error_count} issue${r.error_count!==1?'s':''}`, cls: 'ws-seg-error' };
+});
+
+function toggleUiMode(): void {
+  store.uiMode = store.uiMode === 'writer' ? 'pilot' : 'writer';
+  void store.persistWorkspace();
+}
+
+async function runWorkspaceSearch(): Promise<void> {
+  if (!store.workspaceRoot || !workspaceSearchQuery.value.trim()) return;
+  workspaceSearchBusy.value = true;
+  workspaceSearchResults.value = [];
+  try {
+    const results = await invoke<Array<{ path: string; line: number; column: number; text: string; excerpt: string }>>('search_workspace', {
+      request: { query: workspaceSearchQuery.value, workspace_root: store.workspaceRoot, case_sensitive: false, max_results: 200 },
+    });
+    workspaceSearchResults.value = results;
+  } catch (e) {
+    console.error(e);
+  } finally {
+    workspaceSearchBusy.value = false;
+  }
+}
+
+function openSearchResult(result: { path: string; line: number }): void {
+  if (store.workspaceRoot) {
+    const fullPath = store.workspaceRoot + '/' + result.path;
+    void store.openPath(fullPath);
+  }
+}
+
+async function runHumanize(): Promise<void> {
+  if (!humanizeInput.value.trim()) return;
+  humanizeBusy.value = true;
+  try {
+    const resp = await invoke<{ humanized: string; changes: string[] }>('get_humanize_prompt', {
+      request: { text: humanizeInput.value, mode: 'standard' },
+    });
+    humanizeResult.value = resp.humanized;
+    humanizeChanges.value = resp.changes;
+  } catch (e) {
+    console.error(e);
+  } finally {
+    humanizeBusy.value = false;
+  }
+}
+
+function applyHumanized(): void {
+  if (!humanizeResult.value) return;
+  insertMarkdownAtCursor(humanizeResult.value);
+  humanizeOpen.value = false;
+  humanizeResult.value = '';
+}
+
+function openHumanizer(): void {
+  const sel = editorView?.state?.selection?.main;
+  if (sel && !sel.empty && editorView) {
+    humanizeInput.value = editorView.state.doc.sliceString(sel.from, sel.to);
+  } else {
+    humanizeInput.value = active.value?.text || '';
+  }
+  humanizeResult.value = '';
+  humanizeChanges.value = [];
+  humanizeOpen.value = true;
+}
+
+async function runCompare(): Promise<void> {
+  if (!comparePathA.value || !comparePathB.value) return;
+  compareBusy.value = true;
+  try {
+    const result = await invoke<{ label_a: string; label_b: string; diff: Array<{ kind: string; line_a?: number; line_b?: number; text: string }>; added: number; removed: number; unchanged: number }>('compare_documents', {
+      request: { path_a: comparePathA.value, path_b: comparePathB.value },
+    });
+    compareResult.value = result;
+  } catch (e) {
+    console.error(e);
+  } finally {
+    compareBusy.value = false;
+  }
+}
+
+
+async function checkDocLocked(): Promise<void> {
+  const doc = active.value;
+  if (!doc?.path) { docLocked.value = false; return; }
+  try {
+    docLocked.value = await invoke<boolean>('check_document_approval', { path: doc.path });
+  } catch { docLocked.value = false; }
+}
+
+// Check lock status when active document changes
+watch(() => active.value?.path, checkDocLocked, { immediate: true });
+
 function handleShortcut(event: KeyboardEvent) {
+  if (event.metaKey || event.ctrlKey) {
+    const k = event.key;
+    if (k === '\\' ) { event.preventDefault(); toggleUiMode(); return; }
+    if (k === '/' && !event.shiftKey) { event.preventDefault(); openSlashPicker(); return; }
+    if (k === 't' && event.shiftKey) { event.preventDefault(); openTransformPicker(); return; }
+    if (k === 'u' && event.shiftKey) { event.preventDefault(); openHumanizer(); return; }
+    // ⌘1–7: switch activity group in Pilot mode (before editable-target guard)
+    if (store.uiMode === 'pilot' && !event.shiftKey && !event.altKey) {
+      const digit = parseInt(k);
+      if (digit >= 1 && digit <= 7) {
+        const group = ACTIVITY_GROUPS[digit - 1];
+        if (group) { event.preventDefault(); selectActivityGroup(group); return; }
+      }
+    }
+    // ⌘K works even when the editor is focused (editable target)
+    if ((k === 'k' || (k === 'p' && event.shiftKey)) && isEditableShortcutTarget(event.target)) {
+      event.preventDefault();
+      commandPaletteOpen.value = true;
+      return;
+    }
+  }
   if (!(event.metaKey || event.ctrlKey) || isEditableShortcutTarget(event.target)) return;
   const key = event.key.toLowerCase();
   if (isReservedEmacsEditorShortcut(event, key)) return;
@@ -26754,6 +27936,60 @@ select:hover {
   overflow: hidden;
 }
 
+/* Pilot mode: collapse multi-row toolbar into a single compact scrollable strip */
+.app-shell.ui-mode-pilot .command-bar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0;
+  padding: 3px 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.app-shell.ui-mode-pilot .command-bar::-webkit-scrollbar { display: none; }
+
+.app-shell.ui-mode-pilot .command-toolbar-row {
+  display: inline-flex;
+  flex-direction: row;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  min-height: 32px;
+  padding: 0 6px 0 0;
+  border-right: 1px solid #d0d9e4;
+  margin-right: 4px;
+}
+
+.app-shell.ui-mode-pilot .command-toolbar-row:last-child {
+  border-right: none;
+  margin-right: 0;
+}
+
+/* Hide row headings and group labels in compact strip */
+.app-shell.ui-mode-pilot .command-toolbar-heading { display: none; }
+.app-shell.ui-mode-pilot .command-group-label { display: none; }
+.app-shell.ui-mode-pilot .command-group {
+  border: none;
+  padding: 2px 3px;
+  gap: 2px;
+}
+
+/* Make icon buttons slightly smaller in the strip */
+.app-shell.ui-mode-pilot .icon-command {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 5px;
+  font-size: 10px;
+}
+
+/* Compact the view toolbar row fields */
+.app-shell.ui-mode-pilot .compact-field { font-size: 10px; }
+.app-shell.ui-mode-pilot .compact-field select { height: 24px; font-size: 10px; }
+.app-shell.ui-mode-pilot .compact-toolbar-toggle { min-height: 26px; font-size: 10px; }
+
 .command-toolbar-row {
   display: flex;
   align-items: center;
@@ -27386,6 +28622,7 @@ select:hover {
 }
 
 .sidebar {
+  position: relative;
   padding: 12px;
   background: #f7f9fb;
 }
@@ -34205,4 +35442,1218 @@ select:hover {
     justify-content: start;
   }
 }
+
+/* ── Writer / Pilot mode ──────────────────────────────────────────────────── */
+
+.app-shell.ui-mode-writer {
+  grid-template-rows: 38px 0 minmax(0, 1fr) 22px;
+}
+
+.app-shell.ui-mode-writer .command-bar { display: none; }
+
+.app-shell.ui-mode-writer .titlebar {
+  background: rgba(237,241,245,0.88);
+  backdrop-filter: blur(8px);
+  border-bottom-color: rgba(201,210,220,0.4);
+}
+
+.app-shell[data-theme="dark"].ui-mode-writer .titlebar {
+  background: rgba(17,24,33,0.88);
+  border-bottom-color: rgba(41,56,74,0.4);
+}
+
+.app-shell.ui-mode-writer .workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell.ui-mode-writer .activity-bar,
+.app-shell.ui-mode-writer .sidebar,
+.app-shell.ui-mode-writer .pane-splitter,
+.app-shell.ui-mode-writer .preview-pane,
+.app-shell.ui-mode-writer .inspector-pane {
+  display: none !important;
+}
+
+.app-shell.ui-mode-writer .editor-pane {
+  border-right: none;
+}
+
+.app-shell.ui-mode-writer .status-bar { display: none; }
+
+/* Writer status strip */
+.writer-status-strip {
+  display: none;
+  align-items: stretch;
+  height: 22px;
+  background: #edf1f5;
+  border-top: 1px solid #d0d9e4;
+  font-size: 11px;
+  overflow: hidden;
+}
+
+.app-shell.ui-mode-writer .writer-status-strip { display: flex; }
+
+.app-shell[data-theme="dark"] .writer-status-strip {
+  background: #111821;
+  border-color: #29384a;
+}
+
+.ws-seg {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: none;
+  border-radius: 0;
+  border-right: 1px solid #d0d9e4;
+  background: transparent;
+  color: #526171;
+  font-size: 11px;
+  font-weight: 600;
+  min-height: 0;
+  white-space: nowrap;
+  cursor: default;
+  line-height: 1;
+}
+
+button.ws-seg { cursor: pointer; }
+button.ws-seg:hover { background: #dce6f0; color: #1e3a56; border-color: #d0d9e4; }
+
+.app-shell[data-theme="dark"] .ws-seg {
+  color: #7a9ab8;
+  border-color: #29384a;
+}
+
+.app-shell[data-theme="dark"] button.ws-seg:hover {
+  background: #1a2d42;
+  color: #c0d8f0;
+}
+
+.ws-seg-error { color: #b91c1c !important; }
+.ws-seg-ready { color: #1a6b48 !important; }
+
+.ws-seg-pilot {
+  margin-left: auto;
+  border-right: none;
+  border-left: 1px solid #d0d9e4;
+  color: #2a5a90;
+  padding: 0 13px;
+  font-weight: 750;
+  font-size: 12px;
+}
+
+.app-shell[data-theme="dark"] .ws-seg-pilot { color: #6aacdc; border-color: #29384a; }
+
+/* Activity bar */
+.activity-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 40px;
+  padding: 4px 0;
+  gap: 2px;
+  background: #edf1f7;
+  border-right: 1px solid #d0d9e4;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.app-shell[data-theme="dark"] .activity-bar {
+  background: #161f2c;
+  border-color: #29384a;
+}
+
+.activity-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #5a7190;
+  cursor: pointer;
+}
+
+.activity-bar-btn:hover {
+  background: #dce5f0;
+  color: #1a3a5a;
+  border-color: transparent;
+}
+
+.activity-bar-btn.act-active {
+  background: #dbeeff;
+  border-color: #7eaedd;
+  color: #1a4a7a;
+}
+
+.app-shell[data-theme="dark"] .activity-bar-btn { color: #6a8aaa; }
+.app-shell[data-theme="dark"] .activity-bar-btn:hover { background: #1e2f42; color: #b8d4ec; }
+.app-shell[data-theme="dark"] .activity-bar-btn.act-active {
+  background: #163050;
+  border-color: #3a6fa0;
+  color: #80c0f0;
+}
+
+.activity-bar-btn svg { width: 17px; height: 17px; stroke-width: 1.7; }
+
+/* Pilot mode workspace with activity bar + inspector columns */
+.app-shell.ui-mode-pilot .workspace:not(.mode-outline):not(.workspace-writing-maximized) {
+  grid-template-columns:
+    40px var(--sidebar-panel-width, 220px) minmax(200px, calc((100vw - 308px) * var(--editor-ratio, 0.5)))
+    8px minmax(200px, 1fr) var(--inspector-width, 220px);
+}
+
+.app-shell.ui-mode-pilot .workspace.mode-source:not(.mode-outline):not(.workspace-writing-maximized),
+.app-shell.ui-mode-pilot .workspace.mode-focus:not(.mode-outline):not(.workspace-writing-maximized) {
+  grid-template-columns: 40px var(--sidebar-panel-width, 220px) minmax(0, 1fr) var(--inspector-width, 220px);
+}
+
+.app-shell.ui-mode-pilot .workspace.mode-preview:not(.mode-outline):not(.workspace-writing-maximized),
+.app-shell.ui-mode-pilot .workspace.mode-export:not(.mode-outline):not(.workspace-writing-maximized),
+.app-shell.ui-mode-pilot .workspace.mode-presentation:not(.mode-outline):not(.workspace-writing-maximized) {
+  grid-template-columns: 40px var(--sidebar-panel-width, 220px) minmax(0, 1fr) var(--inspector-width, 220px);
+}
+
+/* Inspector pane */
+.inspector-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid #c9d2dc;
+  background: #f4f7fb;
+  font-size: 12px;
+}
+
+.app-shell[data-theme="dark"] .inspector-pane {
+  background: #131c28;
+  border-color: #29384a;
+}
+
+.inspector-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px 6px;
+  border-bottom: 1px solid #d0d9e4;
+  background: #edf1f7;
+}
+
+.app-shell[data-theme="dark"] .inspector-header { background: #161f2c; border-color: #29384a; }
+
+.inspector-kind {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5a7090;
+}
+
+.app-shell[data-theme="dark"] .inspector-kind { color: #6a90b8; }
+
+.inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.inspector-row {
+  margin-bottom: 9px;
+}
+
+.inspector-lbl {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8090a4;
+  margin-bottom: 1px;
+}
+
+.inspector-val {
+  display: block;
+  font-size: 12px;
+  color: #1e3040;
+  word-break: break-word;
+}
+
+.app-shell[data-theme="dark"] .inspector-val { color: #c0d4ec; }
+
+.inspector-act {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-size: 11px;
+  text-align: left;
+}
+
+/* Slash command picker */
+.slash-picker {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  max-height: 380px;
+  border: 1px solid #7eaedd;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(24,36,52,0.22), 0 0 0 1px rgba(125,172,220,0.28);
+  overflow: hidden;
+}
+
+.app-shell[data-theme="dark"] .slash-picker {
+  background: #1a2535;
+  border-color: #3a6090;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+}
+
+.slash-picker-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border-bottom: 1px solid #d8eaf8;
+  background: #f4f9ff;
+}
+
+.app-shell[data-theme="dark"] .slash-picker-input-row {
+  background: #141e2e;
+  border-color: #2a3e58;
+}
+
+.slash-picker-slash {
+  font-size: 15px;
+  font-weight: 800;
+  color: #4080c0;
+  line-height: 1;
+}
+
+.slash-picker-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: #18212f;
+  min-height: 0;
+  outline: none;
+}
+
+.app-shell[data-theme="dark"] .slash-picker-input { color: #e0ecf8; }
+
+.slash-picker-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+
+.slash-picker-item {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 13px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  min-height: 0;
+  cursor: pointer;
+  color: #1e3040;
+}
+
+.slash-picker-item:hover,
+.slash-picker-item.slash-sel {
+  background: #e4f0ff;
+  color: #0f2a48;
+  border-color: transparent;
+}
+
+.app-shell[data-theme="dark"] .slash-picker-item { color: #c0d8f0; }
+.app-shell[data-theme="dark"] .slash-picker-item:hover,
+.app-shell[data-theme="dark"] .slash-picker-item.slash-sel {
+  background: #1e3050;
+  color: #e0f0ff;
+}
+
+.slash-picker-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: #dbeeff;
+  font-size: 15px;
+}
+
+.app-shell[data-theme="dark"] .slash-picker-icon { background: #1a3a5e; }
+
+.slash-picker-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.slash-picker-desc {
+  display: block;
+  font-size: 11px;
+  color: #7a8ea0;
+  line-height: 1.3;
+}
+
+.app-shell[data-theme="dark"] .slash-picker-desc { color: #6a8aaa; }
+
+.slash-picker-empty {
+  padding: 18px 14px;
+  text-align: center;
+  color: #8a9aaa;
+  font-size: 12px;
+}
+
+.slash-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 599;
+  background: transparent;
+}
+
+/* Mode toggle button in titlebar */
+.ui-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  min-height: 0;
+  border: 1px solid #c0ccda;
+  border-radius: 5px;
+  background: #f0f6ff;
+  color: #2a5a90;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.ui-mode-btn:hover { background: #dbeeff; border-color: #7eaedd; color: #1a4a7a; }
+
+.app-shell.ui-mode-writer .ui-mode-btn {
+  background: #dbeeff;
+  border-color: #7eaedd;
+  color: #1a4a7a;
+}
+
+.app-shell[data-theme="dark"] .ui-mode-btn {
+  background: #1a2a3e;
+  border-color: #2a4060;
+  color: #80b8e8;
+}
+
+.app-shell[data-theme="dark"] .ui-mode-btn:hover {
+  background: #1e3454;
+  border-color: #3a70a0;
+  color: #a0d0f8;
+}
+
+/* ── Sidebar panel header (Pilot mode) ───────────────────────────────────── */
+.sidebar-panel-header {
+  display: flex;
+  align-items: center;
+  padding: 7px 12px 6px;
+  border-bottom: 1px solid #d0d9e4;
+  background: #edf1f7;
+  min-height: 32px;
+}
+
+.app-shell[data-theme="dark"] .sidebar-panel-header {
+  background: #161f2c;
+  border-color: #29384a;
+}
+
+.sidebar-panel-name {
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5a7090;
+}
+
+.app-shell[data-theme="dark"] .sidebar-panel-name { color: #6a90b8; }
+
+/* ── Sidebar resize handle ───────────────────────────────────────────────── */
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle:active { background: rgba(99, 134, 180, 0.3); }
+
+/* ── Writer mode: document title overlay ─────────────────────────────────── */
+.writer-doc-title {
+  padding: 18px 48px 4px;
+  font-size: 20px;
+  font-weight: 750;
+  color: #18212f;
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.app-shell[data-theme="dark"] .writer-doc-title { color: #e0ecf8; }
+
+/* ── Writer status strip: idle fade ─────────────────────────────────────── */
+.writer-status-strip {
+  transition: opacity 0.6s ease;
+}
+
+.writer-status-strip.writer-strip-idle {
+  opacity: 0.18;
+}
+
+.writer-status-strip.writer-strip-idle:hover {
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+/* ── Transform picker palette ────────────────────────────────────────────── */
+.transform-picker {
+  position: fixed;
+  z-index: 400;
+  width: 320px;
+  border: 1px solid #7eaedd;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgba(24,36,52,0.18), 0 0 0 1px rgba(125,172,220,0.18);
+  overflow: hidden;
+}
+
+.app-shell[data-theme="dark"] .transform-picker {
+  background: #1a2535;
+  border-color: #3a6090;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+}
+
+.transform-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px 6px;
+  background: #f0f7ff;
+  border-bottom: 1px solid #d8eaf8;
+  cursor: grab;
+  cursor: -webkit-grab;
+}
+
+.transform-picker-header:active { cursor: grabbing; cursor: -webkit-grabbing; }
+
+.transform-picker-min .transform-picker-header { border-bottom: none; }
+
+.app-shell[data-theme="dark"] .transform-picker-header {
+  background: #141e2e;
+  border-color: #2a3e58;
+}
+
+.transform-picker-title {
+  font-size: 12px;
+  font-weight: 750;
+  color: #1a3a5e;
+  pointer-events: none;
+}
+
+.app-shell[data-theme="dark"] .transform-picker-title { color: #90c0f0; }
+
+.transform-picker-controls { display: flex; gap: 4px; }
+
+.tp-ctrl {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #5a7090;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tp-ctrl:hover { background: #dbeeff; color: #1a4a7a; }
+
+.app-shell[data-theme="dark"] .tp-ctrl { color: #6a90b8; }
+.app-shell[data-theme="dark"] .tp-ctrl:hover { background: #1e3050; color: #80c0f0; }
+
+.transform-picker-body {
+  padding: 8px 8px 4px;
+  max-height: 480px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.tp-group { margin-bottom: 8px; }
+
+.tp-group-label {
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8090a4;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+
+.app-shell[data-theme="dark"] .tp-group-label { color: #5a7090; }
+
+.tp-cards { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.tp-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 52px;
+  min-height: 0;
+  padding: 4px 3px;
+  border: 1px solid #d0dce8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #1e3040;
+  cursor: pointer;
+  gap: 3px;
+  transition: background 0.1s, border-color 0.1s, transform 0.08s;
+}
+
+.tp-card:hover {
+  background: #e4f0ff;
+  border-color: #7eaedd;
+  color: #0f2a48;
+  transform: translateY(-1px);
+}
+
+.tp-card:active { transform: translateY(0); }
+
+.tp-card.tp-card-ext {
+  border-style: dashed;
+  opacity: 0.72;
+}
+
+.tp-card.tp-card-ext:hover { opacity: 1; }
+
+.app-shell[data-theme="dark"] .tp-card {
+  background: #1e2d42;
+  border-color: #2a4060;
+  color: #c0d8f0;
+}
+
+.app-shell[data-theme="dark"] .tp-card:hover {
+  background: #1e3454;
+  border-color: #3a70a0;
+  color: #e0f0ff;
+}
+
+.tp-icon {
+  font-size: 16px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.tp-label {
+  font-size: 9px;
+  font-weight: 650;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+  pointer-events: none;
+}
+
+.tp-hint {
+  font-size: 10px;
+  color: #8090a4;
+  padding: 4px 2px 6px;
+  margin: 0;
+  border-top: 1px solid #edf1f7;
+  margin-top: 4px;
+}
+
+.app-shell[data-theme="dark"] .tp-hint { color: #5a7090; border-color: #29384a; }
+
+/* ── KaTeX equation rendering ────────────────────────────────────────────── */
+
+/* KaTeX fonts are bundled by Vite; the import at the top handles them. */
+
+/* Display equations */
+.preview-document figure.equation {
+  margin: 1.6em 0;
+  text-align: center;
+  page-break-inside: avoid;
+}
+
+.preview-document .math-rendered.math-display {
+  font-size: 1.08em;
+  line-height: 1.5;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25em 0;
+}
+
+.preview-document figure.equation figcaption {
+  margin-top: 0.5em;
+  font-size: 0.82em;
+  color: #5a7090;
+  font-style: italic;
+}
+
+/* Inline math */
+.preview-document .math.math-inline {
+  display: inline;
+}
+
+.preview-document .math-rendered {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Math source disclosure */
+.preview-document details.math-source {
+  margin-top: 0.5em;
+  font-size: 0.8em;
+  color: #8090a8;
+}
+
+.preview-document details.math-source summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Render errors: show raw LaTeX with a red border */
+.preview-document .katex-error {
+  color: #b91c1c;
+  border-bottom: 1.5px dashed #b91c1c;
+  padding-bottom: 1px;
+}
+
+/* Dark theme adjustments */
+.preview-pane[data-preview-theme="dark"] figure.equation figcaption { color: #7a9ab8; }
+.preview-pane[data-preview-theme="dark"] details.math-source { color: #6a8aaa; }
+.preview-pane[data-preview-theme="dark"] .katex { color: #e0ecf8; }
+
+/* ── Word goal progress segment ──────────────────────────────────────────── */
+.ws-seg-goal {
+  position: relative;
+  min-width: 52px;
+  overflow: hidden;
+  padding: 0 8px;
+  cursor: default;
+}
+
+.ws-goal-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(59, 130, 246, 0.18);
+  transition: width 0.3s ease;
+  pointer-events: none;
+}
+
+.ws-seg-goal.ws-seg-ready .ws-goal-bar { background: rgba(22, 163, 74, 0.2); }
+
+.ws-goal-label {
+  position: relative;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell[data-theme="dark"] .ws-goal-bar { background: rgba(96, 165, 250, 0.2); }
+.app-shell[data-theme="dark"] .ws-seg-goal.ws-seg-ready .ws-goal-bar { background: rgba(74, 222, 128, 0.2); }
+
+/* ── Slash picker: cursor-anchored variant ───────────────────────────────── */
+.slash-picker.slash-picker-anchored {
+  position: fixed;
+  top: auto;
+  left: auto;
+  transform: none;
+}
+
+/* ── Inspector collapse ──────────────────────────────────────────────────── */
+.inspector-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #5a7090;
+  font-size: 9px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.inspector-collapse-btn:hover { background: #dbeeff; color: #1a4a7a; }
+.app-shell[data-theme="dark"] .inspector-collapse-btn { color: #6a8aaa; }
+.app-shell[data-theme="dark"] .inspector-collapse-btn:hover { background: #1e3050; color: #80c0f0; }
+
+.app-shell.ui-mode-pilot .inspector-pane:has(.inspector-body:not([style*="display: none"])) {
+  min-width: 220px;
+}
+
+/* Collapsed inspector: shrink to header only */
+.inspector-pane.is-collapsed { width: 32px; min-width: 32px; overflow: hidden; }
+.inspector-pane.is-collapsed .inspector-header {
+  flex-direction: column;
+  padding: 6px 4px;
+  writing-mode: vertical-rl;
+  height: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.inspector-pane.is-collapsed .inspector-kind { writing-mode: vertical-rl; font-size: 9px; }
+.inspector-pane.is-collapsed .inspector-collapse-btn { writing-mode: horizontal-tb; margin-left: 0; margin-top: auto; }
+
+/* ── Activity bar badges ─────────────────────────────────────────────────── */
+.activity-bar-btn { position: relative; }
+
+.activity-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.app-shell[data-theme="dark"] .activity-badge { background: #ef4444; }
+
+/* ── Writer flyovers ──────────────────────────────────────────────────────── */
+
+.writer-flyover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 498;
+  background: transparent;
+}
+
+.writer-flyover {
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 499;
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: 340px;
+  border: 1px solid #7eaedd;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 -4px 24px rgba(24,36,52,0.18), 0 0 0 1px rgba(125,172,220,0.2);
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.app-shell[data-theme="dark"] .writer-flyover {
+  background: #1a2535;
+  border-color: #3a6090;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.45);
+}
+
+.writer-flyover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 7px;
+  border-bottom: 1px solid #d8eaf8;
+  background: #f0f7ff;
+  font-size: 11px;
+  font-weight: 750;
+  color: #1a3a5e;
+}
+
+.app-shell[data-theme="dark"] .writer-flyover-header {
+  background: #141e2e;
+  border-color: #2a3e58;
+  color: #90c8f0;
+}
+
+.writer-flyover-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #5a7090;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.writer-flyover-close:hover { background: #dbeeff; color: #1a4a7a; }
+
+.writer-flyover-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+.writer-flyover-empty {
+  margin: 8px 0 0;
+  color: #7a8ea0;
+  font-size: 12px;
+}
+
+.writer-flyover-diag {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid #edf1f7;
+}
+
+.writer-flyover-diag:last-child { border-bottom: none; }
+
+.flyover-sev {
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.flyover-error .flyover-sev { color: #b91c1c; }
+.flyover-warning .flyover-sev { color: #92400e; }
+.flyover-info .flyover-sev { color: #1d4ed8; }
+
+.flyover-msg { font-size: 12px; color: #1e3040; }
+.app-shell[data-theme="dark"] .flyover-msg { color: #c0d8f0; }
+
+.flyover-loc { color: #8a9aaa; font-size: 10px; white-space: nowrap; }
+
+.flyover-summary {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.flyover-ok { color: #1a6b48; }
+.flyover-err { color: #b91c1c; }
+
+.writer-flyover-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-top: 1px solid #d8eaf8;
+  background: #f8fbff;
+}
+
+.app-shell[data-theme="dark"] .writer-flyover-footer {
+  background: #141e2e;
+  border-color: #2a3e58;
+}
+
+.writer-flyover-footer button {
+  font-size: 11px;
+  height: 26px;
+  min-height: 0;
+  padding: 0 10px;
+}
+
+/* ── Inspector resize handle ──────────────────────────────────────────────── */
+.inspector-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.inspector-resize-handle:hover,
+.inspector-resize-handle:active {
+  background: rgba(99, 134, 180, 0.35);
+}
+
+/* ── Writer focus dimming ─────────────────────────────────────────────────── */
+.editor-pane.focus-mode .cm-line {
+  opacity: 0.28;
+  transition: opacity 0.18s ease;
+}
+
+.editor-pane.focus-mode .cm-activeLine {
+  opacity: 1;
+}
+
+.editor-pane.focus-mode .cm-activeLine ~ .cm-line:first-of-type {
+  opacity: 0.55;
+}
+
+/* ── Session word count segment ──────────────────────────────────────────── */
+.ws-seg-session {
+  color: #2a6baf;
+  font-weight: 750;
+}
+
+.app-shell[data-theme="dark"] .ws-seg-session { color: #6aacdc; }
+
+/* ── Slash picker: divider + keyboard hint ───────────────────────────────── */
+.slash-picker-divider {
+  padding: 4px 13px 2px;
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a9aaa;
+}
+
+.app-shell[data-theme="dark"] .slash-picker-divider { color: #5a7090; }
+
+.slash-picker-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 13px;
+  border-top: 1px solid #d8eaf8;
+  background: #f4f9ff;
+  font-size: 10px;
+  color: #8a9aaa;
+}
+
+.app-shell[data-theme="dark"] .slash-picker-hint {
+  background: #141e2e;
+  border-color: #2a3e58;
+  color: #5a7090;
+}
+
+.slash-picker-hint span::before {
+  font-weight: 700;
+  color: #607090;
+  margin-right: 3px;
+}
+
+/* Active state for status strip segments when flyover is open */
+.ws-seg-active {
+  background: #dbeeff !important;
+  color: #1a4a7a !important;
+  border-color: #7eaedd;
+}
+
+.app-shell[data-theme="dark"] .ws-seg-active {
+  background: #163050 !important;
+  color: #80c0f0 !important;
+}
+
+/* ── Document transform base ─────────────────────────────────────────────── */
+.transform { overflow-x: auto; margin: 1em 0; }
+
+/* ── RACI matrix ─────────────────────────────────────────────────────────── */
+.transform-raci { width: 100%; border-collapse: collapse; font-size: 13px; }
+.transform-raci th { background: #f0f6ff; padding: 8px 12px; text-align: left; border: 1px solid #c9d8ea; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #3a5a82; }
+.transform-raci td { padding: 7px 12px; border: 1px solid #dce6f0; }
+.raci-task { font-weight: 600; color: #1e3040; }
+.raci-cell { text-align: center; font-weight: 750; font-size: 13px; }
+.raci-r { background: #dbeeff; color: #1a4a8a; }
+.raci-a { background: #fff3e0; color: #9a4a00; }
+.raci-c { background: #e8f8f0; color: #1a6b48; }
+.raci-i { background: #f5f0ff; color: #5a2a9a; }
+.raci-s { background: #fef3c7; color: #92400e; }
+
+/* ── Comparison matrix ───────────────────────────────────────────────────── */
+.transform-comparison { width: 100%; border-collapse: collapse; font-size: 13px; }
+.transform-comparison th { background: #f0f6ff; padding: 8px 14px; text-align: center; border: 1px solid #c9d8ea; font-weight: 700; color: #1a3a6a; }
+.transform-comparison th:first-child { text-align: left; }
+.transform-comparison td { padding: 7px 14px; border: 1px solid #dce6f0; text-align: center; }
+.comparison-feature { text-align: left; font-weight: 600; color: #1e3040; }
+.cmp-yes { color: #1a6b48; font-weight: 750; font-size: 16px; }
+.cmp-no { color: #b91c1c; font-weight: 750; font-size: 16px; }
+.cmp-partial { color: #92400e; font-weight: 750; }
+.cmp-value { color: #1e3040; }
+.cmp-none { color: #94a3b8; }
+
+/* ── Status (RAG) table ─────────────────────────────────────────────────── */
+.transform-status-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.transform-status-table th { background: #f0f4f8; padding: 7px 14px; text-align: left; border-bottom: 2px solid #c9d8ea; font-size: 11px; text-transform: uppercase; color: #5a7090; font-weight: 700; }
+.transform-status-table td { padding: 8px 14px; border-bottom: 1px solid #edf1f7; }
+.rag-green span { background: #dcfce7; color: #15803d; padding: 2px 10px; border-radius: 99px; font-weight: 700; font-size: 12px; }
+.rag-amber span { background: #fef9c3; color: #92400e; padding: 2px 10px; border-radius: 99px; font-weight: 700; font-size: 12px; }
+.rag-red span { background: #fee2e2; color: #b91c1c; padding: 2px 10px; border-radius: 99px; font-weight: 700; font-size: 12px; }
+.rag-grey span { background: #f1f5f9; color: #64748b; padding: 2px 10px; border-radius: 99px; font-weight: 700; font-size: 12px; }
+
+/* ── Decision table ─────────────────────────────────────────────────────── */
+.transform-decision-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.transform-decision-table th { background: #f0f4f8; padding: 6px 10px; border: 1px solid #c9d8ea; text-align: center; color: #5a7090; font-size: 11px; font-weight: 700; }
+.transform-decision-table td { padding: 6px 10px; border: 1px solid #dce6f0; text-align: center; }
+.dt-condition td:first-child { text-align: left; font-style: italic; color: #526171; }
+.dt-action td:first-child { text-align: left; font-weight: 600; color: #1e3040; }
+.dt-yes { background: #dcfce7; color: #15803d; font-weight: 750; }
+.dt-no { background: #fee2e2; color: #b91c1c; font-weight: 750; }
+.dt-any { color: #94a3b8; }
+
+/* ── Kanban board ───────────────────────────────────────────────────────── */
+.transform-kanban { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.kanban-column { flex: 0 0 200px; min-width: 160px; }
+.kanban-col-title { margin: 0 0 8px; font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.04em; color: #5a7090; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; }
+.kanban-cards { display: flex; flex-direction: column; gap: 6px; }
+.kanban-card { background: #ffffff; border: 1px solid #d0dce8; border-radius: 7px; padding: 8px 10px; font-size: 12px; color: #1e3040; box-shadow: 0 1px 3px rgba(24,36,52,0.06); line-height: 1.4; }
+
+/* ── Changelog ───────────────────────────────────────────────────────────── */
+.transform-changelog { font-size: 13px; }
+.changelog-version { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+.changelog-version summary { padding: 9px 14px; background: #f8fafc; cursor: pointer; font-weight: 700; color: #1e3040; font-size: 13px; list-style: none; }
+.changelog-version summary::-webkit-details-marker { display: none; }
+.changelog-version[open] summary { border-bottom: 1px solid #e2e8f0; }
+.changelog-section { margin: 10px 14px 4px; font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.05em; color: #5a7090; }
+.changelog-items { margin: 4px 14px 10px; padding-left: 16px; }
+.changelog-items li { margin-bottom: 3px; color: #1e3040; line-height: 1.5; }
+
+/* ── Process steps ──────────────────────────────────────────────────────── */
+.transform-process { padding-left: 0; list-style: none; counter-reset: step; }
+.process-step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+.process-step::before { counter-increment: step; content: counter(step); display: flex; align-items: center; justify-content: center; flex: 0 0 28px; height: 28px; border-radius: 50%; background: #275DA8; color: #fff; font-size: 13px; font-weight: 750; }
+.process-step-body { flex: 1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.process-step-name { font-weight: 650; color: #1e3040; font-size: 13px; }
+.process-step-owner { font-size: 11px; color: #5a7090; background: #e8f0f8; padding: 1px 8px; border-radius: 99px; }
+.process-step-duration { font-size: 11px; color: #92400e; background: #fef3c7; padding: 1px 8px; border-radius: 99px; }
+
+/* ── Org chart ───────────────────────────────────────────────────────────── */
+.transform-org { overflow-x: auto; }
+.org-root, .org-children { list-style: none; padding-left: 0; margin: 0; }
+.org-root { padding: 8px 0; }
+.org-node { position: relative; padding: 4px 0 4px 24px; }
+.org-node::before { content: ""; position: absolute; left: 8px; top: 0; bottom: 0; border-left: 1.5px solid #c9d8ea; }
+.org-node:last-child::before { bottom: 50%; }
+.org-node::after { content: ""; position: absolute; left: 8px; top: 17px; width: 14px; border-top: 1.5px solid #c9d8ea; }
+.org-card { display: inline-block; padding: 5px 12px; background: #f0f6ff; border: 1px solid #c9d8ea; border-radius: 6px; font-size: 12px; font-weight: 600; color: #1e3040; margin-bottom: 4px; }
+.org-root > .org-node::before { display: none; }
+.org-root > .org-node::after { display: none; }
+.org-root > .org-node { padding-left: 0; }
+.org-children { margin-top: 2px; }
+
+/* ── Gantt chart ─────────────────────────────────────────────────────────── */
+.transform-gantt { font-size: 12px; }
+.gantt-chart { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
+.gantt-row { display: grid; grid-template-columns: 180px 1fr; gap: 8px; align-items: center; min-height: 28px; }
+.gantt-label { font-size: 12px; color: #1e3040; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+.gantt-owner { font-size: 10px; color: #7a8ea0; background: #f0f4f8; padding: 1px 6px; border-radius: 99px; white-space: nowrap; }
+.gantt-track { position: relative; height: 22px; background: #f0f4f8; border-radius: 4px; overflow: hidden; }
+.gantt-bar { position: absolute; height: 100%; background: #275DA8; border-radius: 4px; min-width: 4px; }
+.gantt-done { height: 100%; background: rgba(255,255,255,0.35); }
+
+/* ── TOML ────────────────────────────────────────────────────────────────── */
+.transform-toml { background: #1e2535; color: #e0ecf8; padding: 14px 16px; border-radius: 8px; font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.6; overflow-x: auto; }
+
+/* ── Wiki links ──────────────────────────────────────────────────────────── */
+.wiki-link { color: #275DA8; text-decoration: none; border-bottom: 1px dashed #7eaedd; cursor: pointer; }
+.wiki-link:hover { background: #e8f0ff; border-bottom-style: solid; }
+
+/* ── Chart: waterfall, stacked, donut, funnel, gauge, heatmap, scatter ───── */
+.transform-chart { max-width: 100%; height: auto; }
+svg.transform-chart { display: block; margin: 0 auto; }
+
+/* ── Track changes ───────────────────────────────────────────────────────── */
+ins.tracked-ins { background: #dcfce7; color: #15803d; text-decoration: none; border-radius: 2px; padding: 0 1px; }
+del.tracked-del { background: #fee2e2; color: #b91c1c; text-decoration: line-through; border-radius: 2px; padding: 0 1px; }
+
+/* ── Approval lock indicator ─────────────────────────────────────────────── */
+.doc-locked-banner { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: #fef9c3; border: 1px solid #fbbf24; border-radius: 7px; margin-bottom: 10px; font-size: 12px; color: #92400e; font-weight: 650; }
+
+/* Workspace search */
+.workspace-search-box { display: flex; gap: 6px; margin-bottom: 8px; }
+.workspace-search-input { flex: 1; padding: 5px 8px; border: 1px solid #c9d2dc; border-radius: 6px; font: inherit; font-size: 12px; }
+.workspace-search-results { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; max-height: 340px; overflow-y: auto; }
+.ws-search-result { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 4px; padding: 5px 8px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; background: #fafcfe; }
+.ws-search-result:hover { background: #e8f0ff; border-color: #7eaedd; }
+.ws-sr-path { font-size: 11px; font-weight: 650; color: #275DA8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-sr-line { font-size: 10px; color: #8090a4; white-space: nowrap; }
+.ws-sr-excerpt { grid-column: 1 / -1; font-size: 11px; color: #526171; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Editor locked */
+.editor-locked { opacity: 0.6; pointer-events: none; user-select: none; }
+
+/* Humanizer + comparison modals */
+.humanize-modal, .compare-modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 601; width: min(600px, 96vw); max-height: 90vh;
+  border: 1px solid #7eaedd; border-radius: 12px; background: #fff;
+  box-shadow: 0 12px 40px rgba(24,36,52,0.22); display: flex; flex-direction: column; overflow: hidden;
+}
+.app-shell[data-theme="dark"] .humanize-modal,
+.app-shell[data-theme="dark"] .compare-modal { background: #1a2535; border-color: #3a6090; }
+.humanize-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f0f7ff; border-bottom: 1px solid #d8eaf8; font-size: 13px; font-weight: 750; color: #1a3a5e; }
+.app-shell[data-theme="dark"] .humanize-header { background: #141e2e; border-color: #2a3e58; color: #90c0f0; }
+.humanize-body { padding: 14px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.humanize-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #5a7090; }
+.humanize-textarea { font: 13px/1.5 ui-monospace, monospace; padding: 8px; border: 1px solid #c9d2dc; border-radius: 6px; resize: vertical; }
+.humanize-input { padding: 7px 10px; border: 1px solid #c9d2dc; border-radius: 6px; font: inherit; font-size: 13px; width: 100%; }
+.humanize-run-btn { align-self: flex-start; font-weight: 750; background: #275DA8; color: #fff; border: none; padding: 6px 16px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.humanize-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.humanize-changes { display: flex; flex-direction: column; gap: 3px; }
+.humanize-change { font-size: 11px; color: #1a6b48; }
+.humanize-actions { display: flex; gap: 8px; }
+
+/* Compare modal */
+.compare-result { display: flex; flex-direction: column; overflow: hidden; }
+.compare-stats { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid #e2e8f0; font-size: 12px; font-weight: 650; }
+.cmp-added { color: #15803d; }
+.cmp-removed { color: #b91c1c; }
+.cmp-unchanged { color: #64748b; }
+.compare-diff { flex: 1; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 11px; }
+.diff-line { display: grid; grid-template-columns: 48px 1fr; gap: 8px; padding: 1px 8px; }
+.diff-added { background: #f0fdf4; }
+.diff-removed { background: #fff1f2; }
+.diff-equal { color: #64748b; }
+.diff-ln { color: #94a3b8; text-align: right; font-size: 10px; padding-top: 1px; }
+.diff-added .diff-text { color: #15803d; }
+.diff-added .diff-text::before { content: "+ "; }
+.diff-removed .diff-text { color: #b91c1c; text-decoration: line-through; }
+.diff-removed .diff-text::before { content: "− "; }
 </style>

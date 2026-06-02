@@ -50,18 +50,34 @@ mod table_cells;
 mod tables;
 mod transform_install;
 mod transforms;
+mod ai_humanizer;
+mod audit;
+mod backlinks;
+mod document_compare;
+mod mail_merge;
+mod pandoc_import;
+mod search;
 mod tts;
 mod utils;
 mod validation;
 mod variables;
+mod webhooks;
 mod workspace_files;
 
 use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
 use ai_cleanup::AiCleanupRequest;
 use citation_discovery::{
-    download_citation_source, list_citation_sources, search_citation_sources,
+    download_citation_source, list_citation_sources, lookup_doi, search_citation_sources,
 };
+use ai_humanizer::get_humanize_prompt;
+use audit::{record_audit_event, read_audit_log};
+use backlinks::{check_document_approval, find_backlinks};
+use document_compare::compare_documents;
+use mail_merge::run_mail_merge;
+use pandoc_import::import_document;
+use search::search_workspace;
+use webhooks::fire_webhook;
 use cli::{
     cli_deploy_plan, configure_default_markdown_reader, create_support_bundle,
     default_markdown_reader_plan, deploy_cli, pending_cli_open_paths,
@@ -73,7 +89,7 @@ use compiler::{compile_document, compile_document_with_options, run_transform};
 pub(crate) use compiler_types::{
     CompileRequest, CompileResponse, ExportManifest, Heading, IncludeEdge, SourceMapEntry,
 };
-use data_exchange::{export_markdown_tables, import_spreadsheet_table};
+use data_exchange::{export_markdown_tables, fetch_rest_source, import_spreadsheet_table};
 pub(crate) use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
@@ -224,7 +240,19 @@ pub fn run() {
             desktop_workflow_smoke_named_path,
             desktop_workflow_smoke_export_path,
             emit_desktop_workflow_smoke_menu_command,
-            write_desktop_workflow_smoke_report
+            write_desktop_workflow_smoke_report,
+            search_workspace,
+            lookup_doi,
+            import_document,
+            run_mail_merge,
+            fire_webhook,
+            record_audit_event,
+            read_audit_log,
+            get_humanize_prompt,
+            compare_documents,
+            find_backlinks,
+            check_document_approval,
+            fetch_rest_source
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");

@@ -42,6 +42,9 @@ pub(crate) fn validate_git_restore_target(cwd: &Path, path: &Path) -> Result<(),
     let parent = path
         .parent()
         .ok_or_else(|| "Git restore target must have a parent directory.".to_string())?;
+    if !parent.exists() {
+        return Err("Git restore target's parent directory does not exist.".to_string());
+    }
     let parent = parent.canonicalize().map_err(|err| err.to_string())?;
     if !parent.starts_with(&repo_root) {
         return Err("Git restore target must stay inside the repository.".to_string());
@@ -84,7 +87,7 @@ fn validate_git_refish(label: &str, value: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn git_repo_root(cwd: &Path) -> Result<PathBuf, String> {
+pub(crate) fn git_repo_root(cwd: &Path) -> Result<PathBuf, String> {
     let root = run_git(cwd, &["rev-parse", "--show-toplevel"])?;
     PathBuf::from(root.trim())
         .canonicalize()

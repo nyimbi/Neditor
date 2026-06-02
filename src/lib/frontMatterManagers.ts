@@ -735,7 +735,8 @@ function normalizeDataSourceKind(value: string): FrontMatterDataSourceKind {
   const normalized = value.trim().toLowerCase();
   if (normalized === "yml") return "yaml";
   if (DATA_SOURCE_TYPE_OPTIONS.includes(normalized as SupportedDataSourceKind)) return normalized;
-  return normalized || "csv";
+  if (!normalized) return "csv";
+  return normalized;
 }
 
 function dataSourceStatus(path: string, kind: FrontMatterDataSourceKind): FrontMatterDataSourceStatus {
@@ -896,6 +897,7 @@ function isYamlNullToken(value: string) {
 
 function collectYamlBlockScalar(lines: string[], endIndex: number, index: number, indent: number, style: string) {
   const collected: string[] = [];
+  let contentIndentChars: number | null = null;
   for (let nextIndex = index + 1; nextIndex < endIndex; nextIndex += 1) {
     const next = lines[nextIndex];
     if (!next.trim()) {
@@ -904,10 +906,16 @@ function collectYamlBlockScalar(lines: string[], endIndex: number, index: number
     }
     const nextIndent = yamlIndentWidth(next.match(/^\s*/)?.[0] || "");
     if (nextIndent <= indent) break;
-    collected.push(next.slice(Math.min(next.length, indent + 2)));
+    if (contentIndentChars === null) {
+      contentIndentChars = next.match(/^\s*/)?.[0].length ?? 0;
+    }
+    collected.push(next.slice(contentIndentChars));
   }
-  const text = style === ">" ? collected.map((line) => line.trim()).filter(Boolean).join(" ") : collected.join("\n").trim();
-  return text.replace(/\s+/g, " ").trim();
+  if (style === ">") {
+    const text = collected.map((line) => line.trim()).filter(Boolean).join(" ");
+    return text.replace(/\s+/g, " ").trim();
+  }
+  return collected.join("\n").trim();
 }
 
 function startsWithFrontMatter(text: string) {

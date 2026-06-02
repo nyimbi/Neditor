@@ -1,5 +1,23 @@
 use serde::{Deserialize, Serialize};
 use std::process::{Command, Stdio};
+use tauri::Emitter;
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TransformInstallStepResult {
+    pub(crate) command: String,
+    pub(crate) success: bool,
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) stderr: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TransformInstallProgressPayload {
+    pub(crate) plan_id: String,
+    pub(crate) step_index: usize,
+    pub(crate) total_steps: usize,
+    pub(crate) result: TransformInstallStepResult,
+    pub(crate) finished: bool,
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct TransformHandlerInstallerPlan {
@@ -41,6 +59,7 @@ pub(crate) fn list_transform_handler_installers() -> Vec<TransformHandlerInstall
 
 #[tauri::command]
 pub(crate) fn install_transform_handlers(
+    app: tauri::AppHandle,
     request: TransformHandlerInstallRequest,
 ) -> Result<TransformHandlerInstallResponse, String> {
     let platform = std::env::consts::OS;
@@ -58,14 +77,43 @@ pub(crate) fn install_transform_handlers(
         return Err("No transform handler installer steps are configured.".to_string());
     }
     let commands = steps.iter().map(format_installer_step).collect::<Vec<_>>();
+    let plan_id = request.plan_id.clone();
+    let total_steps = steps.len();
+    let event_app = app.clone();
     std::thread::spawn(move || {
-        for step in steps {
-            let _ = Command::new(step.program)
-                .args(step.args)
+        for (index, step) in steps.iter().enumerate() {
+            let command_label = format_installer_step(step);
+            let output = Command::new(step.program)
+                .args(&step.args)
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
+                .stderr(Stdio::piped())
+                .output();
+            let result = match output {
+                Ok(out) => TransformInstallStepResult {
+                    command: command_label,
+                    success: out.status.success(),
+                    exit_code: out.status.code(),
+                    stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+                },
+                Err(err) => TransformInstallStepResult {
+                    command: command_label,
+                    success: false,
+                    exit_code: None,
+                    stderr: err.to_string(),
+                },
+            };
+            let finished = index + 1 == total_steps;
+            let _ = event_app.emit(
+                "transform-install-progress",
+                TransformInstallProgressPayload {
+                    plan_id: plan_id.clone(),
+                    step_index: index,
+                    total_steps,
+                    result,
+                    finished,
+                },
+            );
         }
     });
 

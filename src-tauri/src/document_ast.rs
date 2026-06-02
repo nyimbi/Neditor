@@ -697,9 +697,10 @@ fn flush_ast_paragraph(
     if paragraph_lines.is_empty() {
         return;
     }
-    let text = clean_inline_text(&paragraph_lines.join(" "));
+    let raw = paragraph_lines.join(" ");
+    let text = clean_inline_text(&raw);
     if !text.is_empty() {
-        let inlines = parse_inline_nodes(&paragraph_lines.join(" "));
+        let inlines = parse_inline_nodes(&raw);
         blocks.push(DocumentBlock::Paragraph {
             text,
             inlines,
@@ -869,7 +870,7 @@ fn parse_citation_inline(text: &str) -> Option<CitationInline> {
 fn parse_html_citation_inline(text: &str) -> Option<CitationInline> {
     let marker = "data-citation-keys=\"";
     let marker_start = text.find(marker)?;
-    let start = text[..marker_start].rfind("<span").unwrap_or(marker_start);
+    let start = text[..marker_start].rfind("<span")?;
     let key_start = marker_start + marker.len();
     let key_end = text[key_start..].find('"')? + key_start;
     let keys = text[key_start..key_end]

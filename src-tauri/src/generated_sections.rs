@@ -91,12 +91,12 @@ pub(crate) fn inject_generated_sections(
 }
 
 pub(crate) fn generated_section_marker_requested(text: &str, marker: &str) -> bool {
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for segment in text.split_inclusive('\n') {
         let line = segment.strip_suffix('\n').unwrap_or(segment);
         let code_line = line.strip_suffix('\r').unwrap_or(line);
-        if let Some(active_marker) = fence_marker {
-            if code_line.trim_start().starts_with(active_marker) {
+        if let Some(ref active_marker) = fence_marker {
+            if code_line.trim_start().starts_with(active_marker.as_str()) {
                 fence_marker = None;
             }
             continue;
@@ -114,14 +114,14 @@ pub(crate) fn generated_section_marker_requested(text: &str, marker: &str) -> bo
 
 fn replace_generated_marker(text: &str, marker: &str, replacement: &str) -> String {
     let mut output = String::with_capacity(text.len() + replacement.len());
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for segment in text.split_inclusive('\n') {
         let has_newline = segment.ends_with('\n');
         let line = segment.strip_suffix('\n').unwrap_or(segment);
         let code_line = line.strip_suffix('\r').unwrap_or(line);
-        if let Some(active_marker) = fence_marker {
+        if let Some(ref active_marker) = fence_marker {
             output.push_str(segment);
-            if code_line.trim_start().starts_with(active_marker) {
+            if code_line.trim_start().starts_with(active_marker.as_str()) {
                 fence_marker = None;
             }
             continue;
@@ -254,10 +254,10 @@ fn render_caption_list(kind: &str, entries: &[CaptionEntry]) -> String {
 
 fn collect_figure_entries(text: &str) -> Vec<CaptionEntry> {
     let mut entries = Vec::new();
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for line in text.lines() {
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;
@@ -297,11 +297,11 @@ fn figure_entry_from_line(line: &str) -> Option<CaptionEntry> {
 
 fn collect_table_entries(text: &str) -> Vec<CaptionEntry> {
     let mut entries = Vec::new();
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     let mut pending_caption: Option<CaptionEntry> = None;
     for line in text.lines() {
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;

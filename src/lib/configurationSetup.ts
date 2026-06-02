@@ -190,7 +190,7 @@ export function isConfigurationSetupStepId(stepId: string): stepId is Configurat
 export function buildConfigurationSetupStatus(input: ConfigurationSetupStatusInput): ConfigurationSetupStatus {
   const llmDone = Boolean(input.aiProviderProfileId && input.aiProviderModel && input.aiProviderKeyEnv);
   const runtimeDone = input.docsLiveRuntimeIssueCount !== null;
-  const exportDone = Boolean(input.exportIncludeManifest && input.exportLayoutPreset && input.citationStyle);
+  const exportDone = Boolean(input.exportTarget && input.exportIncludeManifest && input.exportLayoutPreset && input.citationStyle);
   const googleDone = Boolean(input.googleClientId && input.googleScopeCount && input.googleAuthorized);
   const releaseDone = input.releaseEvidenceReadyToSendCount > 0;
   const releaseNeedsAction =

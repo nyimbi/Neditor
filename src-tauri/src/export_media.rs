@@ -289,7 +289,12 @@ fn xml_attr_value<'a>(tag: &'a str, attr: &str) -> Option<&'a str> {
             .map(|ch| !matches!(ch, ':' | '-' | '_' | '.') && !ch.is_ascii_alphanumeric())
             .unwrap_or(true);
         let after = tag[candidate_end..].trim_start();
-        if is_name_boundary && after.starts_with('=') {
+        let after_boundary = after
+            .chars()
+            .next()
+            .map(|ch| ch == '=' || !matches!(ch, ':' | '-' | '_' | '.') && !ch.is_ascii_alphanumeric())
+            .unwrap_or(false);
+        if is_name_boundary && after_boundary && after.starts_with('=') {
             let value = after[1..].trim_start();
             let quote = value.chars().next()?;
             if quote == '"' || quote == '\'' {
@@ -355,7 +360,7 @@ fn jpeg_image_dimensions(bytes: &[u8]) -> Option<ExportImageDimensions> {
         return None;
     }
     let mut index = 2;
-    while index + 3 < bytes.len() {
+    while index + 1 < bytes.len() {
         if bytes[index] != 0xff {
             index += 1;
             continue;

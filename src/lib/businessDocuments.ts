@@ -900,20 +900,28 @@ const specialistDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
   },
 ];
 
-export const builtInDocumentOutlineTemplates: DocumentOutlineTemplate[] = [
-  ...businessDocumentTemplates.map((template) => ({
-    id: `business-${template.id}`,
-    source: "builtin" as const,
-    name: template.label,
-    category: documentOutlineCategoryForTemplate(template),
-    summary: template.summary,
-    docsLiveType: template.docsLiveType,
-    outline: template.outline,
-    tags: [template.id, template.docsLiveType, ...template.bestFor].map((item) => item.toLowerCase().replace(/\s+/g, "-")),
-    bestFor: template.bestFor,
-  })),
-  ...specialistDocumentOutlineTemplates,
-];
+export const builtInDocumentOutlineTemplates: DocumentOutlineTemplate[] = (() => {
+  const combined: DocumentOutlineTemplate[] = [
+    ...businessDocumentTemplates.map((template) => ({
+      id: `business-${template.id}`,
+      source: "builtin" as const,
+      name: template.label,
+      category: documentOutlineCategoryForTemplate(template),
+      summary: template.summary,
+      docsLiveType: template.docsLiveType,
+      outline: template.outline,
+      tags: [template.id, template.docsLiveType, ...template.bestFor].map((item) => item.toLowerCase().replace(/\s+/g, "-")),
+      bestFor: template.bestFor,
+    })),
+    ...specialistDocumentOutlineTemplates,
+  ];
+  const seen = new Set<string>();
+  return combined.filter((t) => {
+    if (seen.has(t.id)) return false;
+    seen.add(t.id);
+    return true;
+  });
+})();
 
 export const businessDocumentSnippets: BusinessDocumentSnippet[] = [
   {
@@ -1656,6 +1664,15 @@ export function businessTemplateMarkdown(template: BusinessDocumentTemplate, pro
 }
 
 function longFormTemplateGate(template: BusinessDocumentTemplate) {
+  if (template.id === "textbook") {
+    return [
+      "## Textbook Architecture Approval Gate",
+      "",
+      "- [ ] Define the reader level, prerequisites, chapter order, outcomes, notation, examples, exercises, and assessment path before drafting prose.",
+      "- [ ] Approve the outline before Chapter 1 is fleshed out.",
+      "- [ ] Draft chapters sequentially and run instructional quality review after the chapter sequence is complete.",
+    ].join("\n");
+  }
   if (template.id === "technical-textbook") {
     return [
       "## Textbook Architecture Approval Gate",
@@ -1837,11 +1854,11 @@ function businessProfileCompletionSummary(profile: BusinessProfile) {
 }
 
 function isLongFormTemplate(template: BusinessDocumentTemplate) {
-  return template.id === "technical-textbook" || template.id === "novel" || template.id === "podcast-script" || template.id === "movie-script";
+  return template.id === "technical-textbook" || template.id === "textbook" || template.id === "novel" || template.id === "podcast-script" || template.id === "movie-script";
 }
 
 function isProcurementTemplate(template: BusinessDocumentTemplate) {
-  return template.id === "rfp" || template.id === "rfq" || template.id === "tender";
+  return template.id === "rfp" || template.id === "rfq" || template.id === "tender" || template.id === "rfp-response" || template.id === "sow";
 }
 
 export function buildRfpWizardStepAssistance(input: RfpWizardStepAssistanceInput): RfpWizardStepAssistance[] {
@@ -2030,7 +2047,7 @@ export function analyzeRfpSource(input: RfpSourceInput, profile: Partial<Busines
     profile: normalizedProfile,
   });
   const completenessScore = Math.max(0, Math.min(100, Math.round(
-    20 +
+    (requirements.length > 0 ? 20 : 0) +
       Math.min(requirements.length, 12) * 4 +
       Math.min(capabilities.length, 6) * 3 +
       Math.min(timelines.length, 4) * 3 +

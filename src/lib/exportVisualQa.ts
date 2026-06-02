@@ -155,11 +155,11 @@ function buildTargetRow(
   diagnostics: ExportVisualQaDiagnosticLike[],
   readiness: ExportVisualQaInput["readiness"],
 ): ExportVisualQaTargetRow {
-  const isCurrent = input.currentTarget === target || input.manifest?.export_target === target;
+  const isCurrent = input.currentTarget ? input.currentTarget === target : input.manifest?.export_target === target;
   const outputProof = Boolean(isCurrent && (input.manifest?.output_hash || input.manifest?.output_path));
   const readinessRan = Boolean(isCurrent && readiness);
-  const errorCount = readiness?.error_count || diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
-  const warningCount = readiness?.warning_count || diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length;
+  const errorCount = readinessRan ? (readiness?.error_count ?? 0) : diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
+  const warningCount = readinessRan ? (readiness?.warning_count ?? 0) : diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length;
   const blockers = [
     readinessRan && errorCount ? `${errorCount} readiness error${errorCount === 1 ? "" : "s"}` : "",
     isCurrent && !readinessRan && errorCount ? `${errorCount} compiler error${errorCount === 1 ? "" : "s"}` : "",

@@ -14,9 +14,12 @@ const CALLBACK_PATH: &str = "/google-oauth-callback";
 const SESSION_TTL_SECONDS: u64 = 300;
 const OAUTH_TOKEN_BYTES: usize = 32;
 
+const MAX_CONCURRENT_OAUTH_LISTENERS: u32 = 1;
+
 #[derive(Clone, Default)]
 pub(crate) struct GoogleAuthState {
     sessions: Arc<Mutex<HashMap<String, GoogleAuthSession>>>,
+    active_listeners: Arc<Mutex<u32>>,
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +87,20 @@ pub(crate) fn start_google_oauth_sign_in(
     let created_at_ms = epoch_ms();
 
     {
+        let mut count = state
+            .active_listeners
+            .lock()
+            .map_err(|_| "Google OAuth listener lock poisoned".to_string())?;
+        if *count >= MAX_CONCURRENT_OAUTH_LISTENERS {
+            return Err(
+                "A Google OAuth sign-in is already in progress. Complete or cancel it first."
+                    .to_string(),
+            );
+        }
+        *count += 1;
+    }
+
+    {
         let mut sessions = state
             .sessions
             .lock()
@@ -101,8 +118,14 @@ pub(crate) fn start_google_oauth_sign_in(
     }
 
     let sessions = state.sessions.clone();
+    let active_listeners = state.active_listeners.clone();
     let expected_state = state_id.clone();
-    thread::spawn(move || listen_for_google_callback(listener, sessions, expected_state));
+    thread::spawn(move || {
+        listen_for_google_callback(listener, sessions, expected_state);
+        if let Ok(mut count) = active_listeners.lock() {
+            *count = count.saturating_sub(1);
+        }
+    });
 
     let authorization_url = google_authorization_url(
         client_id,

@@ -125,6 +125,7 @@ export function vimWordEnd(text: string, cursor: number) {
   if (!text.length) return 0;
   let position = Math.max(0, Math.min(text.length - 1, cursor + 1));
   while (position < text.length && isVimWhitespace(text[position])) position += 1;
+  if (position >= text.length) return position;
   const startKind = vimCharacterKind(text[position]);
   while (position < text.length - 1 && vimCharacterKind(text[position + 1]) === startKind) position += 1;
   return position;
@@ -225,9 +226,8 @@ function vimOpenLineBelow(view: EditorView, controller: VimKeybindingController)
 }
 
 function vimOpenLineAbove(view: EditorView, controller: VimKeybindingController) {
-  cursorLineStart(view);
-  insertNewlineAndIndent(view);
-  cursorLineUp(view);
+  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  view.dispatch({ changes: { from: line.from, insert: '\n' }, selection: EditorSelection.cursor(line.from) });
   return vimEnterInsertMode(view, controller);
 }
 

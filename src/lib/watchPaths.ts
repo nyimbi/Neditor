@@ -29,9 +29,8 @@ export function sameWatchPath(left?: string | null, right?: string | null): bool
 
 export function buildWatchedPathRoles(files: WatchPathRoleInput[]): Record<string, WatchPathRole> {
   return files.reduce<Record<string, WatchPathRole>>((roles, file) => {
-    const role = file.role === "root" ? "root" : "include";
-    roles[file.path] = role;
-    roles[normalizeWatchPath(file.path)] = role;
+    const key = normalizeWatchPath(file.path);
+    if (!roles[key]) roles[key] = file.role === "root" ? "root" : "include";
     return roles;
   }, {});
 }

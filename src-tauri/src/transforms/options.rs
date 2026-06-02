@@ -87,11 +87,15 @@ impl TransformExecutionOptions {
             return false;
         }
         let resolved = document_dir.join(&path);
+        // Invariant: callers must ensure the resolved path already exists on disk
+        // (e.g. the is_file() check in sql.rs) before calling this function.
+        // If canonicalization still fails after the file is confirmed to exist
+        // (e.g. a race or a broken symlink), we treat it as a potential escape
+        // and deny access rather than falling back to the ParentDir heuristic,
+        // which cannot detect symlink-based escapes.
         match (document_dir.canonicalize(), resolved.canonicalize()) {
             (Ok(base), Ok(target)) => !target.starts_with(base),
-            _ => path
-                .components()
-                .any(|component| matches!(component, std::path::Component::ParentDir)),
+            _ => true,
         }
     }
 }

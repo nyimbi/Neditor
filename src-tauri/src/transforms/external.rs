@@ -3,12 +3,11 @@ use crate::{diagnostics::diag, escape_html, path_to_string, sha256_hex};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
-    collections::HashMap,
     fs,
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::{Mutex, OnceLock},
+    sync::{mpsc, Mutex, OnceLock},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -20,7 +19,7 @@ const MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES: usize = 64;
 const MAX_EXTERNAL_TRANSFORM_CACHE_FILE_BYTES: u64 = 4_194_304;
 const EXTERNAL_TRANSFORM_RENDERER_VERSION: &str = "external-render-v4";
 
-static EXTERNAL_TRANSFORM_CACHE: OnceLock<Mutex<HashMap<String, TransformArtifact>>> =
+static EXTERNAL_TRANSFORM_CACHE: OnceLock<Mutex<Vec<(String, TransformArtifact)>>> =
     OnceLock::new();
 
 #[derive(Debug, Deserialize)]
@@ -264,7 +263,19 @@ fn external_engine_adapter(
             output_format,
         )),
         ("pikchr", "stdin") if pikchr_uses_source_file_argument(engine_path) => {
-            Ok(ExternalEngineAdapter::stdout("pikchr", "stdin", vec![temp]))
+            // pikchr-cli treats its positional argument as a source file path, so
+            // we must always have a real temp file here.  Passing "-" would cause
+            // pikchr-cli to attempt to open a file literally named "-" and fail.
+            // external_transform_requires_temp_input returns true for this branch,
+            // so execute_external_transform always creates the temp file before
+            // calling this function.  For the cache-key probe call in
+            // run_external_transform (where temp_path is None), use a stable
+            // "<tempfile>" sentinel so the cache identity is consistent across
+            // both calls.
+            let source_arg = temp_path
+                .map(path_to_string)
+                .unwrap_or_else(|| "<tempfile>".to_string());
+            Ok(ExternalEngineAdapter::stdout("pikchr", "stdin", vec![source_arg]))
         }
         ("pikchr", "file") if pikchr_uses_source_file_argument(engine_path) => {
             Ok(ExternalEngineAdapter::stdout("pikchr", "file", vec![temp]))
@@ -354,8 +365,8 @@ fn validate_external_engine_executable(_engine_path: &Path) -> Result<(), String
     Ok(())
 }
 
-fn external_transform_cache() -> &'static Mutex<HashMap<String, TransformArtifact>> {
-    EXTERNAL_TRANSFORM_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+fn external_transform_cache() -> &'static Mutex<Vec<(String, TransformArtifact)>> {
+    EXTERNAL_TRANSFORM_CACHE.get_or_init(|| Mutex::new(Vec::new()))
 }
 
 fn cached_external_transform(
@@ -373,7 +384,10 @@ fn cached_memory_external_transform(
     max_output_bytes: usize,
 ) -> Option<TransformArtifact> {
     let cache = external_transform_cache().lock().ok()?;
-    let mut artifact = cache.get(cache_key)?.clone();
+    let mut artifact = cache
+        .iter()
+        .find(|(k, _)| k == cache_key)
+        .map(|(_, v)| v.clone())?;
     prepare_cached_external_transform(&mut artifact, name, max_output_bytes, false)?;
     Some(artifact)
 }
@@ -455,12 +469,15 @@ fn store_external_transform_memory(artifact: TransformArtifact) {
     let Ok(mut cache) = external_transform_cache().lock() else {
         return;
     };
-    if cache.len() >= MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES {
-        if let Some(key) = cache.keys().next().cloned() {
-            cache.remove(&key);
-        }
+    // Remove existing entry for this key so the updated entry goes at the back.
+    if let Some(pos) = cache.iter().position(|(k, _)| k == &artifact.cache_key) {
+        cache.remove(pos);
     }
-    cache.insert(artifact.cache_key.clone(), artifact);
+    // Evict the oldest entry (index 0) when the cache is full.
+    if cache.len() >= MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES {
+        cache.remove(0);
+    }
+    cache.push((artifact.cache_key.clone(), artifact));
 }
 
 fn store_external_transform_disk(artifact: &TransformArtifact) {
@@ -474,7 +491,14 @@ fn store_external_transform_disk(artifact: &TransformArtifact) {
         return;
     };
     if fs::write(&temp_path, text.as_bytes()).is_ok() {
-        let _ = fs::rename(&temp_path, &path);
+        if fs::rename(&temp_path, &path).is_err() {
+            // Rename can fail on cross-device moves or permission errors.
+            // Fall back to copy+delete so we don't leave an orphaned .tmp file.
+            if fs::copy(&temp_path, &path).is_err() {
+                let _ = fs::remove_file(&path);
+            }
+            let _ = fs::remove_file(&temp_path);
+        }
     }
     prune_external_transform_disk_cache(&root);
 }
@@ -596,7 +620,7 @@ fn execute_external_transform(
         command.stdin(Stdio::piped());
     }
 
-    let mut child = match command.spawn() {
+    let child = match command.spawn() {
         Ok(child) => child,
         Err(error) => {
             if let Some(path) = temp_input {
@@ -605,22 +629,45 @@ fn execute_external_transform(
             return Err(error.to_string());
         }
     };
-    let stdin_writer = if adapter.stdin {
-        child.stdin.take().map(|mut stdin| {
-            let input = request.body.as_bytes().to_vec();
-            std::thread::spawn(move || stdin.write_all(&input).map_err(|err| err.to_string()))
-        })
-    } else {
-        None
-    };
 
-    let status = loop {
-        if let Some(status) = child.try_wait().map_err(|err| err.to_string())? {
-            break status;
+    // Move all blocking work — stdin write + wait_with_output — onto a
+    // dedicated OS thread so the calling thread (Tauri async runtime) is
+    // never blocked.  The channel's recv_timeout enforces the deadline
+    // without a spin loop.
+    let (tx, rx) = mpsc::channel::<Result<std::process::Output, String>>();
+    let stdin_input = if adapter.stdin {
+        request.body.as_bytes().to_vec()
+    } else {
+        Vec::new()
+    };
+    let needs_stdin = adapter.stdin;
+    std::thread::spawn(move || {
+        let mut child = child;
+        if needs_stdin {
+            if let Some(mut stdin) = child.stdin.take() {
+                // Ignore write errors; the process exit status will surface them.
+                let _ = stdin.write_all(&stdin_input);
+                // Drop stdin to signal EOF before waiting.
+            }
         }
-        if started.elapsed() >= Duration::from_millis(request.timeout_ms) {
-            let _ = child.kill();
-            let _ = child.wait();
+        let result = child.wait_with_output().map_err(|e| e.to_string());
+        let _ = tx.send(result);
+    });
+
+    let timeout = Duration::from_millis(request.timeout_ms);
+    let output = match rx.recv_timeout(timeout) {
+        Ok(Ok(output)) => output,
+        Ok(Err(err)) => {
+            if let Some(path) = temp_input {
+                let _ = fs::remove_file(path);
+            }
+            if let Some(path) = temp_output {
+                let _ = fs::remove_file(path);
+            }
+            return Err(err);
+        }
+        Err(_) => {
+            // Timeout or sender dropped — clean up and report timeout.
             if let Some(path) = temp_input {
                 let _ = fs::remove_file(path);
             }
@@ -632,26 +679,8 @@ fn execute_external_transform(
                 name, request.timeout_ms
             ));
         }
-        std::thread::sleep(Duration::from_millis(10));
     };
-
-    if let Some(writer) = stdin_writer {
-        match writer.join() {
-            Ok(Ok(())) => {}
-            Ok(Err(error)) if status.success() => {
-                return Err(format!(
-                    "{name} external transform stdin write failed: {error}"
-                ));
-            }
-            Ok(Err(_)) => {}
-            Err(_) if status.success() => {
-                return Err(format!("{name} external transform stdin writer panicked."));
-            }
-            Err(_) => {}
-        }
-    }
-
-    let output = child.wait_with_output().map_err(|err| err.to_string())?;
+    let status = output.status;
     let output_channel = if adapter.sidecar_output_suffix.is_some() {
         format!(
             "sidecar {}",

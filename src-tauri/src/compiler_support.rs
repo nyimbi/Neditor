@@ -7,10 +7,13 @@ use std::collections::BTreeMap;
 
 pub(crate) fn extract_headings(text: &str) -> Vec<Heading> {
     let mut headings = Vec::new();
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for (index, line) in text.lines().enumerate() {
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            let trimmed = line.trim_start();
+            let fence_char = marker.chars().next().unwrap();
+            let close_run_len = trimmed.chars().take_while(|&c| c == fence_char).count();
+            if close_run_len >= marker.len() {
                 fence_marker = None;
             }
             continue;
@@ -117,15 +120,15 @@ fn strip_heading_attributes(text: &str) -> &str {
         .unwrap_or_else(|| text.trim())
 }
 
-pub(crate) fn fenced_code_marker(line: &str) -> Option<&'static str> {
+pub(crate) fn fenced_code_marker(line: &str) -> Option<String> {
     let trimmed = line.trim_start();
-    if trimmed.starts_with("```") {
-        Some("```")
-    } else if trimmed.starts_with("~~~") {
-        Some("~~~")
-    } else {
-        None
+    for ch in ['`', '~'] {
+        let run: String = trimmed.chars().take_while(|&c| c == ch).collect();
+        if run.len() >= 3 {
+            return Some(run);
+        }
     }
+    None
 }
 
 pub(crate) fn collect_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(usize, String)> {
@@ -133,10 +136,17 @@ pub(crate) fn collect_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(
     let mut lines = text.lines().enumerate();
     while let Some((line_index, line)) = lines.next() {
         if let Some(marker) = fenced_code_marker(line) {
-            let info = line.trim_start().strip_prefix(marker).unwrap_or("").trim();
+            let fence_char = marker.chars().next().unwrap();
+            let fence_len = marker.len();
+            let closes = |l: &str| -> bool {
+                let trimmed = l.trim_start();
+                let run_len = trimmed.chars().take_while(|&c| c == fence_char).count();
+                run_len >= fence_len
+            };
+            let info = line.trim_start().strip_prefix(marker.as_str()).unwrap_or("").trim();
             if info.split_whitespace().next().unwrap_or("") != target {
                 for (_, body_line) in lines.by_ref() {
-                    if body_line.trim_start().starts_with(marker) {
+                    if closes(body_line) {
                         break;
                     }
                 }
@@ -144,7 +154,7 @@ pub(crate) fn collect_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(
             }
             let mut body = String::new();
             for (_, body_line) in lines.by_ref() {
-                if body_line.trim_start().starts_with(marker) {
+                if closes(body_line) {
                     break;
                 }
                 body.push_str(body_line);

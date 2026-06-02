@@ -43,6 +43,11 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
         classification.as_deref().unwrap_or(""),
     );
     let language = html_document_language(&response.metadata, options);
+    let contains_raw_html = response
+        .document_ast
+        .blocks
+        .iter()
+        .any(|block| matches!(block, DocumentBlock::RawHtml { .. }));
     let head_metadata = html_head_metadata(
         response,
         options,
@@ -51,6 +56,7 @@ pub(crate) fn render_full_html(response: &CompileResponse, options: &Value) -> S
         &date,
         &version,
         &classification,
+        contains_raw_html,
     );
     let cover_meta = [author, date, version, classification, brand, audience]
         .into_iter()
@@ -157,6 +163,7 @@ fn html_head_metadata(
     date: &Option<String>,
     version: &Option<String>,
     classification: &Option<String>,
+    contains_raw_html: bool,
 ) -> String {
     let mut tags = vec![
         r#"<meta name="viewport" content="width=device-width, initial-scale=1">"#.to_string(),
@@ -164,6 +171,12 @@ fn html_head_metadata(
         html_meta_tag("neditor-status", &response.semantic.status),
         html_meta_tag("neditor-source-hash", &response.export_manifest.source_hash),
     ];
+    // NOTE: raw HTML pass-through is intentional (DocumentBlock::RawHtml), but the output
+    // may include author-supplied HTML verbatim. Flag this in the document head so that
+    // downstream tooling (sanitizers, renderers, security scanners) can detect it.
+    if contains_raw_html {
+        tags.push(r#"<meta name="neditor-contains-raw-html" content="true">"#.to_string());
+    }
     if let Some(description) = options
         .get("htmlDescription")
         .and_then(Value::as_str)

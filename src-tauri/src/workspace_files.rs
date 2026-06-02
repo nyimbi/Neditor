@@ -79,7 +79,10 @@ fn scan_workspace_dir(
             .strip_prefix(root)
             .map(path_to_string)
             .unwrap_or_else(|_| path_to_string(&path));
-        if path.is_dir() {
+        let is_symlink = fs::symlink_metadata(&path)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false);
+        if path.is_dir() && !is_symlink {
             entries.push(WorkspaceFileEntry {
                 path: path_to_string(&path),
                 name,

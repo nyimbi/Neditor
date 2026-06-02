@@ -91,11 +91,10 @@ export function buildTemplatePack(input: BuildTemplatePackInput): NeditorTemplat
   const businessTemplates = dedupeById(input.businessTemplates || []).slice(0, 30);
   const snippets = normalizeCustomBusinessSnippets(input.snippets || []).slice(0, 60);
   const outlines = normalizeCustomDocumentOutlineTemplates(
-    (input.outlines || []).map((template) => ({
-      ...template,
-      id: marketplaceId(template.id),
-      source: undefined,
-    })),
+    (input.outlines || []).map((template) => {
+      const { source: _source, ...rest } = template;
+      return { ...rest, id: marketplaceId(template.id) };
+    }),
   ).slice(0, 40);
   const transforms = normalizeCustomTransformTemplates(
     (input.transforms || []).map((template) => ({

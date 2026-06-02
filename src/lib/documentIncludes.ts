@@ -93,5 +93,5 @@ function isAbsoluteIncludeTarget(target: string) {
 function folderFromPath(path: string) {
   const normalized = path.trim().replace(/\\/g, "/");
   const index = normalized.lastIndexOf("/");
-  return index > 0 ? normalized.slice(0, index) : "";
+  return index >= 0 ? normalized.slice(0, index) || '/' : '';
 }

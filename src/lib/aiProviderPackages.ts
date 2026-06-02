@@ -264,9 +264,9 @@ export function buildAiProviderRequestPackage(
   const userPrompt = buildUserPrompt(run, sourcePack);
   const requestBody = buildRequestBody(profile, systemPrompt, userPrompt);
   const redactedHeaders = buildHeaders(profile, keyEnv);
-  const curl = buildCurl(profile, redactedHeaders, requestBody);
+  const curl = buildCurl(profile, displayHeaders(redactedHeaders, keyEnv), requestBody);
   const checklist = buildChecklist(profile, keyEnv, sourcePack);
-  const markdown = buildMarkdown(profile, systemPrompt, userPrompt, sourcePack, requestBody, redactedHeaders, curl, checklist);
+  const markdown = buildMarkdown(profile, systemPrompt, userPrompt, sourcePack, requestBody, displayHeaders(redactedHeaders, keyEnv), curl, checklist);
 
   return {
     profile,
@@ -527,12 +527,30 @@ export function formatAiProviderSourcePack(sourcePack: AiProviderSourcePack) {
   ].join("\n");
 }
 
+const NEDITOR_API_KEY_PLACEHOLDER = "__NEDITOR_API_KEY_PLACEHOLDER__";
+const NEDITOR_API_KEY_BEARER_PLACEHOLDER = `Bearer ${NEDITOR_API_KEY_PLACEHOLDER}`;
+
+/** Replace sentinels with human-readable env-var references for display in curl snippets and markdown. */
+function displayHeaders(headers: Record<string, string>, keyEnv: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (value === NEDITOR_API_KEY_BEARER_PLACEHOLDER) {
+      result[key] = `Bearer \${${keyEnv}}`;
+    } else if (value === NEDITOR_API_KEY_PLACEHOLDER) {
+      result[key] = `\${${keyEnv}}`;
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 function concreteHeaders(headers: Record<string, string>, apiKey: string) {
   const concrete: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
-    if (value.includes("${")) {
+    if (value === NEDITOR_API_KEY_PLACEHOLDER || value === NEDITOR_API_KEY_BEARER_PLACEHOLDER) {
       if (!apiKey.trim()) throw new Error(`Provider request needs a session API key for ${key}.`);
-      concrete[key] = value.toLowerCase().startsWith("bearer ") ? `Bearer ${apiKey.trim()}` : apiKey.trim();
+      concrete[key] = value === NEDITOR_API_KEY_BEARER_PLACEHOLDER ? `Bearer ${apiKey.trim()}` : apiKey.trim();
     } else {
       concrete[key] = value;
     }
@@ -633,17 +651,25 @@ function buildRequestBody(profile: AiProviderProfile, systemPrompt: string, user
   };
 }
 
-function buildHeaders(profile: AiProviderProfile, keyEnv: string) {
+function buildHeaders(profile: AiProviderProfile, _keyEnv: string) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
   if (profile.authHeader) {
-    headers[profile.authHeader] = profile.authHeader.toLowerCase() === "authorization" ? `Bearer \${${keyEnv}}` : `\${${keyEnv}}`;
+    // Use dedicated sentinels so concreteHeaders can detect them with strict equality.
+    // The keyEnv name is interpolated into the redacted display value only (curl/markdown),
+    // never used for substitution logic.
+    headers[profile.authHeader] =
+      profile.authHeader.toLowerCase() === "authorization"
+        ? NEDITOR_API_KEY_BEARER_PLACEHOLDER
+        : NEDITOR_API_KEY_PLACEHOLDER;
   }
   return headers;
 }
 
 function buildCurl(profile: AiProviderProfile, headers: Record<string, string>, body: Record<string, unknown>) {
+  // NOTE: output is for display/copy only and must NEVER be passed to a shell executor.
+  // If shell execution support is ever added, use an argument array instead of a quoted string.
   if (!profile.endpoint) return "";
   const headerArgs = Object.entries(headers)
     .map(([key, value]) => `  -H '${shellEscape(`${key}: ${value}`)}'`)

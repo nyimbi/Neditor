@@ -1720,7 +1720,7 @@ function humanizeText(text: string) {
 function clarifyText(text: string) {
   return text
     .replace(/\bcan be\b/gi, "is")
-    .replace(/\bthis section\b/gi, "this section")
+    .replace(/\bthis section\b/gi, "this part")
     .replace(/\bopportunities\b/gi, "options")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
@@ -1728,8 +1728,8 @@ function clarifyText(text: string) {
 
 function accessibilityText(text: string) {
   return text
-    .replace(/\bARR\b/g, "ARR")
-    .replace(/\bROI\b/g, "ROI")
+    .replace(/\bARR\b/g, "Annual Recurring Revenue (ARR)")
+    .replace(/\bROI\b/g, "Return on Investment (ROI)")
     .replace(/\butilisation\b/gi, "use")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
@@ -1744,9 +1744,26 @@ function addRevisionReviewNote(text: string, modes: Set<AgenticRevisionMode>) {
 }
 
 function shortenText(text: string) {
-  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
-  if (sentences.length <= 2) return text;
-  return sentences.slice(0, 2).join(" ");
+  const WORD_THRESHOLD = 400;
+  const PRESERVE_PATTERN = /\d|today|deadline|by\s+\w+|must|will|shall|required/i;
+
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= WORD_THRESHOLD) return text;
+
+  // Shorten per paragraph so only verbose paragraphs are trimmed.
+  const paragraphs = text.split(/\n{2,}/);
+  const shortened = paragraphs.map((para) => {
+    const sentences = para.split(/(?<=[.!?])\s+/).filter(Boolean);
+    if (sentences.length <= 2) return para;
+    // Keep the first 2 sentences, then re-add any sentence containing a
+    // number, date, or commitment keyword to avoid meaning drift.
+    const kept = sentences.slice(0, 2);
+    for (const s of sentences.slice(2)) {
+      if (PRESERVE_PATTERN.test(s)) kept.push(s);
+    }
+    return kept.join(" ");
+  });
+  return shortened.join("\n\n");
 }
 
 function expandText(text: string, placeholders: string) {

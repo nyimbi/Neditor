@@ -542,7 +542,7 @@ fn hayagriva_entry_spans(body: &str, start_line: usize) -> Vec<HayagrivaEntrySpa
                 starts.push((byte_offset, line_index, key.to_string(), column));
             }
         }
-        byte_offset += line.len() + 1;
+        byte_offset += line.len() + if body[byte_offset + line.len()..].starts_with("\r\n") { 2 } else { 1 };
     }
     starts
         .iter()
@@ -592,19 +592,36 @@ fn bibliography_key_location(body: &str, key: &str, start_line: usize) -> Option
     bibliography_key_location_for_occurrence(body, key, start_line, 0)
 }
 
+fn is_word_boundary(s: &str, byte_pos: usize) -> bool {
+    let before = s[..byte_pos].chars().next_back();
+    let after = s[byte_pos..].chars().next();
+    let is_ident = |ch: char| ch.is_ascii_alphanumeric() || ch == '_';
+    !before.is_some_and(is_ident) && !after.is_some_and(is_ident)
+}
+
 fn bibliography_key_location_for_occurrence(
     body: &str,
     key: &str,
     start_line: usize,
     occurrence: usize,
 ) -> Option<(usize, usize)> {
+    if key.is_empty() {
+        return None;
+    }
     let mut seen = 0usize;
     for (index, line) in body.lines().enumerate() {
-        if let Some(column) = line.find(key) {
-            if seen == occurrence {
-                return Some((start_line + index, column + 1));
+        let mut search_from = 0usize;
+        while let Some(relative_col) = line[search_from..].find(key) {
+            let column_index = search_from + relative_col;
+            if is_word_boundary(line, column_index)
+                && is_word_boundary(line, column_index + key.len())
+            {
+                if seen == occurrence {
+                    return Some((start_line + index, column_index + 1));
+                }
+                seen += 1;
             }
-            seen += 1;
+            search_from = column_index + key.len().max(1);
         }
     }
     None
@@ -987,10 +1004,10 @@ fn is_year(value: &str) -> bool {
 
 pub(crate) fn collect_citation_references(text: &str) -> Vec<CitationReference> {
     let mut citations = Vec::new();
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for (index, line) in text.lines().enumerate() {
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;
@@ -1080,11 +1097,11 @@ pub(crate) fn render_citations(
 ) -> String {
     let context = CitationRenderContext::new(bibliography);
     let mut lines = Vec::new();
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for line in markdown.lines() {
-        if let Some(marker) = fence_marker {
+        if let Some(ref marker) = fence_marker {
             lines.push(line.to_string());
-            if line.trim_start().starts_with(marker) {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;

@@ -30,7 +30,7 @@ export function stripMarkdownFencedBlocks(value: string) {
     .map((line) => {
       const trimmed = line.trimStart();
       if (fenceMarker) {
-        if (trimmed.startsWith(fenceMarker)) fenceMarker = "";
+        if (new RegExp('^' + fenceMarker.replace(/`/g, '\\`') + '+\\s*$').test(trimmed)) fenceMarker = "";
         return "";
       }
       const opener = markdownFenceOpener(line);

@@ -310,6 +310,179 @@ fn roadmap_metadata(parts: &[&str]) -> String {
     format!("<small>{items}</small>")
 }
 
+pub(crate) fn render_raci_html(body: &str) -> String {
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut headers: Vec<String> = Vec::new();
+    for line in body.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        let cols: Vec<&str> = line.split('|').map(str::trim).filter(|c| !c.is_empty()).collect();
+        if headers.is_empty() {
+            headers = cols.iter().map(|c| escape_html(c)).collect();
+        } else {
+            rows.push(cols.iter().map(|c| escape_html(c)).collect());
+        }
+    }
+    if headers.is_empty() {
+        return "<section class=\"transform transform-raci\"><p>No RACI data.</p></section>".to_string();
+    }
+    let thead = format!("<tr>{}</tr>", headers.iter().map(|h| format!("<th>{h}</th>")).collect::<String>());
+    let tbody = rows.iter().map(|row| {
+        let cells = row.iter().enumerate().map(|(i, cell)| {
+            let class = if i == 0 { " class=\"raci-task\"".to_string() } else {
+                let c = cell.to_ascii_uppercase();
+                format!(" class=\"raci-cell raci-{}\"", if c == "R" { "responsible" } else if c == "A" { "accountable" } else if c == "C" { "consulted" } else if c == "I" { "informed" } else { "other" })
+            };
+            format!("<td{class}>{cell}</td>")
+        }).collect::<String>();
+        format!("<tr>{cells}</tr>")
+    }).collect::<String>();
+    format!("<section class=\"transform transform-raci\"><h3>RACI Matrix</h3><table><thead>{thead}</thead><tbody>{tbody}</tbody></table></section>")
+}
+
+pub(crate) fn render_comparison_html(body: &str) -> String {
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut headers: Vec<String> = Vec::new();
+    for line in body.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        let cols: Vec<&str> = line.split('|').map(str::trim).filter(|c| !c.is_empty()).collect();
+        if headers.is_empty() {
+            headers = cols.iter().map(|c| escape_html(c)).collect();
+        } else {
+            rows.push(cols.iter().map(|c| escape_html(c)).collect());
+        }
+    }
+    if headers.is_empty() {
+        return "<section class=\"transform transform-comparison\"><p>No comparison data.</p></section>".to_string();
+    }
+    let thead = format!("<tr>{}</tr>", headers.iter().map(|h| format!("<th>{h}</th>")).collect::<String>());
+    let tbody = rows.iter().map(|row| {
+        let cells = row.iter().enumerate().map(|(i, cell)| {
+            let class = if i == 0 { " class=\"comparison-feature\"" } else { " class=\"comparison-value\"" };
+            format!("<td{class}>{cell}</td>")
+        }).collect::<String>();
+        format!("<tr>{cells}</tr>")
+    }).collect::<String>();
+    format!("<section class=\"transform transform-comparison\"><h3>Comparison</h3><table><thead>{thead}</thead><tbody>{tbody}</tbody></table></section>")
+}
+
+pub(crate) fn render_status_table_html(body: &str) -> String {
+    let rows = body.lines().map(str::trim).filter(|l| !l.is_empty()).map(|line| {
+        let parts: Vec<&str> = line.splitn(3, '|').map(str::trim).collect();
+        let item = escape_html(parts.first().copied().unwrap_or(""));
+        let status = parts.get(1).copied().unwrap_or("").trim().to_string();
+        let note = escape_html(parts.get(2).copied().unwrap_or(""));
+        let status_class = business_key_class(&status);
+        let status_escaped = escape_html(&status);
+        format!("<tr><td class=\"status-item\">{item}</td><td class=\"status-badge status-{status_class}\">{status_escaped}</td><td class=\"status-note\">{note}</td></tr>")
+    }).collect::<String>();
+    format!("<section class=\"transform transform-status-table\"><h3>Status</h3><table><thead><tr><th>Item</th><th>Status</th><th>Notes</th></tr></thead><tbody>{rows}</tbody></table></section>")
+}
+
+pub(crate) fn render_kanban_html(body: &str) -> String {
+    let mut columns: Vec<(String, Vec<String>)> = Vec::new();
+    let mut current_col: Option<String> = None;
+    for line in body.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        if line.ends_with(':') || (!line.starts_with('-') && !line.starts_with('*') && line.contains(':') && line.split(':').next().map(|p| !p.contains(' ')).unwrap_or(false)) {
+            let col_name = line.trim_end_matches(':').trim().to_string();
+            columns.push((col_name.clone(), Vec::new()));
+            current_col = Some(col_name);
+        } else if current_col.is_some() {
+            let card = line.trim_start_matches(['-', '*', ' ']).trim().to_string();
+            if !card.is_empty() {
+                if let Some(col) = columns.last_mut() {
+                    col.1.push(card);
+                }
+            }
+        } else {
+            columns.push(("Backlog".to_string(), vec![line.trim_start_matches(['-', '*', ' ']).trim().to_string()]));
+        }
+    }
+    let _ = current_col;
+    let cols_html = columns.iter().map(|(name, cards)| {
+        let cards_html = cards.iter().map(|c| format!("<div class=\"kanban-card\">{}</div>", escape_html(c))).collect::<String>();
+        format!("<div class=\"kanban-column\"><h4>{}</h4>{cards_html}</div>", escape_html(name))
+    }).collect::<String>();
+    format!("<section class=\"transform transform-kanban\"><div class=\"kanban-board\">{cols_html}</div></section>")
+}
+
+pub(crate) fn render_changelog_html(body: &str) -> String {
+    let mut sections: Vec<(String, Vec<String>)> = Vec::new();
+    for line in body.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        if line.starts_with('#') || (!line.starts_with('-') && !line.starts_with('*') && line.ends_with(':')) {
+            let heading = line.trim_start_matches('#').trim().trim_end_matches(':').trim().to_string();
+            sections.push((heading, Vec::new()));
+        } else {
+            let entry = line.trim_start_matches(['-', '*', ' ']).trim().to_string();
+            if let Some(sec) = sections.last_mut() {
+                sec.1.push(entry);
+            } else {
+                sections.push(("Changes".to_string(), vec![entry]));
+            }
+        }
+    }
+    let sections_html = sections.iter().map(|(heading, entries)| {
+        let items = entries.iter().map(|e| format!("<li>{}</li>", escape_html(e))).collect::<String>();
+        let list = if items.is_empty() { String::new() } else { format!("<ul>{items}</ul>") };
+        format!("<div class=\"changelog-section\"><h4>{}</h4>{list}</div>", escape_html(heading))
+    }).collect::<String>();
+    format!("<section class=\"transform transform-changelog\"><h3>Changelog</h3>{sections_html}</section>")
+}
+
+pub(crate) fn render_process_html(body: &str) -> String {
+    let steps: Vec<String> = body.lines().map(str::trim).filter(|l| !l.is_empty()).enumerate().map(|(i, line)| {
+        let text = line.trim_start_matches(['-', '*', ' ']).trim();
+        let num = i + 1;
+        format!("<li class=\"process-step\"><span class=\"process-step-number\">{num}</span><span class=\"process-step-label\">{}</span></li>", escape_html(text))
+    }).collect();
+    format!("<section class=\"transform transform-process\"><h3>Process</h3><ol class=\"process-steps\">{}</ol></section>", steps.join(""))
+}
+
+pub(crate) fn render_org_chart_html(body: &str) -> String {
+    let items: Vec<(usize, String)> = body.lines().filter(|l| !l.trim().is_empty()).map(|line| {
+        let indent = line.len() - line.trim_start_matches([' ', '\t', '-', '*']).len();
+        let label = line.trim_start_matches([' ', '\t', '-', '*']).trim().to_string();
+        (indent, label)
+    }).collect();
+    fn build_tree(items: &[(usize, String)], start: usize, parent_indent: usize) -> (String, usize) {
+        let mut html = String::new();
+        let mut i = start;
+        while i < items.len() {
+            let (indent, label) = &items[i];
+            if *indent < parent_indent { break; }
+            if *indent == parent_indent {
+                let next = i + 1;
+                let child_indent = if next < items.len() && items[next].0 > parent_indent { items[next].0 } else { usize::MAX };
+                let (children, consumed) = if child_indent < usize::MAX {
+                    build_tree(items, next, child_indent)
+                } else {
+                    (String::new(), 0)
+                };
+                let children_html = if children.is_empty() { String::new() } else { format!("<ul>{children}</ul>") };
+                html.push_str(&format!("<li class=\"org-node\"><span>{}</span>{children_html}</li>", escape_html(label)));
+                i = next + consumed;
+            } else {
+                break;
+            }
+        }
+        (html, i - start)
+    }
+    let root_indent = items.first().map(|(ind, _)| *ind).unwrap_or(0);
+    let (tree, _) = build_tree(&items, 0, root_indent);
+    format!("<section class=\"transform transform-org\"><h3>Org Chart</h3><ul class=\"org-chart\">{tree}</ul></section>")
+}
+
+pub(crate) fn render_gantt_html(body: &str) -> String {
+    let tasks: Vec<(String, String, String)> = body.lines().map(str::trim).filter(|l| !l.is_empty()).map(|line| {
+        let parts: Vec<&str> = line.splitn(3, '|').map(str::trim).collect();
+        let task = escape_html(parts.first().copied().unwrap_or(""));
+        let start = escape_html(parts.get(1).copied().unwrap_or(""));
+        let end = escape_html(parts.get(2).copied().unwrap_or(""));
+        (task, start, end)
+    }).collect();
+    let rows = tasks.iter().map(|(task, start, end)| {
+        format!("<tr><td class=\"gantt-task\">{task}</td><td class=\"gantt-start\">{start}</td><td class=\"gantt-end\">{end}</td></tr>")
+    }).collect::<String>();
+    format!("<section class=\"transform transform-gantt\"><h3>Gantt Chart</h3><table><thead><tr><th>Task</th><th>Start</th><th>End</th></tr></thead><tbody>{rows}</tbody></table></section>")
+}
+
 fn business_key_class(value: &str) -> String {
     let class = value
         .chars()

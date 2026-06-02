@@ -7,7 +7,14 @@ use tauri::Manager;
 
 pub(crate) fn snapshot_workspace_id(file_path: Option<&str>) -> String {
     file_path
-        .map(|path| sha256_hex(path.as_bytes()))
+        .map(|path| {
+            let canonical = PathBuf::from(path)
+                .canonicalize()
+                .ok()
+                .and_then(|p| p.to_str().map(str::to_string));
+            let bytes = canonical.as_deref().unwrap_or(path).as_bytes();
+            sha256_hex(bytes)
+        })
         .unwrap_or_else(|| "unsaved".to_string())
 }
 

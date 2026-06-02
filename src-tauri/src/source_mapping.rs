@@ -39,30 +39,16 @@ pub(crate) fn expand_includes(
         .and_then(Path::parent)
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
+    let canonical_base_dir = base_dir.canonicalize().unwrap_or_else(|_| base_dir.clone());
     let mut output = String::new();
     for (line_index, line) in text.lines().enumerate() {
         if let Some(include_target) = parse_include_directive(line) {
             let child = base_dir.join(include_target);
-            let canonical = child.canonicalize().unwrap_or(child.clone());
-            if visited.contains(&canonical) {
-                let mut diagnostic = include_diagnostic_for_target(
-                    "error",
-                    "Circular include detected.",
-                    source_file,
-                    line_index + 1,
-                    line,
-                    include_target,
-                    Some("Remove the cycle or include a different file."),
-                );
-                diagnostic
-                    .related
-                    .push(format!("Include target: {}", child.display()));
-                diagnostic
-                    .related
-                    .push(format!("Canonical path: {}", canonical.display()));
-                diagnostics.push(diagnostic);
-                continue;
-            }
+            // Check existence before canonicalize so that the fallback path is
+            // never reached for files that do exist: if canonicalize fails for a
+            // file that is present (e.g. a broken symlink) we emit a warning and
+            // skip rather than silently falling back to the unresolved path, which
+            // would defeat both the traversal guard and cycle detection.
             if !child.exists() {
                 let mut diagnostic = include_diagnostic_for_target(
                     "error",
@@ -79,6 +65,70 @@ pub(crate) fn expand_includes(
                 diagnostic
                     .related
                     .push(format!("Resolved path: {}", child.display()));
+                diagnostics.push(diagnostic);
+                continue;
+            }
+            let canonical = match child.canonicalize() {
+                Ok(p) => p,
+                Err(err) => {
+                    // File exists but canonicalize failed (e.g. broken symlink).
+                    // Falling back to the unresolved path is unsafe: it would
+                    // defeat the traversal guard and cycle detection. Emit a
+                    // warning and skip instead.
+                    let mut diagnostic = include_diagnostic_for_target(
+                        "warning",
+                        format!("Cannot resolve include path: {err}"),
+                        source_file,
+                        line_index + 1,
+                        line,
+                        include_target,
+                        Some("Check that the file and any symlinks it uses are valid."),
+                    );
+                    diagnostic
+                        .related
+                        .push(format!("Include target: {include_target}"));
+                    diagnostic
+                        .related
+                        .push(format!("Resolved path: {}", child.display()));
+                    diagnostics.push(diagnostic);
+                    continue;
+                }
+            };
+            if !canonical.starts_with(&canonical_base_dir) {
+                let mut diagnostic = include_diagnostic_for_target(
+                    "error",
+                    "Include path escapes the document root.",
+                    source_file,
+                    line_index + 1,
+                    line,
+                    include_target,
+                    Some("Use a path that stays within the document directory."),
+                );
+                diagnostic
+                    .related
+                    .push(format!("Include target: {include_target}"));
+                diagnostic
+                    .related
+                    .push(format!("Resolved path: {}", canonical.display()));
+                diagnostics.push(diagnostic);
+                continue;
+            }
+            if visited.contains(&canonical) {
+                let mut diagnostic = include_diagnostic_for_target(
+                    "error",
+                    "Circular include detected.",
+                    source_file,
+                    line_index + 1,
+                    line,
+                    include_target,
+                    Some("Remove the cycle or include a different file."),
+                );
+                diagnostic
+                    .related
+                    .push(format!("Include target: {}", child.display()));
+                diagnostic
+                    .related
+                    .push(format!("Canonical path: {}", canonical.display()));
                 diagnostics.push(diagnostic);
                 continue;
             }

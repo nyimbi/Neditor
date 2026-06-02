@@ -80,6 +80,6 @@ function normalizeItem(level: number, title: string): OutlinePlanItem | null {
 }
 
 function yamlScalar(value: string) {
-  if (/^[A-Za-z0-9 _.,:/-]+$/.test(value)) return value;
+  if (/^[A-Za-z0-9 _.,:/-]+$/.test(value) && !/(: |:$)/.test(value)) return value;
   return JSON.stringify(value);
 }

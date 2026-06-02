@@ -1,3 +1,4 @@
+use crate::compiler_support::fenced_code_marker;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
@@ -130,16 +131,23 @@ fn normalized_markdown_heading(line: &str) -> Option<String> {
 
 fn remove_chat_labels(text: &str, issues: &mut Vec<String>) -> String {
     let mut removed = Vec::new();
-    let mut in_code_fence = false;
+    let mut open_marker: Option<String> = None;
     let output = text
         .lines()
         .filter_map(|line| {
             let trimmed = line.trim_start();
-            if trimmed.starts_with("```") {
-                in_code_fence = !in_code_fence;
+            if let Some(ref marker) = open_marker.clone() {
+                // Inside a fence: close when we see a run of the same character
+                // with length >= the opening marker length.
+                let fence_char = marker.chars().next().unwrap();
+                let run_len = trimmed.chars().take_while(|&c| c == fence_char).count();
+                if run_len >= marker.len() {
+                    open_marker = None;
+                }
                 return Some(line.to_string());
             }
-            if in_code_fence {
+            if let Some(marker) = fenced_code_marker(line) {
+                open_marker = Some(marker);
                 return Some(line.to_string());
             }
             if let Some((label, rest)) = strip_chat_label(trimmed) {

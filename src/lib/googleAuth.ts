@@ -112,7 +112,7 @@ export function googleOAuthRefreshTokenRequestBody(clientId: string, refreshToke
 
 export function googleOAuthTokenNeedsRefresh(expiresAt: string, now = Date.now(), skewMs = 120_000) {
   const expiresMs = Date.parse(expiresAt);
-  if (!Number.isFinite(expiresMs)) return false;
+  if (!Number.isFinite(expiresMs)) return true;
   return expiresMs <= now + skewMs;
 }
 

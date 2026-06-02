@@ -423,6 +423,8 @@ export interface PersistedWorkspace {
   codeFolding?: boolean;
   highContrast?: boolean;
   reducedMotion?: boolean;
+  uiMode?: 'writer' | 'pilot';
+  pilotActivityPanel?: string;
   autosave?: boolean;
   autosaveDelayMs?: number;
   autoSnapshot?: boolean;
@@ -1172,8 +1174,8 @@ function normalizeAgentRunHistoryItem(value: unknown): AgentRunHistoryItem | nul
   return {
     runId,
     title: normalizedString(value.title, 120) || "Agent run",
-    generatedAt: normalizedString(value.generatedAt, 40),
-    updatedAt: normalizedString(value.updatedAt, 40),
+    generatedAt: normalizedString(value.generatedAt, 40) || new Date(0).toISOString(),
+    updatedAt: normalizedString(value.updatedAt, 40) || new Date(0).toISOString(),
     instruction: normalizedString(value.instruction, 500),
     contextAnswers: normalizedString(value.contextAnswers, 4_000) || undefined,
     sourcePackText: normalizedString(value.sourcePackText, 8_000) || undefined,

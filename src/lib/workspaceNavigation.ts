@@ -299,7 +299,7 @@ export function applyOpenedWorkspaceDocumentState(
   recentFiles: string[],
   recentlyClosed: string[],
   missingWorkspaceFiles: string[],
-  document: OpenDocument,
+  document: OpenDocument & { path: string },
 ): OpenedWorkspaceDocumentStateResult {
   return {
     documents: [...documents, document],

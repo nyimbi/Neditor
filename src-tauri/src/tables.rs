@@ -204,7 +204,7 @@ fn numeric_cell(cell: &str) -> Option<NumericCell> {
 
 fn format_numeric_data_value(value: f64) -> String {
     if value.fract().abs() < f64::EPSILON {
-        format!("{}", value as i64)
+        format!("{value:.0}")
     } else {
         let formatted = format!("{value:.6}");
         formatted
@@ -283,12 +283,12 @@ pub(crate) fn evaluate_markdown_table_formulas(
     let mut output = Vec::new();
     let mut index = 0;
     let mut named_tables = HashMap::new();
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     while index < lines.len() {
         let line = lines[index];
-        if let Some(marker) = fence_marker {
+        if let Some(ref marker) = fence_marker {
             output.push(line.to_string());
-            if line.trim_start().starts_with(marker) {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             index += 1;
@@ -598,12 +598,15 @@ fn parse_cell_reference_at(
 }
 
 fn cell_ref_from_parts(column: &[char], row: &[char]) -> Option<(usize, usize)> {
+    if column.len() > 3 {
+        return None;
+    }
     let column_index = column.iter().try_fold(0usize, |acc, ch| {
         let upper = ch.to_ascii_uppercase();
         if !upper.is_ascii_uppercase() {
             return None;
         }
-        Some(acc * 26 + (upper as u8 - b'A' + 1) as usize)
+        acc.checked_mul(26)?.checked_add((upper as u8 - b'A' + 1) as usize)
     })?;
     let row_index = row.iter().collect::<String>().parse::<usize>().ok()?;
     if column_index == 0 || row_index == 0 {

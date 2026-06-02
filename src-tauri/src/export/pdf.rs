@@ -41,6 +41,11 @@ pub(crate) fn render_pdf_bytes(response: &CompileResponse, options: &Value) -> V
                 &header,
             ));
         }
+        debug_assert!(
+            page.items.len() <= 160,
+            "pdf page has {} items; items beyond 160 will be silently dropped",
+            page.items.len()
+        );
         for item in page.items.iter().take(160) {
             if matches!(item, PdfPageItem::ColumnBreak) {
                 active_float = None;
@@ -207,7 +212,12 @@ fn pdf_heading_text(line: &str) -> Option<(usize, String)> {
     if !(1..=6).contains(&level) || trimmed.chars().nth(level) != Some(' ') {
         return None;
     }
-    Some((level, trimmed[level..].trim().to_string()))
+    let rest = trimmed
+        .char_indices()
+        .nth(level)
+        .map(|(i, _)| &trimmed[i..])
+        .unwrap_or("");
+    Some((level, rest.trim().to_string()))
 }
 
 fn parse_pdf_toc_item(line: &str) -> Option<(String, String, String)> {
@@ -270,7 +280,7 @@ fn pdf_table_stream(table: &PdfTable, x: u32, top_y: i32, width: u32) -> (String
 fn pdf_figure_stream(figure: &PdfFigure, x: u32, top_y: i32, max_width: u32) -> (String, i32) {
     let (width, height) =
         pdf_figure_box_size(figure.dimensions, max_width, 180, figure.fit.as_deref());
-    let x = pdf_aligned_x(x, max_width, width, figure.float.as_deref());
+    let x = pdf_aligned_x(x, max_width, width, figure.float.as_deref()).max(0);
     let bottom_y = top_y - height;
     let label = figure
         .alt
@@ -901,7 +911,7 @@ impl PdfPaginator {
         if available_for_rows < pdf_table_row_height() {
             return 0;
         }
-        (available_for_rows / pdf_table_row_height()) as usize
+        (available_for_rows.max(0) / pdf_table_row_height()) as usize
     }
 
     fn finish_page(&mut self) {

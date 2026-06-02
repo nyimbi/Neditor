@@ -6,6 +6,7 @@ use crate::{
 };
 use serde_json::Value;
 use std::{
+    io::Write,
     path::PathBuf,
     process::{Command, Stdio},
     time::{Duration, Instant},
@@ -104,8 +105,7 @@ pub(crate) fn render_sql_table(
     let mut child = match Command::new(&engine_path)
         .args(["-header", "-csv"])
         .arg(&database_path)
-        .arg(query)
-        .stdin(Stdio::null())
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -117,6 +117,17 @@ pub(crate) fn render_sql_table(
             return error_block(&message);
         }
     };
+    // Write the query via stdin so it is never visible in the process argument list.
+    if let Some(mut stdin) = child.stdin.take() {
+        if let Err(error) = stdin.write_all(query.as_bytes()) {
+            let message = format!("Could not write SQL query to sqlite3 stdin: {error}");
+            artifact_diags.push(diag("error", message.clone(), None, None, None));
+            let _ = child.kill();
+            let _ = child.wait();
+            return error_block(&message);
+        }
+        // stdin is dropped here, sending EOF so sqlite3 begins executing.
+    }
     loop {
         match child.try_wait() {
             Ok(Some(_)) => break,
@@ -206,9 +217,19 @@ fn read_only_select(query: &str) -> bool {
 fn has_non_trailing_statement_separator(query: &str) -> bool {
     let chars = query.chars().collect::<Vec<_>>();
     let mut quote: Option<char> = None;
+    let mut in_block_comment = false;
     let mut index = 0usize;
     while index < chars.len() {
         let ch = chars[index];
+        if in_block_comment {
+            if ch == '*' && chars.get(index + 1) == Some(&'/') {
+                in_block_comment = false;
+                index += 2;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
         if let Some(quote_char) = quote {
             if ch == quote_char {
                 if chars.get(index + 1) == Some(&quote_char) {
@@ -218,6 +239,11 @@ fn has_non_trailing_statement_separator(query: &str) -> bool {
                 quote = None;
             }
             index += 1;
+            continue;
+        }
+        if ch == '/' && chars.get(index + 1) == Some(&'*') {
+            in_block_comment = true;
+            index += 2;
             continue;
         }
         if matches!(ch, '\'' | '"' | '`') {

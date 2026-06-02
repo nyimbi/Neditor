@@ -173,6 +173,7 @@ const CLI_COMMANDS: &[&str] = &[
     "doctor",
     "help",
     "version",
+    "serve",
 ];
 const COMPLETION_SHELLS: &[&str] = &["bash", "zsh", "fish"];
 const MIN_DEPLOYABLE_NED_BYTES: u64 = 100_000;
@@ -685,7 +686,68 @@ pub(crate) fn run_cli_with_args_and_stdin(
         "default-reader" => run_default_reader_command(&args[2..]),
         "deploy-cli" | "install-cli" => run_deploy_cli_command(&args[2..]),
         "doctor" => run_doctor_command(&args[2..]),
+        "serve" => {
+            let port: u16 = args
+                .iter()
+                .skip_while(|a| *a != "--port")
+                .nth(1)
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(7000);
+            run_serve_mode(port);
+            Ok(CliOutcome { message: String::new(), exit_code: 0 })
+        }
         other => Err(format!("Unknown ned command '{other}'.\n\n{}", help_text())),
+    }
+}
+
+pub(crate) fn run_serve_mode(port: u16) {
+    use tiny_http::{Header, Response, Server};
+    let addr = format!("127.0.0.1:{port}");
+    let server = match Server::http(&addr) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("ned serve: cannot bind to {addr}: {e}");
+            std::process::exit(1);
+        }
+    };
+    eprintln!("ned serve listening on http://{addr}");
+    eprintln!("  POST /compile   body: {{text, file_path?}}");
+    eprintln!("  GET  /health");
+    for mut request in server.incoming_requests() {
+        let path = request.url().to_string();
+        let method = request.method().as_str().to_uppercase();
+        let response = match (method.as_str(), path.as_str()) {
+            ("GET", "/health") => {
+                Response::from_string(r#"{"status":"ok","app":"neditor"}"#)
+                    .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+            }
+            ("POST", "/compile") => {
+                let mut body = String::new();
+                if request.as_reader().read_to_string(&mut body).is_ok() {
+                    if let Ok(req) = serde_json::from_str::<serde_json::Value>(&body) {
+                        let text = req["text"].as_str().unwrap_or("").to_string();
+                        let file_path = req["file_path"].as_str().map(String::from);
+                        let compile_req = crate::compiler_types::CompileRequest { text, file_path };
+                        let result = crate::compile_with_options(compile_req, &Default::default());
+                        let json = serde_json::to_string(&result).unwrap_or_default();
+                        Response::from_string(json)
+                            .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+                    } else {
+                        Response::from_string(r#"{"error":"invalid JSON body"}"#)
+                            .with_status_code(400)
+                            .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+                    }
+                } else {
+                    Response::from_string(r#"{"error":"body read error"}"#)
+                        .with_status_code(400)
+                        .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+                }
+            }
+            _ => Response::from_string(r#"{"error":"not found"}"#)
+                .with_status_code(404)
+                .with_header(Header::from_bytes("Content-Type", "application/json").unwrap()),
+        };
+        let _ = request.respond(response);
     }
 }
 

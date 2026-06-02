@@ -24,7 +24,7 @@ pub(crate) fn collect_index_entries(
     let mut proper_nouns: BTreeMap<String, (usize, Option<String>)> = BTreeMap::new();
     let mut heading_index = 0usize;
     let mut current_anchor = headings.first().map(|heading| heading.anchor.clone());
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
 
     for (zero_index, line) in text.lines().enumerate() {
         let line_number = zero_index + 1;
@@ -32,8 +32,8 @@ pub(crate) fn collect_index_entries(
             current_anchor = Some(headings[heading_index].anchor.clone());
             heading_index += 1;
         }
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;
@@ -306,15 +306,15 @@ fn index_stop_word(token: &str) -> bool {
 fn first_term_anchor(text: &str, headings: &[Heading], term: &str) -> Option<String> {
     let mut heading_index = 0usize;
     let mut current_anchor = headings.first().map(|heading| heading.anchor.clone());
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for (zero_index, line) in text.lines().enumerate() {
         let line_number = zero_index + 1;
         while heading_index < headings.len() && headings[heading_index].line <= line_number {
             current_anchor = Some(headings[heading_index].anchor.clone());
             heading_index += 1;
         }
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;

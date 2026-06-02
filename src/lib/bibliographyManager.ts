@@ -10,7 +10,7 @@ export function normalizeCitationKey(key: string): string {
     .trim()
     .replace(/^@+/, "")
     .replace(/\s+/g, "-")
-    .replace(/[^A-Za-z0-9_:/.-]/g, "")
+    .replace(/[^A-Za-z0-9_:.-]/g, "")
     .replace(/^-+|-+$/g, "");
 }
 

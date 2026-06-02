@@ -21,7 +21,7 @@ export function titleFromPath(path: string | null) {
 export function folderFromPath(path: string | null) {
   if (!path) return null;
   const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return separator > 0 ? path.slice(0, separator) : null;
+  return separator === 0 ? '/' : separator > 0 ? path.slice(0, separator) : null;
 }
 
 export function createUntitledDocumentState(text: string, savedHash: string, createId: () => string, title = "Untitled"): OpenDocument {

@@ -429,6 +429,9 @@ fn push_duplicate_bibliography_diagnostic(
         .iter()
         .filter(|entry| entry.key == key)
         .collect::<Vec<_>>();
+    if entries.len() < 2 {
+        return;
+    }
     let primary = entries.get(1).or_else(|| entries.first());
     let (source_file, line) = primary
         .and_then(|entry| bibliography_entry_location(entry, input.source_map))

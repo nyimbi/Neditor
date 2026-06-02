@@ -1185,7 +1185,7 @@ export function inferTableFormat(values: string[]): TableFormat {
     return filled.some((value) => value.startsWith("$")) ? "currency" : "number";
   }
   if (filled.every((value) => /^-?\d+(\.\d+)?%$/.test(value))) return "percent";
-  if (filled.every((value) => !Number.isNaN(Date.parse(value)))) return "date";
+  if (filled.every((value) => /^\d{4}-\d{2}-\d{2}/.test(value) && !Number.isNaN(Date.parse(value)))) return "date";
   return "text";
 }
 

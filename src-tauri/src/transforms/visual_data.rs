@@ -1620,13 +1620,15 @@ fn read_le_f32(bytes: &[u8], offset: usize) -> Option<f32> {
 }
 
 fn decode_base64_payload(input: &str) -> Option<Vec<u8>> {
-    let cleaned = input
+    let mut cleaned = input
         .bytes()
         .filter(|byte| !byte.is_ascii_whitespace())
         .collect::<Vec<_>>();
-    if cleaned.is_empty() || cleaned.len() % 4 != 0 {
+    if cleaned.is_empty() {
         return None;
     }
+    let pad = (4 - cleaned.len() % 4) % 4;
+    cleaned.extend(std::iter::repeat(b'=').take(pad));
     let mut output = Vec::with_capacity(cleaned.len() / 4 * 3);
     for chunk in cleaned.chunks(4) {
         let a = base64_value(chunk[0])?;

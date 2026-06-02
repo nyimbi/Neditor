@@ -29,7 +29,7 @@ export function splitSelectionIntoLineRanges(text: string, from: number, to: num
   for (const line of lineRanges(source)) {
     if (line.to < selection.from) continue;
     if (line.from > selection.to) break;
-    if (line.from === selection.to && line.from === source.length && source[selection.to - 1] === "\n") break;
+    if (line.from === selection.to && selection.to > 0 && source[selection.to - 1] === "\n") break;
     const fromInLine = Math.max(line.from, selection.from);
     const toInLine = Math.min(line.to, selection.to);
     if (fromInLine <= toInLine) ranges.push({ from: fromInLine, to: Math.max(fromInLine, toInLine) });

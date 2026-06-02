@@ -356,6 +356,8 @@ export const useDocumentsStore = defineStore("documents", {
     ] as OpenDocument[],
     activeId: "",
     mode: "split" as "split" | "source" | "preview" | "focus" | "outline" | "export" | "review" | "presentation",
+    uiMode: "pilot" as "writer" | "pilot",
+    pilotActivityPanel: "outline" as string,
     sidebar: "outline" as
       | "files"
       | "outline"
@@ -673,7 +675,7 @@ export const useDocumentsStore = defineStore("documents", {
         return;
       }
       const response = await invoke<{ path: string; text: string; hash: string; modified?: string }>("read_file", { path });
-      const document = createOpenedDocumentState(response, () => crypto.randomUUID());
+      const document = createOpenedDocumentState(response, () => crypto.randomUUID()) as OpenDocument & { path: string };
       const opened = applyOpenedWorkspaceDocumentState(
         this.documents,
         this.recentFiles,
@@ -776,7 +778,7 @@ export const useDocumentsStore = defineStore("documents", {
       const pathChanged = !doc.path || target !== doc.path;
       if (isExistingDocumentSave) {
         const metadata = await invoke<FileMetadataResponse>("file_metadata", { path: target });
-        if (metadata.exists && metadata.hash && metadata.hash !== doc.savedHash) {
+        if (metadata.exists && metadata.hash && !equivalentSha256Hash(metadata.hash, doc.savedHash)) {
           await this.openExternalConflict(doc, target, "root", "The root file changed outside NEditor before save.", metadata.hash);
           this.statusMessage = "Save blocked; resolve external changes first";
           return;
@@ -945,13 +947,14 @@ export const useDocumentsStore = defineStore("documents", {
         this.watchedPathRoles = {};
         return;
       }
+      const rootPath = doc.path;
       const openRootPaths = this.documents
         .map((document) => document.path)
         .filter((path): path is string => Boolean(path))
-        .filter((path) => !sameWatchPath(path, doc.path));
+        .filter((path) => !sameWatchPath(path, rootPath));
       const includedPaths = (doc.compile?.export_manifest.included_files || []).map((file) => file.path);
       const watchSnapshot = await invoke<WatchFileResponse>("start_file_watcher", {
-        request: { root: doc.path, open_roots: openRootPaths, included: includedPaths },
+        request: { root: rootPath, open_roots: openRootPaths, included: includedPaths },
       });
       const watchedFiles = watchSnapshot.paths.filter((file) => file.exists);
       const watchPaths = watchedFiles.map((file) => file.path);
@@ -961,7 +964,7 @@ export const useDocumentsStore = defineStore("documents", {
       if (signature === this.watchSignature) return;
       const context: WatchContext = {
         documentId: doc.id,
-        rootPath: doc.path,
+        rootPath,
         openRootPaths,
         includedPaths,
         signature,
@@ -1357,6 +1360,7 @@ export const useDocumentsStore = defineStore("documents", {
     async prepareForExport() {
       if (this.exportBusy) return;
       const doc = this.activeDocument;
+      if (!doc) return;
       Object.assign(this, beginExportReadinessState());
       try {
         const exportReadiness = await invoke<ExportReadinessReport>("prepare_for_export", {
@@ -1368,6 +1372,8 @@ export const useDocumentsStore = defineStore("documents", {
           },
         });
         Object.assign(this, applyExportReadinessState(exportReadiness));
+      } catch (error) {
+        Object.assign(this, applyExportFailureState(error, doc.path, this.exportTarget));
       } finally {
         Object.assign(this, finishExportWorkflowState());
       }
@@ -1668,6 +1674,10 @@ export const useDocumentsStore = defineStore("documents", {
     },
     async testExternalTransform(name: string) {
       const engine = this.transformEngines.find((candidate) => candidate.name === name);
+      if (!engine) {
+        this.statusMessage = `Transform engine "${name}" not found`;
+        return;
+      }
       try {
         const response = await invoke<{ diagnostics: Array<{ message: string }>; cache_key: string }>("run_external_transform", {
           request: {
@@ -1677,8 +1687,8 @@ export const useDocumentsStore = defineStore("documents", {
             trusted: Boolean(this.trustedTransformEngines[name]),
             input_mode: this.transformInputModes[name] || "stdin",
             timeout_ms: this.transformTimeoutMs,
-            max_input_bytes: engine?.limits.maxInputBytes,
-            max_output_bytes: engine?.limits.maxOutputBytes,
+            max_input_bytes: engine.limits.maxInputBytes ?? null,
+            max_output_bytes: engine.limits.maxOutputBytes ?? null,
           },
         });
         Object.assign(this, applyTransformProbeSuccessState(this.transformProbeResults, name, response));
@@ -1779,8 +1789,9 @@ export const useDocumentsStore = defineStore("documents", {
       this.gitDiffText = await invoke<string>("git_diff", { request: { path } });
     },
     async commitActive(message?: string) {
-      const path = this.activeDocument?.path;
-      const commitMessage = (message || this.commitMessage || `Update ${this.activeDocument.title}`).trim();
+      const doc = this.activeDocument;
+      const path = doc?.path;
+      const commitMessage = (message || this.commitMessage || `Update ${doc?.title ?? "document"}`).trim();
       if (!path) throw new Error("Save the document before committing it.");
       await invoke("commit_document_changes", { request: { path, message: commitMessage } });
       this.commitMessage = "";
@@ -1788,12 +1799,13 @@ export const useDocumentsStore = defineStore("documents", {
       await this.refreshGitStatus();
     },
     async tagActiveRelease(tag?: string) {
-      const path = this.activeDocument?.path;
+      const doc = this.activeDocument;
+      const path = doc?.path;
       const releaseTag = (tag || this.releaseTag).trim();
       if (!path) throw new Error("Save the document before tagging it.");
       if (!releaseTag) throw new Error("Enter a release tag.");
       await invoke("tag_release", {
-        request: { path, tag: releaseTag, message: `Release ${this.activeDocument.title} ${releaseTag}` },
+        request: { path, tag: releaseTag, message: `Release ${doc?.title ?? "document"} ${releaseTag}` },
       });
       this.releaseTag = "";
       this.statusMessage = `Tagged release ${releaseTag}`;

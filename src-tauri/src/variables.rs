@@ -169,10 +169,14 @@ fn parse_variable_token(token: &str) -> VariableToken<'_> {
 }
 
 fn unquote_variable_default(value: &str) -> String {
-    value
-        .trim()
-        .trim_matches(|ch| ch == '"' || ch == '\'')
-        .to_string()
+    let value = value.trim();
+    if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
+        value[1..value.len() - 1].to_string()
+    } else if value.starts_with('\'') && value.ends_with('\'') && value.len() >= 2 {
+        value[1..value.len() - 1].to_string()
+    } else {
+        value.to_string()
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

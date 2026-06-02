@@ -174,7 +174,7 @@ pub(crate) fn copy_data_source_file(
         .map(safe_data_source_file_name)
         .filter(|name| !name.trim().is_empty())
         .ok_or_else(|| "Could not determine a safe data-source file name.".to_string())?;
-    let output = unique_data_source_output_path(&data_dir, &file_name);
+    let output = unique_data_source_output_path(&data_dir, &file_name)?;
     let canonical_base = base
         .canonicalize()
         .map_err(|err| format!("Could not inspect data-source folder: {err}"))?;
@@ -263,10 +263,13 @@ fn safe_data_source_file_name(name: &str) -> String {
         .to_string()
 }
 
-fn unique_data_source_output_path(data_dir: &std::path::Path, file_name: &str) -> PathBuf {
+fn unique_data_source_output_path(
+    data_dir: &std::path::Path,
+    file_name: &str,
+) -> Result<PathBuf, String> {
     let initial = data_dir.join(file_name);
     if !initial.exists() {
-        return initial;
+        return Ok(initial);
     }
     let path = PathBuf::from(file_name);
     let stem = path
@@ -285,10 +288,10 @@ fn unique_data_source_output_path(data_dir: &std::path::Path, file_name: &str) -
         };
         let candidate = data_dir.join(candidate_name);
         if !candidate.exists() {
-            return candidate;
+            return Ok(candidate);
         }
     }
-    data_dir.join(format!("{stem}-copy"))
+    Err("Too many copies of this data-source file already exist.".to_string())
 }
 
 fn data_source_relative_path(base: &std::path::Path, output: &std::path::Path) -> String {

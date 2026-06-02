@@ -94,6 +94,8 @@ export interface WorkspacePersistenceStateInput {
   customDocumentOutlineTemplates: RequiredPersistedValue<"customDocumentOutlineTemplates">;
   customVersionedClauses: RequiredPersistedValue<"customVersionedClauses">;
   documentMemoryText: string;
+  uiMode?: 'writer' | 'pilot';
+  pilotActivityPanel?: string;
 }
 
 export type WorkspacePreferenceStateInput = Omit<WorkspacePersistenceStateInput, "documents" | "activeId">;
@@ -145,6 +147,8 @@ export function applyPersistedWorkspacePreferenceState(
     agentRunHistory: normalizeAgentRunHistory(persisted.agentRunHistory),
     docsLiveDraftHistory: normalizeDocsLiveDraftHistory(persisted.docsLiveDraftHistory),
     guidedDemoCompletedStepIds: persisted.guidedDemoCompletedStepIds || [],
+    uiMode: (persisted.uiMode === 'writer' || persisted.uiMode === 'pilot') ? persisted.uiMode : undefined,
+    pilotActivityPanel: typeof persisted.pilotActivityPanel === 'string' ? persisted.pilotActivityPanel : undefined,
     recentFiles: persisted.recentFiles || [],
     recentFolders: persisted.recentFolders || [],
     recentlyClosed: persisted.recentlyClosed || [],
@@ -224,6 +228,8 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     recentlyClosed: state.recentlyClosed.slice(0, 20),
     workspaceRoot: state.workspaceRoot,
     mode: state.mode,
+    uiMode: state.uiMode,
+    pilotActivityPanel: state.pilotActivityPanel,
     sidebar: state.sidebar,
     openFiles: state.documents.map((document) => document.path).filter((path): path is string => Boolean(path)),
     scrollPositions: Object.fromEntries(

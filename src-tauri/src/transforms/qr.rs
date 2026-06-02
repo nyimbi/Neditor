@@ -101,7 +101,12 @@ fn qr_payload_fits(payload_len: usize, data_codewords: usize) -> bool {
 fn qr_data_codewords(payload: &[u8], data_codewords: usize) -> Vec<u8> {
     let mut bits = Vec::new();
     qr_append_bits(&mut bits, 0b0100, 4);
-    qr_append_bits(&mut bits, payload.len() as u32, 8);
+    qr_append_bits(
+        &mut bits,
+        u8::try_from(payload.len()).expect("payload length must fit in 8 bits for byte-mode QR")
+            as u32,
+        8,
+    );
     for byte in payload {
         qr_append_bits(&mut bits, u32::from(*byte), 8);
     }

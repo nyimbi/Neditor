@@ -497,21 +497,24 @@ fn pptx_table_chunks(table: &PptxTable) -> Vec<PptxTable> {
         .rows
         .chunks(PPTX_TABLE_ROWS_PER_SLIDE)
         .enumerate()
-        .map(|(index, rows)| pptx_table_chunk(table, rows.to_vec(), index > 0))
+        .map(|(index, rows)| {
+            let start = index * PPTX_TABLE_ROWS_PER_SLIDE;
+            pptx_table_chunk(table, rows.to_vec(), start, index > 0)
+        })
         .collect()
 }
 
-fn pptx_table_chunk(table: &PptxTable, rows: Vec<Vec<String>>, continued: bool) -> PptxTable {
+fn pptx_table_chunk(
+    table: &PptxTable,
+    rows: Vec<Vec<String>>,
+    start: usize,
+    continued: bool,
+) -> PptxTable {
     let caption = if continued {
         Some(table.caption.clone().unwrap_or_else(|| "Table".to_string()) + " (continued)")
     } else {
         table.caption.clone()
     };
-    let start = table
-        .rows
-        .windows(rows.len().max(1))
-        .position(|window| window == rows.as_slice())
-        .unwrap_or(0);
     let row_cells = table
         .row_cells
         .get(start..start + rows.len())

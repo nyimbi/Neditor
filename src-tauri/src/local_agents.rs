@@ -215,11 +215,16 @@ fn local_agent_spec(profile_id: &str) -> Option<&'static LocalAgentSpec> {
 }
 
 fn resolve_workspace_path(workspace_path: Option<&str>) -> Result<PathBuf, String> {
-    let raw_path = workspace_path
+    let raw_path: PathBuf = match workspace_path
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    {
+        Some(p) => p,
+        None => env::current_dir().map_err(|err| {
+            format!("No workspace path provided and current directory is unavailable: {err}")
+        })?,
+    };
     let candidate = if raw_path.extension().is_some() {
         raw_path
             .parent()

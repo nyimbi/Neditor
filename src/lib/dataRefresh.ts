@@ -154,9 +154,8 @@ function dataRefreshRowStatus(
   if (source.status !== "ready" || diagnostics.some((diagnostic) => diagnostic.severity === "error")) return "blocked";
   if (!includeGraphSize) return "missing-compile";
   if (!compiled) return "needs-refresh";
-  const effectiveAudit = audit || undefined;
-  if (!effectiveAudit) return "needs-refresh";
-  if (effectiveAudit.signature !== signature) return "stale-audit";
+  if (!audit) return "needs-refresh";
+  if (audit.signature !== signature) return "stale-audit";
   return "current";
 }
 

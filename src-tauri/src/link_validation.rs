@@ -18,10 +18,10 @@ pub(crate) fn validate_image_paths(
         .and_then(Path::parent)
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for (line_index, line) in markdown.lines().enumerate() {
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;
@@ -132,10 +132,10 @@ pub(crate) fn validate_link_paths(
         .and_then(Path::parent)
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for (line_index, line) in markdown.lines().enumerate() {
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;

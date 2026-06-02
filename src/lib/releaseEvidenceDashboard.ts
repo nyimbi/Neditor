@@ -139,7 +139,7 @@ export function buildReleaseEvidenceDashboard(input: ReleaseEvidenceDashboardInp
     acc[lane] = items.filter((item) => item.lane === lane).length;
     return acc;
   }, { complete: 0, blocked: 0, manual: 0, credentialed: 0, "cross-platform": 0, stale: 0, "ready-to-send": 0 });
-  const status = counts["ready-to-send"] ? "ready" : counts.blocked || counts.stale ? "blocked" : counts.manual || counts.credentialed || counts["cross-platform"] ? "needs-work" : "ready";
+  const status = counts["ready-to-send"] ? "ready" : counts.blocked || counts.stale ? "blocked" : counts.manual || counts.credentialed || counts["cross-platform"] ? "needs-work" : "needs-work";
   return {
     status,
     counts,

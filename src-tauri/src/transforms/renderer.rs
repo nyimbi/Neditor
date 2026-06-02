@@ -1,13 +1,19 @@
 use super::{
     business::{
-        render_adr_html, render_bibtex_html, render_diff_html, render_glossary_html,
-        render_roadmap_html, render_timeline_svg,
+        render_adr_html, render_bibtex_html, render_changelog_html, render_comparison_html,
+        render_diff_html, render_gantt_html, render_glossary_html, render_kanban_html,
+        render_org_chart_html, render_process_html, render_raci_html, render_roadmap_html,
+        render_status_table_html, render_timeline_svg,
     },
     chart::render_chart_svg,
     diagram,
     external::{graphviz_command, run_external_transform, ExternalTransformRequest},
     options::TransformExecutionOptions,
-    qr, sql, structured, transform_cache_key,
+    qr, sql,
+    structured::{
+        self, render_decision_table_html, render_toml_html,
+    },
+    transform_cache_key,
     visual_data::{render_geojson_svg, render_stl_svg, render_topojson_svg, render_vega_lite_svg},
     TransformArtifact,
 };
@@ -47,6 +53,16 @@ pub(crate) fn render_transform(
         "timeline" => render_timeline_svg(body),
         "roadmap" => render_roadmap_html(body),
         "adr" => render_adr_html(body),
+        "raci" => render_raci_html(body),
+        "comparison" => render_comparison_html(body),
+        "status-table" => render_status_table_html(body),
+        "kanban" => render_kanban_html(body),
+        "changelog" => render_changelog_html(body),
+        "process" => render_process_html(body),
+        "org" => render_org_chart_html(body),
+        "gantt" => render_gantt_html(body),
+        "decision-table" => render_decision_table_html(body, &mut artifact_diags, diagnostics),
+        "toml" => render_toml_html(body, &mut artifact_diags, diagnostics),
         "diff" => render_diff_html(body),
         "qr" => qr::render_qr_svg(body, &mut artifact_diags, diagnostics),
         "chart" => render_chart_svg(body),
@@ -125,6 +141,29 @@ pub(crate) fn supported_transform(name: &str) -> bool {
             | "openapi"
             | "json-schema"
             | "bibtex"
+            | "stacked"
+            | "stacked-bar"
+            | "donut"
+            | "waterfall"
+            | "funnel"
+            | "scatter"
+            | "bubble"
+            | "heatmap"
+            | "gauge"
+            | "raci"
+            | "comparison"
+            | "status-table"
+            | "kanban"
+            | "changelog"
+            | "process"
+            | "org"
+            | "gantt"
+            | "decision-table"
+            | "toml"
+            | "python"
+            | "r"
+            | "ditaa"
+            | "gnuplot"
     )
 }
 
@@ -134,6 +173,10 @@ pub(crate) fn canonical_transform_name(name: &str) -> &str {
         "jsonschema" | "schema" => "json-schema",
         "yml" => "yaml",
         "graph" => "dot",
+        "stacked_bar" | "stackedbar" => "stacked-bar",
+        "status_table" | "rag" => "status-table",
+        "decision_table" => "decision-table",
+        "orgchart" | "org-chart" => "org",
         other => other,
     }
 }
@@ -201,7 +244,8 @@ fn render_external_transform(
 }
 
 fn external_transform_supported(name: &str) -> bool {
-    graphviz_command(name).is_some() || matches!(name, "pikchr" | "plantuml" | "d2")
+    graphviz_command(name).is_some()
+        || matches!(name, "pikchr" | "plantuml" | "d2" | "python" | "r" | "ditaa" | "gnuplot")
 }
 
 fn external_output_format(name: &str, fence_options: &Value) -> Option<String> {

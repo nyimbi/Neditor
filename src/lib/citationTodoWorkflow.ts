@@ -12,8 +12,11 @@ export interface CitationTodoItem {
   note?: string;
 }
 
-const textTodoPattern = citationTodoMarkerRegex();
-const commentTodoPattern = /<!--\s*citation-todo:\s*(open|deferred)\b([^>]*)-->/gi;
+const TEXT_TODO_SOURCE = citationTodoMarkerRegex().source;
+const COMMENT_TODO_SOURCE = /<!--\s*citation-todo:\s*(open|deferred)\b([^>]*)-->/.source;
+
+function textTodoPat() { return new RegExp(TEXT_TODO_SOURCE, "gi"); }
+function commentTodoPat() { return new RegExp(COMMENT_TODO_SOURCE, "gi"); }
 
 export function extractCitationTodoItems(markdown: string): CitationTodoItem[] {
   const items: CitationTodoItem[] = [];
@@ -55,8 +58,7 @@ export function citationTodoAuditMarkdown(items: CitationTodoItem[]) {
 }
 
 function collectCommentTodos(items: CitationTodoItem[], line: string, lineNumber: number) {
-  commentTodoPattern.lastIndex = 0;
-  for (const match of line.matchAll(commentTodoPattern)) {
+  for (const match of line.matchAll(commentTodoPat())) {
     const status = match[1]?.toLowerCase() === "deferred" ? "deferred" : "open";
     const marker = match[0];
     const column = (match.index || 0) + 1;
@@ -73,9 +75,8 @@ function collectCommentTodos(items: CitationTodoItem[], line: string, lineNumber
 }
 
 function collectTextTodos(items: CitationTodoItem[], line: string, lineNumber: number) {
-  textTodoPattern.lastIndex = 0;
-  const searchableLine = line.replace(commentTodoPattern, (match) => " ".repeat(match.length));
-  for (const match of searchableLine.matchAll(textTodoPattern)) {
+  const searchableLine = line.replace(commentTodoPat(), (match) => " ".repeat(match.length));
+  for (const match of searchableLine.matchAll(textTodoPat())) {
     const marker = match[0];
     const column = (match.index || 0) + 1;
     items.push({
@@ -97,8 +98,7 @@ function replaceCitationTodoMarker(markdown: string, item: CitationTodoItem, rep
   const line = lines[index];
   const preferredIndex = Math.max(item.column - 1, 0);
   const markerIndex = line.indexOf(item.marker, preferredIndex);
-  const fallbackIndex = line.indexOf(item.marker);
-  const start = markerIndex >= 0 ? markerIndex : fallbackIndex;
+  const start = markerIndex >= 0 ? markerIndex : -1;
   if (start < 0) return markdown;
   lines[index] = `${line.slice(0, start)}${replacement}${line.slice(start + item.marker.length)}`;
   return lines.join(newline);

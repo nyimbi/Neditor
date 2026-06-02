@@ -23,7 +23,8 @@ export function appendChangeNoteMarker(documentText: string, text: string, creat
 
 export function resolveReviewCommentAtLine(documentText: string, line: number) {
   const lines = documentText.split("\n");
-  const index = Math.max(0, line - 1);
+  if (line < 1 || line > lines.length) return null;
+  const index = line - 1;
   const currentLine = lines[index] || "";
   const resolvedLine = currentLine.replace(/<!--\s*comment:\s*unresolved\b/, "<!-- comment: resolved");
   if (resolvedLine === currentLine) return null;

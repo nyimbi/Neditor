@@ -18,7 +18,7 @@ export interface ExternalConflictState {
   reason: ExternalConflictReason;
   message: string;
   externalHash: string;
-  externalText?: string;
+  externalText: string;
 }
 
 export interface ExternalConflictFileResponse {
@@ -107,7 +107,7 @@ export function applyRootConflictMergeState<T extends OpenDocument>(
   conflict: ExternalConflictState,
   text: string,
 ) {
-  const externalText = conflict.externalText || "";
+  const externalText = conflict.externalText;
   return {
     document: {
       ...document,

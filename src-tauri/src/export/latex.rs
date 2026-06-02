@@ -343,9 +343,9 @@ fn render_latex_block(block: &DocumentBlock, template: &LatexTemplateSpec) -> St
         DocumentBlock::CodeBlock { language, code, .. } => {
             let label = language.as_deref().unwrap_or("text");
             format!(
-                "% code block: {}\n\\begin{{verbatim}}\n{}\n\\end{{verbatim}}\n\n",
+                "% code block: {}\n{}\n",
                 latex_escape(label),
-                code.replace("\\end{verbatim}", "\\end\\{verbatim\\}")
+                verbatim_safe(code)
             )
         }
         DocumentBlock::Table {
@@ -437,14 +437,14 @@ fn render_latex_block(block: &DocumentBlock, template: &LatexTemplateSpec) -> St
             text,
             ..
         } => format!(
-            "\\subsection*{{Transform: {}}}\n\\textit{{{}}}\n\\begin{{verbatim}}\n{}\n\\end{{verbatim}}\n\n",
+            "\\subsection*{{Transform: {}}}\n\\textit{{{}}}\n{}\n",
             latex_escape(name),
             latex_escape(output_kind),
-            text.replace("\\end{verbatim}", "\\end\\{verbatim\\}")
+            verbatim_safe(text)
         ),
         DocumentBlock::RawHtml { html, .. } => format!(
-            "% Raw HTML retained for audit only.\n\\begin{{verbatim}}\n{}\n\\end{{verbatim}}\n\n",
-            html.replace("\\end{verbatim}", "\\end\\{verbatim\\}")
+            "% Raw HTML retained for audit only.\n{}\n",
+            verbatim_safe(html)
         ),
     }
 }
@@ -498,15 +498,17 @@ fn render_latex_figure(
     let source = src.unwrap_or("");
     let mut output = String::new();
     output.push_str("\\begin{figure}[h]\n\\centering\n");
-    if source.starts_with("data:") || source.trim().is_empty() {
+    let use_fbox = source.starts_with("data:")
+        || source.trim().is_empty()
+        || !source.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '/'));
+    if use_fbox {
         output.push_str(&format!(
             "\\fbox{{\\parbox{{0.85\\linewidth}}{{{}}}}}\n",
             latex_escape(alt.unwrap_or("Embedded image"))
         ));
     } else {
         output.push_str(&format!(
-            "\\includegraphics[width=0.85\\linewidth]{{{}}}\n",
-            latex_escape(source)
+            "\\includegraphics[width=0.85\\linewidth]{{{source}}}\n"
         ));
     }
     output.push_str(&format!("\\caption{{{}}}\n", latex_escape(caption)));
@@ -581,6 +583,30 @@ fn latex_label(value: &str) -> String {
             }
         })
         .collect::<String>()
+}
+
+/// Wrap `content` in one or more verbatim blocks such that any literal
+/// `\end{verbatim}` inside the content cannot prematurely close the environment.
+/// Each occurrence is split out and rendered as an inline `\texttt` snippet
+/// between two verbatim blocks, which is the only LaTeX-safe approach since
+/// backslash has no special meaning inside a verbatim environment.
+fn verbatim_safe(content: &str) -> String {
+    const TAG: &str = "\\end{verbatim}";
+    let segments: Vec<&str> = content.split(TAG).collect();
+    if segments.len() == 1 {
+        return format!("\\begin{{verbatim}}\n{content}\n\\end{{verbatim}}");
+    }
+    let mut out = String::new();
+    for (i, seg) in segments.iter().enumerate() {
+        out.push_str("\\begin{verbatim}\n");
+        out.push_str(seg);
+        out.push_str("\n\\end{verbatim}");
+        if i + 1 < segments.len() {
+            // Render the literal \end{verbatim} text safely outside verbatim.
+            out.push_str("\\texttt{\\textbackslash end\\{verbatim\\}}");
+        }
+    }
+    out
 }
 
 fn latex_escape(value: impl AsRef<str>) -> String {

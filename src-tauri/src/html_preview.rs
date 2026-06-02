@@ -17,7 +17,9 @@ pub(crate) fn markdown_to_html(
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
     let html_with_heading_ids = add_heading_ids(&html_output, heading_anchors);
-    annotate_glossary_terms(&html_with_heading_ids, glossary)
+    let html_with_glossary = annotate_glossary_terms(&html_with_heading_ids, glossary);
+    // Convert [[Document links]] to clickable anchors
+    convert_wiki_links(&html_with_glossary)
 }
 
 fn add_heading_ids(html: &str, heading_anchors: &[&str]) -> String {
@@ -140,4 +142,28 @@ fn glossary_term_has_boundaries(segment: &str, start: usize, end: usize) -> bool
 
 fn is_word_char(ch: char) -> bool {
     ch.is_alphanumeric() || ch == '_'
+}
+
+fn convert_wiki_links(html: &str) -> String {
+    let mut out = String::new();
+    let mut rest = html;
+    while let Some(start) = rest.find("[[") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 2..];
+        if let Some(end) = after.find("]]") {
+            let link_text = &after[..end];
+            let (display, target) = link_text.split_once('|').map(|(t, d)| (d.trim(), t.trim())).unwrap_or((link_text, link_text));
+            out.push_str(&format!(
+                "<a class=\"wiki-link\" data-wiki-target=\"{}\" href=\"#\">[[{}]]</a>",
+                crate::escape_html(target),
+                crate::escape_html(display)
+            ));
+            rest = &after[end + 2..];
+        } else {
+            out.push_str("[[");
+            rest = after;
+        }
+    }
+    out.push_str(rest);
+    out
 }

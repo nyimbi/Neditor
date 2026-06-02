@@ -51,10 +51,10 @@ pub(crate) fn collect_labels(
             origin: "heading",
         });
     }
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for (line_index, line) in text.lines().enumerate() {
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;
@@ -237,10 +237,10 @@ pub(crate) fn collect_cross_references(
 ) -> Vec<CrossReference> {
     let known = labels.iter().map(String::as_str).collect::<HashSet<_>>();
     let mut references = Vec::new();
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     for (line_index, line) in text.lines().enumerate() {
-        if let Some(marker) = fence_marker {
-            if line.trim_start().starts_with(marker) {
+        if let Some(ref marker) = fence_marker {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;
@@ -399,12 +399,12 @@ pub(crate) fn render_cross_references(markdown: &str, references: &[CrossReferen
         .iter()
         .map(|reference| (reference.key.as_str(), reference))
         .collect::<HashMap<_, _>>();
-    let mut fence_marker = None;
+    let mut fence_marker: Option<String> = None;
     let mut lines = Vec::new();
     for line in markdown.lines() {
-        if let Some(marker) = fence_marker {
+        if let Some(ref marker) = fence_marker {
             lines.push(line.to_string());
-            if line.trim_start().starts_with(marker) {
+            if line.trim_start().starts_with(marker.as_str()) {
                 fence_marker = None;
             }
             continue;

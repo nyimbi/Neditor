@@ -270,7 +270,7 @@ function metadataText(metadata: Record<string, unknown>, text: string, keys: str
     if (typeof value === "string" && value.trim()) return value.trim();
     if (typeof value === "number" || typeof value === "boolean") return String(value);
     const frontMatterValue = frontMatterScalarValue(text, key);
-    if (frontMatterValue.trim()) return frontMatterValue.trim();
+    if (typeof frontMatterValue === "string" && frontMatterValue.trim()) return frontMatterValue.trim();
   }
   return "";
 }
@@ -293,7 +293,10 @@ function metadataList(metadata: Record<string, unknown>, text: string, keys: str
 function metadataValueAtPath(metadata: Record<string, unknown>, key: string): unknown {
   if (Object.prototype.hasOwnProperty.call(metadata, key)) return metadata[key];
   return key.split(".").reduce<unknown>((current, part) => {
-    if (!current || typeof current !== "object") return undefined;
+    if (current === null || current === undefined) return undefined;
+    const index = /^\d+$/.test(part) ? Number(part) : NaN;
+    if (!Number.isNaN(index) && Array.isArray(current)) return current[index];
+    if (typeof current !== "object") return undefined;
     return (current as Record<string, unknown>)[part];
   }, metadata);
 }

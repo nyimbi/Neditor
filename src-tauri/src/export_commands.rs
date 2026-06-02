@@ -142,59 +142,27 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
         fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
 
-    match request.target.as_str() {
-        "html" => fs::write(
-            &output_path,
-            render_full_html(&compile_response, &request.options),
-        )
-        .map_err(|err| err.to_string())?,
-        "pdf" => fs::write(
-            &output_path,
-            render_pdf_bytes(&compile_response, &request.options),
-        )
-        .map_err(|err| err.to_string())?,
-        "docx" => fs::write(
-            &output_path,
-            render_docx_bytes(&compile_response, &request.options)?,
-        )
-        .map_err(|err| err.to_string())?,
-        "pptx" => fs::write(
-            &output_path,
-            render_pptx_bytes(&compile_response, &request.options)?,
-        )
-        .map_err(|err| err.to_string())?,
-        "markdown-bundle" | "markdown" => fs::write(
-            &output_path,
-            render_markdown_bundle_bytes(&compile_response, &manifest)?,
-        )
-        .map_err(|err| err.to_string())?,
-        "blog" | "substack" => fs::write(
-            &output_path,
-            render_blog_publish_package_bytes(&compile_response, &manifest)?,
-        )
-        .map_err(|err| err.to_string())?,
-        "latex" => fs::write(
-            &output_path,
-            render_latex_bytes(&compile_response, &manifest)?,
-        )
-        .map_err(|err| err.to_string())?,
-        "google-docs" => fs::write(
-            &output_path,
-            render_google_docs_package_bytes(&compile_response, &manifest)?,
-        )
-        .map_err(|err| err.to_string())?,
-        "epub" => fs::write(
-            &output_path,
-            render_epub_bytes(&compile_response, &manifest)?,
-        )
-        .map_err(|err| err.to_string())?,
+    let output_bytes: Vec<u8> = match request.target.as_str() {
+        "html" => render_full_html(&compile_response, &request.options).into_bytes(),
+        "pdf" => render_pdf_bytes(&compile_response, &request.options),
+        "docx" => render_docx_bytes(&compile_response, &request.options)?,
+        "pptx" => render_pptx_bytes(&compile_response, &request.options)?,
+        "markdown-bundle" | "markdown" => {
+            render_markdown_bundle_bytes(&compile_response, &manifest)?
+        }
+        "blog" | "substack" => {
+            render_blog_publish_package_bytes(&compile_response, &manifest)?
+        }
+        "latex" => render_latex_bytes(&compile_response, &manifest)?,
+        "google-docs" => render_google_docs_package_bytes(&compile_response, &manifest)?,
+        "epub" => render_epub_bytes(&compile_response, &manifest)?,
         other => {
             return Err(format!(
                 "Unsupported export target '{other}'. Use html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, google-docs, or epub."
             ));
         }
-    }
-    let output_bytes = fs::read(&output_path).map_err(|err| err.to_string())?;
+    };
+    fs::write(&output_path, &output_bytes).map_err(|err| err.to_string())?;
     manifest.output_path = Some(path_to_string(&output_path));
     manifest.output_hash = Some(sha256_uri(&output_bytes));
     manifest.progress_steps = export_progress_steps(

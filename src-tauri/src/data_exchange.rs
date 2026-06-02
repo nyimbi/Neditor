@@ -756,3 +756,40 @@ fn xml_escape(text: &str) -> String {
 fn markdown_safe_cell(cell: &str) -> String {
     escape_markdown_table_cell(cell)
 }
+
+#[derive(Debug, serde::Deserialize)]
+pub struct FetchRestSourceRequest {
+    pub url: String,
+    pub headers: Option<std::collections::HashMap<String, String>>,
+    pub jq_filter: Option<String>, // optional jq-style key path like "data.items"
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct FetchRestSourceResponse {
+    pub content: String,
+    pub content_type: String,
+    pub status: u32,
+}
+
+#[tauri::command]
+pub(crate) fn fetch_rest_source(request: FetchRestSourceRequest) -> Result<FetchRestSourceResponse, String> {
+    // Use curl to fetch the REST endpoint (avoids native TLS complexity)
+    let mut cmd = std::process::Command::new("curl");
+    cmd.args(["-sL", "--max-time", "15", "-w", "\n%{http_code}", "-H", "Accept: application/json"]);
+    if let Some(headers) = &request.headers {
+        for (k, v) in headers {
+            cmd.args(["-H", &format!("{k}: {v}")]);
+        }
+    }
+    cmd.arg(&request.url);
+    let output = cmd.output().map_err(|e| e.to_string())?;
+    let raw = String::from_utf8_lossy(&output.stdout);
+    let (body, status_str) = raw.rsplit_once('\n').unwrap_or((&raw, "0"));
+    let status: u32 = status_str.trim().parse().unwrap_or(0);
+    let content = body.trim().to_string();
+    Ok(FetchRestSourceResponse {
+        content,
+        content_type: "application/json".to_string(),
+        status,
+    })
+}

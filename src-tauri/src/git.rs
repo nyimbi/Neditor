@@ -1,6 +1,6 @@
 use crate::{
     git_support::{
-        git_cwd_for_path, git_pathspec, run_git, validate_git_restore_target,
+        git_cwd_for_path, git_pathspec, git_repo_root, run_git, validate_git_restore_target,
         validate_git_revision, validate_git_tag_name,
     },
     git_types::{
@@ -110,11 +110,16 @@ pub(crate) fn tag_release(request: GitTagRequest) -> Result<String, String> {
 pub(crate) fn restore_git_revision(request: GitRestoreRequest) -> Result<FileResponse, String> {
     let path = PathBuf::from(&request.path);
     let cwd = git_cwd_for_path(&path);
-    let file_name = git_pathspec(&path, request.path.as_str());
     let revision = request.revision.trim();
     validate_git_revision(revision)?;
     validate_git_restore_target(&cwd, &path)?;
-    let content = run_git(&cwd, &["show", &format!("{revision}:{file_name}")])?;
+    let repo_root = git_repo_root(&cwd)?;
+    let canonical_path = path.canonicalize().map_err(|err| err.to_string())?;
+    let tree_path = canonical_path
+        .strip_prefix(&repo_root)
+        .map_err(|_| "File is not inside the repository root.".to_string())?;
+    let tree_path_str = tree_path.to_str().ok_or_else(|| "File path is not valid UTF-8.".to_string())?;
+    let content = run_git(&cwd, &["show", &format!("{revision}:{tree_path_str}")])?;
     fs::write(&path, content.as_bytes()).map_err(|err| err.to_string())?;
     read_file(path_to_string(&path))
 }

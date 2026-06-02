@@ -169,6 +169,7 @@ pub(crate) fn stop_text_aloud(
     let count = children.len();
     for child in children.iter_mut() {
         let _ = child.kill();
+        let _ = child.wait();
     }
     children.clear();
     Ok(NativeTtsResponse {

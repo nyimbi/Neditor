@@ -80,8 +80,12 @@ export const latexTemplateProfiles: LatexTemplateProfile[] = [
 ];
 const builtInLatexTemplateIds = new Set(latexTemplateProfiles.map((profile) => profile.id));
 
-export function latexTemplateProfileById(id: LatexTemplatePreset) {
+export function latexTemplateProfileById(id: string) {
   return latexTemplateProfiles.find((profile) => profile.id === id) || latexTemplateProfiles[0];
+}
+
+export function lookupLatexTemplateProfile(id: string, profiles: LatexTemplateProfile[]): LatexTemplateProfile {
+  return profiles.find((profile) => profile.id === id) || latexTemplateProfiles[0];
 }
 
 export function createCustomLatexTemplateId(name: string) {

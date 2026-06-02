@@ -38,10 +38,10 @@ const defaultWordsPerPageByPreset: Record<string, number> = {
 
 export function buildPrintPreviewReport(markdown: string, options: PrintPreviewOptions = {}): PrintPreviewReport {
   const layoutBlock = frontMatterLayoutBlock(markdown);
-  const pageSize = normalizePageSize(valueFromLayout(layoutBlock, "pageSize") || firstDirectiveValue(markdown, "pageSize") || "A4");
-  const orientation = normalizeOrientation(firstDirectiveValue(markdown, "orientation") || "portrait");
-  const margins = normalizeMargins(firstDirectiveValue(markdown, "margins") || (options.layoutPreset === "compact" ? "narrow" : "normal"));
-  const columns = normalizeColumns(firstDirectiveValue(markdown, "columns") || "1");
+  const pageSize = normalizePageSize(valueFromLayout(layoutBlock, "pageSize") || "A4");
+  const orientation = normalizeOrientation(valueFromLayout(layoutBlock, "orientation") || "portrait");
+  const margins = normalizeMargins(valueFromLayout(layoutBlock, "margins") || (options.layoutPreset === "compact" ? "narrow" : "normal"));
+  const columns = normalizeColumns(valueFromLayout(layoutBlock, "columns") || "1");
   const wordCount = countPreviewWords(markdown);
   const pageBreaks = (markdown.match(/\{\{\s*page-break\s*\}\}/gi) || []).length;
   const sectionBreaks = extractSectionBreaks(markdown, { pageSize, orientation, margins, columns });
@@ -66,7 +66,7 @@ function countPreviewWords(markdown: string) {
   return markdown
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/~~~[\s\S]*?~~~/g, " ")
-    .replace(/^---[\s\S]*?---/m, " ")
+    .replace(/^---\n[\s\S]*?\n---(?:\n|$)/, " ")
     .replace(/\{\{[^}]+\}\}/g, " ")
     .split(/\s+/)
     .filter((word) => /[A-Za-z0-9]/.test(word)).length;
@@ -106,11 +106,6 @@ function printPreviewWarnings(markdown: string, report: Pick<PrintPreviewReport,
   if (!report.pageBreaks && report.estimatedPages > 8) warnings.push("Long document has no explicit page breaks; add breaks before appendices or major parts if needed.");
   if (report.pageSize === "Letter" && /\bA4\b/i.test(markdown)) warnings.push("Document text mentions A4 while preview uses Letter.");
   return warnings;
-}
-
-function firstDirectiveValue(markdown: string, key: string) {
-  const match = markdown.match(/\{\{\s*section-break\b[^}]*\}\}/i);
-  return match ? directiveValue(match[0], key) : "";
 }
 
 function directiveValue(text: string, key: string) {

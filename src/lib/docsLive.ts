@@ -1596,7 +1596,7 @@ function sequentialDraftQueueMarkdown(blueprint: DocsLiveBlueprint, sections: Do
     "| Order | Unit | Expansion rule | Acceptance criteria |",
     "| --- | --- | --- | --- |",
     ...draftableSections.map((section, index) =>
-      `| ${index + 1} | ${escapeTableCell(section.title)} | ${escapeTableCell(section.draftingBrief)} | ${escapeTableCell(profile.sequenceAcceptance[index % profile.sequenceAcceptance.length])} |`,
+      `| ${index + 1} | ${escapeTableCell(section.title)} | ${escapeTableCell(section.draftingBrief)} | ${escapeTableCell(profile.sequenceAcceptance[Math.min(index, profile.sequenceAcceptance.length - 1)])} |`,
     ),
     "",
     `## Final ${titleCase(profile.qualityLabel)}`,
