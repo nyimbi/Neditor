@@ -4070,6 +4070,97 @@
               </span>
             </div>
           </section>
+          <!-- Ollama status + model catalog -->
+          <template v-if="isOllamaProfile">
+            <h3>Ollama status</h3>
+            <div class="ollama-health-row">
+              <div class="ollama-health-badge" :class="ollamaHealth ? (ollamaHealth.running ? 'health-ok' : 'health-err') : 'health-unknown'">
+                <span class="health-dot"></span>
+                <span v-if="!ollamaHealth">not checked</span>
+                <span v-else-if="ollamaHealth.running">running · {{ ollamaHealth.modelCount }} model{{ ollamaHealth.modelCount !== 1 ? 's' : '' }} installed{{ ollamaHealth.version ? ' · v' + ollamaHealth.version : '' }}</span>
+                <span v-else>not running — {{ ollamaHealth.error || 'check endpoint' }}</span>
+              </div>
+              <button type="button" :disabled="ollamaHealthBusy" @click="probeOllamaHealth">{{ ollamaHealthBusy ? 'Checking…' : 'Check' }}</button>
+            </div>
+
+            <div v-if="contextBudgetInfo && activeModelCard" class="context-budget">
+              <div class="context-budget-label">
+                <span>Context budget — {{ activeModelCard.label }}</span>
+                <span>{{ contextBudgetInfo.totalUsed.toLocaleString() }} / {{ activeModelCard.numCtx.toLocaleString() }} est. tokens ({{ contextBudgetInfo.utilizationPct }}% used)</span>
+              </div>
+              <div class="context-budget-bar">
+                <div class="context-budget-fill"
+                  :class="contextBudgetInfo.utilizationPct > 85 ? 'budget-danger' : contextBudgetInfo.utilizationPct > 65 ? 'budget-warn' : 'budget-ok'"
+                  :style="{ width: contextBudgetInfo.utilizationPct + '%' }"
+                ></div>
+              </div>
+              <p v-if="contextBudgetInfo.overBudget" class="sidebar-hint" style="color:#b91c1c">Document exceeds context window. NEditor will trim context automatically.</p>
+            </div>
+
+            <template v-if="ollamaInstalledModels.length">
+              <h3>Installed models</h3>
+              <div class="ollama-installed-list">
+                <div v-for="m in ollamaInstalledModels" :key="m" class="ollama-installed-row">
+                  <span class="ollama-installed-name">{{ m }}</span>
+                  <div class="ollama-installed-actions">
+                    <button type="button" :class="{ primary: store.aiProviderDefaults.model === m }" @click="useOllamaModel(m)">
+                      {{ store.aiProviderDefaults.model === m ? '✓ Active' : 'Use' }}
+                    </button>
+                    <button type="button" :disabled="ollamaDeleteBusy" @click="deleteOllamaModel(m)">Delete</button>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <h3>Recommended models (≤9B, local)</h3>
+            <p class="sidebar-hint">Pull downloads the model to your machine — no API key needed. All models below are ≤9B parameters.</p>
+            <div v-if="ollamaPullError" class="sidebar-hint" style="color:#b91c1c;margin-top:4px">{{ ollamaPullError }}</div>
+            <div v-if="ollamaPullSuccess" class="sidebar-hint" style="color:#1a6b48;margin-top:4px">✓ {{ ollamaPullSuccess }}</div>
+            <div class="ollama-model-grid">
+              <div
+                v-for="card in OLLAMA_MODEL_CATALOG.filter(m => m.recommended)"
+                :key="card.id"
+                class="ollama-model-card"
+                :class="{
+                  'model-active': store.aiProviderDefaults.model === card.id,
+                  'model-installed': ollamaInstalledModels.some(n => n.startsWith(card.id.split(':')[0]))
+                }"
+              >
+                <div class="model-card-header">
+                  <span class="model-badge-family">{{ card.family }}</span>
+                  <span class="model-badge-params">{{ card.params }}</span>
+                  <span class="model-badge-rec">{{ card.badge }}</span>
+                </div>
+                <div class="model-card-name">{{ card.label }}</div>
+                <div class="model-card-meta">
+                  <span title="Context window">{{ (card.contextTokens / 1000).toFixed(0) }}k ctx</span>
+                  <span title="VRAM">~{{ card.vramGb }}GB</span>
+                  <span title="Disk">{{ card.diskGb }}GB dl</span>
+                  <span class="model-speed" :class="'speed-' + card.speed">{{ card.speed }}</span>
+                </div>
+                <div class="model-card-why">{{ card.whyRecommended }}</div>
+                <div class="model-card-tags">
+                  <span v-for="tag in card.tags.slice(0, 3)" :key="tag" class="model-tag">{{ tag }}</span>
+                </div>
+                <div class="model-card-actions">
+                  <button
+                    v-if="!ollamaInstalledModels.some(n => n.startsWith(card.id.split(':')[0]))"
+                    type="button"
+                    class="model-pull-btn"
+                    :disabled="ollamaPullBusy"
+                    @click="pullOllamaModel(card.id)"
+                  >{{ ollamaPullBusy && ollamaPullModelId === card.id ? 'Pulling…' : 'Pull ↓' }}</button>
+                  <button
+                    v-else
+                    type="button"
+                    :class="{ primary: store.aiProviderDefaults.model === card.id }"
+                    @click="useOllamaModel(card.id)"
+                  >{{ store.aiProviderDefaults.model === card.id ? '✓ Active' : 'Use' }}</button>
+                </div>
+              </div>
+            </div>
+          </template>
+
           <section class="agent-provider-panel" aria-label="Text to speech setup">
             <header>
               <div>
@@ -8883,6 +8974,93 @@ const docLocked = ref(false);
 
 const slashPickerInputEl = ref<HTMLInputElement | null>(null);
 const slashPickerPos = ref({ top: -1, left: -1 });
+// ── Ollama AI state ────────────────────────────────────────────────────────
+import type { OllamaHealthResult } from "./lib/ollamaModels.js";
+import { OLLAMA_MODEL_CATALOG, checkOllamaHealth, computeContextBudget } from "./lib/ollamaModels.js";
+
+const ollamaHealth = ref<OllamaHealthResult | null>(null);
+const ollamaHealthBusy = ref(false);
+const ollamaPullModelId = ref("");
+const ollamaPullBusy = ref(false);
+const ollamaPullError = ref("");
+const ollamaPullSuccess = ref("");
+const ollamaDeleteBusy = ref(false);
+const ollamaInstalledModels = ref<string[]>([]);
+
+const isOllamaProfile = computed(() =>
+  store.aiProviderDefaults.profileId === "ollama-local" ||
+  store.aiProviderDefaults.profileId === "ollama-cloud"
+);
+
+const activeModelCard = computed(() =>
+  OLLAMA_MODEL_CATALOG.find(m => m.id === store.aiProviderDefaults.model)
+);
+
+const contextBudgetInfo = computed(() => {
+  if (!isOllamaProfile.value || !activeModelCard.value) return null;
+  const docText = active.value?.text ?? "";
+  const sysPrompt = "You are an expert document co-writer inside NEditor. Return only well-structured Markdown.";
+  return computeContextBudget(sysPrompt, docText, activeModelCard.value.numCtx, 4096);
+});
+
+async function probeOllamaHealth(): Promise<void> {
+  if (ollamaHealthBusy.value) return;
+  ollamaHealthBusy.value = true;
+  const endpoint = store.aiProviderDefaults.endpoint || "http://127.0.0.1:11434/api/chat";
+  ollamaHealth.value = await checkOllamaHealth(endpoint);
+  if (ollamaHealth.value.running) {
+    try {
+      const resp = await invoke<{ models: Array<{ name: string }> }>("list_ollama_models", {
+        request: { endpoint, auth_header: null, api_key: null, key_env: null },
+      });
+      ollamaInstalledModels.value = resp.models.map((m) => m.name);
+    } catch { ollamaInstalledModels.value = []; }
+  }
+  ollamaHealthBusy.value = false;
+}
+
+async function pullOllamaModel(modelId: string): Promise<void> {
+  ollamaPullBusy.value = true;
+  ollamaPullError.value = "";
+  ollamaPullSuccess.value = "";
+  ollamaPullModelId.value = modelId;
+  try {
+    const endpoint = store.aiProviderDefaults.endpoint || "http://127.0.0.1:11434/api/chat";
+    const result = await invoke<{ success: boolean; error: string; status: string }>("pull_ollama_model", {
+      request: { endpoint, model: modelId },
+    });
+    if (result.success) {
+      ollamaPullSuccess.value = `${modelId} installed successfully`;
+      await probeOllamaHealth();
+    } else {
+      ollamaPullError.value = result.error || "Pull failed";
+    }
+  } catch (e) {
+    ollamaPullError.value = String(e);
+  } finally {
+    ollamaPullBusy.value = false;
+    ollamaPullModelId.value = "";
+  }
+}
+
+async function deleteOllamaModel(modelName: string): Promise<void> {
+  ollamaDeleteBusy.value = true;
+  try {
+    const endpoint = store.aiProviderDefaults.endpoint || "http://127.0.0.1:11434/api/chat";
+    await invoke("delete_ollama_model", { request: { endpoint, model: modelName } });
+    await probeOllamaHealth();
+  } catch (e) { store.statusMessage = `Delete failed: ${e}`; }
+  finally { ollamaDeleteBusy.value = false; }
+}
+
+function useOllamaModel(modelId: string): void {
+  store.aiProviderDefaults = { ...store.aiProviderDefaults, model: modelId };
+  void store.persistWorkspace();
+  store.statusMessage = `Switched to ${modelId}`;
+}
+
+watch(isOllamaProfile, (v) => { if (v) void probeOllamaHealth(); });
+
 // Import tools probe
 const pandocAvailable = ref(false);
 const curlAvailable = ref(false);
@@ -36836,4 +37014,53 @@ del.tracked-del { background: #fee2e2; color: #b91c1c; text-decoration: line-thr
 .audit-ts { color:#7a8ea0; font-variant-numeric:tabular-nums; }
 .audit-event { font-weight:650; color:#1e3040; }
 .audit-doc { color:#526171; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ── Ollama model catalog UI ─────────────────────────────────────────────── */
+.ollama-health-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.ollama-health-badge { display:flex; align-items:center; gap:6px; padding:5px 12px; border-radius:99px; font-size:12px; font-weight:600; border:1px solid transparent; flex:0 0 auto; max-width:100%; }
+.health-ok { background:#f0fdf4; border-color:#86efac; color:#15803d; }
+.health-err { background:#fff1f2; border-color:#fca5a5; color:#b91c1c; }
+.health-unknown { background:#f8fafc; border-color:#d0d9e4; color:#5a7090; }
+.health-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.health-ok .health-dot { background:#22c55e; }
+.health-err .health-dot { background:#ef4444; }
+.health-unknown .health-dot { background:#94a3b8; }
+.context-budget { margin:8px 0; }
+.context-budget-label { display:flex; justify-content:space-between; font-size:11px; color:#526171; margin-bottom:3px; flex-wrap:wrap; gap:4px; }
+.context-budget-bar { height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; }
+.context-budget-fill { height:100%; border-radius:3px; transition:width 0.4s ease; }
+.budget-ok { background:#22c55e; }
+.budget-warn { background:#f59e0b; }
+.budget-danger { background:#ef4444; }
+.ollama-installed-list { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+.ollama-installed-row { display:flex; align-items:center; justify-content:space-between; padding:5px 8px; border:1px solid #dce6f0; border-radius:6px; background:#f8fafc; }
+.ollama-installed-name { font-size:12px; font-weight:600; color:#1e3040; font-family:ui-monospace,monospace; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ollama-installed-actions { display:flex; gap:5px; flex-shrink:0; }
+.ollama-model-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; margin-top:4px; }
+.ollama-model-card { display:flex; flex-direction:column; gap:5px; padding:10px 12px; border:1px solid #dce6f0; border-radius:10px; background:#f8fafc; transition:border-color 0.12s,background 0.12s; }
+.ollama-model-card:hover { border-color:#7eaedd; background:#f0f7ff; }
+.model-active { border-color:#7eaedd !important; background:#e8f3ff !important; box-shadow:0 0 0 1px #7eaedd; }
+.model-installed { border-left:3px solid #22c55e; }
+.model-card-header { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.model-badge-family { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; background:#dbeeff; color:#1a4a7a; padding:1px 6px; border-radius:99px; }
+.model-badge-params { font-size:9px; font-weight:750; background:#f0f4f8; color:#5a7090; padding:1px 5px; border-radius:99px; }
+.model-badge-rec { font-size:9px; font-weight:750; background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:99px; }
+.model-card-name { font-size:13px; font-weight:750; color:#1e3040; }
+.model-card-meta { display:flex; flex-wrap:wrap; gap:6px; font-size:10px; color:#7a8ea0; }
+.model-card-why { font-size:11px; color:#526171; line-height:1.4; flex:1; }
+.model-card-tags { display:flex; flex-wrap:wrap; gap:3px; }
+.model-tag { font-size:9px; background:#f0f4f8; color:#526171; padding:1px 5px; border-radius:4px; }
+.model-card-actions { margin-top:4px; }
+.model-pull-btn { width:100%; font-size:12px; }
+.speed-fast { color:#1a6b48 !important; font-weight:700; }
+.speed-medium { color:#92400e !important; }
+.speed-slow { color:#7a8ea0 !important; }
+.app-shell[data-theme="dark"] .ollama-model-card { background:#1e2d42; border-color:#2a4060; }
+.app-shell[data-theme="dark"] .ollama-model-card:hover { background:#1e3454; border-color:#3a70a0; }
+.app-shell[data-theme="dark"] .model-active { background:#163050 !important; border-color:#3a6090 !important; }
+.app-shell[data-theme="dark"] .model-card-name { color:#c0d8f0; }
+.app-shell[data-theme="dark"] .model-card-why { color:#8aaccc; }
+.app-shell[data-theme="dark"] .ollama-installed-row { background:#1e2d42; border-color:#2a4060; }
+.app-shell[data-theme="dark"] .ollama-installed-name { color:#c0d8f0; }
+.app-shell[data-theme="dark"] .ollama-health-badge { background:#1a2535; }
 </style>

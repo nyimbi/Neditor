@@ -128,7 +128,10 @@ use google_auth::{
     GoogleAuthState,
 };
 use local_agents::{import_local_agent_response, prepare_local_agent_handoff};
-use ollama_models::list_ollama_models;
+use ollama_models::{
+    check_ollama_health, delete_ollama_model, list_ollama_models, pull_ollama_model,
+    show_ollama_model_info,
+};
 use rfp_import::import_rfp_source;
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
 use tauri::{
@@ -229,6 +232,10 @@ pub fn run() {
             download_citation_source,
             list_citation_sources,
             list_ollama_models,
+            check_ollama_health,
+            pull_ollama_model,
+            delete_ollama_model,
+            show_ollama_model_info,
             inspect_native_tts,
             download_tts_model,
             read_text_aloud,

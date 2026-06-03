@@ -201,6 +201,152 @@ fn is_safe_env_name(value: &str) -> bool {
         && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct OllamaHealthResult {
+    pub(crate) running: bool,
+    pub(crate) endpoint: String,
+    pub(crate) model_count: usize,
+    pub(crate) version: String,
+    pub(crate) error: String,
+}
+
+#[tauri::command]
+pub(crate) fn check_ollama_health(endpoint: String) -> OllamaHealthResult {
+    let base = endpoint
+        .trim_end_matches('/')
+        .trim_end_matches("/api/chat")
+        .trim_end_matches("/api/generate")
+        .trim_end_matches("/api/tags");
+    let tags_url = format!("{base}/api/tags");
+    let output = std::process::Command::new("curl")
+        .args(["-sL", "--max-time", "3", "--write-out", "\n%{http_code}", &tags_url])
+        .output();
+    match output {
+        Err(e) => OllamaHealthResult {
+            running: false, endpoint: base.to_string(), model_count: 0,
+            version: String::new(), error: e.to_string(),
+        },
+        Ok(out) => {
+            let raw = String::from_utf8_lossy(&out.stdout);
+            let (body, status_str) = raw.rsplit_once('\n').unwrap_or((&raw, "0"));
+            let status: u32 = status_str.trim().parse().unwrap_or(0);
+            if status < 200 || status >= 300 {
+                return OllamaHealthResult {
+                    running: false, endpoint: base.to_string(), model_count: 0,
+                    version: String::new(), error: format!("HTTP {status}"),
+                };
+            }
+            let model_count = serde_json::from_str::<serde_json::Value>(body.trim())
+                .ok()
+                .and_then(|v| v.get("models")?.as_array().map(|a| a.len()))
+                .unwrap_or(0);
+            let version = {
+                let version_url = format!("{base}/api/version");
+                std::process::Command::new("curl")
+                    .args(["-sL", "--max-time", "2", &version_url])
+                    .output()
+                    .ok()
+                    .and_then(|o| serde_json::from_slice::<serde_json::Value>(&o.stdout).ok())
+                    .and_then(|v| v.get("version")?.as_str().map(String::from))
+                    .unwrap_or_default()
+            };
+            OllamaHealthResult { running: true, endpoint: base.to_string(), model_count, version, error: String::new() }
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct OllamaPullRequest {
+    pub(crate) endpoint: String,
+    pub(crate) model: String,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct OllamaPullResult {
+    pub(crate) success: bool,
+    pub(crate) model: String,
+    pub(crate) error: String,
+    pub(crate) status: String,
+}
+
+#[tauri::command]
+pub(crate) fn pull_ollama_model(request: OllamaPullRequest) -> Result<OllamaPullResult, String> {
+    let base = request.endpoint.trim_end_matches('/')
+        .trim_end_matches("/api/chat").trim_end_matches("/api/generate").trim_end_matches("/api/tags");
+    let pull_url = format!("{base}/api/pull");
+    let body = serde_json::json!({ "name": &request.model, "stream": false }).to_string();
+    let output = std::process::Command::new("curl")
+        .args(["-sL", "--max-time", "600", "-X", "POST",
+               "-H", "Content-Type: application/json", "-d", &body, &pull_url])
+        .output().map_err(|e| e.to_string())?;
+    let raw = String::from_utf8_lossy(&output.stdout);
+    let status_msg = serde_json::from_str::<serde_json::Value>(raw.trim())
+        .ok().and_then(|v| v.get("status")?.as_str().map(String::from)).unwrap_or_default();
+    let success = output.status.success() && (status_msg == "success" || raw.contains("\"success\""));
+    Ok(OllamaPullResult {
+        success, model: request.model,
+        error: if success { String::new() } else { raw.trim().chars().take(300).collect() },
+        status: status_msg,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct OllamaDeleteRequest {
+    pub(crate) endpoint: String,
+    pub(crate) model: String,
+}
+
+#[tauri::command]
+pub(crate) fn delete_ollama_model(request: OllamaDeleteRequest) -> Result<(), String> {
+    let base = request.endpoint.trim_end_matches('/')
+        .trim_end_matches("/api/chat").trim_end_matches("/api/generate").trim_end_matches("/api/tags");
+    let delete_url = format!("{base}/api/delete");
+    let body = serde_json::json!({ "name": &request.model }).to_string();
+    let output = std::process::Command::new("curl")
+        .args(["-sL", "--max-time", "30", "-X", "DELETE",
+               "-H", "Content-Type: application/json", "-d", &body, &delete_url])
+        .output().map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stdout);
+        return Err(format!("Delete failed: {}", err.trim().chars().take(200).collect::<String>()));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct OllamaModelInfo {
+    pub(crate) name: String,
+    pub(crate) family: String,
+    pub(crate) parameter_size: String,
+    pub(crate) context_length: u64,
+    pub(crate) quantization: String,
+}
+
+#[tauri::command]
+pub(crate) fn show_ollama_model_info(endpoint: String, model: String) -> Result<OllamaModelInfo, String> {
+    let base = endpoint.trim_end_matches('/')
+        .trim_end_matches("/api/chat").trim_end_matches("/api/generate").trim_end_matches("/api/tags");
+    let show_url = format!("{base}/api/show");
+    let body = serde_json::json!({ "name": &model }).to_string();
+    let output = std::process::Command::new("curl")
+        .args(["-sL", "--max-time", "10", "-X", "POST",
+               "-H", "Content-Type: application/json", "-d", &body, &show_url])
+        .output().map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
+    let details = v.get("details");
+    let modelinfo = v.get("model_info");
+    let context_length = modelinfo
+        .and_then(|m| m.get("llama.context_length").or_else(|| m.get("context_length")))
+        .and_then(|c| c.as_u64()).unwrap_or(0);
+    Ok(OllamaModelInfo {
+        name: model,
+        family: details.and_then(|d| d.get("family")?.as_str()).unwrap_or_default().to_string(),
+        parameter_size: details.and_then(|d| d.get("parameter_size")?.as_str()).unwrap_or_default().to_string(),
+        context_length,
+        quantization: details.and_then(|d| d.get("quantization_level")?.as_str()).unwrap_or_default().to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

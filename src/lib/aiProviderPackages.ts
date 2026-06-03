@@ -353,6 +353,49 @@ export async function executeDirectAiProviderPrompt(
   };
 }
 
+/**
+ * Execute an Ollama prompt with optional streaming.
+ * When onToken is provided and the profile is ollama-chat, tokens stream as they arrive.
+ * For non-Ollama profiles, falls back to standard execution.
+ */
+export async function executeOllamaWithStreaming(
+  options: DirectAiProviderPromptOptions & { numCtx?: number; onToken?: (chunk: string, total: string) => void },
+  apiKey = "",
+  fetcher: AiProviderFetch = globalThis.fetch.bind(globalThis) as AiProviderFetch,
+): Promise<AiProviderExecutionResult> {
+  const baseProfile = providerProfileById(options.profileId);
+  const profile: AiProviderProfile = {
+    ...baseProfile,
+    endpoint: normalizeEndpoint(options.endpoint) || baseProfile.endpoint,
+    model: normalizeField(options.model, 120) || baseProfile.model,
+  };
+  if (!profile.endpoint) {
+    throw new Error("This provider profile is a manual handoff and does not define an endpoint.");
+  }
+  if (profile.bodyStyle !== "ollama-chat" || !options.onToken) {
+    return executeDirectAiProviderPrompt(options, apiKey, fetcher);
+  }
+  const { executeStreamingOllamaPrompt } = await import("./ollamaModels.js");
+  try {
+    const result = await executeStreamingOllamaPrompt(
+      profile.endpoint,
+      profile.model,
+      options.systemPrompt,
+      options.userPrompt,
+      options.onToken,
+      undefined,
+      { numCtx: options.numCtx ?? 32768 },
+    );
+    const markdown = result.totalText.trim();
+    if (!markdown) throw new Error("Ollama streaming response did not contain usable text.");
+    return { ok: true, status: 200, statusText: "OK", markdown, rawText: result.totalText };
+  } catch (streamError) {
+    // Fallback to non-streaming on error
+    console.warn("Streaming failed, falling back to non-streaming:", streamError);
+    return executeDirectAiProviderPrompt(options, apiKey, fetcher);
+  }
+}
+
 export function buildAiProviderResponseReviewMarkdown(markdown: string, options: AiProviderResponseReviewOptions = {}) {
   const generatedAt = options.generatedAt || new Date().toISOString();
   const provider = normalizeField(options.profileLabel, 120) || "Approved AI provider";
@@ -569,7 +612,10 @@ function extractProviderMarkdown(rawText: string, bodyStyle: AiProviderBodyStyle
   }
   if (bodyStyle === "ollama-chat") {
     const message = recordValue(parsed.message);
-    return stringValue(message?.content) || stringValue(parsed.response) || stringValue(parsed.output) || rawText.trim();
+    let text = stringValue(message?.content) || stringValue(parsed.response) || stringValue(parsed.output) || rawText.trim();
+    // Strip DeepSeek R1-style <think>...</think> reasoning blocks
+    text = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    return text;
   }
   if (bodyStyle === "system-and-messages") {
     const content = arrayValue(parsed.content);
@@ -638,7 +684,12 @@ function buildRequestBody(profile: AiProviderProfile, systemPrompt: string, user
         { role: "user", content: userPrompt },
       ],
       stream: false,
-      options: { temperature: 0.2 },
+      options: {
+        temperature: 0.2,
+        num_ctx: 32768,
+        repeat_penalty: 1.1,
+        top_p: 0.9,
+      },
     };
   }
   return {
