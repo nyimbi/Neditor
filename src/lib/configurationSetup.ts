@@ -54,6 +54,24 @@ export const configurationSetupSteps = [
     actionLabel: "Open release checks",
   },
   {
+    id: "imports",
+    title: "Imports and data sources",
+    summary: "Verify pandoc and curl are installed for document import, DOI lookup, and live REST data sources.",
+    actionLabel: "Check import tools",
+  },
+  {
+    id: "automation",
+    title: "Automation and webhooks",
+    summary: "Configure webhook endpoints that fire on document approval, export, and status change. Set mail merge defaults.",
+    actionLabel: "Configure automation",
+  },
+  {
+    id: "audit",
+    title: "Audit and compliance",
+    summary: "Enable the append-only document audit log, set authorship identity, and configure log retention for this workspace.",
+    actionLabel: "Configure audit",
+  },
+  {
     id: "support",
     title: "Support bundle",
     summary: "Create redaction-safe setup, release, evidence, engine, and spec-completion diagnostics for help desks and internal IT.",
@@ -118,6 +136,10 @@ export interface ConfigurationSetupStatusInput {
   supportBundleStatus: string;
   supportBundleRecommendationCount: number;
   supportBundleEvidenceAttentionCount: number;
+  pandocAvailable: boolean;
+  curlAvailable: boolean;
+  webhookCount: number;
+  auditEnabled: boolean;
 }
 
 export interface ConfigurationSetupAssistanceInput {
@@ -158,6 +180,10 @@ export interface ConfigurationSetupAssistanceInput {
   supportBundleStatus: string;
   supportBundleRecommendationCount: number;
   supportBundleEvidenceAttentionCount: number;
+  pandocAvailable: boolean;
+  curlAvailable: boolean;
+  webhookCount: number;
+  auditEnabled: boolean;
 }
 
 export interface ConfigurationCenterSectionInput {
@@ -177,6 +203,10 @@ export interface ConfigurationCenterSectionInput {
   releaseEvidenceSummary: string;
   supportBundleStatus: string;
   supportBundleRecommendationCount: number;
+  pandocAvailable: boolean;
+  curlAvailable: boolean;
+  webhookCount: number;
+  auditEnabled: boolean;
 }
 
 export function configurationSetupStepById(stepId: string): (typeof configurationSetupSteps)[number] {
@@ -247,6 +277,24 @@ export function buildConfigurationSetupStatus(input: ConfigurationSetupStatusInp
         : releaseNeedsAction
           ? `${input.releaseEvidenceStatus}: ${input.releaseEvidenceSummary}`
           : "release evidence not generated",
+    },
+    {
+      id: "imports",
+      label: "Imports and data sources",
+      done: input.pandocAvailable || input.curlAvailable,
+      detail: [input.pandocAvailable ? "pandoc ready" : "pandoc missing", input.curlAvailable ? "curl ready" : "curl missing"].join("; "),
+    },
+    {
+      id: "automation",
+      label: "Automation",
+      done: input.webhookCount > 0,
+      detail: input.webhookCount > 0 ? `${input.webhookCount} webhook(s) configured` : "no webhooks configured",
+    },
+    {
+      id: "audit",
+      label: "Audit and compliance",
+      done: input.auditEnabled,
+      detail: input.auditEnabled ? "audit log enabled" : "audit log disabled",
     },
     {
       id: "support",
@@ -343,6 +391,30 @@ export function buildConfigurationSetupStepAssistance(input: ConfigurationSetupA
         `Ready-to-send lanes: ${input.releaseEvidenceReadyToSendCount}`,
       );
       break;
+    case "imports":
+      suggestedAnswer = input.pandocAvailable && input.curlAvailable
+        ? "Both pandoc and curl are available. Document import, DOI lookup, and live REST data source population are ready to use."
+        : `Install missing tools before relying on import or data-source features: ${[!input.pandocAvailable ? "pandoc" : null, !input.curlAvailable ? "curl" : null].filter(Boolean).join(", ")}. pandoc handles document conversion; curl is required for DOI resolution and REST data endpoints.`;
+      rationale = "Import and data-source workflows fail silently when binary dependencies are absent; checking them at setup time surfaces the gap before users hit it mid-document.";
+      contextSignals.push(
+        `pandoc available: ${input.pandocAvailable ? "yes" : "no"}`,
+        `curl available: ${input.curlAvailable ? "yes" : "no"}`,
+      );
+      break;
+    case "automation":
+      suggestedAnswer = input.webhookCount > 0
+        ? `${input.webhookCount} webhook endpoint(s) are configured. Review event bindings for document approval, export completion, and status change, and confirm mail merge defaults are set for batch dispatch.`
+        : "No webhook endpoints are configured. Add at least one endpoint for document approval or export events to enable automated downstream integrations. Set mail merge defaults before first batch run.";
+      rationale = "Webhook and mail merge automation reduces manual handoff steps; configuring endpoints at setup time prevents silent drops when approval or export events fire.";
+      contextSignals.push(`Webhook count: ${input.webhookCount}`);
+      break;
+    case "audit":
+      suggestedAnswer = input.auditEnabled
+        ? "The append-only audit log is enabled. Confirm authorship identity is set, log retention matches your compliance policy, and document compare history and humanizer audit records are included in the log scope."
+        : "Enable the append-only document audit log before handling production documents. Set authorship identity and log retention period to satisfy compliance requirements. Audit records for compare history and humanizer rewrites should be included from the start.";
+      rationale = "Audit trails must be established before documents are created; retroactive logging cannot capture authorship or change provenance for records already written.";
+      contextSignals.push(`Audit log enabled: ${input.auditEnabled ? "yes" : "no"}`);
+      break;
     case "support":
       suggestedAnswer = input.supportBundleReady
         ? `Support bundle preview is ready. Review ${input.supportBundleRecommendationCount} recommendation(s) and ${input.supportBundleEvidenceAttentionCount} evidence report(s) needing attention, then save the JSON before handing the installation or release case to help desk, internal IT, or release management.`
@@ -416,6 +488,30 @@ export function buildConfigurationCenterSections(input: ConfigurationCenterSecti
       label: "Transforms",
       summary: `${input.externalEngineCount} external engines; ${input.installerPlanCount} installer plan`,
       detail: "Download handlers, set executable paths, trust engines, probe setup, timeout, and execution modes.",
+    },
+    {
+      id: "imports",
+      label: "Imports and data",
+      summary: input.pandocAvailable && input.curlAvailable
+        ? "pandoc and curl ready"
+        : input.pandocAvailable
+          ? "pandoc ready; curl missing"
+          : input.curlAvailable
+            ? "curl ready; pandoc missing"
+            : "pandoc and curl not found",
+      detail: "Document import via pandoc, DOI lookup, live REST data sources, and mail merge field population.",
+    },
+    {
+      id: "automation",
+      label: "Automation",
+      summary: input.webhookCount > 0 ? `${input.webhookCount} webhook(s) configured` : "no webhooks configured",
+      detail: "Webhook endpoints for document approval, export, and status change events; mail merge defaults and batch dispatch settings.",
+    },
+    {
+      id: "audit",
+      label: "Audit and compliance",
+      summary: input.auditEnabled ? "audit log enabled" : "audit log disabled",
+      detail: "Append-only document audit trail, authorship identity, log retention policy, document compare history, and humanizer audit records.",
     },
     {
       id: "release",

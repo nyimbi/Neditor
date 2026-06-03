@@ -3679,6 +3679,10 @@
                 <small>{{ item.detail }}</small>
               </button>
             </div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid #dce6f0">
+              <p class="sidebar-hint">Reset the guided walkthrough so it replays on next open.</p>
+              <button type="button" @click="store.resetGuidedDemoProgress(); void store.persistWorkspace()">Reset guided demo ({{ store.guidedDemoCompletedStepIds.length }} steps done)</button>
+            </div>
           </section>
           </section>
           <section v-show="selectedConfigurationSection === 'appearance'" class="configuration-center-panel" aria-label="Appearance and editor configuration">
@@ -4168,6 +4172,9 @@
           <label><input v-model="store.aiCleanupDefaults.convertNumberedLists" type="checkbox" /> Convert numbered lists</label>
           <label><input v-model="store.aiCleanupDefaults.convertTables" type="checkbox" /> Convert tables</label>
           <label><input v-model="store.aiCleanupDefaults.insertCitationTodos" type="checkbox" /> Insert citation TODOs</label>
+          <h3>Document memory</h3>
+          <p class="sidebar-hint">Shared context injected into every AI session. Keep to 3-5 lines of audience, tone, and standing instructions.</p>
+          <label><textarea v-model="store.documentMemoryText" rows="4" placeholder="Audience: senior finance executives.&#10;Tone: formal, direct." @blur="void store.persistWorkspace()"></textarea></label>
           </section>
           <section v-show="selectedConfigurationSection === 'appearance'" class="configuration-center-panel" aria-label="Typography configuration">
           <h3>Typography</h3>
@@ -4439,6 +4446,87 @@
               </article>
             </section>
           </section>
+          <section v-show="selectedConfigurationSection === 'imports'" class="configuration-center-panel" aria-label="Imports and data sources">
+  <h3>Document import (pandoc)</h3>
+  <p class="sidebar-hint">pandoc converts Word (.docx), PowerPoint (.pptx), OpenDocument, RTF, and HTML to Markdown. Install from <strong>pandoc.org</strong>.</p>
+  <div class="config-probe-row">
+    <div class="config-probe-status" :class="pandocAvailable ? 'probe-ok' : 'probe-missing'">
+      <strong>pandoc</strong><span>{{ pandocProbeResult || "not checked" }}</span>
+    </div>
+    <div class="config-probe-status" :class="curlAvailable ? 'probe-ok' : 'probe-missing'">
+      <strong>curl</strong><span>{{ curlProbeResult || "not checked" }}</span>
+    </div>
+    <button type="button" @click="probeImportTools">Check tools</button>
+  </div>
+  <label>pandoc path (blank = use PATH)<input v-model="store.pandocBinaryPath" type="text" placeholder="/usr/local/bin/pandoc" @blur="void store.persistWorkspace()" /></label>
+  <label>curl path (blank = use PATH)<input v-model="store.curlBinaryPath" type="text" placeholder="/usr/bin/curl" @blur="void store.persistWorkspace()" /></label>
+  <h3>REST data source security</h3>
+  <p class="sidebar-hint">Allowed hosts for REST data fetches (one per line). Leave empty to allow any host.</p>
+  <label>
+    Allowed hosts
+    <textarea :value="store.restFetchAllowedHosts.join('\n')" rows="4" placeholder="api.example.com" @blur="store.restFetchAllowedHosts = ($event.target as HTMLTextAreaElement).value.split('\n').map((s: string) => s.trim()).filter(Boolean); void store.persistWorkspace()"></textarea>
+  </label>
+  <label>REST fetch timeout (ms)<input v-model.number="store.restFetchTimeoutMs" type="number" min="1000" max="60000" step="1000" @blur="void store.persistWorkspace()" /></label>
+  <h3>Mail merge</h3>
+  <label class="compact-check"><input v-model="store.mailMergeRequireWorkspaceRoot" type="checkbox" @change="void store.persistWorkspace()" /><span>Require workspace root (restrict paths to open workspace)</span></label>
+  <label>Max records per merge<input v-model.number="store.mailMergeMaxRecords" type="number" min="1" max="100000" step="100" @blur="void store.persistWorkspace()" /></label>
+  <label>Default CSV delimiter<select v-model="store.mailMergeDefaultDelimiter" @change="void store.persistWorkspace()"><option value=",">Comma (,)</option><option value="&#9;">Tab</option></select></label>
+</section>
+          <section v-show="selectedConfigurationSection === 'automation'" class="configuration-center-panel" aria-label="Automation and webhooks">
+  <h3>Webhooks</h3>
+  <p class="sidebar-hint">NEditor POSTs a JSON event payload to each enabled URL when the selected events occur. Requires curl on PATH.</p>
+  <div v-if="!store.webhookConfigs.length" class="sidebar-hint">No webhooks configured.</div>
+  <div v-for="webhook in store.webhookConfigs" :key="webhook.id" class="webhook-row">
+    <div class="webhook-info">
+      <strong>{{ webhook.name }}</strong>
+      <span class="webhook-url">{{ webhook.url }}</span>
+      <span class="webhook-events">{{ webhook.events.join(", ") }}</span>
+    </div>
+    <div class="webhook-actions">
+      <label class="compact-check" style="margin:0"><input type="checkbox" :checked="webhook.enabled" @change="toggleWebhook(webhook.id)" /><span>{{ webhook.enabled ? "on" : "off" }}</span></label>
+      <button type="button" @click="removeWebhook(webhook.id)">Remove</button>
+    </div>
+  </div>
+  <section class="webhook-add-form" aria-label="Add webhook">
+    <h4>Add webhook</h4>
+    <label>Name<input v-model="newWebhookDraft.name" type="text" placeholder="Slack notify" /></label>
+    <label>URL<input v-model="newWebhookDraft.url" type="url" placeholder="https://hooks.example.com/neditor" /></label>
+    <div class="webhook-events-select">
+      <strong>Fire on events</strong>
+      <label v-for="ev in WEBHOOK_EVENTS" :key="ev.id" class="compact-check">
+        <input type="checkbox" :value="ev.id" v-model="newWebhookDraft.events" /><span>{{ ev.label }}</span>
+      </label>
+    </div>
+    <button type="button" :disabled="!newWebhookDraft.name.trim() || !newWebhookDraft.url.trim()" @click="addWebhook">Add webhook</button>
+  </section>
+</section>
+          <section v-show="selectedConfigurationSection === 'audit'" class="configuration-center-panel" aria-label="Audit and compliance">
+  <h3>Document audit log</h3>
+  <p class="sidebar-hint">Appends a tamper-evident JSONL entry to <code>.neditor/audit.jsonl</code> on save, export, status change, and approval.</p>
+  <label class="compact-check"><input v-model="store.auditEnabled" type="checkbox" @change="void store.persistWorkspace()" /><span>Enable audit log for this workspace</span></label>
+  <label>Author identity<input v-model="store.auditAuthor" type="text" :placeholder="store.businessProfile.fullName || 'Your name'" @blur="void store.persistWorkspace()" /></label>
+  <label>Max log file size (bytes, 0 = unlimited)<input v-model.number="store.auditMaxBytes" type="number" min="0" max="100000000" step="1000000" @blur="void store.persistWorkspace()" /></label>
+  <div style="margin-top:8px" v-if="store.workspaceRoot">
+    <button type="button" @click="loadAuditLog()">View recent entries</button>
+    <div v-if="auditLogEntries.length" class="audit-log-preview">
+      <div v-for="entry in auditLogEntries.slice(0, 20)" :key="entry.timestamp" class="audit-entry">
+        <span class="audit-ts">{{ entry.timestamp.slice(0, 19).replace('T', ' ') }}</span>
+        <span class="audit-event">{{ entry.event }}</span>
+        <span v-if="entry.document_title" class="audit-doc">{{ entry.document_title }}</span>
+      </div>
+    </div>
+  </div>
+  <h3>History retention</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+    <button type="button" @click="store.clearAgentRunHistory(); void store.persistWorkspace()">Clear agent history ({{ store.agentRunHistory.length }})</button>
+    <button type="button" @click="store.clearDocsLiveDraftHistory(); void store.persistWorkspace()">Clear Docs Live history ({{ store.docsLiveDraftHistory.length }})</button>
+  </div>
+  <h3>AI humanizer</h3>
+  <label>Default intensity<select v-model="store.humanizerDefaultMode" @change="void store.persistWorkspace()"><option value="light">Light</option><option value="standard">Standard (recommended)</option><option value="heavy">Heavy</option></select></label>
+  <h3>Document comparison</h3>
+  <label>Max lines (prevents OOM)<input v-model.number="store.compareMaxLines" type="number" min="100" max="50000" step="500" @blur="void store.persistWorkspace()" /></label>
+  <label class="compact-check"><input v-model="store.compareIgnoreWhitespace" type="checkbox" @change="void store.persistWorkspace()" /><span>Ignore leading/trailing whitespace</span></label>
+</section>
           <section v-show="selectedConfigurationSection === 'support'" class="configuration-center-panel" aria-label="Support and diagnostics configuration">
             <section class="transform-handler-installer" aria-label="Configurator support bundle">
               <header>
@@ -8795,6 +8883,63 @@ const docLocked = ref(false);
 
 const slashPickerInputEl = ref<HTMLInputElement | null>(null);
 const slashPickerPos = ref({ top: -1, left: -1 });
+// Import tools probe
+const pandocAvailable = ref(false);
+const curlAvailable = ref(false);
+const pandocProbeResult = ref("");
+const curlProbeResult = ref("");
+// Webhook form draft
+const newWebhookDraft = ref({ name: "", url: "", events: ["status-changed"] as string[], enabled: true });
+// Audit log preview
+const auditLogEntries = ref<{ timestamp: string; event: string; document_title?: string }[]>([]);
+
+async function probeImportTools(): Promise<void> {
+  // Try to find pandoc and curl by running --version
+  try {
+    const pr = await invoke<{ success: boolean; output: string }>("probe_binary", { name: store.pandocBinaryPath || "pandoc" }).catch(() => ({ success: false, output: "not found" }));
+    pandocAvailable.value = pr.success;
+    pandocProbeResult.value = pr.output || (pr.success ? "found" : "not found");
+  } catch { pandocAvailable.value = false; pandocProbeResult.value = "not found"; }
+  try {
+    const cr = await invoke<{ success: boolean; output: string }>("probe_binary", { name: store.curlBinaryPath || "curl" }).catch(() => ({ success: false, output: "not found" }));
+    curlAvailable.value = cr.success;
+    curlProbeResult.value = cr.output || (cr.success ? "found" : "not found");
+  } catch { curlAvailable.value = false; curlProbeResult.value = "not found"; }
+}
+
+function addWebhook(): void {
+  const draft = newWebhookDraft.value;
+  if (!draft.name.trim() || !draft.url.trim()) return;
+  const id = "wh-" + String(store.webhookConfigs.length + 1) + "-" + draft.name.trim().slice(0, 8).replace(/\s+/g, "");
+  store.webhookConfigs = [...store.webhookConfigs, { id, name: draft.name.trim(), url: draft.url.trim(), events: [...draft.events], enabled: true }];
+  newWebhookDraft.value = { name: "", url: "", events: ["status-changed"], enabled: true };
+  void store.persistWorkspace();
+}
+
+function removeWebhook(id: string): void {
+  store.webhookConfigs = store.webhookConfigs.filter(w => w.id !== id);
+  void store.persistWorkspace();
+}
+
+function toggleWebhook(id: string): void {
+  store.webhookConfigs = store.webhookConfigs.map(w => w.id === id ? { ...w, enabled: !w.enabled } : w);
+  void store.persistWorkspace();
+}
+
+const WEBHOOK_EVENTS = [
+  { id: "status-changed", label: "Status changed" },
+  { id: "exported", label: "Exported" },
+  { id: "approved", label: "Approved / locked" },
+  { id: "saved", label: "Saved" },
+];
+
+async function loadAuditLog(): Promise<void> {
+  try {
+    const result = await invoke<{ entries: { timestamp: string; event: string; document_title?: string }[] }>("read_audit_log", { workspaceRoot: store.workspaceRoot }).catch(() => ({ entries: [] }));
+    auditLogEntries.value = result.entries || [];
+  } catch { auditLogEntries.value = []; }
+}
+
 const transformPickerOpen = ref(false);
 const transformPickerMinimized = ref(false);
 const transformPickerPos = ref({ x: 80, y: 120 });
@@ -11056,6 +11201,10 @@ const configurationSetupStatus = computed(() =>
     supportBundleStatus: supportBundleStatus.value,
     supportBundleRecommendationCount: supportBundleReport.value?.recommendations?.length || 0,
     supportBundleEvidenceAttentionCount: (supportBundleReport.value?.evidenceReportSummary?.attention || 0) + (supportBundleReport.value?.evidenceReportSummary?.missing || 0),
+    pandocAvailable: pandocAvailable.value,
+    curlAvailable: curlAvailable.value,
+    webhookCount: store.webhookConfigs.length,
+    auditEnabled: store.auditEnabled,
   }),
 );
 const configurationSetupSummary = computed(() => formatConfigurationSetupSummary(configurationSetupStatus.value));
@@ -11103,6 +11252,10 @@ const configurationSetupStepAssistance = computed(() => {
     supportBundleStatus: supportBundleStatus.value,
     supportBundleRecommendationCount: supportBundleReport.value?.recommendations?.length || 0,
     supportBundleEvidenceAttentionCount: (supportBundleReport.value?.evidenceReportSummary?.attention || 0) + (supportBundleReport.value?.evidenceReportSummary?.missing || 0),
+    pandocAvailable: pandocAvailable.value,
+    curlAvailable: curlAvailable.value,
+    webhookCount: store.webhookConfigs.length,
+    auditEnabled: store.auditEnabled,
   });
 });
 const selectedTransformInstallerPlan = computed(() =>
@@ -11137,6 +11290,10 @@ const configurationCenterSections = computed(() =>
     releaseEvidenceSummary: releaseEvidenceDashboard.value.summary,
     supportBundleStatus: supportBundleStatus.value || (supportBundleReport.value ? "preview ready" : "preview required"),
     supportBundleRecommendationCount: supportBundleReport.value?.recommendations?.length || 0,
+    pandocAvailable: pandocAvailable.value,
+    curlAvailable: curlAvailable.value,
+    webhookCount: store.webhookConfigs.length,
+    auditEnabled: store.auditEnabled,
   }),
 );
 const rfpAnalysisSummary = computed(() => {
@@ -36656,4 +36813,27 @@ del.tracked-del { background: #fee2e2; color: #b91c1c; text-decoration: line-thr
 .diff-added .diff-text::before { content: "+ "; }
 .diff-removed .diff-text { color: #b91c1c; text-decoration: line-through; }
 .diff-removed .diff-text::before { content: "− "; }
+.config-probe-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+.config-probe-status { display:flex; flex-direction:column; padding:6px 12px; border-radius:7px; border:1px solid #d0d9e4; background:#f7f9fb; font-size:12px; min-width:140px; }
+.config-probe-status strong { font-size:12px; margin-bottom:1px; }
+.config-probe-status span { font-size:11px; color:#5a7090; }
+.probe-ok { border-color:#86efac; background:#f0fdf4; }
+.probe-ok strong { color:#15803d; }
+.probe-missing { border-color:#fca5a5; background:#fff1f2; }
+.probe-missing strong { color:#b91c1c; }
+.webhook-row { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:8px 10px; border:1px solid #dce6f0; border-radius:7px; background:#f8fafc; margin-bottom:6px; }
+.webhook-info { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.webhook-url { font-size:11px; color:#526171; word-break:break-all; }
+.webhook-events { font-size:10px; color:#7a8ea0; }
+.webhook-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.webhook-add-form { margin-top:12px; padding:12px; border:1px solid #d0d9e4; border-radius:8px; background:#f4f7fb; display:flex; flex-direction:column; gap:8px; }
+.webhook-add-form h4 { margin:0 0 6px; font-size:12px; text-transform:uppercase; color:#5a7090; }
+.webhook-events-select { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.webhook-events-select strong { font-size:11px; color:#526171; margin-right:4px; }
+.audit-log-preview { margin-top:8px; border:1px solid #dce6f0; border-radius:7px; max-height:200px; overflow-y:auto; background:#f8fafc; }
+.audit-entry { display:grid; grid-template-columns:130px 100px 1fr; gap:8px; padding:4px 10px; border-bottom:1px solid #edf1f7; font-size:11px; }
+.audit-entry:last-child { border-bottom:none; }
+.audit-ts { color:#7a8ea0; font-variant-numeric:tabular-nums; }
+.audit-event { font-weight:650; color:#1e3040; }
+.audit-doc { color:#526171; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>

@@ -96,6 +96,22 @@ export interface WorkspacePersistenceStateInput {
   documentMemoryText: string;
   uiMode?: 'writer' | 'pilot';
   pilotActivityPanel?: string;
+  webhookConfigs: Array<{ id: string; name: string; url: string; events: string[]; enabled: boolean }>;
+  auditEnabled: boolean;
+  auditAuthor: string;
+  auditMaxBytes: number;
+  searchMaxResults: number;
+  searchDefaultCaseSensitive: boolean;
+  humanizerDefaultMode: "light" | "standard" | "heavy";
+  compareMaxLines: number;
+  compareIgnoreWhitespace: boolean;
+  pandocBinaryPath: string;
+  curlBinaryPath: string;
+  restFetchAllowedHosts: string[];
+  restFetchTimeoutMs: number;
+  mailMergeRequireWorkspaceRoot: boolean;
+  mailMergeMaxRecords: number;
+  mailMergeDefaultDelimiter: "," | "\t";
 }
 
 export type WorkspacePreferenceStateInput = Omit<WorkspacePersistenceStateInput, "documents" | "activeId">;
@@ -167,6 +183,22 @@ export function applyPersistedWorkspacePreferenceState(
     customDocumentOutlineTemplates: normalizeCustomDocumentOutlineTemplates(persisted.customDocumentOutlineTemplates),
     customVersionedClauses: normalizeCustomVersionedClauses(persisted.customVersionedClauses),
     documentMemoryText: persisted.documentMemoryText || "",
+    webhookConfigs: Array.isArray(persisted.webhookConfigs) ? persisted.webhookConfigs : current.webhookConfigs,
+    auditEnabled: typeof persisted.auditEnabled === "boolean" ? persisted.auditEnabled : current.auditEnabled,
+    auditAuthor: typeof persisted.auditAuthor === "string" ? persisted.auditAuthor : current.auditAuthor,
+    auditMaxBytes: typeof persisted.auditMaxBytes === "number" ? persisted.auditMaxBytes : current.auditMaxBytes,
+    searchMaxResults: typeof persisted.searchMaxResults === "number" ? persisted.searchMaxResults : current.searchMaxResults,
+    searchDefaultCaseSensitive: typeof persisted.searchDefaultCaseSensitive === "boolean" ? persisted.searchDefaultCaseSensitive : current.searchDefaultCaseSensitive,
+    humanizerDefaultMode: (persisted.humanizerDefaultMode === "light" || persisted.humanizerDefaultMode === "standard" || persisted.humanizerDefaultMode === "heavy") ? persisted.humanizerDefaultMode : current.humanizerDefaultMode,
+    compareMaxLines: typeof persisted.compareMaxLines === "number" ? persisted.compareMaxLines : current.compareMaxLines,
+    compareIgnoreWhitespace: typeof persisted.compareIgnoreWhitespace === "boolean" ? persisted.compareIgnoreWhitespace : current.compareIgnoreWhitespace,
+    pandocBinaryPath: typeof persisted.pandocBinaryPath === "string" ? persisted.pandocBinaryPath : current.pandocBinaryPath,
+    curlBinaryPath: typeof persisted.curlBinaryPath === "string" ? persisted.curlBinaryPath : current.curlBinaryPath,
+    restFetchAllowedHosts: Array.isArray(persisted.restFetchAllowedHosts) ? persisted.restFetchAllowedHosts : current.restFetchAllowedHosts,
+    restFetchTimeoutMs: typeof persisted.restFetchTimeoutMs === "number" ? persisted.restFetchTimeoutMs : current.restFetchTimeoutMs,
+    mailMergeRequireWorkspaceRoot: typeof persisted.mailMergeRequireWorkspaceRoot === "boolean" ? persisted.mailMergeRequireWorkspaceRoot : current.mailMergeRequireWorkspaceRoot,
+    mailMergeMaxRecords: typeof persisted.mailMergeMaxRecords === "number" ? persisted.mailMergeMaxRecords : current.mailMergeMaxRecords,
+    mailMergeDefaultDelimiter: (persisted.mailMergeDefaultDelimiter === "," || persisted.mailMergeDefaultDelimiter === "\t") ? persisted.mailMergeDefaultDelimiter : current.mailMergeDefaultDelimiter,
   };
   const restoreRequest = persisted.openFiles?.length
     ? {
@@ -258,5 +290,21 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     customDocumentOutlineTemplates: state.customDocumentOutlineTemplates,
     customVersionedClauses: state.customVersionedClauses,
     documentMemoryText: state.documentMemoryText,
+    webhookConfigs: state.webhookConfigs,
+    auditEnabled: state.auditEnabled,
+    auditAuthor: state.auditAuthor,
+    auditMaxBytes: state.auditMaxBytes,
+    searchMaxResults: state.searchMaxResults,
+    searchDefaultCaseSensitive: state.searchDefaultCaseSensitive,
+    humanizerDefaultMode: state.humanizerDefaultMode,
+    compareMaxLines: state.compareMaxLines,
+    compareIgnoreWhitespace: state.compareIgnoreWhitespace,
+    pandocBinaryPath: state.pandocBinaryPath,
+    curlBinaryPath: state.curlBinaryPath,
+    restFetchAllowedHosts: state.restFetchAllowedHosts,
+    restFetchTimeoutMs: state.restFetchTimeoutMs,
+    mailMergeRequireWorkspaceRoot: state.mailMergeRequireWorkspaceRoot,
+    mailMergeMaxRecords: state.mailMergeMaxRecords,
+    mailMergeDefaultDelimiter: state.mailMergeDefaultDelimiter,
   });
 }

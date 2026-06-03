@@ -479,6 +479,22 @@ export interface PersistedWorkspace {
   agentRunHistory?: Partial<AgentRunHistoryItem>[];
   docsLiveDraftHistory?: Partial<DocsLiveDraftHistoryItem>[];
   guidedDemoCompletedStepIds?: string[];
+  webhookConfigs?: Array<{ id: string; name: string; url: string; events: string[]; enabled: boolean }>;
+  auditEnabled?: boolean;
+  auditAuthor?: string;
+  auditMaxBytes?: number;
+  searchMaxResults?: number;
+  searchDefaultCaseSensitive?: boolean;
+  humanizerDefaultMode?: "light" | "standard" | "heavy";
+  compareMaxLines?: number;
+  compareIgnoreWhitespace?: boolean;
+  pandocBinaryPath?: string;
+  curlBinaryPath?: string;
+  restFetchAllowedHosts?: string[];
+  restFetchTimeoutMs?: number;
+  mailMergeRequireWorkspaceRoot?: boolean;
+  mailMergeMaxRecords?: number;
+  mailMergeDefaultDelimiter?: "," | "\t";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
