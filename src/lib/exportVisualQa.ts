@@ -2,6 +2,7 @@ import type { PrintPreviewReport } from "./printPreview.js";
 
 export type ExportVisualQaTarget =
   | "html"
+  | "html-slides"
   | "pdf"
   | "docx"
   | "pptx"
@@ -70,6 +71,7 @@ export interface ExportVisualQaDashboard {
 
 const targetLabels: Record<ExportVisualQaTarget, string> = {
   html: "HTML",
+  "html-slides": "HTML Slides",
   pdf: "PDF",
   docx: "DOCX",
   pptx: "PPTX",
@@ -83,6 +85,7 @@ const targetLabels: Record<ExportVisualQaTarget, string> = {
 
 const targetChecks: Record<ExportVisualQaTarget, string[]> = {
   html: ["Rendered HTML opens", "Styles and syntax highlighting present", "Language and description metadata set", "Images have inspectable paths"],
+  "html-slides": ["Slides open in browser", "Theme and transition render correctly", "Keyboard navigation works", "Presenter view shows notes"],
   pdf: ["Pagination reviewed", "Margins and headers checked", "Wide tables fit", "Page numbers and cover settings verified"],
   docx: ["Heading styles map cleanly", "Tables and captions survive", "Comments/provenance policy checked", "DOCX import target reviewed"],
   pptx: ["Agenda and slide sections checked", "Speaker notes reviewed", "Figures and tables fit slides", "Decision slides obvious"],

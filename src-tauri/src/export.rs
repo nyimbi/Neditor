@@ -52,3 +52,6 @@ pub(crate) use google_docs::render_google_docs_package_bytes;
 
 mod epub;
 pub(crate) use epub::render_epub_bytes;
+
+mod html_slides;
+pub(crate) use html_slides::render_html_slides_bytes;

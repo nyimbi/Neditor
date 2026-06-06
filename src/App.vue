@@ -3065,6 +3065,25 @@
           <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
           <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
           <label><input v-model="store.exportDefaults.includeAgenda" type="checkbox" /> PPTX agenda</label>
+          <h3>Presentation settings</h3>
+          <div class="pres-theme-row">
+            <span class="compact-label">Theme</span>
+            <div class="pres-theme-grid">
+              <button
+                v-for="theme in PRESENTATION_THEMES" :key="theme.id"
+                type="button" class="pres-theme-btn"
+                :class="{ 'pres-theme-active': store.presentationTheme === theme.id }"
+                :title="theme.label"
+                :style="{ background: 'linear-gradient(135deg,' + theme.previewStart + ',' + theme.previewEnd + ')' }"
+                @click="store.presentationTheme = theme.id; void store.persistWorkspace()"
+              ><span class="pres-theme-lbl">{{ theme.label }}</span></button>
+            </div>
+          </div>
+          <label>Transition<select v-model="store.presentationTransition" @change="void store.persistWorkspace()"><option v-for="t in PRESENTATION_TRANSITIONS" :key="t.id" :value="t.id">{{ t.label }}</option></select></label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <button type="button" @click="openPresenterView">Presenter view</button>
+            <button type="button" :disabled="store.exportBusy" @click="exportDocumentAs('html-slides')">Export HTML slides</button>
+          </div>
           <div class="export-actions">
             <button class="template-action-primary" type="button" :disabled="store.exportBusy" @click="exportDocumentAs('html')">
               <span class="button-icon" aria-hidden="true">
@@ -7552,6 +7571,42 @@
         <p class="tp-hint">Dashed border = external engine required. Configure in Settings → Transforms.</p>
       </div>
     </div>
+    <div v-if="presenterViewOpen" class="presenter-modal" role="dialog" aria-modal="true" aria-label="Presenter view">
+      <div class="presenter-main">
+        <div class="presenter-slide-view" :style="{ background: activeThemeInfo.bg, color: activeThemeInfo.text }">
+          <div v-if="currentPresenterSlide" class="presenter-slide-content">
+            <h2 class="presenter-slide-h">{{ currentPresenterSlide.title }}</h2>
+            <ul class="presenter-slide-bullets">
+              <li v-for="line in currentPresenterSlide.lines.slice(0,7)" :key="line">{{ line }}</li>
+            </ul>
+          </div>
+        </div>
+        <div class="presenter-notes-area">
+          <span class="presenter-label">Speaker notes</span>
+          <textarea class="presenter-notes-ta" :value="currentPresenterSlide?.notes || ''" placeholder="Type notes for this slide…" @input="currentPresenterSlide && updateSlideNotes(currentPresenterSlide.title, ($event.target as HTMLTextAreaElement).value)"></textarea>
+        </div>
+      </div>
+      <div class="presenter-panel">
+        <div>
+          <span class="presenter-label">Next</span>
+          <div class="presenter-next-box" :style="{ background: activeThemeInfo.bg }">
+            <span style="font-size:12px;opacity:0.7">{{ nextPresenterSlide?.title || '(end)' }}</span>
+          </div>
+        </div>
+        <div class="presenter-slide-list">
+          <div v-for="(slide, i) in presentationSlides" :key="i" class="presenter-list-item" :class="{ 'pli-active': i === presenterCurrentIdx }" @click="presenterCurrentIdx = i">
+            <span class="pli-num">{{ i+1 }}</span>
+            <span class="pli-title">{{ slide.title || '(untitled)' }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="presenter-nav">
+        <button type="button" :disabled="presenterCurrentIdx === 0" @click="presenterPrev">← Prev</button>
+        <span>{{ presenterCurrentIdx + 1 }} / {{ presentationSlides.length }}</span>
+        <button type="button" :disabled="presenterCurrentIdx >= presentationSlides.length - 1" @click="presenterNext">Next →</button>
+        <button type="button" class="presenter-close" @click="presenterViewOpen = false">✕ Close</button>
+      </div>
+    </div>
     <div v-if="writerFlyover" class="writer-flyover-backdrop" @click="writerFlyover = null"></div>
     <div v-if="writerFlyover === 'diagnostics'" class="writer-flyover" role="dialog" aria-label="Diagnostics">
       <header class="writer-flyover-header">
@@ -9060,6 +9115,34 @@ function useOllamaModel(modelId: string): void {
 }
 
 watch(isOllamaProfile, (v) => { if (v) void probeOllamaHealth(); });
+
+import { PRESENTATION_THEMES, PRESENTATION_TRANSITIONS, parseSlidesFromBlocks, upsertSlideNotes, type SlideData } from "./lib/presentationEditor.js";
+
+const presenterViewOpen = ref(false);
+const presenterCurrentIdx = ref(0);
+
+const presentationSlides = computed<SlideData[]>(() => {
+  const doc = active.value;
+  if (!doc?.compile) return [];
+  return parseSlidesFromBlocks(
+    doc.compile.document_ast.blocks as Array<{ kind: string; level?: number; text?: string; items?: string[]; headers?: string[]; rows?: string[][]; caption?: string; directive?: string; settings?: { title?: string; layout?: string; notes?: string }; line: number }>,
+    doc.compile.semantic.title || doc.title,
+    doc.compile.metadata as Record<string, unknown>,
+  );
+});
+
+const currentPresenterSlide = computed(() => presentationSlides.value[presenterCurrentIdx.value] ?? null);
+const nextPresenterSlide = computed(() => presentationSlides.value[presenterCurrentIdx.value + 1] ?? null);
+const activeThemeInfo = computed(() => PRESENTATION_THEMES.find(t => t.id === store.presentationTheme) ?? PRESENTATION_THEMES[0]);
+
+function openPresenterView(): void { presenterCurrentIdx.value = 0; presenterViewOpen.value = true; }
+function presenterNext(): void { if (presenterCurrentIdx.value < presentationSlides.value.length - 1) presenterCurrentIdx.value++; }
+function presenterPrev(): void { if (presenterCurrentIdx.value > 0) presenterCurrentIdx.value--; }
+function updateSlideNotes(slideTitle: string, notes: string): void {
+  if (!active.value) return;
+  const updated = upsertSlideNotes(active.value.text, slideTitle, notes);
+  if (updated !== active.value.text) applyTextToDocument(active.value, updated);
+}
 
 // Import tools probe
 const pandocAvailable = ref(false);
@@ -23805,6 +23888,7 @@ async function exportDocument() {
   }
   const extensions: Record<typeof store.exportTarget, string> = {
     html: "html",
+    "html-slides": "html",
     pdf: "pdf",
     docx: "docx",
     pptx: "pptx",
@@ -37063,4 +37147,33 @@ del.tracked-del { background: #fee2e2; color: #b91c1c; text-decoration: line-thr
 .app-shell[data-theme="dark"] .ollama-installed-row { background:#1e2d42; border-color:#2a4060; }
 .app-shell[data-theme="dark"] .ollama-installed-name { color:#c0d8f0; }
 .app-shell[data-theme="dark"] .ollama-health-badge { background:#1a2535; }
+.pres-theme-row { display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+.pres-theme-grid { display:flex; gap:6px; flex-wrap:wrap; }
+.pres-theme-btn { width:78px; height:44px; border-radius:7px; border:2px solid transparent; cursor:pointer; display:flex; align-items:flex-end; padding:3px 5px; min-height:0; transition:border-color 0.12s; }
+.pres-theme-active { border-color:#7eaedd !important; box-shadow:0 0 0 2px rgba(125,174,221,0.35); }
+.pres-theme-lbl { font-size:8px; font-weight:750; color:rgba(255,255,255,0.9); text-shadow:0 1px 2px rgba(0,0,0,0.6); line-height:1; }
+.presenter-modal { position:fixed; inset:0; z-index:800; background:#07101c; display:grid; grid-template-columns:1fr 260px; grid-template-rows:1fr auto; gap:12px; padding:14px; }
+.presenter-main { display:flex; flex-direction:column; gap:10px; overflow:hidden; }
+.presenter-slide-view { flex:1; border-radius:10px; overflow:hidden; display:flex; align-items:center; justify-content:center; min-height:0; }
+.presenter-slide-content { padding:28px 36px; width:100%; }
+.presenter-slide-h { font-size:clamp(1.1rem,2.5vw,2rem); font-weight:750; margin-bottom:14px; border-bottom:2px solid rgba(255,255,255,0.25); padding-bottom:10px; }
+.presenter-slide-bullets { font-size:clamp(0.8rem,1.5vw,1.15rem); line-height:1.6; padding-left:1.3em; }
+.presenter-notes-area { flex:0 0 100px; display:flex; flex-direction:column; gap:4px; }
+.presenter-label { font-size:9px; font-weight:750; text-transform:uppercase; letter-spacing:0.05em; color:#475569; }
+.presenter-notes-ta { flex:1; background:#111b29; border:1px solid #1e3050; border-radius:6px; color:#94a3b8; font:12px/1.5 inherit; padding:7px 9px; resize:none; }
+.presenter-notes-ta:focus { border-color:#7eaedd; outline:none; }
+.presenter-panel { display:flex; flex-direction:column; gap:10px; overflow:hidden; }
+.presenter-next-box { border-radius:8px; height:72px; overflow:hidden; border:1px solid #1e3050; display:flex; align-items:center; padding:10px 14px; }
+.presenter-slide-list { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+.presenter-list-item { display:flex; align-items:center; gap:6px; padding:4px 7px; border-radius:5px; cursor:pointer; color:#475569; font-size:11px; }
+.presenter-list-item:hover { background:#1a2535; color:#64748b; }
+.pli-active { background:#152640 !important; color:#7eaedd !important; }
+.pli-num { flex:0 0 18px; text-align:right; font-size:10px; }
+.pli-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.presenter-nav { grid-column:1/3; display:flex; align-items:center; gap:10px; background:#111b29; border-radius:8px; padding:9px 14px; }
+.presenter-nav button { padding:5px 14px; border-radius:6px; background:#1e2d42; border:1px solid #2a4060; color:#90c0f0; cursor:pointer; font-weight:650; font-size:12px; }
+.presenter-nav button:disabled { opacity:0.4; cursor:not-allowed; }
+.presenter-nav span { flex:1; text-align:center; color:#64748b; font-size:12px; }
+.presenter-close { background:#1e0f1a !important; border-color:#4a1020 !important; color:#f87171 !important; }
+.compact-label { font-size:11px; font-weight:700; text-transform:uppercase; color:#526171; white-space:nowrap; margin-top:4px; }
 </style>

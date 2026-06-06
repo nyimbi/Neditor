@@ -357,6 +357,8 @@ export const useDocumentsStore = defineStore("documents", {
     activeId: "",
     mode: "split" as "split" | "source" | "preview" | "focus" | "outline" | "export" | "review" | "presentation",
     uiMode: "pilot" as "writer" | "pilot",
+    presentationTheme: "corporate" as string,
+    presentationTransition: "fade" as string,
     pilotActivityPanel: "outline" as string,
     sidebar: "outline" as
       | "files"

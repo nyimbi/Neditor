@@ -144,6 +144,8 @@ struct PptxSlide {
     media_refs: Vec<MediaRef>,
     hyperlinks: Vec<ExportHyperlink>,
     notes: Vec<String>,
+    bg_color: Option<String>,
+    transition: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -196,6 +198,8 @@ impl PptxSlide {
             media_refs: Vec::new(),
             hyperlinks: Vec::new(),
             notes: Vec::new(),
+            bg_color: None,
+            transition: None,
         }
     }
 
@@ -212,6 +216,8 @@ impl PptxSlide {
             media_refs: Vec::new(),
             hyperlinks: Vec::new(),
             notes: Vec::new(),
+            bg_color: None,
+            transition: None,
         }
     }
 }
@@ -226,6 +232,17 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
     );
     title_slide.layout = PptxLayout::Title;
     let mut slides = vec![title_slide];
+    let global_bg: Option<String> = match options.get("presentationTheme").and_then(|v| v.as_str()).unwrap_or("corporate") {
+        "minimal"   => None,
+        "dark"      => Some("111821".to_string()),
+        "nature"    => Some("1a3326".to_string()),
+        "warm"      => Some("2d1b0e".to_string()),
+        _           => Some("1f3a5f".to_string()),
+    };
+    let global_transition: Option<String> = options.get("presentationTransition")
+        .and_then(|v| v.as_str())
+        .filter(|s| *s != "none")
+        .map(String::from);
     let include_agenda = include_pptx_agenda(response, options);
     if include_agenda {
         let lines = response
@@ -379,7 +396,7 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
     }
     let slides = expand_pptx_table_slides(slides);
     let total_slides = slides.len().max(1);
-    slides
+    let mut slides: Vec<PptxSlide> = slides
         .into_iter()
         .enumerate()
         .map(|(index, mut slide)| {
@@ -405,7 +422,12 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
             slide.lines.truncate(14);
             slide
         })
-        .collect()
+        .collect();
+    for slide in &mut slides {
+        if slide.bg_color.is_none() { slide.bg_color = global_bg.clone(); }
+        if slide.transition.is_none() { slide.transition = global_transition.clone(); }
+    }
+    slides
 }
 
 fn apply_pptx_section_options(slide: &mut PptxSlide, settings: &LayoutSettings) {
@@ -775,8 +797,18 @@ fn render_pptx_slide(slide: &PptxSlide, pictures: &[PptxSlidePicture]) -> String
             escape_xml(&slide.footer)
         )
     };
+    let bg_xml = slide.bg_color.as_deref()
+        .map(|c| format!("<p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>", c))
+        .unwrap_or_default();
+    let transition_xml = slide.transition.as_deref().map(|t| match t {
+        "fade" => "<p:transition spd=\"med\"><p:fade/></p:transition>",
+        "push" => "<p:transition spd=\"med\"><p:push dir=\"l\"/></p:transition>",
+        "wipe" => "<p:transition spd=\"fast\"><p:wipe dir=\"l\"/></p:transition>",
+        "zoom" => "<p:transition spd=\"med\"><p:zoom dir=\"in\"/></p:transition>",
+        _ => "",
+    }).unwrap_or("");
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{header}{content_shapes}{tables}{pictures}{footer}</p:spTree></p:cSld></p:sld>"#,
+        r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld>{bg_xml}<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{header}{content_shapes}{tables}{pictures}{footer}</p:spTree></p:cSld>{transition_xml}</p:sld>"#,
         pictures = picture_shapes
     )
 }

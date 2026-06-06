@@ -59,6 +59,7 @@ export type PreviewTheme = "match" | "light" | "dark";
 export type SnapshotStorage = "app-data" | "project-local";
 export type ExportTarget =
   | "html"
+  | "html-slides"
   | "pdf"
   | "docx"
   | "pptx"
@@ -495,6 +496,8 @@ export interface PersistedWorkspace {
   mailMergeRequireWorkspaceRoot?: boolean;
   mailMergeMaxRecords?: number;
   mailMergeDefaultDelimiter?: "," | "\t";
+  presentationTheme?: string;
+  presentationTransition?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

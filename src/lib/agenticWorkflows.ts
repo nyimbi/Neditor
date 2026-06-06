@@ -5497,6 +5497,13 @@ function distributionProfile(target: ExportTarget) {
       handoffSteps: ["Export EPUB, inspect the package manifest, open it in an EPUB reader, and keep the source hash with the release record."],
       evidenceRequired: ["EPUB package proof with content.opf, nav.xhtml, document.xhtml, manifest.json, and reader/viewer review notes."],
     },
+    "html-slides": {
+      label: "HTML slides presentation",
+      purpose: "Self-contained browser presentation with keyboard navigation, presenter view, and speaker notes.",
+      preflightChecks: ["Confirm slide headings, theme, transition, and speaker notes are ready before sharing."],
+      handoffSteps: ["Export HTML slides, open in a browser, verify navigation and presenter view, then share the single-file HTML."],
+      evidenceRequired: ["Browser screenshot of the exported HTML slides confirming navigation and theme render correctly."],
+    },
   };
   return profiles[target];
 }

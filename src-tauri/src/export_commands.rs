@@ -8,8 +8,8 @@ use crate::{
     diagnostics::{diag, DocumentDiagnostic},
     export::{
         render_blog_publish_package_bytes, render_docx_bytes, render_epub_bytes, render_full_html,
-        render_google_docs_package_bytes, render_latex_bytes, render_markdown_bundle_bytes,
-        render_pdf_bytes, render_pptx_bytes,
+        render_google_docs_package_bytes, render_html_slides_bytes, render_latex_bytes,
+        render_markdown_bundle_bytes, render_pdf_bytes, render_pptx_bytes,
     },
     git::get_git_status,
     metadata_string,
@@ -144,6 +144,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
 
     let output_bytes: Vec<u8> = match request.target.as_str() {
         "html" => render_full_html(&compile_response, &request.options).into_bytes(),
+        "html-slides" => render_html_slides_bytes(&compile_response, &request.options),
         "pdf" => render_pdf_bytes(&compile_response, &request.options),
         "docx" => render_docx_bytes(&compile_response, &request.options)?,
         "pptx" => render_pptx_bytes(&compile_response, &request.options)?,
@@ -158,7 +159,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
         "epub" => render_epub_bytes(&compile_response, &manifest)?,
         other => {
             return Err(format!(
-                "Unsupported export target '{other}'. Use html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, google-docs, or epub."
+                "Unsupported export target '{other}'. Use html, html-slides, pdf, docx, pptx, markdown-bundle, blog, substack, latex, google-docs, or epub."
             ));
         }
     };
@@ -385,6 +386,7 @@ fn validate_export_settings(
     if !matches!(
         target,
         "html"
+            | "html-slides"
             | "pdf"
             | "docx"
             | "pptx"
@@ -401,7 +403,7 @@ fn validate_export_settings(
             format!("Unsupported export target: {target}"),
             None,
             None,
-            Some("Use html, pdf, docx, pptx, markdown-bundle, blog, substack, latex, google-docs, or epub."),
+            Some("Use html, html-slides, pdf, docx, pptx, markdown-bundle, blog, substack, latex, google-docs, or epub."),
         ));
     }
     validate_optional_string(options, "watermark", "Export watermark", diagnostics);
@@ -943,7 +945,7 @@ fn validate_export_output_path(
 
 fn expected_export_extension(target: &str) -> Option<&'static str> {
     match target {
-        "html" => Some("html"),
+        "html" | "html-slides" => Some("html"),
         "pdf" => Some("pdf"),
         "docx" => Some("docx"),
         "pptx" => Some("pptx"),

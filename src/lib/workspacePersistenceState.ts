@@ -96,6 +96,8 @@ export interface WorkspacePersistenceStateInput {
   documentMemoryText: string;
   uiMode?: 'writer' | 'pilot';
   pilotActivityPanel?: string;
+  presentationTheme?: string;
+  presentationTransition?: string;
   webhookConfigs: Array<{ id: string; name: string; url: string; events: string[]; enabled: boolean }>;
   auditEnabled: boolean;
   auditAuthor: string;
@@ -165,6 +167,8 @@ export function applyPersistedWorkspacePreferenceState(
     guidedDemoCompletedStepIds: persisted.guidedDemoCompletedStepIds || [],
     uiMode: (persisted.uiMode === 'writer' || persisted.uiMode === 'pilot') ? persisted.uiMode : undefined,
     pilotActivityPanel: typeof persisted.pilotActivityPanel === 'string' ? persisted.pilotActivityPanel : undefined,
+    presentationTheme: typeof persisted.presentationTheme === "string" ? persisted.presentationTheme : current.presentationTheme,
+    presentationTransition: typeof persisted.presentationTransition === "string" ? persisted.presentationTransition : current.presentationTransition,
     recentFiles: persisted.recentFiles || [],
     recentFolders: persisted.recentFolders || [],
     recentlyClosed: persisted.recentlyClosed || [],
@@ -262,6 +266,8 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     mode: state.mode,
     uiMode: state.uiMode,
     pilotActivityPanel: state.pilotActivityPanel,
+    presentationTheme: state.presentationTheme,
+    presentationTransition: state.presentationTransition,
     sidebar: state.sidebar,
     openFiles: state.documents.map((document) => document.path).filter((path): path is string => Boolean(path)),
     scrollPositions: Object.fromEntries(
