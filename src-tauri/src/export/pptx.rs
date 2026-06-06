@@ -66,6 +66,12 @@ pub(crate) fn render_pptx_bytes(
             zip.write_all(&item.bytes).map_err(|err| err.to_string())?;
         }
     }
+    zip.add_directory("ppt/theme/", options)
+        .map_err(|err| err.to_string())?;
+    zip.start_file("ppt/theme/theme1.xml", options)
+        .map_err(|err| err.to_string())?;
+    zip.write_all(render_pptx_theme_xml(options_value).as_bytes())
+        .map_err(|err| err.to_string())?;
     zip.start_file("ppt/presentation.xml", options)
         .map_err(|err| err.to_string())?;
     zip.write_all(render_pptx_presentation(slides.len()).as_bytes())
@@ -710,16 +716,34 @@ fn render_pptx_content_types(slides: &[PptxSlide], media: &[ExportMedia]) -> Str
         })
         .collect::<String>();
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>{slide_overrides}{notes_overrides}</Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">{default_xml}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>{slide_overrides}{notes_overrides}</Types>"#
     )
 }
 
 fn render_pptx_relationships(slide_count: usize) -> String {
+    let theme_rel = r#"<Relationship Id="rIdTheme1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>"#;
     let relationships = (1..=slide_count)
         .map(|index| format!(r#"<Relationship Id="rId{index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide{index}.xml"/>"#))
         .collect::<String>();
     format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{relationships}</Relationships>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{theme_rel}{relationships}</Relationships>"#
+    )
+}
+
+pub(crate) fn render_pptx_theme_xml(options: &Value) -> String {
+    let (name, dk1, lt1, dk2, accent) = match options
+        .get("presentationTheme")
+        .and_then(|v| v.as_str())
+        .unwrap_or("corporate")
+    {
+        "minimal" => ("Minimal", "1e293b", "ffffff", "475569", "275DA8"),
+        "dark"    => ("Dark",    "0f172a", "f1f5f9", "1e293b", "0f766e"),
+        "nature"  => ("Nature",  "1a3326", "f0fdf4", "14532d", "4ade80"),
+        "warm"    => ("Warm",    "2d1b0e", "fefce8", "451a03", "f59e0b"),
+        _         => ("Corporate", "1f3a5f", "ffffff", "2d5f8a", "4b9cd3"),
+    };
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="{name}"><a:themeElements><a:clrScheme name="{name}"><a:dk1><a:srgbClr val="{dk1}"/></a:dk1><a:lt1><a:srgbClr val="{lt1}"/></a:lt1><a:dk2><a:srgbClr val="{dk2}"/></a:dk2><a:lt2><a:srgbClr val="e2e8f0"/></a:lt2><a:accent1><a:srgbClr val="{accent}"/></a:accent1><a:accent2><a:srgbClr val="f59e0b"/></a:accent2><a:accent3><a:srgbClr val="10b981"/></a:accent3><a:accent4><a:srgbClr val="8b5cf6"/></a:accent4><a:accent5><a:srgbClr val="ef4444"/></a:accent5><a:accent6><a:srgbClr val="0ea5e9"/></a:accent6><a:hlink><a:srgbClr val="{accent}"/></a:hlink><a:folHlink><a:srgbClr val="94a3b8"/></a:folHlink></a:clrScheme><a:fontScheme name="{name}"><a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="{name}"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>"#
     )
 }
 

@@ -188,6 +188,7 @@ fn render_html_slides_document(
         .collect();
     let notes_json = render_notes_json(slides);
     let titles_json = render_titles_json(slides);
+    let lines_json = render_lines_json(slides);
     let transition_css = transition_css(transition);
 
     format!(
@@ -312,19 +313,14 @@ html,body{{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var
 (function(){{
   const NOTES = {notes_json};
   const TITLES = {titles_json};
-  const LINES = (function(){{
-    var els = document.querySelectorAll('.slide');
-    return Array.from(els).map(function(el){{
-      var bullets = el.querySelectorAll('.slide-body li, .slide-body p');
-      return Array.from(bullets).map(function(b){{return b.textContent||'';}});
-    }});
-  }})();
-  var total = document.querySelectorAll('.slide').length;
+  const LINES = {lines_json};
+  var total = {total};
   var current = 0;
   var timerStart = null;
   var timerInterval = null;
+  var slidesCache = Array.from(document.querySelectorAll('.slide'));
 
-  function getSlides(){{ return document.querySelectorAll('.slide'); }}
+  function getSlides(){{ return slidesCache; }}
 
   function goTo(idx){{
     if(idx < 0 || idx >= total) return;
@@ -462,6 +458,7 @@ html,body{{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var
         total = slides.len(),
         notes_json = notes_json,
         titles_json = titles_json,
+        lines_json = lines_json,
     )
 }
 
@@ -525,23 +522,16 @@ fn render_slide_div(
 }
 
 fn render_notes_json(slides: &[HtmlSlide]) -> String {
-    let entries: Vec<String> = slides
-        .iter()
-        .map(|slide| {
-            let notes = slide.notes.join(" ").replace('\\', "\\\\").replace('"', "\\\"");
-            format!("\"{}\"", notes)
-        })
-        .collect();
-    format!("[{}]", entries.join(","))
+    let notes: Vec<String> = slides.iter().map(|s| s.notes.join(" ")).collect();
+    serde_json::to_string(&notes).unwrap_or_else(|_| "[]".to_string())
 }
 
 fn render_titles_json(slides: &[HtmlSlide]) -> String {
-    let entries: Vec<String> = slides
-        .iter()
-        .map(|slide| {
-            let title = slide.title.replace('\\', "\\\\").replace('"', "\\\"");
-            format!("\"{}\"", title)
-        })
-        .collect();
-    format!("[{}]", entries.join(","))
+    let titles: Vec<&str> = slides.iter().map(|s| s.title.as_str()).collect();
+    serde_json::to_string(&titles).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn render_lines_json(slides: &[HtmlSlide]) -> String {
+    let lines: Vec<&[String]> = slides.iter().map(|s| s.lines.as_slice()).collect();
+    serde_json::to_string(&lines).unwrap_or_else(|_| "[]".to_string())
 }

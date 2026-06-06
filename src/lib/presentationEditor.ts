@@ -102,16 +102,43 @@ export function parseSlidesFromBlocks(
 
 export function upsertSlideNotes(source: string, slideTitle: string, newNotes: string): string {
   if (!slideTitle.trim()) return source;
-  const safe = newNotes.replace(/"/g, "'").replace(/\n/g, " ").trim();
+  // Preserve literal content; normalise internal newlines only
+  const safe = newNotes.replace(/\n/g, " ").replace(/"/g, "'").trim();
   const escaped = slideTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(
-    `(\\{\\{\\s*(?:slide|section-break)\\s[^}]*title="${escaped}"[^}]*?)(?:\\s+notes="[^"]*")?([^}]*\\}\\})`,
+
+  // 1. Update existing {{ slide / section-break }} directive.
+  //    Use (?:[^}]|\}(?!\}))* so that a lone } inside a directive value
+  //    (e.g. footer="{budget}") does not prematurely terminate the match.
+  const di = "(?:[^}]|\\}(?!\\}))*?";
+  const directivePattern = new RegExp(
+    `(\\{\\{\\s*(?:slide|section-break)\\s${di}title="${escaped}"${di})(?:\\s+notes="[^"]*")?(${di}\\}\\})`,
     "g",
   );
   let replaced = false;
-  const out = source.replace(pattern, (_m, before, after) => {
+  let out = source.replace(directivePattern, (_m, before, after) => {
     replaced = true;
     return safe ? `${before} notes="${safe}"${after}` : `${before}${after}`;
   });
-  return replaced ? out : source;
+  if (replaced) return out;
+
+  // 2. Update an existing neditor-notes comment (from a previous call).
+  const ce = slideTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const commentPattern = new RegExp(`<!--\\s*neditor-slide-notes:\\s*"${ce}"[^>]*-->`, "g");
+  out = source.replace(commentPattern, () => {
+    replaced = true;
+    return safe ? `<!-- neditor-slide-notes: "${slideTitle}" notes="${safe}" -->` : "";
+  });
+  if (replaced) return out;
+
+  // 3. No directive found — insert a comment before the matching heading.
+  //    This handles the common case of heading-based slides (## Title).
+  if (safe) {
+    const headingPattern = new RegExp(`^(#{1,2}[ \\t]+${escaped}[ \\t]*)$`, "m");
+    const inserted = source.replace(headingPattern, (match) =>
+      `<!-- neditor-slide-notes: "${slideTitle}" notes="${safe}" -->\n${match}`,
+    );
+    if (inserted !== source) return inserted;
+  }
+
+  return source;
 }
