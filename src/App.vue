@@ -37312,17 +37312,52 @@ button.ws-seg:hover { background: var(--c-fill-hover) !important; color: var(--c
 .configuration-center-nav button:hover { background: var(--c-fill-hover) !important; color: var(--c-text) !important; }
 .configuration-center-nav button.active { background: var(--c-accent-tint) !important; color: var(--c-accent) !important; font-weight: 650 !important; }
 
-/* ── Dark mode editor text ───────────────────────────────────────────────── */
-/* CodeMirror injects color:black on .cm-editor via its own <style> element, */
-/* overriding CSS inheritance. Explicit rules needed to restore dark text.    */
-.app-shell[data-theme="dark"] .cm-editor { color: var(--c-text) !important; background: var(--c-surface) !important; }
-.app-shell[data-theme="dark"] .cm-content { color: var(--c-text) !important; caret-color: var(--c-accent) !important; }
-.app-shell[data-theme="dark"] .cm-line { color: var(--c-text) !important; }
-.app-shell[data-theme="dark"] .cm-gutters { background: var(--c-surface) !important; border-right-color: var(--c-border) !important; color: var(--c-text3) !important; }
-.app-shell[data-theme="dark"] .cm-cursor { border-left-color: var(--c-accent) !important; }
-.app-shell[data-theme="dark"] .cm-selectionBackground { background: var(--c-accent-tint) !important; }
-.app-shell[data-theme="dark"] .cm-activeLine { background: var(--c-fill) !important; }
-.app-shell[data-theme="dark"] .cm-activeLineGutter { background: var(--c-fill) !important; }
+/* ── Dark mode editor: full syntax color remapping ───────────────────────── */
+/* Every .cm-neditor-* color is a light-mode dark value. Override all to     */
+/* dark-mode equivalents so text is visible on the dark editor background.   */
+
+/* Base CodeMirror elements */
+.app-shell[data-theme="dark"] .cm-editor { color: #cdd9e5 !important; background: #1c2433 !important; }
+.app-shell[data-theme="dark"] .cm-content { color: #cdd9e5 !important; caret-color: #4b9cd3 !important; }
+.app-shell[data-theme="dark"] .cm-line { color: #cdd9e5 !important; }
+.app-shell[data-theme="dark"] .cm-gutters { background: #1c2433 !important; border-right: 1px solid rgba(255,255,255,0.08) !important; color: rgba(255,255,255,0.28) !important; }
+.app-shell[data-theme="dark"] .cm-lineNumbers .cm-gutterElement { color: rgba(255,255,255,0.28) !important; }
+.app-shell[data-theme="dark"] .cm-cursor { border-left-color: #4b9cd3 !important; }
+.app-shell[data-theme="dark"] .cm-selectionBackground { background: rgba(75,156,211,0.25) !important; }
+.app-shell[data-theme="dark"] .cm-focused .cm-selectionBackground { background: rgba(75,156,211,0.30) !important; }
+.app-shell[data-theme="dark"] .cm-activeLine { background: rgba(255,255,255,0.03) !important; }
+.app-shell[data-theme="dark"] .cm-activeLineGutter { background: rgba(255,255,255,0.03) !important; }
+.app-shell[data-theme="dark"] .cm-foldPlaceholder { background: rgba(255,255,255,0.1) !important; color: rgba(255,255,255,0.5) !important; border-color: rgba(255,255,255,0.15) !important; }
+
+/* NEditor semantic decorations — dark mode palette */
+.app-shell[data-theme="dark"] .cm-neditor-citation { color: #4ade80 !important; }
+.app-shell[data-theme="dark"] .cm-neditor-variable { color: #c084fc !important; background: rgba(192,132,252,0.12) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-front-matter { color: #94a3b8 !important; background: rgba(148,163,184,0.08) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-formula { color: #fb923c !important; background: rgba(251,146,60,0.12) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-unresolved-reference { color: #f87171 !important; text-decoration: underline wavy #ef4444 !important; }
+.app-shell[data-theme="dark"] .cm-neditor-transform-fence { color: #60a5fa !important; background: rgba(96,165,250,0.10) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-layout-token { color: #fbbf24 !important; background: rgba(251,191,36,0.08) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-review-comment { color: #fca5a5 !important; background: rgba(248,113,113,0.10) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-ai-source { color: #22d3ee !important; background: rgba(34,211,238,0.08) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-ai-assisted { color: #86efac !important; background: rgba(134,239,172,0.08) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-table-source-separator { color: #64748b !important; }
+
+/* Markdown syntax — dark mode */
+.app-shell[data-theme="dark"] .cm-neditor-md-heading { color: #2dd4bf !important; }
+.app-shell[data-theme="dark"] .cm-neditor-md-marker { color: rgba(255,255,255,0.35) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-md-blockquote { color: #94a3b8 !important; }
+.app-shell[data-theme="dark"] .cm-neditor-md-list-marker { color: #a78bfa !important; }
+.app-shell[data-theme="dark"] .cm-neditor-md-code { color: #fb923c !important; background: rgba(251,146,60,0.12) !important; }
+.app-shell[data-theme="dark"] .cm-neditor-md-link { color: #60a5fa !important; }
+.app-shell[data-theme="dark"] .cm-neditor-md-strong { color: #f0f6fc !important; }
+.app-shell[data-theme="dark"] .cm-neditor-md-emphasis { color: #fdba74 !important; }
+.app-shell[data-theme="dark"] .cm-neditor-md-strikethrough { color: #64748b !important; }
+
+/* Linting markers */
+.app-shell[data-theme="dark"] .cm-lintRange { opacity: 0.8; }
+
+/* Also fix the editor-pane itself to use the right dark background */
+.app-shell[data-theme="dark"] .editor-pane { background: #1c2433 !important; }
 
 /* ── Collapsible sidebar ────────────────────────────────────────────────── */
 .app-shell.sidebar-is-collapsed .sidebar {
