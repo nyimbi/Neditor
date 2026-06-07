@@ -8930,8 +8930,12 @@ fn open_paths_in_neditor(paths: &[String]) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
+        // -n forces a new instance so the launched process receives the file
+        // paths via env::args() and pending_cli_open_paths() picks them up.
+        // Without -n, if NEditor is already running macOS just activates the
+        // existing window without forwarding the new arguments.
         Command::new("open")
-            .args(["-a", APP_BUNDLE_NAME, "--args"])
+            .args(["-n", "-a", APP_BUNDLE_NAME, "--args"])
             .args(paths)
             .stdin(Stdio::null())
             .spawn()
