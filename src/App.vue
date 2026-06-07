@@ -37187,8 +37187,11 @@ del.tracked-del { background: #fee2e2; color: #b91c1c; text-decoration: line-thr
 .app-shell button:hover { background: var(--c-fill-hover); border: none; }
 .app-shell button:active { background: var(--c-fill-press); }
 .app-shell button:disabled { opacity: 0.35; pointer-events: none; }
-.app-shell button.primary, .app-shell .template-action-primary { background: var(--c-accent) !important; color: #fff !important; font-weight: 600 !important; border: none !important; }
+/* Primary buttons: accent fill in dialogs/sidebars ONLY — not in the toolbar */
+.app-shell button.primary, .app-shell .template-action-primary { background: var(--c-accent); color: #fff; font-weight: 600; border: none; }
 .app-shell button.primary:hover { filter: brightness(1.1); }
+/* Override: no accent fill when primary is inside the command bar */
+.app-shell .command-bar button.primary { background: transparent !important; color: var(--c-text) !important; filter: none !important; }
 
 /* Titlebar */
 .titlebar { background: var(--c-chrome) !important; backdrop-filter: blur(24px) saturate(1.8); -webkit-backdrop-filter: blur(24px) saturate(1.8); border-bottom: 1px solid var(--c-border) !important; }
@@ -37220,13 +37223,15 @@ del.tracked-del { background: #fee2e2; color: #b91c1c; text-decoration: line-thr
 .command-group { border: none !important; background: transparent !important; padding: 2px 3px !important; gap: 1px !important; }
 .command-group-label { color: var(--c-text3) !important; font-size: 9px !important; font-weight: 700 !important; }
 
-/* Icon buttons */
-.icon-command { background: transparent !important; border: none !important; color: var(--c-text) !important; border-radius: var(--c-radius-sm) !important; height: 26px !important; min-width: 26px !important; padding: 0 5px !important; font-size: 11px !important; font-weight: 500 !important; gap: 3px !important; }
-.icon-command:hover { background: var(--c-fill-hover) !important; }
+/* Icon buttons — ALL the same weight in the toolbar. NO accent fill.
+   Primary distinction belongs in dialogs only, not toolbars. */
+.icon-command { background: transparent !important; border: none !important; color: var(--c-text) !important; border-radius: var(--c-radius-sm) !important; height: 26px !important; min-width: 26px !important; padding: 0 6px !important; font-size: 11px !important; font-weight: 500 !important; gap: 4px !important; opacity: 0.82; }
+.icon-command:hover { background: var(--c-fill-hover) !important; opacity: 1; }
 .icon-command:active { background: var(--c-fill-press) !important; }
-.icon-command.primary { background: var(--c-accent) !important; color: #fff !important; font-weight: 600 !important; }
-.icon-command.primary:hover { filter: brightness(1.1); background: var(--c-accent) !important; }
-.icon-command:disabled { opacity: 0.35 !important; }
+/* Primary in toolbar = same as others, just full opacity */
+.icon-command.primary { background: transparent !important; color: var(--c-text) !important; opacity: 1; }
+.icon-command.primary:hover { background: var(--c-fill-hover) !important; }
+.icon-command:disabled { opacity: 0.28 !important; }
 .compact-toolbar-toggle { background: transparent !important; border: none !important; color: var(--c-text2) !important; font-size: 11px !important; font-weight: 600 !important; min-height: 0 !important; height: 24px !important; border-radius: var(--c-radius-sm) !important; padding: 0 6px !important; }
 .compact-toolbar-toggle:hover { background: var(--c-fill-hover) !important; color: var(--c-text) !important; }
 .compact-field { color: var(--c-text2) !important; }
@@ -37262,10 +37267,11 @@ del.tracked-del { background: #fee2e2; color: #b91c1c; text-decoration: line-thr
 .inspector-act { background: var(--c-fill) !important; border: 1px solid var(--c-border) !important; color: var(--c-text) !important; font-size: 11px !important; border-radius: var(--c-radius-sm) !important; padding: 3px 8px !important; }
 .inspector-act:hover { background: var(--c-accent) !important; border-color: transparent !important; color: #fff !important; }
 
-/* Status bar */
-.status-bar { background: var(--c-chrome) !important; backdrop-filter: blur(20px); border-top: 1px solid var(--c-border) !important; color: var(--c-text2) !important; }
-.status-bar .status-message, .status-bar span { color: var(--c-text2) !important; }
-.status-bar button { background: transparent !important; border: none !important; color: var(--c-text2) !important; font-size: 11px !important; height: 100% !important; min-height: 0 !important; border-radius: 0 !important; padding: 0 8px !important; }
+/* Status bar — zero out ALL child backgrounds so nothing shows as a "pill" */
+.status-bar { background: var(--c-chrome) !important; backdrop-filter: blur(20px); border-top: 1px solid var(--c-border) !important; color: var(--c-text2) !important; overflow: hidden; }
+.status-bar * { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; }
+.status-bar .status-message, .status-bar span, .status-bar small { color: var(--c-text2) !important; font-size: 10px !important; }
+.status-bar button { color: var(--c-text2) !important; font-size: 10px !important; height: 100% !important; min-height: 0 !important; padding: 0 8px !important; cursor: pointer; }
 .status-bar button:hover { background: var(--c-fill-hover) !important; color: var(--c-text) !important; }
 
 /* Panes */
@@ -37365,15 +37371,17 @@ button.ws-seg:hover { background: var(--c-fill-hover) !important; color: var(--c
 
 .titlebar { min-height: 30px !important; }
 
-/* Toolbar rows 24px effective */
-.command-toolbar-row { min-height: 22px !important; padding: 1px 0 !important; }
-.command-toolbar-heading { min-height: 20px !important; height: 20px !important; padding: 0 4px !important; }
-.command-group { padding: 1px 2px !important; gap: 1px !important; }
+/* Toolbar rows — 26px rows, 22px buttons (comfortable + compact) */
+.command-toolbar-row { min-height: 24px !important; padding: 1px 0 !important; }
+.command-toolbar-heading { min-height: 22px !important; height: 22px !important; padding: 0 5px !important; }
+/* Group separator: subtle right border to visually group related actions */
+.command-group { padding: 1px 3px !important; gap: 1px !important; border-right: 1px solid var(--c-border) !important; background: transparent !important; border-top: none !important; border-bottom: none !important; border-left: none !important; border-radius: 0 !important; }
+.command-group:last-child { border-right: none !important; }
 
-/* Icon buttons: 20px — macOS "small" control size */
-.icon-command { height: 20px !important; min-width: 20px !important; padding: 0 4px !important; font-size: 11px !important; }
-.compact-toolbar-toggle { height: 20px !important; min-height: 0 !important; padding: 0 5px !important; font-size: 11px !important; }
-.compact-field select { height: 20px !important; min-height: 0 !important; font-size: 11px !important; }
+/* Icon buttons: 22px — slightly larger than before, still compact */
+.icon-command { height: 22px !important; min-width: 22px !important; padding: 0 5px !important; font-size: 11px !important; }
+.compact-toolbar-toggle { height: 22px !important; min-height: 0 !important; padding: 0 6px !important; font-size: 11px !important; }
+.compact-field select { height: 22px !important; min-height: 0 !important; font-size: 11px !important; }
 .compact-check { font-size: 11px !important; }
 
 /* At 20px button height, icon+text labels are cramped — auto icon-only in command bar */
