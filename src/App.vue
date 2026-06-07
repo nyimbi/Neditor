@@ -27269,7 +27269,7 @@ select:hover {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 38px auto minmax(0, 1fr) 28px;
+  grid-template-rows: 30px auto minmax(0, 1fr) 20px;
   width: 100vw;
   height: 100vh;
   color: #18212f;
@@ -27277,23 +27277,23 @@ select:hover {
 }
 
 .app-shell.has-trust-prompt {
-  grid-template-rows: 38px auto auto minmax(0, 1fr) 28px;
+  grid-template-rows: 30px auto auto minmax(0, 1fr) 20px;
 }
 
 .app-shell.toolbars-collapsed {
-  grid-template-rows: 38px 0 minmax(0, 1fr) 28px;
+  grid-template-rows: 30px 0 minmax(0, 1fr) 20px;
 }
 
 .app-shell.has-trust-prompt.toolbars-collapsed {
-  grid-template-rows: 38px 0 auto minmax(0, 1fr) 28px;
+  grid-template-rows: 30px 0 auto minmax(0, 1fr) 20px;
 }
 
 .app-shell.writing-space-maximized {
-  grid-template-rows: 38px 0 minmax(0, 1fr) 0;
+  grid-template-rows: 30px 0 minmax(0, 1fr) 0;
 }
 
 .app-shell.has-trust-prompt.writing-space-maximized {
-  grid-template-rows: 38px 0 auto minmax(0, 1fr) 0;
+  grid-template-rows: 30px 0 auto minmax(0, 1fr) 0;
 }
 
 .app-shell[data-theme="dark"] {
@@ -35789,23 +35789,23 @@ select:hover {
 
 @media (max-width: 600px) {
   .app-shell {
-    grid-template-rows: 38px auto minmax(0, 1fr) 34px;
+    grid-template-rows: 30px auto minmax(0, 1fr) 20px;
   }
 
   .app-shell.toolbars-collapsed {
-    grid-template-rows: 38px 0 minmax(0, 1fr) 34px;
+    grid-template-rows: 30px 0 minmax(0, 1fr) 20px;
   }
 
   .app-shell.has-trust-prompt.toolbars-collapsed {
-    grid-template-rows: 38px 0 auto minmax(0, 1fr) 34px;
+    grid-template-rows: 30px 0 auto minmax(0, 1fr) 20px;
   }
 
   .app-shell.writing-space-maximized {
-    grid-template-rows: 38px 0 minmax(0, 1fr) 0;
+    grid-template-rows: 30px 0 minmax(0, 1fr) 0;
   }
 
   .app-shell.has-trust-prompt.writing-space-maximized {
-    grid-template-rows: 38px 0 auto minmax(0, 1fr) 0;
+    grid-template-rows: 30px 0 auto minmax(0, 1fr) 0;
   }
 
   .titlebar-toolbar-tray {
@@ -35880,7 +35880,7 @@ select:hover {
 /* ── Writer / Pilot mode ──────────────────────────────────────────────────── */
 
 .app-shell.ui-mode-writer {
-  grid-template-rows: 38px 0 minmax(0, 1fr) 22px;
+  grid-template-rows: 30px 0 minmax(0, 1fr) 16px;
 }
 
 .app-shell.ui-mode-writer .command-bar { display: none; }
@@ -37266,6 +37266,41 @@ button.ws-seg:hover { background: var(--c-fill-hover) !important; color: var(--c
 .configuration-center-nav button { background: transparent !important; border: none !important; color: var(--c-text2) !important; border-radius: var(--c-radius) !important; font-size: 12px !important; font-weight: 500 !important; text-align: left; padding: 6px 10px !important; }
 .configuration-center-nav button:hover { background: var(--c-fill-hover) !important; color: var(--c-text) !important; }
 .configuration-center-nav button.active { background: var(--c-accent-tint) !important; color: var(--c-accent) !important; font-weight: 650 !important; }
+
+/* ── Compact height system ─────────────────────────────────────────────────
+   Titlebar 30px · toolbar rows 24px · status bar 20px.
+   Saves ~56px vs old 38/34/28px stack = 4–6 lines of text returned.        */
+
+.titlebar { min-height: 30px !important; }
+
+/* Toolbar rows 24px effective */
+.command-toolbar-row { min-height: 22px !important; padding: 1px 0 !important; }
+.command-toolbar-heading { min-height: 20px !important; height: 20px !important; padding: 0 4px !important; }
+.command-group { padding: 1px 2px !important; gap: 1px !important; }
+
+/* Icon buttons: 20px — macOS "small" control size */
+.icon-command { height: 20px !important; min-width: 20px !important; padding: 0 4px !important; font-size: 11px !important; }
+.compact-toolbar-toggle { height: 20px !important; min-height: 0 !important; padding: 0 5px !important; font-size: 11px !important; }
+.compact-field select { height: 20px !important; min-height: 0 !important; font-size: 11px !important; }
+.compact-check { font-size: 11px !important; }
+
+/* At 20px button height, icon+text labels are cramped — auto icon-only in command bar */
+.command-bar .command-label { display: none !important; }
+
+/* Status bar 20px */
+.status-bar { min-height: 20px !important; font-size: 10px !important; }
+.status-bar button, .status-bar span, .status-bar .status-message { font-size: 10px !important; }
+
+/* Tab bar compact */
+.tab, .tab-group-header { min-height: 28px !important; }
+.tab-main { height: 28px !important; min-height: 0 !important; font-size: 11px !important; }
+.tab-icon-button { width: 18px !important; height: 18px !important; }
+.window-meta { min-height: 30px !important; }
+.release-badge { padding: 1px 6px !important; font-size: 9px !important; }
+
+/* Activity bar compact */
+.activity-bar-btn { width: 30px !important; height: 30px !important; }
+.activity-bar-btn svg { width: 15px !important; height: 15px !important; }
 
 /* ── Ollama model catalog UI ─────────────────────────────────────────────── */
 .ollama-health-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
