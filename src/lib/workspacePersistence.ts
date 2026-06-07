@@ -83,7 +83,7 @@ export type SidebarPanel =
   | "review"
   | "help"
   | "settings";
-export type ThemePreference = "system" | "light" | "dark";
+export type ThemePreference = "system" | "light" | "dark" | "paper";
 export type ToolbarDisplay = "both" | "icons" | "text";
 export type EditorKeymapMode = "default" | "emacs" | "vim";
 export type TransformInputMode = "stdin" | "file";
@@ -1302,7 +1302,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   const migrated: PersistedWorkspace = {
     schemaVersion: WORKSPACE_SCHEMA_VERSION,
   };
-  const theme = enumValue(raw.theme, ["system", "light", "dark"] as const);
+  const theme = enumValue(raw.theme, ["system", "light", "dark", "paper"] as const);
   if (theme) migrated.theme = theme;
   const previewTheme = enumValue(raw.previewTheme, ["match", "light", "dark"] as const);
   if (previewTheme) migrated.previewTheme = previewTheme;

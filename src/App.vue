@@ -3718,6 +3718,7 @@
             <select v-model="store.theme">
               <option value="system">System</option>
               <option value="light">Light</option>
+              <option value="paper">Paper ☕</option>
               <option value="dark">Dark</option>
             </select>
           </label>
@@ -37160,16 +37161,31 @@ del.tracked-del { background: #fee2e2; color: #b91c1c; text-decoration: line-thr
    frosted-glass chrome, native type scale.
    ══════════════════════════════════════════════════════════════════════════ */
 
+/* ── Light (warm) — default ───────────────────────────────────────────────── */
 .app-shell {
-  --c-bg: #f5f5f7; --c-surface: #ffffff;
-  --c-chrome: rgba(242,242,247,0.90); --c-sidebar-bg: rgba(246,246,251,0.95);
-  --c-border: rgba(0,0,0,0.08); --c-sep: rgba(0,0,0,0.10);
-  --c-text: #1d1d1f; --c-text2: #6e6e73; --c-text3: rgba(0,0,0,0.32);
-  --c-accent: #007aff; --c-accent-tint: rgba(0,122,255,0.10);
-  --c-fill: rgba(0,0,0,0.04); --c-fill-hover: rgba(0,0,0,0.07); --c-fill-press: rgba(0,0,0,0.12);
-  --c-danger: #ff3b30; --c-green: #34c759;
+  --c-bg: #fafaf9; --c-surface: #ffffff;                         /* warm off-white, not cold Apple gray */
+  --c-chrome: rgba(249,248,247,0.92); --c-sidebar-bg: rgba(245,242,238,0.96);
+  --c-border: rgba(0,0,0,0.07); --c-sep: rgba(0,0,0,0.09);
+  --c-text: #1c1917; --c-text2: #78716c; --c-text3: rgba(28,25,23,0.35);
+  --c-accent: #275DA8; --c-accent-tint: rgba(39,93,168,0.10);    /* NEditor brand blue, not system blue */
+  --c-fill: rgba(28,25,23,0.04); --c-fill-hover: rgba(28,25,23,0.07); --c-fill-press: rgba(28,25,23,0.12);
+  --c-danger: #dc2626; --c-green: #16a34a;
   --c-radius: 6px; --c-radius-sm: 4px; --c-radius-lg: 10px;
 }
+
+/* ── Paper — warm cream, premium document feel ───────────────────────────── */
+.app-shell[data-theme="paper"] {
+  --c-bg: #f5ede0; --c-surface: #faf5ec;                         /* warm parchment */
+  --c-chrome: rgba(238,228,215,0.92); --c-sidebar-bg: rgba(232,220,204,0.96);
+  --c-border: rgba(120,80,40,0.12); --c-sep: rgba(120,80,40,0.16);
+  --c-text: #2c1a0e; --c-text2: #7a5c44; --c-text3: rgba(80,50,25,0.38);
+  --c-accent: #275DA8; --c-accent-tint: rgba(39,93,168,0.10);
+  --c-fill: rgba(100,60,20,0.04); --c-fill-hover: rgba(100,60,20,0.08); --c-fill-press: rgba(100,60,20,0.14);
+  --c-danger: #b91c1c; --c-green: #15803d;
+  --c-radius: 6px; --c-radius-sm: 4px; --c-radius-lg: 10px;
+}
+
+/* ── Dark ────────────────────────────────────────────────────────────────── */
 .app-shell[data-theme="dark"] {
   --c-bg: #1c1c1e; --c-surface: #2c2c2e;
   --c-chrome: rgba(24,24,26,0.90); --c-sidebar-bg: rgba(26,26,28,0.95);
@@ -37311,6 +37327,35 @@ button.ws-seg:hover { background: var(--c-fill-hover) !important; color: var(--c
 .configuration-center-nav button { background: transparent !important; border: none !important; color: var(--c-text2) !important; border-radius: var(--c-radius) !important; font-size: 12px !important; font-weight: 500 !important; text-align: left; padding: 6px 10px !important; }
 .configuration-center-nav button:hover { background: var(--c-fill-hover) !important; color: var(--c-text) !important; }
 .configuration-center-nav button.active { background: var(--c-accent-tint) !important; color: var(--c-accent) !important; font-weight: 650 !important; }
+
+/* ── Paper theme editor ──────────────────────────────────────────────────── */
+.app-shell[data-theme="paper"] .editor-pane,
+.app-shell[data-theme="paper"] .preview-pane { background: #faf5ec !important; }
+.app-shell[data-theme="paper"] .cm-editor { color: #2c1a0e !important; background: #faf5ec !important; }
+.app-shell[data-theme="paper"] .cm-content { color: #2c1a0e !important; caret-color: #275DA8 !important; }
+.app-shell[data-theme="paper"] .cm-line { color: #2c1a0e !important; }
+.app-shell[data-theme="paper"] .cm-gutters { background: #faf5ec !important; border-right: 1px solid rgba(120,80,40,0.10) !important; color: rgba(100,60,20,0.35) !important; }
+.app-shell[data-theme="paper"] .cm-activeLine { background: rgba(100,60,20,0.025) !important; }
+.app-shell[data-theme="paper"] .cm-cursor { border-left-color: #275DA8 !important; }
+.app-shell[data-theme="paper"] .cm-selectionBackground { background: rgba(39,93,168,0.14) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-front-matter { color: #8a7060 !important; background: rgba(138,112,96,0.07) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-citation { color: #2d6a2d !important; }
+.app-shell[data-theme="paper"] .cm-neditor-variable { color: #7b4796 !important; background: rgba(123,71,150,0.07) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-formula { color: #9a4a20 !important; background: rgba(154,74,32,0.07) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-transform-fence { color: #275DA8 !important; background: rgba(39,93,168,0.07) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-layout-token { color: #8a6020 !important; background: rgba(138,96,32,0.07) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-review-comment { color: #9a2020 !important; background: rgba(154,32,32,0.07) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-ai-source { color: #1a6b72 !important; background: rgba(26,107,114,0.07) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-ai-assisted { color: #1a6b3a !important; background: rgba(26,107,58,0.07) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-md-heading { color: #275DA8 !important; }
+.app-shell[data-theme="paper"] .cm-neditor-md-marker { color: rgba(100,60,20,0.32) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-md-code { color: #9a4a20 !important; background: rgba(154,74,32,0.07) !important; }
+.app-shell[data-theme="paper"] .cm-neditor-md-link { color: #275DA8 !important; text-decoration: underline; }
+.app-shell[data-theme="paper"] .cm-neditor-md-strong { color: #1a0e00 !important; }
+.app-shell[data-theme="paper"] .cm-neditor-md-emphasis { color: #7a4a28 !important; }
+.app-shell[data-theme="paper"] .cm-neditor-md-blockquote { color: #7a5c44 !important; }
+.app-shell[data-theme="paper"] .cm-neditor-md-list-marker { color: #7b4796 !important; }
+.app-shell[data-theme="paper"] .tab.active { background: rgba(120,80,40,0.06) !important; border-bottom-color: #275DA8 !important; }
 
 /* ── Dark mode editor: full syntax color remapping ───────────────────────── */
 /* Every .cm-neditor-* color is a light-mode dark value. Override all to     */
