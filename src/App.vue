@@ -6,6 +6,7 @@
       'toolbars-collapsed': !hasExpandedToolbarRows,
       'writing-space-maximized': writingSpaceMaximized,
       [`ui-mode-${store.uiMode}`]: true,
+      'sidebar-is-collapsed': sidebarCollapsed,
     }"
     :data-theme="store.theme"
     :data-toolbar-display="store.toolbarDisplay"
@@ -574,6 +575,13 @@
           title="Drag to resize"
           @mousedown.prevent="onSidebarResizeStart"
         ></div>
+        <button
+          type="button"
+          class="sidebar-collapse-btn"
+          :title="sidebarCollapsed ? 'Expand sidebar (⌘B)' : 'Collapse sidebar (⌘B)'"
+          :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          @click="toggleSidebarCollapsed()"
+        >{{ sidebarCollapsed ? '▶' : '◀' }}</button>
         <header v-if="store.uiMode === 'pilot'" class="sidebar-panel-header" aria-label="Current panel">
           <span class="sidebar-panel-name">{{ currentPanelLabel }}</span>
         </header>
@@ -9209,6 +9217,11 @@ const writerFlyover = ref<null | 'diagnostics' | 'export'>(null);
 const inspectorCollapsed = ref(false);
 const inspectorWidth = ref(220);
 const sidebarWidth = ref(220);
+const sidebarCollapsed = ref(false);
+function toggleSidebarCollapsed(): void {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
+  void store.persistWorkspace();
+}
 const writerFocusMode = ref(false);
 const sessionStartWords = ref<number | null>(null);
 const openAppMenuId = ref<string | null>(null);
@@ -9585,7 +9598,19 @@ type ToolbarIconName =
   | "epub"
   | "pin"
   | "close"
-  | "versioning";
+  | "versioning"
+  | "wand"
+  | "person"
+  | "palette"
+  | "printer"
+  | "send"
+  | "wrench"
+  | "chip"
+  | "readout"
+  | "plan"
+  | "cover"
+  | "book"
+  | "film";
 
 type AgentMemoryInputKind =
   | "terminology"
@@ -9698,6 +9723,19 @@ const toolbarIconPathMap: Record<ToolbarIconName, string[]> = {
   pin: ["M14 4l6 6-4 1-4 6-1 3-1-1-3-3-3-3-1-1 3-1 6-4z", "M9 15l-5 5"],
   close: ["M6 6l12 12", "M18 6L6 18"],
   versioning: ["M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", "M18 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", "M6 9v2a6 6 0 0 0 6 6h3"],
+  // ── Additional distinct icons ─────────────────────────────────────────
+  wand:    ["M3 21l9-9", "M17 4l3 3", "M14 7l-8 11", "M18 5l1 2"],
+  person:  ["M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8z", "M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"],
+  palette: ["M12 2a9 9 0 1 0 0 18 2.5 2.5 0 0 0 0-5h-1a3 3 0 0 1 0-6h1a9 9 0 0 0 0-7z", "M6 10h.01", "M9 6h.01", "M15 6h.01", "M18 10h.01"],
+  printer: ["M6 9V4h12v5", "M4 9h16v8H4z", "M6 17v3h12v-3", "M8 12h2"],
+  send:    ["M22 2L11 13", "M22 2l-7 20-4-9-9-4 20-7z"],
+  wrench:  ["M14.7 6.3l-1.4 1.4 3 3 1.4-1.4a3 3 0 1 0-3-3z", "M3 21l9-9"],
+  chip:    ["M9 4h6v2h2v2h2v6h-2v2h-2v2H9v-2H7v-2H5v-6h2V6h2z", "M10 10h4v4h-4z"],
+  readout: ["M4 6h16", "M4 11h10", "M4 16h16", "M16 9l4 2-4 2"],
+  plan:    ["M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2", "M9 5a2 2 0 0 1 4 0h1", "M9 12h6", "M9 16h4"],
+  cover:   ["M4 4h16v5H4z", "M4 11h16v9H4z", "M7 7h4", "M7 14h10", "M7 17h6"],
+  book:    ["M4 4v16h16V8l-4-4H4z", "M14 4v4h4", "M8 10h8", "M8 14h6"],
+  film:    ["M4 4h16v16H4z", "M4 9h16", "M4 15h16", "M9 4v5", "M15 4v5", "M9 15v5", "M15 15v5"],
 };
 
 const tableSnippet = `| Item | Value |\n| --- | ---: |\n| Revenue | 125000 |\n`;
@@ -10003,7 +10041,7 @@ const printPreviewReport = computed(() =>
 const appShellStyle = computed(() => ({
   "--toolbar-font-size": `${clampToolbarTextSize(store.toolbarTextSize)}px`,
   "--inspector-width": `${inspectorCollapsed.value ? 32 : inspectorWidth.value}px`,
-  "--sidebar-panel-width": `${sidebarWidth.value}px`,
+  "--sidebar-panel-width": sidebarCollapsed.value ? "0px" : `${sidebarWidth.value}px`,
 }));
 const buttonHelpStyle = computed<CSSProperties>(() => ({
   left: `${buttonHelp.value.x}px`,
@@ -12545,16 +12583,16 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
     label: "Document",
     actions: [
       { id: "ai-create", label: "AI Create", title: "Create a document with the agentic Docs Live composer", icon: "ai", primary: true, run: () => startAiDocumentCreation() },
-      { id: "agent", label: "Agent", title: "Plan creation, editing, revision, review, and distribution with the AI agent workspace", icon: "ai", primary: true, run: () => openAgentWorkspace() },
+      { id: "agent", label: "Agent", title: "Plan creation, editing, revision, review, and distribution with the AI agent workspace", icon: "agent", primary: true, run: () => openAgentWorkspace() },
       { id: "new", label: "New", title: "New document", icon: "new", primary: true, run: () => store.newDocument() },
       { id: "open", label: "Open", title: "Open document", icon: "open", run: () => openDocument() },
       { id: "save", label: "Save", title: "Save document", icon: "save", primary: true, run: () => saveDocument() },
       { id: "save-as", label: "Save As", title: "Save document as", icon: "saveAs", run: () => saveDocumentAs() },
       { id: "export-html", label: "HTML Export", title: "Export standalone HTML", icon: "html", run: () => exportDocumentAs("html") },
       { id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package", icon: "epub", run: () => exportDocumentAs("epub") },
-      { id: "print-preview", label: "Print Preview", title: "Show approximate pagination, margins, columns, page breaks, and print-flow warnings", icon: "layout", run: () => togglePrintPreview(true) },
+      { id: "print-preview", label: "Print Preview", title: "Show approximate pagination, margins, columns, page breaks, and print-flow warnings", icon: "printer", run: () => togglePrintPreview(true) },
       { id: "visual-qa", label: "Visual QA", title: "Open target-by-target export visual QA evidence and next actions", icon: "snapshot", primary: true, run: () => openExportVisualQaDashboard() },
-      { id: "publish", label: "Publish", title: "Open blog, Substack, or CMS publishing handoff", icon: "export", primary: true, run: () => openPublishingHandoff() },
+      { id: "publish", label: "Publish", title: "Open blog, Substack, or CMS publishing handoff", icon: "send", primary: true, run: () => openPublishingHandoff() },
       { id: "export", label: "Export", title: "Export document", icon: "export", disabled: store.exportBusy, run: () => exportDocument() },
     ],
   },
@@ -12593,11 +12631,11 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
         run: () => openDeepResearch(),
       },
       { id: "read-selection", label: "Read Sel.", title: "Read selected text aloud", icon: "speak", run: () => readSelectionAloud() },
-      { id: "read-document", label: "Read Doc", title: "Read the full document aloud", icon: "speak", run: () => readDocumentAloud() },
-      { id: "biz-wizard", label: "Wizards", title: "Open the AI document creation wizard for common business, education, technical, and creative documents", icon: "ai", primary: true, run: () => openDocumentWizardHub() },
-      { id: "memory", label: "Memory", title: "Open reusable document memory for terminology, style, decisions, reviewers, and distribution preferences", icon: "agent", run: () => openAgentWorkspace() },
+      { id: "read-document", label: "Read Doc", title: "Read the full document aloud", icon: "readout", run: () => readDocumentAloud() },
+      { id: "biz-wizard", label: "Wizards", title: "Open the AI document creation wizard for common business, education, technical, and creative documents", icon: "wand", primary: true, run: () => openDocumentWizardHub() },
+      { id: "memory", label: "Memory", title: "Open reusable document memory for terminology, style, decisions, reviewers, and distribution preferences", icon: "chip", run: () => openAgentWorkspace() },
       { id: "setup", label: "Setup", title: "Configure LLM access, local agents, voice, exports, transforms, and release gates", icon: "settings", run: () => openConfigurationSetup() },
-      { id: "biz-identity", label: "Identity", title: "Set up reusable business identity values", icon: "settings", run: () => openBusinessProfile() },
+      { id: "biz-identity", label: "Identity", title: "Set up reusable business identity values", icon: "person", run: () => openBusinessProfile() },
       { id: "bold", label: "Bold", title: "Bold selection", icon: "bold", run: () => wrapSelection("**") },
       { id: "italic", label: "Italic", title: "Italic selection", icon: "italic", run: () => wrapSelection("*") },
       { id: "code", label: "Code", title: "Inline code selection", icon: "code", run: () => wrapSelection("`") },
@@ -12627,7 +12665,7 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "find-previous", label: "Prev", title: "Find previous match", icon: "previous", run: () => runEditorCommand(findPrevious) },
       { id: "find-next", label: "Next", title: "Find next match", icon: "next", run: () => runEditorCommand(findNext) },
       { id: "outline", label: "Outline", title: "Show document outline", icon: "outline", run: () => showOutline() },
-      { id: "plan-outline", label: "Plan", title: "Plan document from outline", icon: "outline", run: () => planDocumentOutline() },
+      { id: "plan-outline", label: "Plan", title: "Plan document from outline", icon: "plan", run: () => planDocumentOutline() },
       { id: "fold-all", label: "Fold", title: "Fold all Markdown sections", icon: "fold", run: () => runEditorCommand(foldAll) },
       { id: "unfold-all", label: "Unfold", title: "Unfold all Markdown sections", icon: "unfold", run: () => runEditorCommand(unfoldAll) },
     ],
@@ -12645,9 +12683,9 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "template-pack", label: "Packs", title: "Open the template pack marketplace to copy, import, and install portable packs", icon: "templates", run: () => openTemplatePackManager() },
       { id: "callout", label: "Callout", title: "Insert a decision, risk, evidence, warning, recommendation, assumption, action, or note callout", icon: "comment", primary: true, run: () => insertSelectedCalloutPreset() },
       { id: "layout-advisor", label: "Layout", title: "Open the Layout Advisor for columns, wide sections, gutters, and export-safe flow", icon: "layout", run: () => openLayoutAdvisor() },
-      { id: "cover-builder", label: "Cover", title: "Open the professional cover builder", icon: "layout", primary: true, run: () => openLayoutAdvisor() },
-      { id: "brand-kit", label: "Brand Kit", title: "Open brand kit and page design presets for business document delivery", icon: "settings", primary: true, run: () => openBrandKitManager() },
-      { id: "install-handlers", label: "Handlers", title: "Download and install transform handlers", icon: "settings", run: () => openTransformInstaller() },
+      { id: "cover-builder", label: "Cover", title: "Open the professional cover builder", icon: "cover", primary: true, run: () => openLayoutAdvisor() },
+      { id: "brand-kit", label: "Brand Kit", title: "Open brand kit and page design presets for business document delivery", icon: "palette", primary: true, run: () => openBrandKitManager() },
+      { id: "install-handlers", label: "Handlers", title: "Download and install transform handlers", icon: "wrench", run: () => openTransformInstaller() },
       { id: "biz-part", label: "Part", title: "Insert a reusable business document part", icon: "templates", run: () => insertBusinessSnippet(businessDocumentSnippets[0]) },
       { id: "include", label: "Include", title: "Open the include document builder", icon: "include", run: () => openIncludeBuilder() },
       { id: "equation", label: "Equation", title: "Open equation editor", icon: "equation", run: () => openEquationEditor() },
@@ -27132,6 +27170,7 @@ function handleShortcut(event: KeyboardEvent) {
     if (k === '/' && !event.shiftKey) { event.preventDefault(); openSlashPicker(); return; }
     if (k === 't' && event.shiftKey) { event.preventDefault(); openTransformPicker(); return; }
     if (k === 'u' && event.shiftKey) { event.preventDefault(); openHumanizer(); return; }
+    if (k === 'b' && !event.shiftKey && !event.altKey) { event.preventDefault(); toggleSidebarCollapsed(); return; }
     // ⌘1–7: switch activity group in Pilot mode (before editable-target guard)
     if (store.uiMode === 'pilot' && !event.shiftKey && !event.altKey) {
       const digit = parseInt(k);
@@ -37266,6 +37305,59 @@ button.ws-seg:hover { background: var(--c-fill-hover) !important; color: var(--c
 .configuration-center-nav button { background: transparent !important; border: none !important; color: var(--c-text2) !important; border-radius: var(--c-radius) !important; font-size: 12px !important; font-weight: 500 !important; text-align: left; padding: 6px 10px !important; }
 .configuration-center-nav button:hover { background: var(--c-fill-hover) !important; color: var(--c-text) !important; }
 .configuration-center-nav button.active { background: var(--c-accent-tint) !important; color: var(--c-accent) !important; font-weight: 650 !important; }
+
+/* ── Dark mode editor text ───────────────────────────────────────────────── */
+/* CodeMirror injects color:black on .cm-editor via its own <style> element, */
+/* overriding CSS inheritance. Explicit rules needed to restore dark text.    */
+.app-shell[data-theme="dark"] .cm-editor { color: var(--c-text) !important; background: var(--c-surface) !important; }
+.app-shell[data-theme="dark"] .cm-content { color: var(--c-text) !important; caret-color: var(--c-accent) !important; }
+.app-shell[data-theme="dark"] .cm-line { color: var(--c-text) !important; }
+.app-shell[data-theme="dark"] .cm-gutters { background: var(--c-surface) !important; border-right-color: var(--c-border) !important; color: var(--c-text3) !important; }
+.app-shell[data-theme="dark"] .cm-cursor { border-left-color: var(--c-accent) !important; }
+.app-shell[data-theme="dark"] .cm-selectionBackground { background: var(--c-accent-tint) !important; }
+.app-shell[data-theme="dark"] .cm-activeLine { background: var(--c-fill) !important; }
+.app-shell[data-theme="dark"] .cm-activeLineGutter { background: var(--c-fill) !important; }
+
+/* ── Collapsible sidebar ────────────────────────────────────────────────── */
+.app-shell.sidebar-is-collapsed .sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  border-right: none !important;
+  padding: 0 !important;
+}
+
+.app-shell.sidebar-is-collapsed .workspace:not(.mode-outline):not(.workspace-writing-maximized) {
+  grid-template-columns: 0 minmax(260px, calc((100vw - 20px) * var(--editor-ratio, 0.5))) 8px minmax(260px, 1fr) !important;
+}
+
+.app-shell.sidebar-is-collapsed.ui-mode-pilot .workspace:not(.mode-outline):not(.workspace-writing-maximized) {
+  grid-template-columns: 0 0 minmax(260px, calc((100vw - 40px) * var(--editor-ratio, 0.5))) 8px minmax(260px, 1fr) var(--inspector-width, 220px) !important;
+}
+
+.app-shell.sidebar-is-collapsed .activity-bar { display: none !important; }
+
+/* ── Sidebar collapse button ────────────────────────────────────────────── */
+.sidebar-collapse-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 20;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--c-radius-sm);
+  color: var(--c-text3);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-collapse-btn:hover { background: var(--c-fill-hover); color: var(--c-text); }
 
 /* ── Compact height system ─────────────────────────────────────────────────
    Titlebar 30px · toolbar rows 24px · status bar 20px.
