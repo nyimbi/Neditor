@@ -16918,8 +16918,23 @@ function installE2eAppHooks() {
   };
 }
 
+async function drainCliQueue(): Promise<void> {
+  try {
+    const paths = await invoke<string[]>("drain_cli_open_queue");
+    for (const path of paths) {
+      await store.openPath(path);
+    }
+  } catch { /* not fatal — cli_ipc may not be available in dev */ }
+}
+
 onMounted(async () => {
   await store.boot();
+  // Register this instance so `ned file.md` can detect us and queue paths
+  void invoke("register_instance").catch(() => {});
+  // Drain any paths queued while we were starting
+  await drainCliQueue();
+  // Re-drain whenever the window comes back into focus
+  window.addEventListener("focus", () => void drainCliQueue());
   syncGoogleIntegrationFields();
   await openPendingCliPaths();
   await loadTransformHandlerInstallers();

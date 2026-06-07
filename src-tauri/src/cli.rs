@@ -8919,6 +8919,23 @@ fn run_doctor_command(args: &[String]) -> Result<CliOutcome, String> {
 }
 
 fn open_paths_in_neditor(paths: &[String]) -> Result<(), String> {
+    use crate::cli_ipc;
+
+    // If NEditor is already running, queue the paths for it to pick up on
+    // focus and bring the existing window to front (no new instance spawned).
+    if cli_ipc::running_instance_pid().is_some() {
+        cli_ipc::queue_paths_for_open(paths)?;
+        #[cfg(target_os = "macos")]
+        {
+            Command::new("open")
+                .args(["-a", APP_BUNDLE_NAME])
+                .stdin(Stdio::null())
+                .spawn()
+                .map_err(|err| format!("Could not activate NEditor.app: {err}"))?;
+        }
+        return Ok(());
+    }
+
     if let Some(app_binary) = find_neditor_binary() {
         Command::new(app_binary)
             .args(paths)
@@ -8930,10 +8947,8 @@ fn open_paths_in_neditor(paths: &[String]) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        // -n forces a new instance so the launched process receives the file
-        // paths via env::args() and pending_cli_open_paths() picks them up.
-        // Without -n, if NEditor is already running macOS just activates the
-        // existing window without forwarding the new arguments.
+        // NEditor is not running — launch a new instance with file paths in
+        // argv so pending_cli_open_paths() picks them up on startup.
         Command::new("open")
             .args(["-n", "-a", APP_BUNDLE_NAME, "--args"])
             .args(paths)

@@ -53,6 +53,7 @@ mod transforms;
 mod ai_humanizer;
 mod audit;
 mod backlinks;
+mod cli_ipc;
 mod document_compare;
 mod mail_merge;
 mod pandoc_import;
@@ -73,6 +74,7 @@ use citation_discovery::{
 use ai_humanizer::get_humanize_prompt;
 use audit::{record_audit_event, read_audit_log};
 use backlinks::{check_document_approval, find_backlinks};
+use cli_ipc::{cli_queue_file_path, drain_cli_open_queue, register_instance};
 use document_compare::compare_documents;
 use mail_merge::run_mail_merge;
 use pandoc_import::import_document;
@@ -248,6 +250,9 @@ pub fn run() {
             desktop_workflow_smoke_export_path,
             emit_desktop_workflow_smoke_menu_command,
             write_desktop_workflow_smoke_report,
+            register_instance,
+            drain_cli_open_queue,
+            cli_queue_file_path,
             search_workspace,
             lookup_doi,
             import_document,
