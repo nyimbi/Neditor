@@ -71,7 +71,12 @@ pub(crate) fn ensure_project_snapshot_gitignore(file_path: Option<&str>) -> Resu
     };
     let root = git_root_for_path(folder).unwrap_or_else(|| folder.to_path_buf());
     let gitignore = root.join(".gitignore");
-    let existing = fs::read_to_string(&gitignore).unwrap_or_default();
+    // Read existing .gitignore; treat NotFound as empty, propagate other errors.
+    let existing = match fs::read_to_string(&gitignore) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(format!("Cannot read .gitignore: {e}")),
+    };
     let Some(updated) = gitignore_with_neditor_entry(&existing) else {
         return Ok(());
     };

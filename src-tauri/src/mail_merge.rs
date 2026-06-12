@@ -38,16 +38,59 @@ fn parse_delimited_line(line: &str, sep: char) -> Vec<String> {
     fields
 }
 
+/// Canonicalize `p`, handling paths whose tail components do not yet exist.
+///
+/// Walks up to the first existing ancestor, canonicalizes it, then re-appends
+/// the remaining (non-existent) components. This prevents attackers from
+/// bypassing the workspace sandbox by supplying a not-yet-existing path like
+/// `../../etc` whose `canonicalize` call would otherwise fail and fall back to
+/// the raw (non-canonical) path.
+fn canonicalize_with_missing_tail(p: &std::path::Path) -> Result<PathBuf, String> {
+    // Fast path: the entire path already exists.
+    if let Ok(c) = p.canonicalize() {
+        return Ok(c);
+    }
+
+    // Collect components so we can rebuild after canonicalizing the prefix.
+    let mut parts: Vec<std::ffi::OsString> = Vec::new();
+    let mut ancestor = p.to_path_buf();
+
+    loop {
+        match ancestor.parent() {
+            Some(parent) if parent != ancestor => {
+                if let Some(name) = ancestor.file_name() {
+                    parts.push(name.to_os_string());
+                }
+                ancestor = parent.to_path_buf();
+            }
+            _ => break,
+        }
+        if ancestor.exists() {
+            break;
+        }
+    }
+
+    let canon_ancestor = ancestor
+        .canonicalize()
+        .map_err(|e| format!("Cannot resolve path '{}': {e}", p.display()))?;
+
+    // Re-append the missing tail components (they were collected in reverse order).
+    let result = parts.iter().rev().fold(canon_ancestor, |acc, part| acc.join(part));
+    Ok(result)
+}
+
 fn safe_path(path: &str, workspace_root: &Option<String>) -> Result<PathBuf, String> {
     let p = PathBuf::from(path);
-    let canonical = p.canonicalize().unwrap_or_else(|_| p.clone());
+    let canonical = canonicalize_with_missing_tail(&p)?;
     if let Some(root) = workspace_root {
-        let root_canon = PathBuf::from(root).canonicalize().unwrap_or_else(|_| PathBuf::from(root));
+        let root_canon = PathBuf::from(root)
+            .canonicalize()
+            .map_err(|e| format!("Cannot resolve workspace root '{}': {e}", root))?;
         if !canonical.starts_with(&root_canon) {
             return Err(format!("Path '{}' is outside the workspace root.", path));
         }
     }
-    Ok(p)
+    Ok(canonical)
 }
 
 #[derive(Debug, Serialize)]

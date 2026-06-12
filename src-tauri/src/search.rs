@@ -61,11 +61,20 @@ fn search_dir(root: &PathBuf, dir: &PathBuf, query: &str, case_sensitive: bool, 
                         (raw..=line.len()).find(|&i| line.is_char_boundary(i)).unwrap_or(line.len())
                     };
                     let excerpt = format!("…{}…", &line[start..end]);
+                    // Bound text to 500 chars to prevent huge lines exhausting memory.
+                    let text_raw = line.trim();
+                    let text = if text_raw.len() > 500 {
+                        // Clamp to nearest char boundary at or below 497 bytes.
+                        let cut = (0..=497usize).rev().find(|&i| text_raw.is_char_boundary(i)).unwrap_or(0);
+                        format!("{}…", &text_raw[..cut])
+                    } else {
+                        text_raw.to_string()
+                    };
                     results.push(SearchMatch {
                         path: rel.clone(),
                         line: li + 1,
                         column: col + 1,
-                        text: line.trim().to_string(),
+                        text,
                         excerpt,
                     });
                 }

@@ -40,7 +40,8 @@ pub(crate) fn fire_webhook(request: FireWebhookRequest) -> Result<WebhookFireRes
         "metadata": request.metadata,
         "source": "neditor"
     });
-    let json_str = serde_json::to_string(&payload).unwrap_or_default();
+    let json_str = serde_json::to_string(&payload)
+        .map_err(|e| format!("Failed to serialize webhook payload: {e}"))?;
     let result = Command::new("curl")
         .args([
             "-s", "-o", "/dev/null", "-w", "%{http_code}",

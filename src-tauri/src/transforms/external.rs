@@ -515,28 +515,45 @@ fn prune_external_transform_disk_cache(root: &Path) {
     let Ok(entries) = fs::read_dir(root) else {
         return;
     };
-    let mut files = entries
+    // Collect all cache JSON files with size and modification time.
+    let mut files: Vec<(std::path::PathBuf, u64, SystemTime)> = entries
         .filter_map(Result::ok)
         .filter_map(|entry| {
             let path = entry.path();
             if path.extension().and_then(|extension| extension.to_str()) != Some("json") {
                 return None;
             }
-            let modified = entry
-                .metadata()
-                .ok()
-                .and_then(|metadata| metadata.modified().ok())
-                .unwrap_or(SystemTime::UNIX_EPOCH);
-            Some((path, modified))
+            let meta = entry.metadata().ok()?;
+            let modified = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+            Some((path, meta.len(), modified))
         })
-        .collect::<Vec<_>>();
-    if files.len() <= MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES {
+        .collect();
+
+    // Prune by count.
+    let over_count = files.len() > MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES;
+    // Prune by total size (50 MB cap for the disk cache).
+    const MAX_CACHE_BYTES: u64 = 50 * 1024 * 1024;
+    let total_bytes: u64 = files.iter().map(|(_, sz, _)| sz).sum();
+    let over_size = total_bytes > MAX_CACHE_BYTES;
+
+    if !over_count && !over_size {
         return;
     }
-    files.sort_by_key(|(_, modified)| *modified);
-    let remove_count = files.len() - MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES;
-    for (path, _) in files.into_iter().take(remove_count) {
+
+    // Sort oldest-first so we remove the least-recently-used entries.
+    files.sort_by_key(|(_, _, modified)| *modified);
+
+    let mut removed_bytes: u64 = 0;
+    let mut removed_count: usize = 0;
+    for (path, size, _) in &files {
+        let should_remove_count = files.len() - removed_count > MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES;
+        let should_remove_size = total_bytes.saturating_sub(removed_bytes) > MAX_CACHE_BYTES;
+        if !should_remove_count && !should_remove_size {
+            break;
+        }
         let _ = fs::remove_file(path);
+        removed_bytes += size;
+        removed_count += 1;
     }
 }
 

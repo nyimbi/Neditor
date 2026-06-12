@@ -36,6 +36,13 @@ pub(crate) struct SnapshotRestoreRequest {
     storage: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct SnapshotDeleteRequest {
+    snapshot_path: String,
+    file_path: Option<String>,
+    storage: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct SnapshotListItem {
     snapshot_path: String,
@@ -80,9 +87,28 @@ pub(crate) fn create_snapshot(
     if snapshot_storage_is_project_local(request.storage.as_deref()) {
         ensure_project_snapshot_gitignore(request.file_path.as_deref())?;
     }
+    // Enforce snapshot count limit: prune oldest when over 200 to prevent unbounded growth.
+    const MAX_SNAPSHOTS: usize = 200;
+    if let Ok(entries) = fs::read_dir(&root) {
+        let mut md_files: Vec<_> = entries
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("md"))
+            .collect();
+        if md_files.len() >= MAX_SNAPSHOTS {
+            md_files.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH));
+            let remove_count = (md_files.len() + 1).saturating_sub(MAX_SNAPSHOTS);
+            for entry in md_files.into_iter().take(remove_count) {
+                let _ = fs::remove_file(entry.path());
+                let _ = fs::remove_file(entry.path().with_extension("json"));
+            }
+        }
+    }
     let snapshot_path = root.join(format!("{timestamp}-{label}.md"));
     let metadata_path = root.join(format!("{timestamp}-{label}.json"));
-    fs::write(&snapshot_path, request.text.as_bytes()).map_err(|err| err.to_string())?;
+    // Write atomically: use temp files + rename so a crash cannot leave a partial snapshot.
+    let tmp_md = snapshot_path.with_extension("md.tmp");
+    let tmp_json = metadata_path.with_extension("json.tmp");
+    fs::write(&tmp_md, request.text.as_bytes()).map_err(|err| err.to_string())?;
     let document_metadata = snapshot_document_metadata(&request.text);
     let metadata = json!({
         "hash": source_hash,
@@ -95,15 +121,68 @@ pub(crate) fn create_snapshot(
         "includeGraphHash": document_metadata.include_graph_hash
     });
     fs::write(
-        &metadata_path,
+        &tmp_json,
         serde_json::to_vec_pretty(&metadata).map_err(|err| err.to_string())?,
     )
     .map_err(|err| err.to_string())?;
+    // Atomic promotion: rename both temp files into their final names.
+    // If either rename fails, clean up and surface the error.
+    if let Err(e) = fs::rename(&tmp_md, &snapshot_path) {
+        let _ = fs::remove_file(&tmp_md);
+        let _ = fs::remove_file(&tmp_json);
+        return Err(format!("Cannot commit snapshot file: {e}"));
+    }
+    if let Err(e) = fs::rename(&tmp_json, &metadata_path) {
+        // The .md is already promoted; remove it to avoid an orphan.
+        let _ = fs::remove_file(&snapshot_path);
+        let _ = fs::remove_file(&tmp_json);
+        return Err(format!("Cannot commit snapshot metadata: {e}"));
+    }
+    // Prune old auto-snapshots so the directory does not grow without bound.
+    let _ = prune_old_snapshots(&root, DEFAULT_SNAPSHOT_MAX_COUNT);
     Ok(SnapshotResponse {
         snapshot_path: path_to_string(&snapshot_path),
         metadata_path: path_to_string(&metadata_path),
         hash: source_hash,
     })
+}
+
+/// Default maximum number of auto-snapshots retained per workspace directory.
+pub(crate) const DEFAULT_SNAPSHOT_MAX_COUNT: usize = 50;
+
+/// Delete the oldest `.md` / `.json` snapshot pairs beyond `max_count` in `root`.
+/// Snapshots are ordered by filename (which starts with a UTC timestamp), so
+/// lexicographic sort gives chronological order.  Returns the number of pairs
+/// removed.  Errors from individual deletes are ignored so a single locked file
+/// does not abort the whole prune.
+pub(crate) fn prune_old_snapshots(root: &Path, max_count: usize) -> Result<usize, String> {
+    if !root.exists() {
+        return Ok(0);
+    }
+    // Collect all .json sidecar files — each corresponds to one snapshot pair.
+    let mut json_paths: Vec<PathBuf> = fs::read_dir(root)
+        .map_err(|err| err.to_string())?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|e| e.to_str()) == Some("json"))
+        .collect();
+    if json_paths.len() <= max_count {
+        return Ok(0);
+    }
+    // Sort ascending (oldest first) — filenames begin with YYYYMMDDTHHMMSSz so
+    // lexicographic order is chronological.
+    json_paths.sort();
+    let excess = json_paths.len() - max_count;
+    let mut removed = 0usize;
+    for json_path in json_paths.iter().take(excess) {
+        let md_path = json_path.with_extension("md");
+        // Attempt both deletes; ignore individual errors (e.g. already gone).
+        let _ = fs::remove_file(&md_path);
+        if fs::remove_file(json_path).is_ok() {
+            removed += 1;
+        }
+    }
+    Ok(removed)
 }
 
 #[tauri::command]
@@ -129,7 +208,14 @@ pub(crate) fn list_snapshots(
             continue;
         }
         let metadata_text = fs::read_to_string(&path).map_err(|err| err.to_string())?;
-        let metadata = serde_json::from_str::<Value>(&metadata_text).unwrap_or_else(|_| json!({}));
+        // Skip corrupt/truncated metadata files instead of silently substituting {}
+        let metadata = match serde_json::from_str::<Value>(&metadata_text) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[neditor snapshot] WARNING: skipping corrupt metadata '{}': {e}", path.display());
+                continue;
+            }
+        };
         let snapshot_path = path.with_extension("md");
         items.push(SnapshotListItem {
             snapshot_path: path_to_string(&snapshot_path),
@@ -181,6 +267,54 @@ pub(crate) fn restore_snapshot(
         request.storage.as_deref(),
     )?;
     restore_snapshot_from_root(&request.snapshot_path, &root, request.file_path.as_deref())
+}
+
+/// Delete a single snapshot pair (`.md` + `.json`).  The path must stay inside
+/// the configured snapshot root for the workspace to prevent directory traversal.
+#[tauri::command]
+pub(crate) fn delete_snapshot(
+    app: tauri::AppHandle,
+    request: SnapshotDeleteRequest,
+) -> Result<(), String> {
+    let workspace_id = snapshot_workspace_id(request.file_path.as_deref());
+    let root = snapshot_root(
+        &app,
+        request.file_path.as_deref(),
+        &workspace_id,
+        request.storage.as_deref(),
+    )?;
+    let root = root.canonicalize().map_err(|err| err.to_string())?;
+    let snapshot_path = PathBuf::from(&request.snapshot_path);
+    // Accept either the .md or the .json path; normalise to .md.
+    let snapshot_path = if snapshot_path.extension().and_then(|e| e.to_str()) == Some("json") {
+        snapshot_path.with_extension("md")
+    } else {
+        snapshot_path
+    };
+    if snapshot_path.extension().and_then(|e| e.to_str()) != Some("md") {
+        return Err("delete_snapshot requires a .md or .json snapshot path.".to_string());
+    }
+    let snapshot_path = snapshot_path
+        .canonicalize()
+        .map_err(|err| err.to_string())?;
+    if !snapshot_path.starts_with(&root) {
+        return Err(
+            "Snapshot delete path must stay inside the configured snapshot store.".to_string(),
+        );
+    }
+    let metadata_path = snapshot_path.with_extension("json");
+    // Remove both files; ignore "not found" errors for each independently.
+    if let Err(err) = fs::remove_file(&snapshot_path) {
+        if err.kind() != std::io::ErrorKind::NotFound {
+            return Err(err.to_string());
+        }
+    }
+    if let Err(err) = fs::remove_file(&metadata_path) {
+        if err.kind() != std::io::ErrorKind::NotFound {
+            return Err(err.to_string());
+        }
+    }
+    Ok(())
 }
 
 fn restore_snapshot_from_root(
@@ -343,5 +477,48 @@ mod tests {
 
         fs::remove_dir_all(root).expect("clean snapshot scope test");
         fs::remove_dir_all(outside).expect("clean outside snapshot scope test");
+    }
+
+    #[test]
+    fn prune_old_snapshots_removes_oldest_beyond_max() {
+        let root = temp_root("prune-snapshots");
+        fs::create_dir_all(&root).expect("create snapshot root");
+        // Write 5 snapshot pairs with ascending timestamps in filenames.
+        for i in 0..5u8 {
+            let base = format!("2024010{i}T000000Z-auto");
+            fs::write(root.join(format!("{base}.md")), format!("# snap {i}"))
+                .expect("write snapshot");
+            fs::write(root.join(format!("{base}.json")), format!("{{\"label\":\"{i}\"}}"))
+                .expect("write metadata");
+        }
+        // Prune keeping only 3.
+        let removed = prune_old_snapshots(&root, 3).expect("prune snapshots");
+        assert_eq!(removed, 2, "expected 2 pairs removed");
+        // The 2 oldest (index 0 and 1) should be gone.
+        assert!(!root.join("20240100T000000Z-auto.md").exists());
+        assert!(!root.join("20240100T000000Z-auto.json").exists());
+        assert!(!root.join("20240101T000000Z-auto.md").exists());
+        assert!(!root.join("20240101T000000Z-auto.json").exists());
+        // The 3 newest must survive.
+        for i in 2..5u8 {
+            let base = format!("2024010{i}T000000Z-auto");
+            assert!(root.join(format!("{base}.md")).exists(), "snap {i} .md missing");
+            assert!(root.join(format!("{base}.json")).exists(), "snap {i} .json missing");
+        }
+        fs::remove_dir_all(root).expect("clean prune test");
+    }
+
+    #[test]
+    fn prune_old_snapshots_noop_when_under_limit() {
+        let root = temp_root("prune-noop");
+        fs::create_dir_all(&root).expect("create snapshot root");
+        for i in 0..3u8 {
+            let base = format!("2024010{i}T000000Z-auto");
+            fs::write(root.join(format!("{base}.md")), "x").expect("write");
+            fs::write(root.join(format!("{base}.json")), "{}").expect("write");
+        }
+        let removed = prune_old_snapshots(&root, 5).expect("prune no-op");
+        assert_eq!(removed, 0);
+        fs::remove_dir_all(root).expect("clean prune noop test");
     }
 }
