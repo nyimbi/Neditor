@@ -1,7 +1,7 @@
 # NEditor State-of-the-Art Research
 ## Capabilities, Gap Analysis, and Interface Strategy
 
-*Research compiled June 2026. Sources: competitive feature pages (Obsidian, Zettlr, Notion, Bear, Logseq, Scrivener, Ulysses), academic writing workflow literature, UX research on progressive disclosure and feature surfacing.*
+*Research compiled June 2026. Sources: competitive feature pages (Obsidian, Zettlr, Notion, Bear, Logseq, Scrivener, Ulysses), academic writing workflow literature, adversarially-verified UX research (113-agent deep research workflow, 609 tool uses). Four claims survived adversarial verification at medium-high confidence; 18 of 25 candidate claims were refuted.*
 
 ---
 
@@ -640,16 +640,89 @@ The gap between these four tools is where NEditor can win:
 
 ---
 
-## Appendix B: Sources
+## Appendix B: Adversarially-Verified Research Findings
+
+The following four claims survived a 3-vote adversarial verification process (113 agents, 609 tool uses). 18 of 25 candidate claims were refuted. These findings should be treated as the most reliable evidence base for design decisions.
+
+### B.1 The Collaborative Scientific Writing Gap (Confidence: HIGH)
+
+**Claim:** The standard scientific co-authorship workflow requires a paid Overleaf plan. The free tier limits collaboration to one person; real-time track changes, full document history, and Git/GitHub/Mendeley/Zotero integration are all paywalled.
+
+**Evidence:** Verified against Overleaf's official documentation. Free plan = 1 collaborator per project; track changes = premium only; project history = premium only (free users get last 24 hours); Git/GitHub integration = premium only; Mendeley and Zotero direct sync = premium only.
+
+**NEditor implication:** There is a confirmed market gap — no single tool currently delivers the full scientific co-authorship workflow at zero cost. NEditor delivering **real-time collaboration + Zotero sync + Git integration + track changes** without a paywall would be a genuine competitive advantage for academic teams, particularly in resource-constrained institutions and open-source research communities.
+
+---
+
+### B.2 Progressive Disclosure Architecture (Confidence: HIGH)
+
+**Claim:** Progressive disclosure improves three of Nielsen's five usability components (learnability, efficiency, error rate), but **only when the primary/secondary split accurately reflects usage frequency**. Everything users frequently need must appear upfront — getting the split wrong is the primary failure mode.
+
+**Source:** Nielsen Norman Group, "Progressive Disclosure" (canonical HCI reference, stable 1990s–2026).
+
+**NEditor implication:**
+- The current 4-toolbar-row default violates this principle — too many secondary features are primary-tier visible.
+- **Correct split for NEditor:**
+  - Primary (always visible): Format toolbar (Bold/Italic/Code/Link), Save, AI Create, Export, Mode toggle
+  - Secondary (one click): All transform types, citation tools, advanced export options, settings
+  - Tertiary (command palette): Every other action
+- The Writer/Pilot mode toggle is architecturally correct — it IS progressive disclosure at the mode level.
+
+---
+
+### B.3 Accelerator Design Principles (Confidence: HIGH)
+
+**Claim:** Accelerators (keyboard shortcuts, slash commands, command palette) are the correct mechanism for expert efficiency, but must be **additional alternate paths** — not feature-gating — and **should not be surfaced to all users simultaneously** as that is counterproductive for novices.
+
+**Source:** Nielsen Norman Group, "UI Accelerators" (canonical HCI reference).
+
+**NEditor implication:**
+- Every toolbar action must remain clickable even if a keyboard shortcut exists.
+- The slash command picker, ⌘K palette, and ⌘⇧T transform picker are architecturally correct accelerators.
+- The current approach of showing ALL accelerators in the View toolbar's keyboard hint section is counterproductive for new users — a progressive reveal after feature usage is better.
+- Recommendation: Surface accelerator hints contextually (e.g., "Tip: Press ⌘⇧T next time" after the user opens the Transform Palette via click for the 3rd time).
+
+---
+
+### B.4 AI Variation Storage Pattern (Confidence: MEDIUM)
+
+**Claim:** Storing AI-generated text variations **adjacent to the cursor position within the document** — rather than in a separate panel — with a contextual mouse-over popup toolbar measurably reduces task workload (Cohen's d = 1.20, p < 0.001) and improves writer perception of the revision process (d = 2.41, p < 0.001) versus a ChatGPT-style separate-interface baseline.
+
+**Source:** ABScribe, CHI 2024 (peer-reviewed). Within-subjects, n=12. Effect sizes are likely upward-biased due to small N; treat as directional signal, not magnitude estimate.
+
+**NEditor implication:** This is a concrete, empirically-tested interaction pattern for AI-assisted revision. The pattern:
+1. Writer selects text and requests AI rewrite
+2. AI generates 2–4 variations stored as "Variation Fields" directly adjacent to the selected text in the document
+3. A small popup toolbar appears on mouse-over showing the variations and accept/reject controls
+4. Selected variation replaces original; unselected variations disappear
+
+This is meaningfully different from NEditor's current AI paste modal (which is a separate overlay). The adjacent-storage pattern keeps writers in the document context. **Recommendation:** Implement this as an opt-in inline variation mode alongside the existing AI paste workflow.
+
+---
+
+### B.5 Open Research Questions (Not Established by Surviving Evidence)
+
+The following questions were investigated but no claims survived adversarial verification. They remain design hypotheses requiring further research:
+
+- Whether Obsidian/Notion/Roam/Zettlr offer capabilities that specialized platforms structurally cannot
+- Optimal citation management UX for mixed academic/business audiences
+- Data visualization integration patterns (embedded vs. linked-file)
+- Command palette vs. contextual toolbar comparative task completion rates
+- Publishing workflow UX for multi-channel distribution
+
+## Appendix C: Sources
 
 1. Obsidian.md — product overview and feature documentation (fetched June 2026)
 2. Zettlr.com/features — academic writing feature list (fetched June 2026)
 3. Notion.com/product — business writing features (fetched June 2026)
 4. Bear.app/faq — writing app features for connected notes (fetched June 2026)
 5. Logseq.com — outline-based knowledge base features (fetched June 2026)
-6. Deep research synthesis: business/academic writer workflows and interface patterns (automated multi-source research, June 2026)
-7. Nielsen Norman Group research on progressive disclosure and feature discovery
-8. NEditor codebase analysis (direct, June 2026) — comprehensive capability inventory from source code
+6. Overleaf — premium features documentation (adversarially verified, June 2026)
+7. Overleaf — Git integration documentation (adversarially verified, June 2026)
+8. Nielsen Norman Group — "Progressive Disclosure" (adversarially verified, stable canonical HCI reference)
+9. Nielsen Norman Group — "UI Accelerators" (adversarially verified, stable canonical HCI reference)
+10. ABScribe: Restructuring AI-Assisted Writing Workflows through Contextual Bandit Feedback on Inline Suggestions — CHI 2024, arXiv:2310.00117 (adversarially verified; N=12, treat effect sizes as directional)
+11. NEditor codebase analysis (direct, June 2026) — comprehensive capability inventory from source code
 
 ---
 
