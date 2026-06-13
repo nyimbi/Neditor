@@ -12,7 +12,9 @@ node_modules
 .cache/
 .tmp/
 .omx/
+.omc/
 .neditor/
+.claude/worktrees/
 dist
 dist-ssr
 .tmp-tests

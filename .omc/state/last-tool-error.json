@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"git add -u src/lib/ollamaModels.ts && git add src/lib/ollamaModels.ts && git add -u && git commit -m \\\"$(cat <<'EOF'\\nDramatically enhance Ollama AI: catalog, streaming, context management...",
-  "error": "Exit code 128\nerror: pathspec 'src/lib/ollamaModels.ts' did not match any file(s) known to git",
-  "timestamp": "2026-06-03T20:35:31.823Z",
-  "retry_count": 1
-}
