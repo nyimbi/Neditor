@@ -15,31 +15,22 @@ pub struct Suggestion {
 	pub line: usize,
 }
 
-pub fn generate_suggestion_id() -> String {
+fn generate_suggestion_id() -> Result<String, String> {
 	let mut bytes = [0u8; 6];
-	if getrandom::getrandom(&mut bytes).is_err() {
-		// Fallback: mix process id + std::time::SystemTime nanos to avoid all-zero collision
-		let pid = std::process::id() as u64;
-		let nanos = std::time::SystemTime::now()
-			.duration_since(std::time::UNIX_EPOCH)
-			.map(|d| d.subsec_nanos() as u64)
-			.unwrap_or(pid ^ 0xdeadbeef);
-		let mixed = pid.wrapping_mul(0x9e3779b97f4a7c15).wrapping_add(nanos);
-		bytes.copy_from_slice(&mixed.to_le_bytes()[..6]);
-	}
-	bytes.iter().map(|b| format!("{b:02x}")).collect()
+	getrandom::getrandom(&mut bytes).map_err(|e| format!("Failed to generate suggestion ID: {e}"))?;
+	Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
 
 #[tauri::command]
-pub(crate) fn create_delete_suggestion(text_to_delete: String, author: String) -> String {
-	let id = generate_suggestion_id();
-	format!("{SUGGEST_DELETE_OPEN}{id} author:{author}{SUGGEST_CLOSE}{text_to_delete}{END_DELETE}")
+pub(crate) fn create_delete_suggestion(text_to_delete: String, author: String) -> Result<String, String> {
+	let id = generate_suggestion_id()?;
+	Ok(format!("{SUGGEST_DELETE_OPEN}{id} author:{author}{SUGGEST_CLOSE}{text_to_delete}{END_DELETE}"))
 }
 
 #[tauri::command]
-pub(crate) fn create_insert_suggestion(text_to_insert: String, author: String) -> String {
-	let id = generate_suggestion_id();
-	format!("{SUGGEST_INSERT_OPEN}{id} author:{author}{SUGGEST_CLOSE}{text_to_insert}{END_INSERT}")
+pub(crate) fn create_insert_suggestion(text_to_insert: String, author: String) -> Result<String, String> {
+	let id = generate_suggestion_id()?;
+	Ok(format!("{SUGGEST_INSERT_OPEN}{id} author:{author}{SUGGEST_CLOSE}{text_to_insert}{END_INSERT}"))
 }
 
 #[tauri::command]

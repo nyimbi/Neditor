@@ -23,7 +23,7 @@ fn find_in_dir(root: &PathBuf, dir: &PathBuf, target: &str, results: &mut Vec<Ba
     for entry in entries.flatten() {
         let path = entry.path();
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-        if name.starts_with('.') { continue; }
+        if name.starts_with('.') || name == "node_modules" || name == "target" { continue; }
         // Skip symlinks to prevent infinite recursion on cyclic symlinks
         if path.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) { continue; }
         if path.is_dir() { find_in_dir(root, &path, target, results); continue; }
@@ -54,7 +54,7 @@ fn find_unlinked_in_dir(root: &PathBuf, dir: &PathBuf, title: &str, results: &mu
     for entry in entries.flatten() {
         let path = entry.path();
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-        if name.starts_with('.') { continue; }
+        if name.starts_with('.') || name == "node_modules" || name == "target" { continue; }
         if path.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) { continue; }
         if path.is_dir() { find_unlinked_in_dir(root, &path, title, results); continue; }
         if path.extension().and_then(|e| e.to_str()) != Some("md") { continue; }

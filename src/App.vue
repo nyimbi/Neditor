@@ -5219,8 +5219,9 @@
       </section>
 
       <!-- ── Welcome screen (no documents open) ──────────────────────────── -->
+      <!-- Show when the only open doc is the pristine unsaved starter — i.e., nothing real is open yet -->
       <section
-        v-if="store.documents.length === 0 && store.mode !== 'graph' && store.mode !== 'canvas'"
+        v-if="store.documents.length <= 1 && !store.documents[0]?.path && !store.documents[0]?.dirty && store.mode !== 'graph' && store.mode !== 'canvas'"
         class="welcome-screen"
         aria-label="Welcome to NEditor"
       >
@@ -9617,7 +9618,11 @@ function applyWorkflowPreset(preset: WorkflowPreset): void {
   store.activeWorkflowPreset = preset.id;
   if (preset.exportTarget) store.exportTarget = preset.exportTarget as typeof store.exportTarget;
   if (preset.sidebar) store.sidebar = preset.sidebar as typeof store.sidebar;
-  if (preset.collapsedRows) store.toolbarCollapsedRows = [...preset.collapsedRows];
+  if (preset.collapsedRows) {
+    // Merge: add preset-recommended rows without removing user's existing hidden rows
+    const merged = new Set([...store.toolbarCollapsedRows, ...preset.collapsedRows]);
+    store.toolbarCollapsedRows = [...merged];
+  }
   if (preset.citationStyle) store.bibliographyDefaults = { ...store.bibliographyDefaults, citationStyle: preset.citationStyle as typeof store.bibliographyDefaults.citationStyle };
   if (preset.editorMode) store.mode = preset.editorMode as typeof store.mode;
   workflowPresetOpen.value = false;
@@ -9697,10 +9702,12 @@ const dailyNotesCalendarGrid = computed(() => {
 const backlinksData = ref<Array<{ source_path: string; line: number; excerpt: string }>>([]);
 const unlinkedMentionsData = ref<Array<{ source_path: string; line: number; excerpt: string }>>([]);
 const backlinksLoading = ref(false);
+let _backlinksToken = 0;
 
 async function refreshBacklinks(): Promise<void> {
   const doc = active.value;
   if (!doc?.path || !store.workspaceRoot) { backlinksData.value = []; unlinkedMentionsData.value = []; return; }
+  const myToken = ++_backlinksToken;
   backlinksLoading.value = true;
   try {
     const [linked, unlinked] = await Promise.all([
@@ -9713,10 +9720,11 @@ async function refreshBacklinks(): Promise<void> {
         workspaceRoot: store.workspaceRoot,
       }),
     ]);
+    if (myToken !== _backlinksToken) return; // stale — a newer call superseded this one
     backlinksData.value = linked;
     unlinkedMentionsData.value = unlinked;
-  } catch { backlinksData.value = []; unlinkedMentionsData.value = []; }
-  backlinksLoading.value = false;
+  } catch { if (myToken === _backlinksToken) { backlinksData.value = []; unlinkedMentionsData.value = []; } }
+  if (myToken === _backlinksToken) backlinksLoading.value = false;
 }
 
 watch(() => store.sidebar, (s) => { if (s === 'backlinks') refreshBacklinks(); });
@@ -9859,13 +9867,23 @@ function scrollEditorToLine(line: number): void {
   } catch { /* line out of range */ }
 }
 
-// ── Style guide ───────────────────────────────────────────────────────────────
-const styleGuideFindings = computed<StyleGuideFinding[]>(() => {
-  if (!store.styleGuideEnabled) return [];
-  const text = active.value?.text || '';
-  const rules = mergeStyleGuideRules(BUILTIN_STYLE_RULES, store.styleGuideRules);
-  return runStyleGuide(text, rules);
-});
+// ── Style guide (debounced — do not run synchronously on every keystroke) ────
+const styleGuideFindings = ref<StyleGuideFinding[]>([]);
+let _styleGuideTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(
+  [() => active.value?.text, () => store.styleGuideEnabled, () => store.styleGuideRules],
+  () => {
+    if (_styleGuideTimer) clearTimeout(_styleGuideTimer);
+    if (!store.styleGuideEnabled) { styleGuideFindings.value = []; return; }
+    _styleGuideTimer = setTimeout(() => {
+      const text = active.value?.text || '';
+      const rules = mergeStyleGuideRules(BUILTIN_STYLE_RULES, store.styleGuideRules);
+      styleGuideFindings.value = runStyleGuide(text, rules);
+    }, 1500);
+  },
+  { flush: 'post' },
+);
 
 const presentationSlides = computed<SlideData[]>(() => {
   const doc = active.value;
@@ -9888,11 +9906,15 @@ const graphQuery = ref('');
 
 async function buildKnowledgeGraph(): Promise<void> {
   if (!store.workspaceRoot) { store.statusMessage = 'Open a workspace folder first.'; return; }
+  if (graphLoading.value) return;
   graphLoading.value = true;
   try {
     graphData.value = await invoke('build_workspace_link_graph', { workspaceRoot: store.workspaceRoot });
-  } catch (e) { store.statusMessage = `Graph error: ${e}`; }
-  graphLoading.value = false;
+  } catch (e) {
+    store.statusMessage = `Graph error: ${e}`;
+  } finally {
+    graphLoading.value = false;
+  }
 }
 
 watch(() => store.mode, (m) => { if (m === 'graph') buildKnowledgeGraph(); });
@@ -18106,6 +18128,10 @@ onBeforeUnmount(() => {
   window.clearTimeout(autosaveHandle);
   window.clearTimeout(autoSnapshotHandle);
   window.clearTimeout(scrollPersistHandle);
+  if (readabilityRefreshTimer.value) clearTimeout(readabilityRefreshTimer.value);
+  if (nudgeTimer.value) clearTimeout(nudgeTimer.value);
+  if (_styleGuideTimer) clearTimeout(_styleGuideTimer);
+  onCanvasDragEnd(); // remove any stale window drag listeners
   window.removeEventListener("keydown", handleShortcut);
   window.removeEventListener("mouseover", handleButtonHelpEnter);
   window.removeEventListener("mousemove", handleButtonHelpPointerMove, true);

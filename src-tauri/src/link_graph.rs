@@ -162,28 +162,27 @@ pub(crate) fn build_workspace_link_graph(workspace_root: String) -> Result<Works
 
 	let file_map = scan_workspace(&root);
 
-	// Build stem → rel_path index for link resolution
-	let stem_index: HashMap<String, String> = file_map
-		.keys()
-		.map(|rel| {
-			let stem = PathBuf::from(rel)
-				.file_stem()
-				.and_then(|s| s.to_str())
-				.unwrap_or("")
-				.to_ascii_lowercase();
-			(stem, rel.clone())
-		})
-		.collect();
+	// Build stem → Vec<rel_path> index (multiple files may share the same stem)
+	let mut stem_index: HashMap<String, Vec<String>> = HashMap::new();
+	for rel in file_map.keys() {
+		let stem = PathBuf::from(rel)
+			.file_stem()
+			.and_then(|s| s.to_str())
+			.unwrap_or("")
+			.to_ascii_lowercase();
+		stem_index.entry(stem).or_default().push(rel.clone());
+	}
 
 	let mut nodes = Vec::new();
 	let mut edges = Vec::new();
 	let mut link_counts: HashMap<String, usize> = HashMap::new();
 
-	// First pass: collect edges
+	// First pass: collect edges — emit one edge per resolved target
 	for (rel, (_title, _abs, _tags, links)) in &file_map {
 		for link_text in links {
 			let target_stem = link_text.to_ascii_lowercase();
-			if let Some(target_rel) = stem_index.get(&target_stem) {
+			if let Some(target_rels) = stem_index.get(&target_stem) {
+				for target_rel in target_rels {
 				if target_rel != rel {
 					edges.push(GraphEdge {
 						source: rel.clone(),
@@ -193,6 +192,7 @@ pub(crate) fn build_workspace_link_graph(workspace_root: String) -> Result<Works
 					*link_counts.entry(rel.clone()).or_insert(0) += 1;
 					*link_counts.entry(target_rel.clone()).or_insert(0) += 1;
 				}
+				} // end for target_rel in target_rels
 			}
 		}
 	}

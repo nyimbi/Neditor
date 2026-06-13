@@ -138,12 +138,19 @@ pub(crate) fn list_daily_notes(
 		.flatten()
 		.filter_map(|e| {
 			let name = e.file_name();
-			let name = name.to_string_lossy();
-			if name.starts_with(&prefix) && name.ends_with(".md") {
-				Some(name.trim_end_matches(".md").to_string())
-			} else {
-				None
-			}
+			let s = name.to_string_lossy();
+			// Use rsplit_once to handle exactly one .md suffix
+			let stem = s.rsplit_once(".md").filter(|(_, rest)| rest.is_empty()).map(|(s, _)| s)?;
+			if !stem.starts_with(&prefix) { return None; }
+			// Validate the stripped name is exactly YYYY-MM-DD
+			let valid = stem.len() == 10 && {
+				let b = stem.as_bytes();
+				b[4] == b'-' && b[7] == b'-'
+					&& b[..4].iter().all(|c| c.is_ascii_digit())
+					&& b[5..7].iter().all(|c| c.is_ascii_digit())
+					&& b[8..10].iter().all(|c| c.is_ascii_digit())
+			};
+			if valid { Some(stem.to_string()) } else { None }
 		})
 		.collect();
 
