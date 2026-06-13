@@ -76,9 +76,18 @@ next: "[[{next}]]"
 
 #[tauri::command]
 pub(crate) fn open_daily_note(workspace_root: String, date: String) -> Result<DailyNoteResult, String> {
-	// Validate date format YYYY-MM-DD
-	if date.len() != 10 || !date.chars().all(|c| c.is_ascii_digit() || c == '-') {
+	// Validate date format YYYY-MM-DD with range checks
+	let parts: Vec<&str> = date.split('-').collect();
+	if parts.len() != 3 {
 		return Err(format!("Invalid date format: {date}. Expected YYYY-MM-DD."));
+	}
+	let (year, month, day) = (
+		parts[0].parse::<u32>().map_err(|_| format!("Invalid year in date: {date}"))?,
+		parts[1].parse::<u32>().map_err(|_| format!("Invalid month in date: {date}"))?,
+		parts[2].parse::<u32>().map_err(|_| format!("Invalid day in date: {date}"))?,
+	);
+	if !(1900..=2200).contains(&year) || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+		return Err(format!("Date out of valid range: {date}"));
 	}
 
 	let root = PathBuf::from(&workspace_root);

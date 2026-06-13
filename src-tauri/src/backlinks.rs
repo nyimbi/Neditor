@@ -66,9 +66,12 @@ fn find_unlinked_in_dir(root: &PathBuf, dir: &PathBuf, title: &str, results: &mu
             if lower.contains(&format!("[[{title}]]")) { continue; }
             // Match plain-text mention of the title (word boundary check via surrounding chars)
             if let Some(pos) = lower.find(title) {
-                let before_ok = pos == 0 || !lower.chars().nth(pos - 1).map(|c| c.is_alphanumeric()).unwrap_or(false);
+                // Use byte-level ASCII check — `find` returns byte offsets, word-boundary
+                // characters are always single-byte ASCII, so this is correct and O(1).
+                let bytes = lower.as_bytes();
+                let before_ok = pos == 0 || !bytes[pos - 1].is_ascii_alphanumeric();
                 let after_pos = pos + title.len();
-                let after_ok = after_pos >= lower.len() || !lower.chars().nth(after_pos).map(|c| c.is_alphanumeric()).unwrap_or(false);
+                let after_ok = after_pos >= lower.len() || !bytes[after_pos].is_ascii_alphanumeric();
                 if before_ok && after_ok {
                     results.push(Backlink { source_path: rel.clone(), line: li + 1, excerpt: line.trim().to_string() });
                 }

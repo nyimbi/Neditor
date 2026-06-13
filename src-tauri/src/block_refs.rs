@@ -37,12 +37,11 @@ pub(crate) fn resolve_block_reference(
 ) -> Result<BlockRefResult, String> {
 	let root = PathBuf::from(&workspace_root);
 
-	// Resolve file path: absolute or relative to workspace root
-	let file_path = if ref_path.starts_with('/') {
-		PathBuf::from(&ref_path)
-	} else {
-		root.join(&ref_path)
-	};
+	// Reject absolute paths — only workspace-relative paths allowed
+	if ref_path.starts_with('/') || ref_path.starts_with('~') {
+		return Err("Block reference path must be relative to the workspace root".to_string());
+	}
+	let file_path = root.join(&ref_path);
 
 	// Path containment guard
 	let canonical = file_path.canonicalize().map_err(|e| format!("Cannot resolve path: {e}"))?;
@@ -82,9 +81,9 @@ pub(crate) fn resolve_block_reference(
 		});
 	};
 
-	// Collect content until next heading of same or higher level
+	// Collect content until next heading of same or higher level (cap at 1000 lines)
 	let mut block_lines = vec![lines[start]];
-	for line in &lines[start + 1..] {
+	for line in lines[start + 1..].iter().take(999) {
 		if let Some(level) = heading_level(line) {
 			if level <= found_level { break; }
 		}

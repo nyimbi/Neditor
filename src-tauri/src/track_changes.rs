@@ -16,11 +16,17 @@ pub struct Suggestion {
 }
 
 pub fn generate_suggestion_id() -> String {
-	// Simple deterministic ID based on content hash via sha2 would be ideal,
-	// but we use a simple random-ish approach from system time nanos
-	// Since getrandom is already a dependency, use it
 	let mut bytes = [0u8; 6];
-	getrandom::getrandom(&mut bytes).unwrap_or(());
+	if getrandom::getrandom(&mut bytes).is_err() {
+		// Fallback: mix process id + std::time::SystemTime nanos to avoid all-zero collision
+		let pid = std::process::id() as u64;
+		let nanos = std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.map(|d| d.subsec_nanos() as u64)
+			.unwrap_or(pid ^ 0xdeadbeef);
+		let mixed = pid.wrapping_mul(0x9e3779b97f4a7c15).wrapping_add(nanos);
+		bytes.copy_from_slice(&mixed.to_le_bytes()[..6]);
+	}
 	bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
@@ -51,8 +57,8 @@ pub(crate) fn reject_suggestion(document: String, suggestion_id: String) -> Resu
 fn process_suggestion(doc: &str, id: &str, accept: bool) -> String {
 	let mut result = doc.to_string();
 
-	// Handle delete suggestions
-	let delete_marker = format!("{SUGGEST_DELETE_OPEN}{id}");
+	// Anchor with trailing space so id "abc" doesn't match "abcdef"
+	let delete_marker = format!("{SUGGEST_DELETE_OPEN}{id} ");
 	if let Some(start) = result.find(&delete_marker) {
 		if let Some(close_pos) = result[start..].find(SUGGEST_CLOSE) {
 			let content_start = start + close_pos + SUGGEST_CLOSE.len();
@@ -72,7 +78,7 @@ fn process_suggestion(doc: &str, id: &str, accept: bool) -> String {
 	}
 
 	// Handle insert suggestions
-	let insert_marker = format!("{SUGGEST_INSERT_OPEN}{id}");
+	let insert_marker = format!("{SUGGEST_INSERT_OPEN}{id} ");
 	if let Some(start) = result.find(&insert_marker) {
 		if let Some(close_pos) = result[start..].find(SUGGEST_CLOSE) {
 			let content_start = start + close_pos + SUGGEST_CLOSE.len();
@@ -159,7 +165,10 @@ fn parse_suggestions_of_kind(
 		let Some(rel_start) = doc[search..].find(open) else { break };
 		let start = search + rel_start;
 		let Some(rel_close) = doc[start..].find(close) else { break };
-		let meta = &doc[start + open.len()..start + rel_close];
+		let meta_raw = &doc[start + open.len()..start + rel_close];
+		// Require at least one space after the id to prevent prefix collisions
+		if !meta_raw.contains(' ') { search = start + 1; continue; }
+		let meta = meta_raw;
 		let content_start = start + rel_close + close.len();
 		let Some(rel_end) = doc[content_start..].find(end) else { break };
 

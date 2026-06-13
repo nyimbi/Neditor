@@ -28,6 +28,7 @@ fn extract_title_and_tags(content: &str) -> (String, Vec<String>) {
 	let mut tags: Vec<String> = Vec::new();
 	let mut in_front_matter = false;
 	let mut front_matter_done = false;
+	let mut in_tags_block = false;
 	let mut fm_line = 0usize;
 
 	for line in content.lines() {
@@ -43,23 +44,31 @@ fn extract_title_and_tags(content: &str) -> (String, Vec<String>) {
 				continue;
 			}
 			if line.starts_with("title:") {
+				in_tags_block = false;
 				title = line["title:".len()..].trim().trim_matches('"').trim_matches('\'').to_string();
 			}
 			if line.starts_with("tags:") {
 				let rest = line["tags:".len()..].trim();
-				// Inline array: tags: [a, b, c]
 				if rest.starts_with('[') {
+					// Inline array: tags: [a, b, c]
+					in_tags_block = false;
 					let inner = rest.trim_matches(|c| c == '[' || c == ']');
 					for t in inner.split(',') {
 						let t = t.trim().trim_matches('"').trim_matches('\'');
 						if !t.is_empty() { tags.push(t.to_string()); }
 					}
+				} else {
+					// Multi-line YAML list follows
+					in_tags_block = true;
 				}
-			}
-			// YAML list item under tags:
-			if line.starts_with("  - ") && !tags.is_empty() {
-				let t = line[4..].trim().trim_matches('"').trim_matches('\'').to_string();
+			} else if in_tags_block && (line.starts_with("  - ") || line.starts_with("- ")) {
+				// YAML list item under tags:
+				let raw = if line.starts_with("  - ") { &line[4..] } else { &line[2..] };
+				let t = raw.trim().trim_matches('"').trim_matches('\'').to_string();
 				if !t.is_empty() { tags.push(t); }
+			} else if !line.starts_with(' ') && !line.starts_with('\t') {
+				// A new top-level key resets the tags block
+				in_tags_block = false;
 			}
 			fm_line += 1;
 			continue;

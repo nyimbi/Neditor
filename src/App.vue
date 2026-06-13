@@ -9941,7 +9941,15 @@ async function generateInlineVariations(): Promise<void> {
       const start = buffer.indexOf('[');
       const end = buffer.lastIndexOf(']');
       if (start !== -1 && end > start) {
-        inlineVariationCandidates.value = JSON.parse(buffer.slice(start, end + 1));
+        const parsed = JSON.parse(buffer.slice(start, end + 1));
+        if (Array.isArray(parsed) && parsed.every(v => typeof v === 'string')) {
+          inlineVariationCandidates.value = parsed;
+        } else if (Array.isArray(parsed)) {
+          // Coerce non-string entries to strings
+          inlineVariationCandidates.value = parsed.map(v =>
+            typeof v === 'string' ? v : (typeof v === 'object' && v !== null && 'text' in v) ? String((v as any).text) : JSON.stringify(v)
+          );
+        }
       }
     } catch { inlineVariationCandidates.value = [buffer.trim()]; }
   } catch (e) {
@@ -10068,31 +10076,43 @@ watch(() => active.value?.text, () => { if (store.suggestionMode) refreshSuggest
 async function acceptSuggestion(id: string): Promise<void> {
   const doc = active.value;
   if (!doc) return;
-  const result = await invoke<string>('accept_suggestion', { document: doc.text, suggestionId: id });
-  store.updateText(result);
+  try {
+    const result = await invoke<string>('accept_suggestion', { document: doc.text, suggestionId: id });
+    store.updateText(result);
+    await refreshSuggestions();
+  } catch (e) { store.statusMessage = `Accept failed: ${e}`; }
 }
 
 async function rejectSuggestion(id: string): Promise<void> {
   const doc = active.value;
   if (!doc) return;
-  const result = await invoke<string>('reject_suggestion', { document: doc.text, suggestionId: id });
-  store.updateText(result);
+  try {
+    const result = await invoke<string>('reject_suggestion', { document: doc.text, suggestionId: id });
+    store.updateText(result);
+    await refreshSuggestions();
+  } catch (e) { store.statusMessage = `Reject failed: ${e}`; }
 }
 
 async function acceptAllSuggestions(): Promise<void> {
   const doc = active.value;
   if (!doc) return;
-  const result = await invoke<string>('accept_all_suggestions', { document: doc.text });
-  store.updateText(result);
-  store.suggestionMode = false;
+  try {
+    const result = await invoke<string>('accept_all_suggestions', { document: doc.text });
+    store.updateText(result);
+    store.suggestionMode = false;
+    activeSuggestions.value = [];
+  } catch (e) { store.statusMessage = `Accept all failed: ${e}`; }
 }
 
 async function rejectAllSuggestions(): Promise<void> {
   const doc = active.value;
   if (!doc) return;
-  const result = await invoke<string>('reject_all_suggestions', { document: doc.text });
-  store.updateText(result);
-  store.suggestionMode = false;
+  try {
+    const result = await invoke<string>('reject_all_suggestions', { document: doc.text });
+    store.updateText(result);
+    store.suggestionMode = false;
+    activeSuggestions.value = [];
+  } catch (e) { store.statusMessage = `Reject all failed: ${e}`; }
 }
 
 // ── Block references ──────────────────────────────────────────────────────────
@@ -10183,8 +10203,8 @@ function saveCanvasState(): void {
 async function loadCanvasState(): Promise<void> {
   if (!store.workspaceRoot) return;
   try {
-    const content = await invoke<{ content: string }>('read_file', { path: `${store.workspaceRoot}/.neditor-canvas.json` });
-    const state = JSON.parse(content.content || '{}');
+    const content = await invoke<{ text: string }>('read_file', { path: `${store.workspaceRoot}/.neditor-canvas.json` });
+    const state = JSON.parse(content.text || '{}');
     canvasNodes.value = state.nodes || [];
     canvasEdges.value = state.edges || [];
   } catch { /* no canvas file yet */ }
