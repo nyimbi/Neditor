@@ -169,9 +169,11 @@ import {
   type GoogleIntegrationPreferences,
   type PersistedScrollPosition,
   type PreviewTheme,
+  type SidebarPanel,
   type SnapshotStorage,
   type ToolbarDisplay,
   type TtsPreferences,
+  type WorkbenchMode,
 } from "../lib/workspacePersistence";
 import type {
   AiCleanupResponse,
@@ -355,24 +357,12 @@ export const useDocumentsStore = defineStore("documents", {
       },
     ] as OpenDocument[],
     activeId: "",
-    mode: "split" as "split" | "source" | "preview" | "focus" | "outline" | "export" | "review" | "presentation",
+    mode: "split" as WorkbenchMode,
     uiMode: "writer" as "writer" | "pilot",
     presentationTheme: "corporate" as string,
     presentationTransition: "fade" as string,
     pilotActivityPanel: "outline" as string,
-    sidebar: "outline" as
-      | "files"
-      | "outline"
-      | "diagnostics"
-      | "tables"
-      | "templates"
-      | "layout"
-      | "references"
-      | "exports"
-      | "versioning"
-      | "review"
-      | "help"
-      | "settings",
+    sidebar: "outline" as SidebarPanel,
     theme: "system" as "system" | "light" | "dark",
     previewTheme: "match" as PreviewTheme,
     toolbarDisplay: "both" as ToolbarDisplay,
@@ -497,6 +487,37 @@ export const useDocumentsStore = defineStore("documents", {
     mailMergeRequireWorkspaceRoot: true,
     mailMergeMaxRecords: 10000,
     mailMergeDefaultDelimiter: "," as "," | "\t",
+    // Daily notes
+    dailyNotesEnabled: true,
+    dailyNotesFolder: "daily-notes",
+    // Workflow presets
+    activeWorkflowPreset: null as string | null,
+    // Writing goals
+    wordCountTarget: null as number | null,
+    writingGoalDeadline: null as string | null,
+    sessionWordCountBaseline: 0,
+    // Feature discovery nudges
+    featureUsageCounts: {} as Record<string, number>,
+    dismissedNudges: [] as string[],
+    // Focus mode
+    focusMode: "off" as "off" | "paragraph" | "sentence",
+    // Minimap
+    showMinimap: false,
+    // Pinned files
+    pinnedFiles: [] as string[],
+    // Style guide
+    styleGuideEnabled: false,
+    styleGuideRules: [] as Array<{ id: string; category: string; description: string; patterns: string[]; severity: "error" | "warn" | "info"; suggestion: string }>,
+    // Suggestion mode (track changes)
+    suggestionMode: false,
+    // Readability cache
+    lastReadabilityStats: null as null | {
+      wordCount: number; sentenceCount: number; paragraphCount: number;
+      syllableCount: number; avgWordsPerSentence: number;
+      fleschReadingEase: number; fleschKincaidGrade: number;
+      gunningFog: number; readingTimeMinutes: number;
+      longSentenceCount: number; complexWordCount: number;
+    },
   }),
   getters: {
     activeDocument(state): OpenDocument {

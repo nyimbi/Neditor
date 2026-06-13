@@ -13,10 +13,25 @@ export interface QualityRecommendation {
   action: string;
 }
 
+export interface ReadabilityStats {
+  wordCount: number;
+  sentenceCount: number;
+  paragraphCount: number;
+  syllableCount: number;
+  avgWordsPerSentence: number;
+  fleschReadingEase: number;
+  fleschKincaidGrade: number;
+  gunningFog: number;
+  readingTimeMinutes: number;
+  longSentenceCount: number;
+  complexWordCount: number;
+}
+
 export interface QualityRecommendationInput {
   text: string;
   semantic?: Pick<SemanticDocument, "title" | "comments" | "ai_sources" | "ai_assisted_sections"> | null;
   diagnostics?: DocumentDiagnostic[] | null;
+  readabilityStats?: ReadabilityStats | null;
 }
 
 export interface QualityStepAssistance {
@@ -144,7 +159,34 @@ export function buildQualityRecommendations(input: QualityRecommendationInput): 
       action: "Use Outline mode or Docs Live to add chapters, sections, subsections, and review checkpoints.",
     });
   }
-  if (longParagraphs) {
+  const rs = input.readabilityStats;
+  if (rs) {
+    if (rs.fleschKincaidGrade > 14) {
+      recommendations.push({
+        id: "readability",
+        label: "Readability",
+        severity: "risk",
+        recommendation: `Flesch-Kincaid Grade Level ${rs.fleschKincaidGrade.toFixed(1)} — post-graduate reading level. Most business audiences read at grade 8–10.`,
+        action: "Shorten sentences, replace polysyllabic jargon with plain words, and split dense paragraphs.",
+      });
+    } else if (rs.fleschKincaidGrade > 12 || rs.fleschReadingEase < 40) {
+      recommendations.push({
+        id: "readability",
+        label: "Readability",
+        severity: "improve",
+        recommendation: `Flesch-Kincaid Grade ${rs.fleschKincaidGrade.toFixed(1)}, Reading Ease ${rs.fleschReadingEase.toFixed(0)}/100. Consider simplifying for a broader audience.`,
+        action: "Aim for FK Grade ≤ 12 and Reading Ease ≥ 50 for business/executive audiences.",
+      });
+    } else if (rs.longSentenceCount > 3) {
+      recommendations.push({
+        id: "readability",
+        label: "Readability",
+        severity: "improve",
+        recommendation: `${rs.longSentenceCount} sentences exceed 30 words. Long sentences reduce scannability.`,
+        action: "Split long sentences at conjunctions and use bullet points for multi-part statements.",
+      });
+    }
+  } else if (longParagraphs) {
     recommendations.push({
       id: "readability",
       label: "Readability",

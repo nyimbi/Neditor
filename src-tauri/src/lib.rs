@@ -64,6 +64,9 @@ mod validation;
 mod variables;
 mod webhooks;
 mod workspace_files;
+mod readability;
+mod daily_notes;
+mod task_aggregator;
 
 use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
@@ -73,7 +76,10 @@ use citation_discovery::{
 };
 use ai_humanizer::get_humanize_prompt;
 use audit::{record_audit_event, read_audit_log};
-use backlinks::{check_document_approval, find_backlinks};
+use backlinks::{check_document_approval, find_backlinks, find_unlinked_mentions};
+use readability::analyze_readability;
+use daily_notes::{open_daily_note, list_daily_notes};
+use task_aggregator::collect_workspace_tasks;
 use cli_ipc::{cli_queue_file_path, drain_cli_open_queue, register_instance};
 use document_compare::compare_documents;
 use mail_merge::run_mail_merge;
@@ -263,8 +269,13 @@ pub fn run() {
             get_humanize_prompt,
             compare_documents,
             find_backlinks,
+            find_unlinked_mentions,
             check_document_approval,
-            fetch_rest_source
+            fetch_rest_source,
+            analyze_readability,
+            open_daily_note,
+            list_daily_notes,
+            collect_workspace_tasks
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");

@@ -114,6 +114,21 @@ export interface WorkspacePersistenceStateInput {
   mailMergeRequireWorkspaceRoot: boolean;
   mailMergeMaxRecords: number;
   mailMergeDefaultDelimiter: "," | "\t";
+  // New fields — optional for backwards-compatible loading
+  dailyNotesEnabled?: boolean;
+  dailyNotesFolder?: string;
+  activeWorkflowPreset?: string | null;
+  wordCountTarget?: number | null;
+  writingGoalDeadline?: string | null;
+  sessionWordCountBaseline?: number;
+  featureUsageCounts?: Record<string, number>;
+  dismissedNudges?: string[];
+  focusMode?: "off" | "paragraph" | "sentence";
+  showMinimap?: boolean;
+  pinnedFiles?: string[];
+  styleGuideEnabled?: boolean;
+  styleGuideRules?: Array<{ id: string; category: string; description: string; patterns: string[]; severity: "error" | "warn" | "info"; suggestion: string }>;
+  suggestionMode?: boolean;
 }
 
 export type WorkspacePreferenceStateInput = Omit<WorkspacePersistenceStateInput, "documents" | "activeId">;

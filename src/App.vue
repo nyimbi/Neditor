@@ -201,6 +201,13 @@
 
       <section class="window-meta" aria-label="Document status">
         <button
+          v-if="store.uiMode === 'pilot'"
+          type="button"
+          class="ui-mode-btn workflow-preset-btn"
+          :title="store.activeWorkflowPreset ? `Workflow: ${presetById(store.activeWorkflowPreset)?.label ?? store.activeWorkflowPreset}` : 'Choose workflow preset'"
+          @click="workflowPresetOpen = true"
+        >{{ store.activeWorkflowPreset ? (presetById(store.activeWorkflowPreset)?.icon ?? '📄') : '📄' }} Mode</button>
+        <button
           type="button"
           class="ui-mode-btn"
           :title="store.uiMode === 'writer' ? 'Switch to Pilot mode (⌘\\)' : 'Switch to Writer mode (⌘\\)'"
@@ -1874,6 +1881,28 @@
               </article>
             </div>
           </section>
+          <!-- Academic / Science Templates -->
+          <h3>Academic &amp; Science templates</h3>
+          <section class="academic-templates" aria-label="Academic and science document templates">
+            <div v-for="(templates, category) in academicTemplatesByCategory()" :key="String(category)" class="academic-template-group">
+              <h4>{{ category }}</h4>
+              <div class="academic-template-list">
+                <article v-for="tmpl in templates" :key="tmpl.id" class="template-card">
+                  <header class="template-card-header">
+                    <div>
+                      <strong>{{ tmpl.label }}</strong>
+                      <small>{{ tmpl.description }}</small>
+                    </div>
+                  </header>
+                  <div class="template-card-actions">
+                    <button type="button" @click="insertMarkdownAtCursor('\n' + tmpl.content + '\n')">Insert</button>
+                    <button type="button" @click="store.newDocument(); store.updateText(tmpl.content)">New doc</button>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </section>
+
           <h3>Calculation and transform templates</h3>
           <section class="template-filters" aria-label="Transform template filters">
             <label>
@@ -3318,6 +3347,35 @@
             <p>{{ reviewSummary.status }} | {{ reviewSummary.unresolved }} unresolved | {{ reviewSummary.resolved }} resolved</p>
             <small>{{ reviewSummary.changeNotes }} change notes | {{ reviewSummary.aiPending }} AI review pending | {{ reviewSummary.aiReviewed }} AI reviewed</small>
           </article>
+          <!-- Style guide findings -->
+          <section class="style-guide-panel" aria-label="Style guide enforcement">
+            <header>
+              <h3>Style guide</h3>
+              <label class="style-guide-toggle" :title="store.styleGuideEnabled ? 'Disable style guide' : 'Enable style guide'">
+                <input type="checkbox" v-model="store.styleGuideEnabled" />
+                {{ store.styleGuideEnabled ? 'On' : 'Off' }}
+              </label>
+            </header>
+            <template v-if="store.styleGuideEnabled">
+              <p v-if="!styleGuideFindings.length" class="sidebar-hint">No style issues found.</p>
+              <article
+                v-for="finding in styleGuideFindings.slice(0, 50)"
+                :key="finding.ruleId + ':' + finding.line + ':' + finding.column"
+                class="style-finding"
+                :data-severity="finding.severity"
+              >
+                <div class="style-finding-header">
+                  <span class="style-badge" :class="finding.severity">{{ finding.severity }}</span>
+                  <small>line {{ finding.line }} · {{ finding.category }}</small>
+                </div>
+                <p>{{ finding.description }}: <em>"{{ finding.matchedText }}"</em></p>
+                <small class="style-suggestion">{{ finding.suggestion }}</small>
+              </article>
+              <p v-if="styleGuideFindings.length > 50" class="sidebar-hint">{{ styleGuideFindings.length - 50 }} more findings not shown.</p>
+            </template>
+            <p v-else class="sidebar-hint">Enable the style guide to check for weak qualifiers, filler phrases, passive voice, and jargon.</p>
+          </section>
+
           <section class="quality-recommendations" aria-label="Quality improvement recommendations">
             <header>
               <h3>Quality recommendations</h3>
@@ -4940,9 +4998,175 @@
           </p>
           </section>
         </template>
+
+        <!-- ── Backlinks panel ──────────────────────────────────────────────── -->
+        <template v-else-if="store.sidebar === 'backlinks'">
+          <h2>Backlinks</h2>
+          <div class="sidebar-toolbar">
+            <button type="button" @click="refreshBacklinks" :disabled="backlinksLoading" title="Refresh backlinks">↻ Refresh</button>
+          </div>
+          <section class="backlinks-panel" aria-label="Documents linking to this document">
+            <div v-if="backlinksLoading" class="sidebar-loading">Scanning workspace…</div>
+            <template v-else>
+              <div class="backlinks-group" v-if="backlinksData.length">
+                <h3>Linked ({{ backlinksData.length }})</h3>
+                <button
+                  v-for="bl in backlinksData"
+                  :key="bl.source_path + ':' + bl.line"
+                  type="button"
+                  class="backlink-item"
+                  :title="bl.excerpt"
+                  @click="store.openPath(bl.source_path)"
+                >
+                  <span class="backlink-file">{{ bl.source_path.split('/').pop() }}</span>
+                  <small class="backlink-line">line {{ bl.line }}</small>
+                  <span class="backlink-excerpt">{{ bl.excerpt }}</span>
+                </button>
+              </div>
+              <p v-else class="sidebar-hint">No documents in this workspace link to <em>{{ active?.title }}</em>.</p>
+              <div class="backlinks-group" v-if="unlinkedMentionsData.length" style="margin-top:12px">
+                <h3>Unlinked mentions ({{ unlinkedMentionsData.length }})</h3>
+                <button
+                  v-for="bl in unlinkedMentionsData"
+                  :key="bl.source_path + ':' + bl.line + ':unlinked'"
+                  type="button"
+                  class="backlink-item"
+                  :title="bl.excerpt"
+                  @click="store.openPath(bl.source_path)"
+                >
+                  <span class="backlink-file">{{ bl.source_path.split('/').pop() }}</span>
+                  <small class="backlink-line">line {{ bl.line }}</small>
+                  <span class="backlink-excerpt">{{ bl.excerpt }}</span>
+                </button>
+              </div>
+            </template>
+          </section>
+        </template>
+
+        <!-- ── Tasks panel ──────────────────────────────────────────────────── -->
+        <template v-else-if="store.sidebar === 'tasks'">
+          <h2>Tasks</h2>
+          <div class="sidebar-toolbar tasks-toolbar">
+            <button type="button" @click="refreshWorkspaceTasks" :disabled="tasksLoading" title="Refresh tasks">↻</button>
+            <button type="button" :class="{ active: tasksFilterStatus === 'all' }" @click="tasksFilterStatus = 'all'">All</button>
+            <button type="button" :class="{ active: tasksFilterStatus === 'todo' }" @click="tasksFilterStatus = 'todo'">Todo</button>
+            <button type="button" :class="{ active: tasksFilterStatus === 'done' }" @click="tasksFilterStatus = 'done'">Done</button>
+          </div>
+          <div class="tasks-tag-filter" v-if="allTaskTags.length">
+            <select v-model="tasksFilterTag" aria-label="Filter by tag">
+              <option value="">All tags</option>
+              <option v-for="tag in allTaskTags" :key="tag" :value="tag">#{{ tag }}</option>
+            </select>
+          </div>
+          <section class="tasks-panel" aria-label="Workspace tasks">
+            <div v-if="tasksLoading" class="sidebar-loading">Scanning workspace…</div>
+            <template v-else>
+              <p v-if="!filteredTasks.length" class="sidebar-hint">
+                {{ workspaceTasks.length ? 'No tasks match the current filter.' : 'No checkboxes found in workspace. Use - [ ] to create tasks.' }}
+              </p>
+              <div class="task-group" v-for="(groupTasks, groupKey) in filteredTasks.reduce((acc: Record<string, typeof filteredTasks>, t) => { (acc[t.file_path] = acc[t.file_path] || []).push(t); return acc; }, {})" :key="String(groupKey)">
+                <h4 class="task-group-header">{{ String(groupKey).split('/').pop() }}</h4>
+                <label
+                  v-for="task in groupTasks as typeof filteredTasks"
+                  :key="task.file_path + ':' + task.line"
+                  class="task-item"
+                  :class="{ done: task.done }"
+                >
+                  <input type="checkbox" :checked="task.done" disabled />
+                  <span class="task-text">{{ task.text }}</span>
+                  <span v-if="task.due_date" class="task-due">{{ task.due_date }}</span>
+                  <button type="button" class="task-goto" @click="store.openPath(task.file_path)" title="Open file">→</button>
+                </label>
+              </div>
+            </template>
+          </section>
+        </template>
+
+        <!-- ── Daily Notes panel ────────────────────────────────────────────── -->
+        <template v-else-if="store.sidebar === 'daily-notes'">
+          <h2>Daily Notes</h2>
+          <div class="sidebar-toolbar">
+            <button type="button" @click="openTodayNote" class="primary" title="Open today's note (⌘⇧D)">Today</button>
+          </div>
+          <section class="daily-notes-panel" aria-label="Daily notes calendar">
+            <div class="daily-notes-calendar-nav">
+              <button type="button" @click="if (dailyNotesCalendarMonth === 1) { dailyNotesCalendarYear--; dailyNotesCalendarMonth = 12; } else dailyNotesCalendarMonth--">‹</button>
+              <span>{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dailyNotesCalendarMonth - 1] }} {{ dailyNotesCalendarYear }}</span>
+              <button type="button" @click="if (dailyNotesCalendarMonth === 12) { dailyNotesCalendarYear++; dailyNotesCalendarMonth = 1; } else dailyNotesCalendarMonth++">›</button>
+            </div>
+            <div class="daily-notes-calendar-grid" role="grid" aria-label="Daily notes calendar">
+              <div class="cal-dow" v-for="d in ['Su','Mo','Tu','We','Th','Fr','Sa']" :key="d">{{ d }}</div>
+              <button
+                v-for="cell in dailyNotesCalendarGrid"
+                :key="cell.date || 'empty-' + cell.day"
+                type="button"
+                :class="['cal-day', { 'cal-empty': cell.empty, 'cal-has-note': cell.hasNote, 'cal-today': cell.isToday }]"
+                :disabled="cell.empty"
+                :aria-label="cell.date ? `Open note for ${cell.date}` : undefined"
+                @click="cell.date && openDailyNoteForDate(cell.date)"
+              >{{ cell.day || '' }}</button>
+            </div>
+            <p class="sidebar-hint" v-if="!store.workspaceRoot">Open a workspace folder to enable daily notes.</p>
+          </section>
+        </template>
+
       </aside>
 
+      <!-- ── Welcome screen (no documents open) ──────────────────────────── -->
+      <section
+        v-if="store.documents.length === 0 && store.mode !== 'graph' && store.mode !== 'canvas'"
+        class="welcome-screen"
+        aria-label="Welcome to NEditor"
+      >
+        <div class="welcome-inner">
+          <h1 class="welcome-title">NEditor</h1>
+          <p class="welcome-subtitle">Local-first document workbench</p>
+          <div class="welcome-preset-grid">
+            <p class="welcome-section-label">I'm writing a…</p>
+            <button
+              v-for="preset in WORKFLOW_PRESETS"
+              :key="preset.id"
+              type="button"
+              class="welcome-preset-card"
+              @click="store.newDocument(); applyWorkflowPreset(preset)"
+            >
+              <span class="preset-icon">{{ preset.icon }}</span>
+              <strong>{{ preset.label }}</strong>
+              <small>{{ preset.description }}</small>
+            </button>
+          </div>
+          <div class="welcome-actions">
+            <button type="button" class="primary" @click="store.newDocument()">New document</button>
+            <button type="button" @click="openDocument()">Open file…</button>
+            <button type="button" @click="openFolder()">Open folder…</button>
+            <button type="button" @click="openTodayNote()">Today's note</button>
+          </div>
+          <div class="welcome-recents" v-if="store.recentFiles.length">
+            <p class="welcome-section-label">Recent files</p>
+            <button
+              v-for="path in store.recentFiles.slice(0, 8)"
+              :key="path"
+              type="button"
+              class="welcome-recent-item"
+              @click="store.openPath(path)"
+            >{{ path.split('/').pop() }}<small>{{ path }}</small></button>
+          </div>
+        </div>
+      </section>
+
       <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" :class="{ 'focus-mode': writerFocusMode && store.uiMode === 'writer' }" aria-label="Markdown source" tabindex="-1">
+        <!-- ── Breadcrumb navigation ── -->
+        <nav
+          v-if="store.uiMode === 'pilot' && documentBreadcrumbs.length"
+          class="editor-breadcrumbs"
+          aria-label="Document section breadcrumbs"
+        >
+          <span class="breadcrumb-doc">{{ active?.title || 'Document' }}</span>
+          <template v-for="crumb in documentBreadcrumbs" :key="crumb.line">
+            <span class="breadcrumb-sep">›</span>
+            <button type="button" class="breadcrumb-item" @click="scrollEditorToLine(crumb.line)">{{ crumb.text }}</button>
+          </template>
+        </nav>
         <div v-if="store.uiMode === 'writer'" class="writer-doc-title" aria-hidden="true">
           {{ active?.compile?.semantic.title || active?.title || '' }}
         </div>
@@ -5137,7 +5361,15 @@
         <button type="button" @click="store.keepLocalChanges">Keep local</button>
         <button type="button" @click="saveConflictCopy">Save copy</button>
       </span>
-      <span class="word-stats" :aria-label="`Document statistics: ${wordStats}`">{{ wordStats }}</span>
+      <span class="word-stats" :aria-label="`Document statistics: ${wordStats}`" @click="openWordGoalDialog" style="cursor:pointer" title="Click to set word count goal">{{ wordStats }}</span>
+      <span v-if="wordGoalProgress" class="word-goal-progress" :title="`Word goal: ${wordGoalProgress.current} / ${wordGoalProgress.target}`">
+        <span class="word-goal-bar" :style="{ width: wordGoalProgress.pct + '%' }" :class="{ done: wordGoalProgress.done }"></span>
+        <small>{{ wordGoalProgress.pct }}%</small>
+      </span>
+      <span v-if="activeNudge" class="feature-nudge" role="status" aria-live="polite">
+        {{ activeNudge }}
+        <button type="button" @click="dismissNudge" aria-label="Dismiss tip">✕</button>
+      </span>
       <span class="keymap-status" :aria-label="`Editor keybinding mode: ${editorKeymapStatus}`">{{ editorKeymapStatus }}</span>
       <span
         v-if="previewTimingStatus"
@@ -7669,6 +7901,49 @@
       </footer>
     </div>
     <!-- AI Humanizer -->
+    <!-- ── Workflow preset picker modal ──────────────────────────────────── -->
+    <div v-if="workflowPresetOpen" class="slash-picker-backdrop" @click="workflowPresetOpen = false"></div>
+    <div v-if="workflowPresetOpen" class="workflow-preset-modal" role="dialog" aria-label="Choose workflow preset">
+      <header>
+        <span>I'm writing a…</span>
+        <button type="button" class="tp-ctrl" @click="workflowPresetOpen = false">×</button>
+      </header>
+      <div class="workflow-preset-grid">
+        <button
+          v-for="preset in WORKFLOW_PRESETS"
+          :key="preset.id"
+          type="button"
+          class="workflow-preset-card"
+          :class="{ active: store.activeWorkflowPreset === preset.id }"
+          @click="applyWorkflowPreset(preset)"
+        >
+          <span class="preset-icon">{{ preset.icon }}</span>
+          <strong>{{ preset.label }}</strong>
+          <small>{{ preset.description }}</small>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Word goal dialog ───────────────────────────────────────────────── -->
+    <div v-if="wordGoalDialogOpen" class="slash-picker-backdrop" @click="wordGoalDialogOpen = false"></div>
+    <div v-if="wordGoalDialogOpen" class="word-goal-modal" role="dialog" aria-label="Set word count goal">
+      <header>
+        <span>Set word count goal</span>
+        <button type="button" class="tp-ctrl" @click="wordGoalDialogOpen = false">×</button>
+      </header>
+      <div class="word-goal-body">
+        <label>
+          Target words
+          <input type="number" v-model="wordGoalInput" min="0" step="100" placeholder="e.g. 2000" @keydown.enter="saveWordGoal" autofocus />
+        </label>
+        <p class="sidebar-hint">Current: {{ activeWordCount }} words. Leave blank to clear goal.</p>
+        <div class="word-goal-actions">
+          <button type="button" class="primary" @click="saveWordGoal">Set goal</button>
+          <button type="button" @click="store.wordCountTarget = null; wordGoalDialogOpen = false">Clear</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="humanizeOpen" class="slash-picker-backdrop" @click="humanizeOpen = false"></div>
     <div v-if="humanizeOpen" class="humanize-modal" role="dialog" aria-label="AI Humanizer">
       <header class="humanize-header">
@@ -9126,9 +9401,269 @@ function useOllamaModel(modelId: string): void {
 watch(isOllamaProfile, (v) => { if (v) void probeOllamaHealth(); });
 
 import { PRESENTATION_THEMES, PRESENTATION_TRANSITIONS, parseSlidesFromBlocks, upsertSlideNotes, type SlideData } from "./lib/presentationEditor.js";
+import { WORKFLOW_PRESETS, presetById, type WorkflowPreset } from "./lib/workflowPresets.js";
+import { academicTemplatesByCategory } from "./lib/academicTemplates.js";
+import { BUILTIN_STYLE_RULES, runStyleGuide, mergeStyleGuideRules, type StyleGuideFinding } from "./lib/styleGuide.js";
 
 const presenterViewOpen = ref(false);
 const presenterCurrentIdx = ref(0);
+
+// ── Workflow preset picker ────────────────────────────────────────────────────
+const workflowPresetOpen = ref(false);
+
+function applyWorkflowPreset(preset: WorkflowPreset): void {
+  store.activeWorkflowPreset = preset.id;
+  if (preset.exportTarget) store.exportTarget = preset.exportTarget as typeof store.exportTarget;
+  if (preset.sidebar) store.sidebar = preset.sidebar as typeof store.sidebar;
+  if (preset.collapsedRows) store.toolbarCollapsedRows = [...preset.collapsedRows];
+  if (preset.citationStyle) store.bibliographyDefaults = { ...store.bibliographyDefaults, citationStyle: preset.citationStyle as typeof store.bibliographyDefaults.citationStyle };
+  if (preset.editorMode) store.mode = preset.editorMode as typeof store.mode;
+  workflowPresetOpen.value = false;
+  bumpNudge('workflow-preset');
+}
+
+// ── Daily notes ───────────────────────────────────────────────────────────────
+const dailyNotesCalendarYear = ref(new Date().getFullYear());
+const dailyNotesCalendarMonth = ref(new Date().getMonth() + 1);
+const dailyNotesDates = ref<string[]>([]);
+const dailyNotesLoading = ref(false);
+
+async function openTodayNote(): Promise<void> {
+  if (!store.workspaceRoot) { store.statusMessage = 'Open a workspace folder first to use daily notes.'; return; }
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const result = await invoke<{ path: string; created: boolean }>('open_daily_note', {
+      workspaceRoot: store.workspaceRoot,
+      date: today,
+    });
+    await store.openPath(result.path);
+    bumpNudge('daily-note');
+  } catch (e) {
+    store.statusMessage = `Daily note error: ${e}`;
+  }
+}
+
+async function openDailyNoteForDate(date: string): Promise<void> {
+  if (!store.workspaceRoot) return;
+  try {
+    const result = await invoke<{ path: string; created: boolean }>('open_daily_note', {
+      workspaceRoot: store.workspaceRoot,
+      date,
+    });
+    await store.openPath(result.path);
+  } catch (e) {
+    store.statusMessage = `Daily note error: ${e}`;
+  }
+}
+
+async function refreshDailyNotesCalendar(): Promise<void> {
+  if (!store.workspaceRoot) return;
+  dailyNotesLoading.value = true;
+  try {
+    const result = await invoke<{ dates: string[] }>('list_daily_notes', {
+      workspaceRoot: store.workspaceRoot,
+      year: dailyNotesCalendarYear.value,
+      month: dailyNotesCalendarMonth.value,
+    });
+    dailyNotesDates.value = result.dates;
+  } catch { dailyNotesDates.value = []; }
+  dailyNotesLoading.value = false;
+}
+
+watch(() => store.sidebar, (s) => { if (s === 'daily-notes') refreshDailyNotesCalendar(); });
+watch([dailyNotesCalendarYear, dailyNotesCalendarMonth], () => {
+  if (store.sidebar === 'daily-notes') refreshDailyNotesCalendar();
+});
+
+const dailyNotesCalendarGrid = computed(() => {
+  const y = dailyNotesCalendarYear.value;
+  const m = dailyNotesCalendarMonth.value;
+  const datesSet = new Set(dailyNotesDates.value);
+  const today = new Date().toISOString().slice(0, 10);
+  const firstDay = new Date(y, m - 1, 1).getDay();
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const cells: Array<{ date: string; day: number; hasNote: boolean; isToday: boolean; empty?: boolean }> = [];
+  for (let i = 0; i < firstDay; i++) cells.push({ date: '', day: 0, hasNote: false, isToday: false, empty: true });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    cells.push({ date, day: d, hasNote: datesSet.has(date), isToday: date === today });
+  }
+  return cells;
+});
+
+// ── Backlinks panel ───────────────────────────────────────────────────────────
+const backlinksData = ref<Array<{ source_path: string; line: number; excerpt: string }>>([]);
+const unlinkedMentionsData = ref<Array<{ source_path: string; line: number; excerpt: string }>>([]);
+const backlinksLoading = ref(false);
+
+async function refreshBacklinks(): Promise<void> {
+  const doc = active.value;
+  if (!doc?.path || !store.workspaceRoot) { backlinksData.value = []; unlinkedMentionsData.value = []; return; }
+  backlinksLoading.value = true;
+  try {
+    const [linked, unlinked] = await Promise.all([
+      invoke<Array<{ source_path: string; line: number; excerpt: string }>>('find_backlinks', {
+        targetPath: doc.path,
+        workspaceRoot: store.workspaceRoot,
+      }),
+      invoke<Array<{ source_path: string; line: number; excerpt: string }>>('find_unlinked_mentions', {
+        title: doc.title || '',
+        workspaceRoot: store.workspaceRoot,
+      }),
+    ]);
+    backlinksData.value = linked;
+    unlinkedMentionsData.value = unlinked;
+  } catch { backlinksData.value = []; unlinkedMentionsData.value = []; }
+  backlinksLoading.value = false;
+}
+
+watch(() => store.sidebar, (s) => { if (s === 'backlinks') refreshBacklinks(); });
+watch(() => store.activeId, () => { if (store.sidebar === 'backlinks') refreshBacklinks(); });
+
+// ── Cross-document task aggregation ──────────────────────────────────────────
+const workspaceTasks = ref<Array<{
+  file_path: string; line: number; text: string; done: boolean;
+  tags: string[]; due_date: string | null; heading_context: string;
+}>>([]);
+const tasksLoading = ref(false);
+const tasksFilterStatus = ref<'all' | 'todo' | 'done'>('todo');
+const tasksFilterTag = ref('');
+
+async function refreshWorkspaceTasks(): Promise<void> {
+  if (!store.workspaceRoot) return;
+  tasksLoading.value = true;
+  try {
+    workspaceTasks.value = await invoke<typeof workspaceTasks.value>('collect_workspace_tasks', {
+      workspaceRoot: store.workspaceRoot,
+    });
+  } catch { workspaceTasks.value = []; }
+  tasksLoading.value = false;
+}
+
+watch(() => store.sidebar, (s) => { if (s === 'tasks') refreshWorkspaceTasks(); });
+
+const filteredTasks = computed(() => {
+  let tasks = workspaceTasks.value;
+  if (tasksFilterStatus.value === 'todo') tasks = tasks.filter(t => !t.done);
+  else if (tasksFilterStatus.value === 'done') tasks = tasks.filter(t => t.done);
+  if (tasksFilterTag.value) tasks = tasks.filter(t => t.tags.includes(tasksFilterTag.value));
+  return tasks;
+});
+
+const allTaskTags = computed(() => {
+  const tags = new Set<string>();
+  workspaceTasks.value.forEach(t => t.tags.forEach(tag => tags.add(tag)));
+  return [...tags].sort();
+});
+
+// ── Readability stats ─────────────────────────────────────────────────────────
+const readabilityRefreshTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+
+async function refreshReadabilityStats(): Promise<void> {
+  const text = active.value?.text;
+  if (!text || text.length < 100) { store.lastReadabilityStats = null; return; }
+  try {
+    const stats = await invoke<typeof store.lastReadabilityStats>('analyze_readability', { text });
+    store.lastReadabilityStats = stats;
+  } catch { /* non-critical */ }
+}
+
+watch(() => active.value?.text, () => {
+  if (readabilityRefreshTimer.value) clearTimeout(readabilityRefreshTimer.value);
+  readabilityRefreshTimer.value = setTimeout(refreshReadabilityStats, 2000);
+}, { immediate: false });
+
+// ── Feature discovery nudges ──────────────────────────────────────────────────
+const activeNudge = ref<string | null>(null);
+const nudgeTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+
+const NUDGE_RULES: Array<{ feature: string; threshold: number; tip: string }> = [
+  { feature: 'transform-palette-click', threshold: 3, tip: 'Tip: ⌘⇧T opens the Transform Palette faster' },
+  { feature: 'manual-save', threshold: 5, tip: 'Tip: Enable Autosave in Settings → Autosave' },
+  { feature: 'ai-paste', threshold: 3, tip: 'Tip: Select text and press ⌘⌥A for inline AI variations' },
+  { feature: 'daily-note', threshold: 1, tip: 'Tip: ⌘⇧D opens today\'s journal entry from anywhere' },
+  { feature: 'export-click', threshold: 3, tip: 'Tip: Save export settings as a Profile for one-click reuse' },
+];
+
+function bumpNudge(feature: string): void {
+  const counts = { ...store.featureUsageCounts };
+  counts[feature] = (counts[feature] || 0) + 1;
+  store.featureUsageCounts = counts;
+  const rule = NUDGE_RULES.find(r => r.feature === feature && counts[feature] === r.threshold);
+  if (rule && !store.dismissedNudges.includes(rule.tip)) {
+    showNudge(rule.tip);
+  }
+}
+
+function showNudge(tip: string): void {
+  activeNudge.value = tip;
+  if (nudgeTimer.value) clearTimeout(nudgeTimer.value);
+  nudgeTimer.value = setTimeout(() => { activeNudge.value = null; }, 5000);
+}
+
+function dismissNudge(): void {
+  if (activeNudge.value) {
+    store.dismissedNudges = [...store.dismissedNudges, activeNudge.value];
+    activeNudge.value = null;
+    if (nudgeTimer.value) clearTimeout(nudgeTimer.value);
+  }
+}
+
+// ── Writing goal ──────────────────────────────────────────────────────────────
+const wordGoalDialogOpen = ref(false);
+const wordGoalInput = ref('');
+
+const wordGoalProgress = computed(() => {
+  const target = store.wordCountTarget;
+  if (!target || target <= 0) return null;
+  const current = activeWordCount.value;
+  const pct = Math.min(100, Math.round((current / target) * 100));
+  return { target, current, pct, done: current >= target };
+});
+
+function openWordGoalDialog(): void {
+  wordGoalInput.value = String(store.wordCountTarget || '');
+  wordGoalDialogOpen.value = true;
+}
+
+function saveWordGoal(): void {
+  const n = parseInt(wordGoalInput.value, 10);
+  store.wordCountTarget = n > 0 ? n : null;
+  wordGoalDialogOpen.value = false;
+}
+
+// ── Breadcrumbs ───────────────────────────────────────────────────────────────
+const documentBreadcrumbs = computed(() => {
+  const doc = active.value;
+  if (!doc?.compile) return [];
+  const line = editorCursorLine.value;
+  const headings = doc.compile.document_ast?.blocks?.filter((b: any) => b.kind === 'heading') || [];
+  const active_headings: Array<{ level: number; text: string; line: number }> = [];
+  for (const h of headings as Array<{ kind: string; level: number; text: string; line: number; end_line: number }>) {
+    if (h.line > line) break;
+    while (active_headings.length && active_headings[active_headings.length - 1].level >= h.level) {
+      active_headings.pop();
+    }
+    active_headings.push({ level: h.level, text: h.text, line: h.line });
+  }
+  return active_headings;
+});
+
+function scrollEditorToLine(line: number): void {
+  if (!editorView) return;
+  try {
+    const pos = editorView.state.doc.line(line).from;
+    editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+  } catch { /* line out of range */ }
+}
+
+// ── Style guide ───────────────────────────────────────────────────────────────
+const styleGuideFindings = computed<StyleGuideFinding[]>(() => {
+  if (!store.styleGuideEnabled) return [];
+  const text = active.value?.text || '';
+  const rules = mergeStyleGuideRules(BUILTIN_STYLE_RULES, store.styleGuideRules);
+  return runStyleGuide(text, rules);
+});
 
 const presentationSlides = computed<SlideData[]>(() => {
   const doc = active.value;
@@ -10554,8 +11089,10 @@ const activeWordCount = computed(() => {
 const wordStats = computed(() => {
   const words = activeWordCount.value;
   const text = active.value?.text || "";
-  const minutes = words ? Math.max(1, Math.ceil(words / 220)) : 0;
-  return `${words} words | ${text.length} characters | ${minutes} min read`;
+  const rs = store.lastReadabilityStats;
+  const minutes = rs ? rs.readingTimeMinutes.toFixed(1) : (words ? Math.max(1, Math.ceil(words / 220)) : 0);
+  const grade = rs ? ` | FK ${rs.fleschKincaidGrade.toFixed(1)}` : '';
+  return `${words} words | ${text.length} chars | ${minutes} min read${grade}`;
 });
 
 const writerWordGoal = computed(() => {
@@ -12736,6 +13273,28 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "release-ready", label: "Release", title: "Prepare release metadata", icon: "snapshot", run: () => applyReleaseMetadataScaffold() },
       { id: "release-audit", label: "Audit", title: "Insert release readiness audit", icon: "snapshot", run: () => insertReleaseReadinessAudit() },
       { id: "release-evidence", label: "Evidence", title: "Insert release evidence dashboard with complete, blocked, manual, credentialed, cross-platform, stale, and ready lanes", icon: "snapshot", primary: true, run: () => insertReleaseEvidenceDashboard() },
+    ],
+  },
+  {
+    id: "knowledge",
+    label: "Knowledge",
+    actions: [
+      { id: "daily-note", label: "Today's Note", title: "Open today's daily journal note (⌘⇧D)", icon: "book", primary: true, run: () => openTodayNote() },
+      { id: "daily-notes-panel", label: "Daily Notes", title: "Open daily notes calendar panel", icon: "book", run: () => { store.sidebar = 'daily-notes' as typeof store.sidebar; } },
+      { id: "backlinks-panel", label: "Backlinks", title: "Show documents linking to this document", icon: "link", run: () => { store.sidebar = 'backlinks' as typeof store.sidebar; refreshBacklinks(); } },
+      { id: "tasks-panel", label: "Workspace Tasks", title: "Aggregate all tasks/checkboxes across workspace", icon: "plan", run: () => { store.sidebar = 'tasks' as typeof store.sidebar; refreshWorkspaceTasks(); } },
+    ],
+  },
+  {
+    id: "workflow",
+    label: "Workflow",
+    actions: [
+      { id: "workflow-preset", label: "Switch Workflow", title: "Choose a workflow preset (Academic, Business, Lab Notebook, etc.)", icon: "settings", primary: true, run: () => { workflowPresetOpen.value = true; } },
+      { id: "word-goal", label: "Word Goal", title: "Set a word count target for this writing session", icon: "readout", run: () => openWordGoalDialog() },
+      { id: "focus-mode-paragraph", label: "Focus: Paragraph", title: "Dim all paragraphs except the one at the cursor", icon: "wand", run: () => { store.focusMode = 'paragraph'; } },
+      { id: "focus-mode-sentence", label: "Focus: Sentence", title: "Dim all text except the sentence at the cursor", icon: "wand", run: () => { store.focusMode = 'sentence'; } },
+      { id: "focus-mode-off", label: "Focus: Off", title: "Turn off sentence/paragraph focus mode", icon: "wand", run: () => { store.focusMode = 'off'; } },
+      { id: "style-guide-toggle", label: "Style Guide", title: "Toggle style guide enforcement in the review sidebar", icon: "comment", run: () => { store.styleGuideEnabled = !store.styleGuideEnabled; store.sidebar = 'review' as typeof store.sidebar; } },
     ],
   },
 ]);
@@ -26717,7 +27276,8 @@ function handleSlashPickerKeydown(event: KeyboardEvent): void {
 interface ActivityGroup { id: string; label: string; icon: ToolbarIconName; panels: string[]; }
 const ACTIVITY_GROUPS: ActivityGroup[] = [
   { id: 'files',    label: 'Files & Workspace',     icon: 'open',       panels: ['files'] },
-  { id: 'document', label: 'Document & Diagnostics', icon: 'layout',     panels: ['outline', 'diagnostics', 'layout'] },
+  { id: 'document', label: 'Document & Diagnostics', icon: 'layout',     panels: ['outline', 'diagnostics', 'layout', 'backlinks'] },
+  { id: 'tasks',    label: 'Tasks & Daily Notes',   icon: 'plan',       panels: ['tasks', 'daily-notes'] },
   { id: 'tables',   label: 'Tables & Structure',    icon: 'table',      panels: ['tables'] },
   { id: 'content',  label: 'Templates & References', icon: 'templates',  panels: ['templates', 'references'] },
   { id: 'exports',  label: 'Export & Publish',       icon: 'export',     panels: ['exports'] },
@@ -27170,8 +27730,10 @@ function handleShortcut(event: KeyboardEvent) {
     if (k === '\\' ) { event.preventDefault(); toggleUiMode(); return; }
     if (k === '/' && !event.shiftKey) { event.preventDefault(); openSlashPicker(); return; }
     if (k === 't' && event.shiftKey) { event.preventDefault(); openTransformPicker(); return; }
+    if (k === 'd' && event.shiftKey) { event.preventDefault(); openTodayNote(); return; }
     if (k === 'u' && event.shiftKey) { event.preventDefault(); openHumanizer(); return; }
     if (k === 'b' && !event.shiftKey && !event.altKey) { event.preventDefault(); toggleSidebarCollapsed(); return; }
+    if (k === 'f' && event.altKey) { event.preventDefault(); store.focusMode = store.focusMode === 'off' ? 'paragraph' : store.focusMode === 'paragraph' ? 'sentence' : 'off'; return; }
     // ⌘1–7: switch activity group in Pilot mode (before editable-target guard)
     if (store.uiMode === 'pilot' && !event.shiftKey && !event.altKey) {
       const digit = parseInt(k);
@@ -37559,4 +38121,121 @@ button.ws-seg:hover { background: var(--c-fill-hover) !important; color: var(--c
 .presenter-nav span { flex:1; text-align:center; color:#64748b; font-size:12px; }
 .presenter-close { background:#1e0f1a !important; border-color:#4a1020 !important; color:#f87171 !important; }
 .compact-label { font-size:11px; font-weight:700; text-transform:uppercase; color:#526171; white-space:nowrap; margin-top:4px; }
+
+/* ── Welcome screen ──────────────────────────────────────────────────────── */
+.welcome-screen { display:flex; align-items:center; justify-content:center; flex:1; min-height:0; overflow-y:auto; background:var(--c-bg); padding:32px 20px; }
+.welcome-inner { max-width:640px; width:100%; display:flex; flex-direction:column; gap:24px; }
+.welcome-title { font-size:2rem; font-weight:800; color:var(--c-text); margin:0; }
+.welcome-subtitle { color:var(--c-text2); margin:0; font-size:0.95rem; }
+.welcome-section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--c-text2); margin:0 0 8px; }
+.welcome-preset-grid { display:flex; flex-direction:column; gap:4px; }
+.welcome-preset-card { display:grid; grid-template-columns:2rem 1fr; grid-template-rows:auto auto; gap:2px 8px; align-items:center; padding:10px 14px; border-radius:8px; border:1px solid var(--c-border); background:var(--c-surface); cursor:pointer; text-align:left; }
+.welcome-preset-card:hover { background:var(--c-fill-hover); border-color:var(--c-accent); }
+.welcome-preset-card .preset-icon { grid-row:1/3; font-size:1.4rem; }
+.welcome-preset-card strong { font-size:13px; color:var(--c-text); }
+.welcome-preset-card small { font-size:11px; color:var(--c-text2); grid-column:2; }
+.welcome-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.welcome-actions button { padding:7px 16px; border-radius:6px; border:1px solid var(--c-border); background:var(--c-surface); color:var(--c-text); cursor:pointer; font-size:13px; }
+.welcome-actions button.primary { background:var(--c-accent); color:#fff; border-color:var(--c-accent); }
+.welcome-actions button:hover { background:var(--c-fill-hover); }
+.welcome-recents { display:flex; flex-direction:column; gap:4px; }
+.welcome-recent-item { display:flex; flex-direction:column; align-items:flex-start; padding:6px 10px; border-radius:6px; border:1px solid var(--c-border); background:var(--c-surface); cursor:pointer; text-align:left; font-size:13px; color:var(--c-text); }
+.welcome-recent-item small { font-size:10px; color:var(--c-text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+.welcome-recent-item:hover { background:var(--c-fill-hover); }
+
+/* ── Breadcrumb navigation ────────────────────────────────────────────────── */
+.editor-breadcrumbs { display:flex; align-items:center; gap:4px; padding:3px 12px; font-size:11px; color:var(--c-text2); border-bottom:1px solid var(--c-border); background:var(--c-chrome); overflow:hidden; white-space:nowrap; flex-shrink:0; }
+.breadcrumb-doc { color:var(--c-text2); }
+.breadcrumb-sep { color:var(--c-border); }
+.breadcrumb-item { background:none; border:none; color:var(--c-accent); cursor:pointer; font-size:11px; padding:0 2px; }
+.breadcrumb-item:hover { text-decoration:underline; }
+
+/* ── Daily notes calendar ────────────────────────────────────────────────── */
+.daily-notes-calendar-nav { display:flex; align-items:center; justify-content:space-between; padding:4px 0 8px; font-size:12px; font-weight:600; color:var(--c-text); }
+.daily-notes-calendar-nav button { background:none; border:none; cursor:pointer; color:var(--c-accent); font-size:14px; padding:2px 6px; }
+.daily-notes-calendar-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.cal-dow { font-size:9px; font-weight:700; text-align:center; color:var(--c-text2); padding:2px 0; }
+.cal-day { font-size:11px; text-align:center; padding:4px 2px; border-radius:4px; border:none; background:transparent; cursor:pointer; color:var(--c-text); }
+.cal-day:hover:not(.cal-empty) { background:var(--c-fill-hover); }
+.cal-day.cal-empty { visibility:hidden; cursor:default; }
+.cal-day.cal-has-note { background:var(--c-accent); color:#fff; font-weight:600; }
+.cal-day.cal-today { outline:2px solid var(--c-accent); outline-offset:-2px; font-weight:700; }
+
+/* ── Backlinks panel ─────────────────────────────────────────────────────── */
+.backlinks-panel { display:flex; flex-direction:column; gap:4px; }
+.backlinks-group h3 { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--c-text2); margin:8px 0 4px; }
+.backlink-item { display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:6px 8px; border-radius:6px; border:1px solid var(--c-border); background:var(--c-surface); cursor:pointer; text-align:left; width:100%; }
+.backlink-item:hover { background:var(--c-fill-hover); border-color:var(--c-accent); }
+.backlink-file { font-size:12px; font-weight:600; color:var(--c-text); }
+.backlink-line { font-size:10px; color:var(--c-text2); }
+.backlink-excerpt { font-size:11px; color:var(--c-text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+
+/* ── Tasks panel ─────────────────────────────────────────────────────────── */
+.tasks-toolbar { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:4px; }
+.tasks-toolbar button { padding:3px 8px; border-radius:4px; border:1px solid var(--c-border); background:var(--c-surface); color:var(--c-text2); cursor:pointer; font-size:11px; }
+.tasks-toolbar button.active { background:var(--c-accent); color:#fff; border-color:var(--c-accent); }
+.tasks-tag-filter select { width:100%; padding:4px 6px; border-radius:4px; border:1px solid var(--c-border); background:var(--c-surface); color:var(--c-text); font-size:11px; margin-bottom:6px; }
+.task-group-header { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--c-text2); margin:10px 0 4px; }
+.task-item { display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:4px; cursor:default; width:100%; }
+.task-item:hover { background:var(--c-fill-hover); }
+.task-item.done .task-text { text-decoration:line-through; opacity:0.55; }
+.task-text { flex:1; font-size:12px; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.task-due { font-size:10px; color:var(--c-accent); flex-shrink:0; }
+.task-goto { background:none; border:none; cursor:pointer; color:var(--c-accent); font-size:12px; padding:0 4px; flex-shrink:0; }
+
+/* ── Workflow preset modal ───────────────────────────────────────────────── */
+.workflow-preset-modal { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10000; background:var(--c-surface); border:1px solid var(--c-border); border-radius:12px; box-shadow:0 24px 72px rgba(0,0,0,0.18); width:520px; max-width:95vw; overflow:hidden; }
+.workflow-preset-modal header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--c-border); font-size:14px; font-weight:600; color:var(--c-text); }
+.workflow-preset-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:16px; }
+.workflow-preset-card { display:flex; flex-direction:column; gap:3px; padding:12px 14px; border-radius:8px; border:1px solid var(--c-border); background:var(--c-bg); cursor:pointer; text-align:left; }
+.workflow-preset-card:hover { border-color:var(--c-accent); background:var(--c-fill-hover); }
+.workflow-preset-card.active { border-color:var(--c-accent); background:color-mix(in srgb, var(--c-accent) 10%, transparent); }
+.workflow-preset-card .preset-icon { font-size:1.2rem; }
+.workflow-preset-card strong { font-size:13px; color:var(--c-text); }
+.workflow-preset-card small { font-size:11px; color:var(--c-text2); }
+.workflow-preset-btn { font-size:11px !important; }
+
+/* ── Word goal modal + status bar elements ───────────────────────────────── */
+.word-goal-modal { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10000; background:var(--c-surface); border:1px solid var(--c-border); border-radius:10px; box-shadow:0 16px 48px rgba(0,0,0,0.15); width:320px; max-width:95vw; overflow:hidden; }
+.word-goal-modal header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--c-border); font-size:13px; font-weight:600; color:var(--c-text); }
+.word-goal-body { padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
+.word-goal-body label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--c-text2); }
+.word-goal-body input { padding:6px 10px; border-radius:6px; border:1px solid var(--c-border); background:var(--c-bg); color:var(--c-text); font-size:13px; }
+.word-goal-actions { display:flex; gap:8px; }
+.word-goal-actions button { padding:6px 14px; border-radius:6px; border:1px solid var(--c-border); background:var(--c-surface); color:var(--c-text); cursor:pointer; font-size:12px; }
+.word-goal-actions button.primary { background:var(--c-accent); color:#fff; border-color:var(--c-accent); }
+.word-goal-progress { display:inline-flex; align-items:center; gap:4px; margin-left:4px; position:relative; height:14px; width:40px; background:var(--c-border); border-radius:3px; overflow:hidden; }
+.word-goal-bar { position:absolute; left:0; top:0; height:100%; background:var(--c-accent); transition:width 0.3s; }
+.word-goal-bar.done { background:#22c55e; }
+.word-goal-progress small { position:relative; z-index:1; font-size:9px; color:#fff; padding-left:3px; }
+.feature-nudge { display:inline-flex; align-items:center; gap:6px; background:var(--c-accent); color:#fff; border-radius:4px; padding:2px 8px; font-size:10px; margin-left:6px; }
+.feature-nudge button { background:none; border:none; color:#fff; cursor:pointer; font-size:11px; padding:0 2px; opacity:0.8; }
+.feature-nudge button:hover { opacity:1; }
+
+/* ── Style guide panel ───────────────────────────────────────────────────── */
+.style-guide-panel { padding:0 0 8px; }
+.style-guide-panel header { display:flex; align-items:center; justify-content:space-between; padding:4px 0; }
+.style-guide-panel h3 { font-size:12px; font-weight:700; margin:0; color:var(--c-text); }
+.style-guide-toggle { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--c-text2); cursor:pointer; }
+.style-finding { padding:6px 8px; border-radius:6px; border-left:3px solid var(--c-border); margin-bottom:4px; background:var(--c-bg); }
+.style-finding[data-severity="warn"] { border-color:#f59e0b; }
+.style-finding[data-severity="error"] { border-color:#ef4444; }
+.style-finding[data-severity="info"] { border-color:#60a5fa; }
+.style-finding-header { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+.style-badge { font-size:9px; font-weight:700; text-transform:uppercase; padding:1px 5px; border-radius:3px; }
+.style-badge.warn { background:#fef3c7; color:#92400e; }
+.style-badge.error { background:#fee2e2; color:#991b1b; }
+.style-badge.info { background:#dbeafe; color:#1e40af; }
+.style-finding p { font-size:11px; color:var(--c-text); margin:0 0 3px; }
+.style-suggestion { font-size:10px; color:var(--c-text2); }
+.sidebar-loading { color:var(--c-text2); font-size:12px; padding:8px 0; }
+
+/* ── Academic template list ──────────────────────────────────────────────── */
+.academic-template-group { margin-bottom:12px; }
+.academic-template-group h4 { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--c-text2); margin:0 0 6px; }
+.academic-template-list { display:flex; flex-direction:column; gap:4px; }
+.academic-template-list .template-card { padding:8px 10px; border-radius:6px; border:1px solid var(--c-border); background:var(--c-surface); }
+.template-card-actions { display:flex; gap:6px; margin-top:6px; }
+.template-card-actions button { padding:3px 10px; border-radius:4px; border:1px solid var(--c-border); background:var(--c-bg); color:var(--c-text); cursor:pointer; font-size:11px; }
+.template-card-actions button:hover { background:var(--c-fill-hover); }
 </style>

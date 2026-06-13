@@ -1,0 +1,606 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1781314220407,
+  "projectRoot": "/Users/nyimbiodero/src/pjs/tooling/neditor",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "vue",
+        "version": "3.5.13",
+        "category": "frontend"
+      },
+      {
+        "name": "@playwright/test",
+        "version": "1.60.0",
+        "category": "testing"
+      },
+      {
+        "name": "vite",
+        "version": "6.0.3",
+        "category": "build"
+      }
+    ],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build 2>&1",
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "dev": "vite",
+      "build": "vue-tsc --noEmit && vite build",
+      "prepare:sidecars": "node scripts/prepare-ned-sidecar.mjs",
+      "check": "vue-tsc --noEmit",
+      "check:ai-roadmap": "node scripts/check-ai-first-roadmap.mjs",
+      "check:ai-provider": "node scripts/check-ai-provider-evidence.mjs",
+      "check:ai-runtime": "node scripts/check-ai-runtime-evidence.mjs",
+      "check:a11y": "node scripts/check-accessibility.mjs",
+      "check:a11y:manual": "node scripts/check-accessibility-manual-signoff.mjs",
+      "check:a11y:runtime": "node scripts/check-accessibility-runtime.mjs",
+      "check:deps": "node scripts/check-dependency-admission.mjs",
+      "check:docs": "node scripts/check-markdown-links.mjs",
+      "check:engines": "node scripts/check-external-engines.mjs",
+      "check:external-transform-docs": "node scripts/check-external-transform-docs.mjs",
+      "check:e2e-env": "node scripts/check-e2e-environment.mjs",
+      "check:google-docs-import": "node scripts/check-google-docs-import-evidence.mjs",
+      "check:homebrew": "node scripts/check-homebrew-packaging.mjs",
+      "check:cli": "cargo test --manifest-path src-tauri/Cargo.toml --locked ned_cli --lib && cargo build --manifest-path src-tauri/Cargo.toml --locked --bin ned",
+      "check:platform-evidence": "node scripts/check-platform-evidence.mjs",
+      "check:platform-packaging": "node scripts/check-platform-packaging.mjs",
+      "check:performance-profile": "node scripts/check-performance-profile-evidence.mjs",
+      "check:release-ci": "node scripts/check-release-ci-workflow.mjs",
+      "check:evidence-kit": "node scripts/check-release-evidence-kit.mjs",
+      "check:release-signing": "node scripts/check-release-signing.mjs",
+      "check:release-readiness": "node scripts/check-release-readiness.mjs",
+      "check:security-review": "node scripts/check-security-review-evidence.mjs",
+      "check:manual-review": "node scripts/check-manual-review-evidence.mjs",
+      "check:spec-completion": "node scripts/check-spec-completion-matrix.mjs",
+      "check:structure": "node scripts/check-project-structure.mjs",
+      "check:tables:manual": "node scripts/check-table-editor-manual-signoff.mjs",
+      "collect:ai-provider": "node scripts/collect-ai-provider-evidence.mjs",
+      "collect:ai-runtime": "node scripts/collect-ai-runtime-evidence.mjs",
+      "collect:google-docs-import": "node scripts/collect-google-docs-import-evidence.mjs",
+      "collect:google-docs-live": "node scripts/collect-google-docs-live-import.mjs",
+      "collect:engine-evidence": "node scripts/check-external-engines.mjs --write-evidence",
+      "collect:platform-evidence": "node scripts/collect-platform-evidence.mjs",
+      "collect:performance-profile": "node scripts/collect-performance-profile-evidence.mjs",
+      "collect:a11y:manual": "node scripts/collect-accessibility-manual-signoff.mjs",
+      "collect:rendered-exports:manual": "node scripts/collect-rendered-export-signoff.mjs",
+      "collect:evidence-kit": "node scripts/collect-release-evidence-kit.mjs",
+      "collect:manual-review": "node scripts/collect-manual-review-signoff.mjs",
+      "collect:release-signing": "node scripts/collect-release-signing-evidence.mjs",
+      "collect:security-review": "node scripts/collect-security-review-evidence.mjs",
+      "collect:tables:manual": "node scripts/collect-table-editor-manual-signoff.mjs",
+      "ingest:evidence": "node scripts/ingest-release-evidence.mjs",
+      "release:local": "node scripts/create-release-candidate.mjs",
+      "release:homebrew": "node scripts/create-homebrew-cask.mjs",
+      "check:release-candidate": "node scripts/check-release-candidate.mjs",
+      "verify:local": "node scripts/run-local-verification.mjs",
+      "verify:local:full": "node scripts/run-local-verification.mjs --full",
+      "test:desktop-bundle": "node scripts/check-desktop-bundle.mjs",
+      "test:desktop-dmg": "node scripts/check-desktop-dmg.mjs",
+      "test:desktop-smoke": "node scripts/check-desktop-smoke.mjs",
+      "test:performance-audit": "node scripts/check-performance-audit.mjs",
+      "test:tauri-webdriver": "node scripts/run-tauri-webdriver.mjs",
+      "test:rendered-exports": "node scripts/check-rendered-export-audit.mjs",
+      "test:unit": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js",
+      "test:e2e": "node scripts/run-e2e.mjs",
+      "preview": "vite preview",
+      "tauri": "tauri"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": "ES modules",
+    "testPattern": "*.test.ts",
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "examples",
+      "public",
+      "scripts",
+      "src",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 2,
+      "lastAccessed": 1781314220395,
+      "keyFiles": [
+        "index.html",
+        "neditor.svg"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 18,
+      "lastAccessed": 1781314220396,
+      "keyFiles": [
+        "100-improve.md",
+        "ai-first-platform-roadmap.md",
+        "architecture.svg",
+        "compiling-and-releasing.md",
+        "dependency-admission.md"
+      ]
+    },
+    "e2e": {
+      "path": "e2e",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1781314220399,
+      "keyFiles": [
+        "app-workflows.spec.ts"
+      ]
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 6,
+      "lastAccessed": 1781314220399,
+      "keyFiles": [
+        "ai-assisted-draft.md",
+        "board-paper.md",
+        "consulting-report.md",
+        "proposal-budget.md",
+        "research-report.md"
+      ]
+    },
+    "packaging": {
+      "path": "packaging",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1781314220399,
+      "keyFiles": []
+    },
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 1,
+      "lastAccessed": 1781314220400,
+      "keyFiles": [
+        "neditor.svg"
+      ]
+    },
+    "runbooks": {
+      "path": "runbooks",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1781314220400,
+      "keyFiles": [
+        "external-engine-evidence.md",
+        "external-evidence.md",
+        "homebrew-release.md",
+        "manual-review.md",
+        "performance-profile.md"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 54,
+      "lastAccessed": 1781314220400,
+      "keyFiles": [
+        "capture-readme-screenshots.mjs",
+        "check-accessibility-manual-signoff.mjs",
+        "check-accessibility-runtime.mjs",
+        "check-accessibility.mjs",
+        "check-ai-first-roadmap.mjs"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 5,
+      "lastAccessed": 1781314220400,
+      "keyFiles": [
+        "App.vue",
+        "main.ts",
+        "types.ts",
+        "vite-env.d.ts"
+      ]
+    },
+    "src-tauri": {
+      "path": "src-tauri",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1781314220401,
+      "keyFiles": [
+        "Cargo.lock",
+        "Cargo.toml",
+        "build.rs",
+        "tauri.conf.json"
+      ]
+    },
+    "test-results": {
+      "path": "test-results",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1781314220401,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 2,
+      "lastAccessed": 1781314220402,
+      "keyFiles": [
+        "frontend-unit.test.ts",
+        "node-test.d.ts"
+      ]
+    },
+    "dist/assets": {
+      "path": "dist/assets",
+      "purpose": "Static assets",
+      "fileCount": 66,
+      "lastAccessed": 1781314220403,
+      "keyFiles": [
+        "KaTeX_AMS-Regular-BQhdFMY1.woff2",
+        "KaTeX_AMS-Regular-DMm9YOAa.woff",
+        "KaTeX_AMS-Regular-DRggAlZN.ttf"
+      ]
+    },
+    "src/assets": {
+      "path": "src/assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1781314220403,
+      "keyFiles": [
+        "vue.svg"
+      ]
+    },
+    "src/lib": {
+      "path": "src/lib",
+      "purpose": "Library code",
+      "fileCount": 67,
+      "lastAccessed": 1781314220404,
+      "keyFiles": [
+        "accessibilityQa.ts",
+        "agenticWorkflows.ts",
+        "aiProviderPackages.ts"
+      ]
+    },
+    "src-tauri/fixtures": {
+      "path": "src-tauri/fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1781314220404,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src/stores/documents.ts",
+      "accessCount": 75,
+      "lastAccessed": 1781319721754,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/agenticWorkflows.ts",
+      "accessCount": 28,
+      "lastAccessed": 1780741137259,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/workspacePersistenceState.ts",
+      "accessCount": 21,
+      "lastAccessed": 1781319549038,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/workspacePersistence.ts",
+      "accessCount": 19,
+      "lastAccessed": 1781319704771,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/publishingWorkflow.ts",
+      "accessCount": 15,
+      "lastAccessed": 1780346875158,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/qualityRecommendations.ts",
+      "accessCount": 15,
+      "lastAccessed": 1781318976932,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/frontMatterManagers.ts",
+      "accessCount": 14,
+      "lastAccessed": 1780346883782,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/printPreview.ts",
+      "accessCount": 13,
+      "lastAccessed": 1780345133449,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/businessDocuments.ts",
+      "accessCount": 13,
+      "lastAccessed": 1780479494791,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/vimKeybindings.ts",
+      "accessCount": 12,
+      "lastAccessed": 1780346180972,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/deepResearch.ts",
+      "accessCount": 10,
+      "lastAccessed": 1780346138502,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/citationTodoWorkflow.ts",
+      "accessCount": 10,
+      "lastAccessed": 1780346212604,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/tables.ts",
+      "accessCount": 9,
+      "lastAccessed": 1780346177240,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/exportVisualQa.ts",
+      "accessCount": 9,
+      "lastAccessed": 1780741246260,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/exportMetadataChecklist.ts",
+      "accessCount": 8,
+      "lastAccessed": 1780346123194,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/exportWorkflowState.ts",
+      "accessCount": 8,
+      "lastAccessed": 1780346718687,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/bibliographyManager.ts",
+      "accessCount": 7,
+      "lastAccessed": 1780345111450,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/documentOutline.ts",
+      "accessCount": 7,
+      "lastAccessed": 1780345134642,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/reviewMarkers.ts",
+      "accessCount": 7,
+      "lastAccessed": 1780346196913,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/documentSelectors.ts",
+      "accessCount": 4,
+      "lastAccessed": 1780343696641,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/documentTabs.ts",
+      "accessCount": 4,
+      "lastAccessed": 1780343717110,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/frontMatter.ts",
+      "accessCount": 4,
+      "lastAccessed": 1780343815403,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/docsLive.ts",
+      "accessCount": 4,
+      "lastAccessed": 1780346091387,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/releaseEvidenceDashboard.ts",
+      "accessCount": 4,
+      "lastAccessed": 1780346196843,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/dataRefresh.ts",
+      "accessCount": 4,
+      "lastAccessed": 1780346214692,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/fileLifecycle.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780346087915,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/workspaceNavigation.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780346091939,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/exportProfiles.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780346136449,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/multiCursor.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780346172730,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/templatePacks.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780346174037,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/documentIncludes.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780346192106,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/provenanceReview.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780346206047,
+      "type": "file"
+    },
+    {
+      "path": "src/types.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780343117556,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/citationTodoPatterns.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780343894124,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/debounce.ts",
+      "accessCount": 2,
+      "lastAccessed": 1781240981293,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/markdownEditing.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343080817,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/markdownSectionMerge.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343080948,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/chartDesigner.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343081422,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/commandPalette.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343081970,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/documentExportOptions.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343082050,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/documentLayout.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343082101,
+      "type": "file"
+    },
+    {
+      "path": "src/main.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343082232,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/releaseReadiness.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343084893,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/emacsKeybindings.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343085631,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/previewCompileState.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343086368,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/recentItems.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343087359,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/ttsSetup.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343087735,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/citationSourceLibrary.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343087830,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/brandKitPresets.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343088557,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/calloutPresets.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780343089005,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

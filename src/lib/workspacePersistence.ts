@@ -69,7 +69,7 @@ export type ExportTarget =
   | "latex"
   | "google-docs"
   | "epub";
-export type WorkbenchMode = "split" | "source" | "preview" | "focus" | "outline" | "export" | "review" | "presentation";
+export type WorkbenchMode = "split" | "source" | "preview" | "focus" | "outline" | "export" | "review" | "presentation" | "graph" | "canvas";
 export type SidebarPanel =
   | "files"
   | "outline"
@@ -82,7 +82,11 @@ export type SidebarPanel =
   | "versioning"
   | "review"
   | "help"
-  | "settings";
+  | "settings"
+  | "backlinks"
+  | "tasks"
+  | "daily-notes"
+  | "graph";
 export type ThemePreference = "system" | "light" | "dark" | "paper";
 export type ToolbarDisplay = "both" | "icons" | "text";
 export type EditorKeymapMode = "default" | "emacs" | "vim";
@@ -1397,11 +1401,11 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (activePath !== undefined) migrated.activePath = activePath || null;
   const scrollPositions = normalizeScrollPositions(raw.scrollPositions);
   if (scrollPositions) migrated.scrollPositions = scrollPositions;
-  const mode = enumValue(raw.mode, ["split", "source", "preview", "focus", "outline", "export", "review", "presentation"] as const);
+  const mode = enumValue(raw.mode, ["split", "source", "preview", "focus", "outline", "export", "review", "presentation", "graph", "canvas"] as const);
   if (mode) migrated.mode = mode;
   const sidebar = enumValue(
     raw.sidebar,
-    ["files", "outline", "diagnostics", "tables", "templates", "layout", "references", "exports", "versioning", "review", "help", "settings"] as const,
+    ["files", "outline", "diagnostics", "tables", "templates", "layout", "references", "exports", "versioning", "review", "help", "settings", "backlinks", "tasks", "daily-notes", "graph"] as const,
   );
   if (sidebar) migrated.sidebar = sidebar;
   migrated.transformEnginePaths = stringRecord(raw.transformEnginePaths);

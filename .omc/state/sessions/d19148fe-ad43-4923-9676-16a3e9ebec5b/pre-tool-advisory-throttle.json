@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "entries": {
+    "79a93d4a2f8f50b95f852280616242fee1855dc99a3c75211917f55e72e95fae": {
+      "last_emitted_at_ms": 1781319556401,
+      "message": "Use parallel execution for independent tasks. Use run_in_background for long operations (npm install, builds, tests)."
+    },
+    "445ed27a3872b681d98190bae61ccb84954e1bc4e140df5370be958dee776b3a": {
+      "last_emitted_at_ms": 1781319503683,
+      "message": "Verify changes work after editing. Test functionality before marking complete."
+    },
+    "466399dafa2d20f60587180bad0a07358eb7f2bce724df0ff682f038ad33f5ad": {
+      "last_emitted_at_ms": 1781319490081,
+      "message": "Read multiple files in parallel when possible for faster analysis."
+    },
+    "54a8d48a661d8967eff28fe7933a8a543ccbb8ac4bc9807dd5433954f9023246": {
+      "last_emitted_at_ms": 1781317597918,
+      "message": "Spawning agent: Explore (sonnet) | Task: Explore project structure, build system, CLI, and configuration files | Active agents: 6"
+    },
+    "540ead5d8cedceaa7ec3d9d7d21e9c75ae05e3e3d50b10747c2af4473f4bf007": {
+      "last_emitted_at_ms": 1781317591066,
+      "message": "Spawning agent: Explore (sonnet) | Task: Explore Rust backend structure, transforms, exports, and commands | Active agents: 6"
+    },
+    "63a2bd5a4f7a7d4983c57b67118f79c2c4e45ece4ee554cfabf44f29b28bc696": {
+      "last_emitted_at_ms": 1781317583801,
+      "message": "Spawning agent: Explore (sonnet) | Task: Explore Vue frontend structure, stores, and existing feature implementations | Active agents: 6"
+    }
+  },
+  "updated_at": "2026-06-13T02:59:16.401Z"
+}
