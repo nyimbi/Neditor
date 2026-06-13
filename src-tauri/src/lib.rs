@@ -67,6 +67,10 @@ mod workspace_files;
 mod readability;
 mod daily_notes;
 mod task_aggregator;
+mod csl_styles;
+mod link_graph;
+mod block_refs;
+mod track_changes;
 
 use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
@@ -80,6 +84,15 @@ use backlinks::{check_document_approval, find_backlinks, find_unlinked_mentions}
 use readability::analyze_readability;
 use daily_notes::{open_daily_note, list_daily_notes};
 use task_aggregator::collect_workspace_tasks;
+use csl_styles::list_installed_csl_styles;
+use link_graph::build_workspace_link_graph;
+use block_refs::resolve_block_reference;
+use track_changes::{
+    create_delete_suggestion, create_insert_suggestion,
+    accept_suggestion, reject_suggestion,
+    accept_all_suggestions, reject_all_suggestions,
+    list_suggestions,
+};
 use cli_ipc::{cli_queue_file_path, drain_cli_open_queue, register_instance};
 use document_compare::compare_documents;
 use mail_merge::run_mail_merge;
@@ -275,7 +288,17 @@ pub fn run() {
             analyze_readability,
             open_daily_note,
             list_daily_notes,
-            collect_workspace_tasks
+            collect_workspace_tasks,
+            list_installed_csl_styles,
+            build_workspace_link_graph,
+            resolve_block_reference,
+            create_delete_suggestion,
+            create_insert_suggestion,
+            accept_suggestion,
+            reject_suggestion,
+            accept_all_suggestions,
+            reject_all_suggestions,
+            list_suggestions
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");

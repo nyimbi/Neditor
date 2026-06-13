@@ -594,6 +594,23 @@
         </header>
         <template v-if="store.sidebar === 'files'">
           <h2>Workspace</h2>
+          <!-- Pinned files -->
+          <section v-if="store.pinnedFiles.length" class="pinned-files" aria-label="Pinned files">
+            <h3>Pinned</h3>
+            <div class="pinned-files-list">
+              <div v-for="path in store.pinnedFiles" :key="path" class="pinned-file-item">
+                <button type="button" class="pinned-file-name" @click="store.openPath(path)" :title="path">
+                  📌 {{ path.split('/').pop() }}
+                </button>
+                <button type="button" class="pin-remove" @click="unpinFile(path)" title="Unpin">×</button>
+              </div>
+            </div>
+          </section>
+          <!-- PARA setup -->
+          <div class="files-actions" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">
+            <button type="button" @click="setupPARAWorkspace" title="Create PARA folder structure (Projects/Areas/Resources/Archives)">PARA setup</button>
+            <button type="button" @click="active?.path && pinFile(active.path)" :disabled="!active?.path || store.pinnedFiles.includes(active?.path || '')">📌 Pin current</button>
+          </div>
           <div class="workspace-search-box">
             <input
               v-model="workspaceSearchQuery"
@@ -2141,20 +2158,27 @@
           <label>
             Citation style
             <select :value="citationStyle" @change="setCitationStyle(eventValue($event))">
-              <option value="title">Title</option>
-              <option value="author-year">Author-year</option>
-              <option value="key">Key</option>
-              <option value="numeric">Numeric</option>
-              <option value="apa">APA</option>
-              <option value="chicago-author-date">Chicago author-date</option>
-              <option value="mla">MLA</option>
-              <option value="harvard">Harvard</option>
-              <option value="ieee">IEEE</option>
-              <option value="vancouver">Vancouver</option>
-              <option value="nature">Nature</option>
-              <option value="ama">AMA</option>
+              <optgroup label="Built-in styles">
+                <option value="title">Title</option>
+                <option value="author-year">Author-year</option>
+                <option value="key">Key</option>
+                <option value="numeric">Numeric</option>
+                <option value="apa">APA</option>
+                <option value="chicago-author-date">Chicago author-date</option>
+                <option value="mla">MLA</option>
+                <option value="harvard">Harvard</option>
+                <option value="ieee">IEEE</option>
+                <option value="vancouver">Vancouver</option>
+                <option value="nature">Nature</option>
+                <option value="ama">AMA</option>
+              </optgroup>
+              <optgroup v-if="installedCslStyles.length" label="Installed CSL files">
+                <option v-for="style in installedCslStyles" :key="style.id" :value="style.path" @click="applyCslFilePath(style.path)">{{ style.title }}</option>
+              </optgroup>
             </select>
           </label>
+          <p v-if="installedCslStyles.length" class="sidebar-hint">{{ installedCslStyles.length }} CSL file(s) found in ~/.pandoc/csl/. Select one to apply via Pandoc.</p>
+          <p v-else class="sidebar-hint">Install .csl files in <code>~/.pandoc/csl/</code> to use custom citation styles via Pandoc.</p>
           <h3>Citations</h3>
           <section class="reference-manager" aria-label="Citation manager">
             <div class="reference-actions">
@@ -5112,6 +5136,88 @@
 
       </aside>
 
+      <!-- ── Knowledge graph view ─────────────────────────────────────────── -->
+      <section v-if="store.mode === 'graph'" class="graph-view" aria-label="Knowledge graph">
+        <div class="graph-toolbar">
+          <button type="button" @click="buildKnowledgeGraph" :disabled="graphLoading" class="primary">↻ Rebuild</button>
+          <input v-model="graphQuery" placeholder="Filter nodes…" class="graph-search" />
+          <span class="graph-stats" v-if="graphData">{{ filteredGraphNodes.length }} nodes · {{ graphData.edges.length }} edges</span>
+        </div>
+        <div v-if="graphLoading" class="graph-loading">Building knowledge graph…</div>
+        <div v-else-if="!graphData" class="graph-empty">
+          <p>Click Rebuild to visualise wiki-link connections across your workspace.</p>
+          <button type="button" class="primary" @click="buildKnowledgeGraph">Build graph</button>
+        </div>
+        <div v-else class="graph-node-list" role="list">
+          <article
+            v-for="node in filteredGraphNodes"
+            :key="node.id"
+            class="graph-node-card"
+            :class="{ 'has-links': node.link_count > 0 }"
+            role="listitem"
+            @click="store.openPath(node.path)"
+          >
+            <div class="graph-node-header">
+              <span class="graph-node-title">{{ node.title }}</span>
+              <span class="graph-node-links" v-if="node.link_count">{{ node.link_count }} links</span>
+            </div>
+            <div class="graph-node-tags" v-if="node.tags.length">
+              <span v-for="tag in node.tags" :key="tag" class="graph-tag">#{{ tag }}</span>
+            </div>
+            <small class="graph-node-path">{{ node.id }}</small>
+          </article>
+        </div>
+        <div v-if="graphData" class="graph-edge-list">
+          <h3>Connections</h3>
+          <article v-for="edge in graphData.edges" :key="edge.source + '->' + edge.target" class="graph-edge-row">
+            <button type="button" @click="store.openPath(graphData.nodes.find(n => n.id === edge.source)?.path || '')">{{ edge.source.split('/').pop()?.replace('.md','') }}</button>
+            <span>→ <em>{{ edge.link_text }}</em> →</span>
+            <button type="button" @click="store.openPath(graphData.nodes.find(n => n.id === edge.target)?.path || '')">{{ edge.target.split('/').pop()?.replace('.md','') }}</button>
+          </article>
+        </div>
+      </section>
+
+      <!-- ── Canvas view ───────────────────────────────────────────────────── -->
+      <section v-if="store.mode === 'canvas'" class="canvas-view" aria-label="Document canvas">
+        <div class="canvas-toolbar">
+          <button type="button" @click="addDocumentToCanvas" class="primary">+ Active doc</button>
+          <button type="button" @click="addNoteToCanvas">+ Note</button>
+          <span class="canvas-hint">Drag nodes to arrange. Click document nodes to open.</span>
+        </div>
+        <div class="canvas-stage" @mouseleave="onCanvasDragEnd">
+          <svg class="canvas-edges" aria-hidden="true">
+            <line
+              v-for="edge in canvasEdges"
+              :key="edge.id"
+              :x1="canvasNodes.find(n => n.id === edge.source)?.x ?? 0"
+              :y1="canvasNodes.find(n => n.id === edge.source)?.y ?? 0"
+              :x2="canvasNodes.find(n => n.id === edge.target)?.x ?? 0"
+              :y2="canvasNodes.find(n => n.id === edge.target)?.y ?? 0"
+              class="canvas-edge-line"
+            />
+          </svg>
+          <div
+            v-for="node in canvasNodes"
+            :key="node.id"
+            class="canvas-node"
+            :class="[`canvas-node-${node.type}`]"
+            :style="{ left: node.x + 'px', top: node.y + 'px', width: node.w + 'px', minHeight: node.h + 'px' }"
+            @mousedown.prevent="onCanvasDragStart($event, node.id)"
+            @dblclick="node.path && store.openPath(node.path)"
+          >
+            <div class="canvas-node-header">
+              <span class="canvas-node-icon">{{ node.type === 'document' ? '📄' : '📝' }}</span>
+              <span class="canvas-node-title">{{ node.content }}</span>
+              <button type="button" class="canvas-node-close" @click.stop="removeCanvasNode(node.id)">×</button>
+            </div>
+            <small v-if="node.path" class="canvas-node-path">{{ node.path.split('/').pop() }}</small>
+          </div>
+          <div v-if="!canvasNodes.length" class="canvas-empty">
+            <p>Add the active document or a sticky note to start arranging ideas spatially.</p>
+          </div>
+        </div>
+      </section>
+
       <!-- ── Welcome screen (no documents open) ──────────────────────────── -->
       <section
         v-if="store.documents.length === 0 && store.mode !== 'graph' && store.mode !== 'canvas'"
@@ -5154,7 +5260,7 @@
         </div>
       </section>
 
-      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" :class="{ 'focus-mode': writerFocusMode && store.uiMode === 'writer' }" aria-label="Markdown source" tabindex="-1">
+      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" :class="{ 'focus-mode': writerFocusMode && store.uiMode === 'writer' }" aria-label="Markdown source" tabindex="-1" @pointerup="handleEditorPointerUp" @keydown.escape="selectionToolbarVisible = false" style="position:relative">
         <!-- ── Breadcrumb navigation ── -->
         <nav
           v-if="store.uiMode === 'pilot' && documentBreadcrumbs.length"
@@ -5173,9 +5279,27 @@
         <div v-if="docLocked" class="doc-locked-banner" aria-live="polite">
           🔒 This document is approved/locked. Editing is disabled. Change status in front matter to unlock.
         </div>
-        <div class="editor-split-grid" :data-split-source="store.splitSourcePanes ? 'true' : 'false'">
+        <div class="editor-split-grid" :data-split-source="store.splitSourcePanes ? 'true' : 'false'" :class="{ 'has-minimap': store.showMinimap }">
           <div ref="editorHost" class="editor-host editor-host-primary" :class="{ 'editor-locked': docLocked }" aria-label="Primary Markdown source pane"></div>
           <div v-if="store.splitSourcePanes" ref="secondaryEditorHost" class="editor-host editor-host-secondary" aria-label="Secondary Markdown source pane"></div>
+          <!-- Minimap: document structure navigator -->
+          <nav v-if="store.showMinimap" class="editor-minimap" aria-label="Document minimap">
+            <div class="minimap-header">
+              <span>Map</span>
+              <button type="button" @click="store.showMinimap = false" aria-label="Close minimap">×</button>
+            </div>
+            <div class="minimap-headings">
+              <button
+                v-for="heading in (active?.compile?.document_ast?.blocks?.filter((b: any) => b.kind === 'heading') || [])"
+                :key="(heading as any).line"
+                type="button"
+                class="minimap-heading"
+                :class="`minimap-h${(heading as any).level}`"
+                :title="(heading as any).text"
+                @click="scrollEditorToLine((heading as any).line)"
+              >{{ (heading as any).text }}</button>
+            </div>
+          </nav>
         </div>
       </section>
 
@@ -5202,6 +5326,7 @@
         aria-label="Live preview"
         tabindex="-1"
         @scroll="syncEditorScrollFromPreview"
+        @click="(e: MouseEvent) => { const a = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null; if (a) { const href = a.getAttribute('href') || ''; const blockMatch = href.match(/^!?\[\[(.+?)(?:#(.+?))?\]\]$/); if (blockMatch) { e.preventDefault(); void navigateToBlockRef(blockMatch[1], blockMatch[2] || ''); } } }"
       >
         <section v-if="store.mode === 'export'" class="export-preview-summary" aria-label="Export preview summary">
           <div>
@@ -7944,6 +8069,83 @@
       </div>
     </div>
 
+    <!-- ── Selection mini-toolbar (ABScribe trigger) ─────────────────────── -->
+    <div
+      v-if="selectionToolbarVisible && store.uiMode === 'pilot'"
+      class="selection-toolbar"
+      :style="{ top: selectionToolbarPos.top + 'px', left: selectionToolbarPos.left + 'px' }"
+      role="toolbar"
+      aria-label="Selection actions"
+    >
+      <button type="button" title="Bold (⌘B)" @click="insertMarkdownAtCursor('**')">B</button>
+      <button type="button" title="Italic (⌘I)" @click="insertMarkdownAtCursor('*')">I</button>
+      <button type="button" title="AI rewrite — 3 variations (⌘⌥A)" class="abscribe-btn" @click="generateInlineVariations" :disabled="inlineVariationsBusy">✦ Rewrite</button>
+    </div>
+
+    <!-- ── Inline AI variations popup ────────────────────────────────────── -->
+    <div v-if="inlineVariationsOpen" class="slash-picker-backdrop" @click="inlineVariationsOpen = false"></div>
+    <div v-if="inlineVariationsOpen" class="inline-variations-modal" role="dialog" aria-label="AI rewrite variations">
+      <header>
+        <span>✦ Choose a rewrite</span>
+        <button type="button" class="tp-ctrl" @click="inlineVariationsOpen = false">×</button>
+      </header>
+      <div v-if="inlineVariationsBusy" class="inline-variations-loading">Generating variations…</div>
+      <div v-else-if="!inlineVariationCandidates.length" class="inline-variations-empty">No variations generated. Check Ollama is running.</div>
+      <div v-else class="inline-variations-list">
+        <div class="inline-variation-original">
+          <small>Original</small>
+          <p>{{ inlineVariationsOriginal }}</p>
+        </div>
+        <button
+          v-for="(variation, idx) in inlineVariationCandidates"
+          :key="idx"
+          type="button"
+          class="inline-variation-card"
+          @click="applyInlineVariation(variation)"
+        >
+          <small>Variation {{ idx + 1 }}</small>
+          <p>{{ variation }}</p>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Track changes panel ────────────────────────────────────────────── -->
+    <div v-if="trackChangesOpen" class="slash-picker-backdrop" @click="trackChangesOpen = false"></div>
+    <div v-if="trackChangesOpen" class="track-changes-modal" role="dialog" aria-label="Track changes">
+      <header>
+        <span>Track Changes</span>
+        <label class="suggestion-mode-toggle">
+          <input type="checkbox" v-model="store.suggestionMode" />
+          Suggestion mode {{ store.suggestionMode ? 'ON' : 'OFF' }}
+        </label>
+        <button type="button" class="tp-ctrl" @click="trackChangesOpen = false">×</button>
+      </header>
+      <div class="track-changes-body">
+        <div class="track-changes-actions">
+          <button type="button" class="primary" @click="acceptAllSuggestions" :disabled="!activeSuggestions.length">Accept all ({{ activeSuggestions.length }})</button>
+          <button type="button" @click="rejectAllSuggestions" :disabled="!activeSuggestions.length">Reject all</button>
+          <button type="button" @click="refreshSuggestions">↻ Refresh</button>
+        </div>
+        <p v-if="!activeSuggestions.length" class="sidebar-hint">No suggestions in this document. Enable suggestion mode to track changes.</p>
+        <article
+          v-for="s in activeSuggestions"
+          :key="s.id"
+          class="suggestion-item"
+          :class="s.kind"
+        >
+          <div class="suggestion-header">
+            <span class="suggestion-kind" :class="s.kind">{{ s.kind === 'delete' ? '− Delete' : '+ Insert' }}</span>
+            <small>line {{ s.line }} · {{ s.author }}</small>
+          </div>
+          <p class="suggestion-text">{{ s.text }}</p>
+          <div class="suggestion-actions">
+            <button type="button" class="accept-btn" @click="acceptSuggestion(s.id)">Accept</button>
+            <button type="button" class="reject-btn" @click="rejectSuggestion(s.id)">Reject</button>
+          </div>
+        </article>
+      </div>
+    </div>
+
     <div v-if="humanizeOpen" class="slash-picker-backdrop" @click="humanizeOpen = false"></div>
     <div v-if="humanizeOpen" class="humanize-modal" role="dialog" aria-label="AI Humanizer">
       <header class="humanize-header">
@@ -9678,6 +9880,317 @@ const presentationSlides = computed<SlideData[]>(() => {
 const currentPresenterSlide = computed(() => presentationSlides.value[presenterCurrentIdx.value] ?? null);
 const nextPresenterSlide = computed(() => presentationSlides.value[presenterCurrentIdx.value + 1] ?? null);
 const activeThemeInfo = computed(() => PRESENTATION_THEMES.find(t => t.id === store.presentationTheme) ?? PRESENTATION_THEMES[0]);
+
+// ── Knowledge graph ──────────────────────────────────────────────────────────
+const graphData = ref<{ nodes: Array<{ id: string; title: string; path: string; link_count: number; tags: string[] }>; edges: Array<{ source: string; target: string; link_text: string }> } | null>(null);
+const graphLoading = ref(false);
+const graphQuery = ref('');
+
+async function buildKnowledgeGraph(): Promise<void> {
+  if (!store.workspaceRoot) { store.statusMessage = 'Open a workspace folder first.'; return; }
+  graphLoading.value = true;
+  try {
+    graphData.value = await invoke('build_workspace_link_graph', { workspaceRoot: store.workspaceRoot });
+  } catch (e) { store.statusMessage = `Graph error: ${e}`; }
+  graphLoading.value = false;
+}
+
+watch(() => store.mode, (m) => { if (m === 'graph') buildKnowledgeGraph(); });
+
+const filteredGraphNodes = computed(() => {
+  const nodes = graphData.value?.nodes || [];
+  const q = graphQuery.value.toLowerCase().trim();
+  if (!q) return nodes;
+  return nodes.filter(n => n.title.toLowerCase().includes(q) || n.id.toLowerCase().includes(q));
+});
+
+// ── ABScribe inline AI variations ────────────────────────────────────────────
+const inlineVariationsOpen = ref(false);
+const inlineVariationsAnchor = ref<{ from: number; to: number } | null>(null);
+const inlineVariationCandidates = ref<string[]>([]);
+const inlineVariationsBusy = ref(false);
+const inlineVariationsOriginal = ref('');
+const selectionToolbarVisible = ref(false);
+const selectionToolbarPos = ref({ top: 0, left: 0 });
+
+async function generateInlineVariations(): Promise<void> {
+  if (!editorView) return;
+  const sel = editorView.state.selection.main;
+  if (sel.empty) return;
+  const selectedText = editorView.state.sliceDoc(sel.from, sel.to);
+  if (!selectedText.trim()) return;
+
+  inlineVariationsOriginal.value = selectedText;
+  inlineVariationsAnchor.value = { from: sel.from, to: sel.to };
+  inlineVariationsBusy.value = true;
+  inlineVariationsOpen.value = true;
+  inlineVariationCandidates.value = [];
+
+  try {
+    const { executeStreamingOllamaPrompt } = await import('./lib/ollamaModels.js');
+    const systemPrompt = 'You are a writing assistant. Produce exactly 3 rewrite variations of the given text. Return a JSON array of 3 strings only — no other text. Each variation must preserve the meaning but differ in style, tone, or length.';
+    let buffer = '';
+    await executeStreamingOllamaPrompt(
+      store.aiProviderDefaults?.endpoint || 'http://localhost:11434',
+      store.aiProviderDefaults?.model || 'qwen2.5:7b',
+      systemPrompt,
+      `Rewrite this text in 3 distinct variations:\n\n${selectedText}`,
+      (token: string) => { buffer += token; },
+    );
+    try {
+      const start = buffer.indexOf('[');
+      const end = buffer.lastIndexOf(']');
+      if (start !== -1 && end > start) {
+        inlineVariationCandidates.value = JSON.parse(buffer.slice(start, end + 1));
+      }
+    } catch { inlineVariationCandidates.value = [buffer.trim()]; }
+  } catch (e) {
+    inlineVariationCandidates.value = [];
+    store.statusMessage = `Variation error: ${e}`;
+  }
+  inlineVariationsBusy.value = false;
+}
+
+function applyInlineVariation(text: string): void {
+  if (!editorView || !inlineVariationsAnchor.value) return;
+  const { from, to } = inlineVariationsAnchor.value;
+  editorView.dispatch({ changes: { from, to, insert: text } });
+  inlineVariationsOpen.value = false;
+  inlineVariationsAnchor.value = null;
+  bumpNudge('ai-paste');
+}
+
+// Expose selection toolbar on pointer-up in editor pane
+function handleEditorPointerUp(): void {
+  if (!editorView) { selectionToolbarVisible.value = false; return; }
+  const sel = editorView.state.selection.main;
+  if (sel.empty || sel.to - sel.from < 3) { selectionToolbarVisible.value = false; return; }
+  const coords = editorView.coordsAtPos(sel.from);
+  if (!coords) { selectionToolbarVisible.value = false; return; }
+  selectionToolbarVisible.value = true;
+  const hostEl = document.getElementById('markdown-source');
+  const hostRect = hostEl?.getBoundingClientRect() ?? { top: 0, left: 0 };
+  selectionToolbarPos.value = {
+    top: Math.max(0, coords.top - hostRect.top - 36),
+    left: coords.left - hostRect.left,
+  };
+}
+
+// ── Pinned favorites ──────────────────────────────────────────────────────────
+function pinFile(path: string): void {
+  if (!store.pinnedFiles.includes(path)) {
+    store.pinnedFiles = [...store.pinnedFiles, path];
+    void store.persistWorkspace();
+  }
+}
+
+function unpinFile(path: string): void {
+  store.pinnedFiles = store.pinnedFiles.filter(p => p !== path);
+  void store.persistWorkspace();
+}
+
+function setupPARAWorkspace(): void {
+  if (!store.workspaceRoot) { store.statusMessage = 'Open a workspace folder first.'; return; }
+  const dirs = ['Projects', 'Areas', 'Resources', 'Archives'];
+  const indexContent = `---
+title: PARA Workspace Index
+---
+
+# PARA Workspace
+
+- **Projects** — Active work with a specific outcome and deadline
+- **Areas** — Ongoing responsibilities with no end date
+- **Resources** — Reference material and topics of interest
+- **Archives** — Completed, inactive, or irrelevant items from the other categories
+
+> Move documents between folders as their status changes. Run "Archive" to move completed projects.
+`;
+  Promise.all(
+    dirs.map(dir => invoke('save_file_as', {
+      path: `${store.workspaceRoot}/${dir}/_INDEX.md`,
+      content: `---\ntitle: ${dir}\n---\n\n# ${dir}\n\n`,
+    }).catch(() => null))
+  ).then(() =>
+    invoke('save_file_as', {
+      path: `${store.workspaceRoot}/_PARA-INDEX.md`,
+      content: indexContent,
+    })
+  ).then(() => {
+    store.statusMessage = 'PARA workspace scaffolded — Projects, Areas, Resources, Archives created.';
+    void store.refreshWorkspace();
+  }).catch(e => { store.statusMessage = `PARA setup error: ${e}`; });
+}
+
+// ── CSL styles ────────────────────────────────────────────────────────────────
+const installedCslStyles = ref<Array<{ id: string; title: string; filename: string; path: string }>>([]);
+
+async function loadInstalledCslStyles(): Promise<void> {
+  try {
+    installedCslStyles.value = await invoke('list_installed_csl_styles', {});
+  } catch { installedCslStyles.value = []; }
+}
+
+watch(() => store.sidebar, (s) => { if (s === 'references') loadInstalledCslStyles(); });
+
+function applyCslFilePath(path: string): void {
+  const doc = active.value;
+  if (!doc) return;
+  // Write cslStyle to front-matter
+  const fm = doc.text.match(/^---\n([\s\S]*?)\n---/);
+  if (fm) {
+    const existing = fm[0];
+    const hasStyle = existing.includes('cslStyle:') || existing.includes('citationStyle:');
+    let updated: string;
+    if (hasStyle) {
+      updated = existing.replace(/cslStyle:.*|citationStyle:.*/g, `cslStyle: "${path}"`);
+    } else {
+      updated = existing.replace('---\n', `---\ncslStyle: "${path}"\n`);
+    }
+    store.updateText(doc.text.replace(existing, updated));
+  }
+}
+
+// ── Track changes ─────────────────────────────────────────────────────────────
+const trackChangesOpen = ref(false);
+const activeSuggestions = ref<Array<{ id: string; kind: string; text: string; author: string; line: number }>>([]);
+
+async function refreshSuggestions(): Promise<void> {
+  const text = active.value?.text || '';
+  if (!text) { activeSuggestions.value = []; return; }
+  try {
+    activeSuggestions.value = await invoke('list_suggestions', { document: text });
+  } catch { activeSuggestions.value = []; }
+}
+
+watch(() => store.suggestionMode, (on) => { if (on) trackChangesOpen.value = true; });
+watch(() => active.value?.text, () => { if (store.suggestionMode) refreshSuggestions(); });
+
+async function acceptSuggestion(id: string): Promise<void> {
+  const doc = active.value;
+  if (!doc) return;
+  const result = await invoke<string>('accept_suggestion', { document: doc.text, suggestionId: id });
+  store.updateText(result);
+}
+
+async function rejectSuggestion(id: string): Promise<void> {
+  const doc = active.value;
+  if (!doc) return;
+  const result = await invoke<string>('reject_suggestion', { document: doc.text, suggestionId: id });
+  store.updateText(result);
+}
+
+async function acceptAllSuggestions(): Promise<void> {
+  const doc = active.value;
+  if (!doc) return;
+  const result = await invoke<string>('accept_all_suggestions', { document: doc.text });
+  store.updateText(result);
+  store.suggestionMode = false;
+}
+
+async function rejectAllSuggestions(): Promise<void> {
+  const doc = active.value;
+  if (!doc) return;
+  const result = await invoke<string>('reject_all_suggestions', { document: doc.text });
+  store.updateText(result);
+  store.suggestionMode = false;
+}
+
+// ── Block references ──────────────────────────────────────────────────────────
+async function navigateToBlockRef(refPath: string, headingId: string): Promise<void> {
+  if (!store.workspaceRoot) return;
+  try {
+    const result = await invoke<{ source_path: string; found: boolean }>('resolve_block_reference', {
+      workspaceRoot: store.workspaceRoot,
+      refPath,
+      headingId,
+    });
+    if (result.found) await store.openPath(result.source_path);
+    else store.statusMessage = `Block reference not found: ${refPath}#${headingId}`;
+  } catch (e) { store.statusMessage = `Block ref error: ${e}`; }
+}
+
+// ── Canvas ────────────────────────────────────────────────────────────────────
+interface CanvasNode { id: string; type: 'document' | 'note' | 'image'; x: number; y: number; w: number; h: number; content: string; path?: string }
+interface CanvasEdge { id: string; source: string; target: string; label: string }
+const canvasNodes = ref<CanvasNode[]>([]);
+const canvasEdges = ref<CanvasEdge[]>([]);
+const canvasDragState = ref<{ nodeId: string; startX: number; startY: number; origX: number; origY: number } | null>(null);
+// canvasConnecting: reserved for future edge-drawing mode
+
+function addDocumentToCanvas(): void {
+  const doc = active.value;
+  if (!doc) return;
+  const id = crypto.randomUUID();
+  canvasNodes.value.push({
+    id,
+    type: 'document',
+    x: 80 + canvasNodes.value.length * 30,
+    y: 80 + canvasNodes.value.length * 20,
+    w: 200,
+    h: 120,
+    content: doc.title || 'Untitled',
+    path: doc.path || undefined,
+  });
+  saveCanvasState();
+}
+
+function addNoteToCanvas(): void {
+  const id = crypto.randomUUID();
+  canvasNodes.value.push({ id, type: 'note', x: 120, y: 120, w: 180, h: 100, content: 'Note...' });
+  saveCanvasState();
+}
+
+function removeCanvasNode(id: string): void {
+  canvasNodes.value = canvasNodes.value.filter(n => n.id !== id);
+  canvasEdges.value = canvasEdges.value.filter(e => e.source !== id && e.target !== id);
+  saveCanvasState();
+}
+
+function onCanvasDragStart(event: MouseEvent, nodeId: string): void {
+  const node = canvasNodes.value.find(n => n.id === nodeId);
+  if (!node) return;
+  canvasDragState.value = { nodeId, startX: event.clientX, startY: event.clientY, origX: node.x, origY: node.y };
+  window.addEventListener('mousemove', onCanvasDragMove);
+  window.addEventListener('mouseup', onCanvasDragEnd);
+}
+
+function onCanvasDragMove(event: MouseEvent): void {
+  if (!canvasDragState.value) return;
+  const { nodeId, startX, startY, origX, origY } = canvasDragState.value;
+  const node = canvasNodes.value.find(n => n.id === nodeId);
+  if (node) {
+    node.x = Math.max(0, origX + event.clientX - startX);
+    node.y = Math.max(0, origY + event.clientY - startY);
+  }
+}
+
+function onCanvasDragEnd(): void {
+  canvasDragState.value = null;
+  window.removeEventListener('mousemove', onCanvasDragMove);
+  window.removeEventListener('mouseup', onCanvasDragEnd);
+  saveCanvasState();
+}
+
+function saveCanvasState(): void {
+  if (!store.workspaceRoot) return;
+  const state = { nodes: canvasNodes.value, edges: canvasEdges.value };
+  invoke('save_file_as', {
+    path: `${store.workspaceRoot}/.neditor-canvas.json`,
+    content: JSON.stringify(state, null, 2),
+  }).catch(() => null);
+}
+
+async function loadCanvasState(): Promise<void> {
+  if (!store.workspaceRoot) return;
+  try {
+    const content = await invoke<{ content: string }>('read_file', { path: `${store.workspaceRoot}/.neditor-canvas.json` });
+    const state = JSON.parse(content.content || '{}');
+    canvasNodes.value = state.nodes || [];
+    canvasEdges.value = state.edges || [];
+  } catch { /* no canvas file yet */ }
+}
+
+watch(() => store.mode, (m) => { if (m === 'canvas') loadCanvasState(); });
 
 function openPresenterView(): void { presenterCurrentIdx.value = 0; presenterViewOpen.value = true; }
 function presenterNext(): void { if (presenterCurrentIdx.value < presentationSlides.value.length - 1) presenterCurrentIdx.value++; }
@@ -13395,6 +13908,10 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "export", label: "Export Preview", help: "Review delivery output and export readiness.", run: () => { store.mode = "export"; store.sidebar = "exports"; } },
           { id: "print-preview", label: "Print Preview", help: "Approximate final pages, margins, columns, section breaks, and print-flow warnings before export.", run: () => togglePrintPreview(true) },
           { id: "review", label: "Review Mode", help: "Show source, preview, comments, QA, and release state.", run: () => { store.mode = "review"; store.sidebar = "review"; } },
+          { id: "graph", label: "Knowledge Graph", help: "Visualise wiki-link connections across all workspace documents.", run: () => { store.mode = "graph"; buildKnowledgeGraph(); } },
+          { id: "canvas", label: "Canvas View", help: "Spatially arrange documents and notes on an infinite whiteboard.", run: () => { store.mode = "canvas"; loadCanvasState(); } },
+          { id: "track-changes", label: "Track Changes", help: "Review and accept or reject inline suggestions.", run: () => { trackChangesOpen.value = true; refreshSuggestions(); } },
+          { id: "minimap-toggle", label: "Toggle Minimap", help: "Show or hide the document structure minimap.", run: () => { store.showMinimap = !store.showMinimap; } },
         ],
       },
       {
@@ -27734,6 +28251,7 @@ function handleShortcut(event: KeyboardEvent) {
     if (k === 'u' && event.shiftKey) { event.preventDefault(); openHumanizer(); return; }
     if (k === 'b' && !event.shiftKey && !event.altKey) { event.preventDefault(); toggleSidebarCollapsed(); return; }
     if (k === 'f' && event.altKey) { event.preventDefault(); store.focusMode = store.focusMode === 'off' ? 'paragraph' : store.focusMode === 'paragraph' ? 'sentence' : 'off'; return; }
+    if (k === 'a' && event.altKey) { event.preventDefault(); void generateInlineVariations(); return; }
     // ⌘1–7: switch activity group in Pilot mode (before editable-target guard)
     if (store.uiMode === 'pilot' && !event.shiftKey && !event.altKey) {
       const digit = parseInt(k);
@@ -38238,4 +38756,107 @@ button.ws-seg:hover { background: var(--c-fill-hover) !important; color: var(--c
 .template-card-actions { display:flex; gap:6px; margin-top:6px; }
 .template-card-actions button { padding:3px 10px; border-radius:4px; border:1px solid var(--c-border); background:var(--c-bg); color:var(--c-text); cursor:pointer; font-size:11px; }
 .template-card-actions button:hover { background:var(--c-fill-hover); }
+
+/* ── Knowledge graph view ────────────────────────────────────────────────── */
+.graph-view { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; background:var(--c-bg); }
+.graph-toolbar { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--c-border); flex-shrink:0; }
+.graph-toolbar button.primary { padding:5px 12px; border-radius:6px; background:var(--c-accent); color:#fff; border:none; cursor:pointer; font-size:12px; }
+.graph-search { flex:1; padding:5px 10px; border-radius:6px; border:1px solid var(--c-border); background:var(--c-surface); color:var(--c-text); font-size:12px; }
+.graph-stats { font-size:11px; color:var(--c-text2); }
+.graph-loading, .graph-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; gap:12px; color:var(--c-text2); font-size:14px; padding:32px; }
+.graph-node-list { flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; padding:12px; align-content:start; }
+.graph-node-card { padding:10px 12px; border-radius:8px; border:1px solid var(--c-border); background:var(--c-surface); cursor:pointer; }
+.graph-node-card:hover { border-color:var(--c-accent); background:var(--c-fill-hover); }
+.graph-node-card.has-links { border-color:color-mix(in srgb, var(--c-accent) 40%, var(--c-border)); }
+.graph-node-header { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:4px; }
+.graph-node-title { font-size:12px; font-weight:600; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.graph-node-links { font-size:10px; color:var(--c-accent); flex-shrink:0; }
+.graph-node-tags { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:4px; }
+.graph-tag { font-size:10px; background:color-mix(in srgb, var(--c-accent) 15%, transparent); color:var(--c-accent); padding:1px 5px; border-radius:10px; }
+.graph-node-path { font-size:10px; color:var(--c-text2); }
+.graph-edge-list { flex-shrink:0; max-height:160px; overflow-y:auto; border-top:1px solid var(--c-border); padding:8px 12px; }
+.graph-edge-list h3 { font-size:11px; font-weight:700; color:var(--c-text2); margin:0 0 6px; }
+.graph-edge-row { display:flex; align-items:center; gap:6px; font-size:11px; padding:2px 0; }
+.graph-edge-row button { background:none; border:none; color:var(--c-accent); cursor:pointer; font-size:11px; padding:0; }
+.graph-edge-row button:hover { text-decoration:underline; }
+
+/* ── Canvas view ─────────────────────────────────────────────────────────── */
+.canvas-view { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; background:var(--c-bg); }
+.canvas-toolbar { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--c-border); flex-shrink:0; font-size:12px; }
+.canvas-toolbar button.primary { padding:5px 12px; border-radius:6px; background:var(--c-accent); color:#fff; border:none; cursor:pointer; font-size:12px; }
+.canvas-toolbar button { padding:5px 10px; border-radius:6px; border:1px solid var(--c-border); background:var(--c-surface); color:var(--c-text); cursor:pointer; font-size:12px; }
+.canvas-hint { font-size:11px; color:var(--c-text2); }
+.canvas-stage { flex:1; position:relative; overflow:hidden; cursor:default; }
+.canvas-edges { position:absolute; inset:0; pointer-events:none; width:100%; height:100%; }
+.canvas-edge-line { stroke:var(--c-border); stroke-width:1.5; }
+.canvas-node { position:absolute; background:var(--c-surface); border:1.5px solid var(--c-border); border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.08); cursor:grab; user-select:none; display:flex; flex-direction:column; overflow:hidden; }
+.canvas-node:active { cursor:grabbing; }
+.canvas-node:hover { border-color:var(--c-accent); }
+.canvas-node-document { border-left:3px solid var(--c-accent); }
+.canvas-node-note { border-left:3px solid #f59e0b; }
+.canvas-node-header { display:flex; align-items:center; gap:6px; padding:7px 10px; background:var(--c-chrome); border-bottom:1px solid var(--c-border); }
+.canvas-node-icon { font-size:12px; }
+.canvas-node-title { flex:1; font-size:12px; font-weight:600; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.canvas-node-close { background:none; border:none; cursor:pointer; color:var(--c-text2); font-size:14px; padding:0 2px; line-height:1; }
+.canvas-node-path { font-size:10px; color:var(--c-text2); padding:4px 10px 6px; }
+.canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--c-text2); font-size:13px; text-align:center; padding:32px; }
+
+/* ── Minimap ─────────────────────────────────────────────────────────────── */
+.editor-split-grid.has-minimap { display:grid; grid-template-columns:1fr 140px; }
+.editor-minimap { border-left:1px solid var(--c-border); background:var(--c-chrome); display:flex; flex-direction:column; overflow:hidden; }
+.minimap-header { display:flex; align-items:center; justify-content:space-between; padding:4px 8px; border-bottom:1px solid var(--c-border); font-size:10px; font-weight:700; color:var(--c-text2); }
+.minimap-header button { background:none; border:none; cursor:pointer; color:var(--c-text2); font-size:13px; padding:0 2px; }
+.minimap-headings { flex:1; overflow-y:auto; padding:4px 0; display:flex; flex-direction:column; gap:1px; }
+.minimap-heading { background:none; border:none; cursor:pointer; text-align:left; font-size:10px; color:var(--c-text2); padding:2px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; }
+.minimap-heading:hover { background:var(--c-fill-hover); color:var(--c-text); }
+.minimap-h1 { font-weight:700; color:var(--c-text); padding-left:6px; }
+.minimap-h2 { padding-left:12px; }
+.minimap-h3 { padding-left:18px; font-size:9px; }
+.minimap-h4, .minimap-h5, .minimap-h6 { padding-left:22px; font-size:9px; opacity:0.7; }
+
+/* ── Selection toolbar + inline variations ───────────────────────────────── */
+.selection-toolbar { position:absolute; z-index:500; display:flex; gap:2px; background:var(--c-surface); border:1px solid var(--c-border); border-radius:6px; box-shadow:0 4px 16px rgba(0,0,0,0.12); padding:3px 6px; pointer-events:all; }
+.selection-toolbar button { background:none; border:none; cursor:pointer; color:var(--c-text); font-size:12px; padding:3px 6px; border-radius:4px; }
+.selection-toolbar button:hover { background:var(--c-fill-hover); }
+.abscribe-btn { color:var(--c-accent) !important; font-weight:600; }
+.inline-variations-modal { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10000; background:var(--c-surface); border:1px solid var(--c-border); border-radius:12px; box-shadow:0 24px 72px rgba(0,0,0,0.18); width:560px; max-width:95vw; max-height:80vh; overflow-y:auto; }
+.inline-variations-modal header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--c-border); font-size:14px; font-weight:600; color:var(--c-text); position:sticky; top:0; background:var(--c-surface); }
+.inline-variations-loading, .inline-variations-empty { padding:24px; text-align:center; color:var(--c-text2); font-size:13px; }
+.inline-variations-list { display:flex; flex-direction:column; gap:8px; padding:14px 18px; }
+.inline-variation-original { padding:10px 12px; border-radius:8px; background:var(--c-chrome); border:1px solid var(--c-border); }
+.inline-variation-original small { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--c-text2); display:block; margin-bottom:4px; }
+.inline-variation-original p { font-size:12px; color:var(--c-text2); margin:0; }
+.inline-variation-card { display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:12px 14px; border-radius:8px; border:1px solid var(--c-border); background:var(--c-bg); cursor:pointer; text-align:left; }
+.inline-variation-card:hover { border-color:var(--c-accent); background:var(--c-fill-hover); }
+.inline-variation-card small { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--c-accent); }
+.inline-variation-card p { font-size:13px; color:var(--c-text); margin:0; }
+
+/* ── Track changes modal ─────────────────────────────────────────────────── */
+.track-changes-modal { position:fixed; top:50%; right:24px; transform:translateY(-50%); z-index:10000; background:var(--c-surface); border:1px solid var(--c-border); border-radius:12px; box-shadow:0 16px 48px rgba(0,0,0,0.15); width:340px; max-width:95vw; max-height:80vh; display:flex; flex-direction:column; overflow:hidden; }
+.track-changes-modal header { display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--c-border); flex-shrink:0; font-size:13px; font-weight:600; }
+.suggestion-mode-toggle { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--c-text2); margin-left:auto; cursor:pointer; }
+.track-changes-body { flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+.track-changes-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.track-changes-actions button { padding:5px 10px; border-radius:6px; border:1px solid var(--c-border); background:var(--c-surface); color:var(--c-text); cursor:pointer; font-size:11px; }
+.track-changes-actions button.primary { background:var(--c-accent); color:#fff; border-color:var(--c-accent); }
+.suggestion-item { padding:8px 10px; border-radius:8px; border:1px solid var(--c-border); background:var(--c-bg); }
+.suggestion-item.delete { border-left:3px solid #ef4444; }
+.suggestion-item.insert { border-left:3px solid #22c55e; }
+.suggestion-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+.suggestion-kind { font-size:10px; font-weight:700; text-transform:uppercase; }
+.suggestion-kind.delete { color:#ef4444; }
+.suggestion-kind.insert { color:#22c55e; }
+.suggestion-text { font-size:12px; color:var(--c-text); margin:0 0 6px; font-family:var(--editor-font, monospace); white-space:pre-wrap; }
+.suggestion-actions { display:flex; gap:4px; }
+.accept-btn { padding:3px 10px; border-radius:4px; background:#22c55e; color:#fff; border:none; cursor:pointer; font-size:11px; }
+.reject-btn { padding:3px 10px; border-radius:4px; background:#ef4444; color:#fff; border:none; cursor:pointer; font-size:11px; }
+
+/* ── Pinned files ─────────────────────────────────────────────────────────── */
+.pinned-files { margin-bottom:8px; }
+.pinned-files h3 { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--c-text2); margin:0 0 4px; }
+.pinned-files-list { display:flex; flex-direction:column; gap:2px; }
+.pinned-file-item { display:flex; align-items:center; gap:4px; }
+.pinned-file-name { flex:1; text-align:left; background:none; border:none; cursor:pointer; color:var(--c-accent); font-size:12px; padding:3px 4px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pinned-file-name:hover { background:var(--c-fill-hover); }
+.pin-remove { background:none; border:none; cursor:pointer; color:var(--c-text2); font-size:12px; padding:2px 4px; }
 </style>
