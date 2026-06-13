@@ -86,7 +86,15 @@ pub(crate) fn open_daily_note(workspace_root: String, date: String) -> Result<Da
 		parts[1].parse::<u32>().map_err(|_| format!("Invalid month in date: {date}"))?,
 		parts[2].parse::<u32>().map_err(|_| format!("Invalid day in date: {date}"))?,
 	);
-	if !(1900..=2200).contains(&year) || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+	let days_in_month = |y: u32, m: u32| -> u32 {
+		match m {
+			1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+			4 | 6 | 9 | 11 => 30,
+			2 => if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) { 29 } else { 28 },
+			_ => 0,
+		}
+	};
+	if !(1900..=2200).contains(&year) || !(1..=12).contains(&month) || day < 1 || day > days_in_month(year, month) {
 		return Err(format!("Date out of valid range: {date}"));
 	}
 

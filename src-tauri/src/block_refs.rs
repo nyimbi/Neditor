@@ -37,8 +37,13 @@ pub(crate) fn resolve_block_reference(
 ) -> Result<BlockRefResult, String> {
 	let root = PathBuf::from(&workspace_root);
 
-	// Reject absolute paths — only workspace-relative paths allowed
-	if ref_path.starts_with('/') || ref_path.starts_with('~') {
+	// Reject absolute paths — only workspace-relative paths allowed.
+	// Covers POSIX (/), tilde (~), Windows drive letters (C:), and UNC (\\).
+	let is_absolute = ref_path.starts_with('/')
+		|| ref_path.starts_with('~')
+		|| ref_path.starts_with("\\\\")
+		|| (ref_path.len() >= 3 && ref_path.chars().nth(1) == Some(':'));
+	if is_absolute {
 		return Err("Block reference path must be relative to the workspace root".to_string());
 	}
 	let file_path = root.join(&ref_path);

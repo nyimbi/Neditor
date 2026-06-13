@@ -2157,7 +2157,10 @@
           <h2>References</h2>
           <label>
             Citation style
-            <select :value="citationStyle" @change="setCitationStyle(eventValue($event))">
+            <select
+              :value="citationStyle"
+              @change="(e) => { const v = eventValue(e); if (v.endsWith('.csl') || v.startsWith('/')) applyCslFilePath(v); else setCitationStyle(v); }"
+            >
               <optgroup label="Built-in styles">
                 <option value="title">Title</option>
                 <option value="author-year">Author-year</option>
@@ -2173,7 +2176,7 @@
                 <option value="ama">AMA</option>
               </optgroup>
               <optgroup v-if="installedCslStyles.length" label="Installed CSL files">
-                <option v-for="style in installedCslStyles" :key="style.id" :value="style.path" @click="applyCslFilePath(style.path)">{{ style.title }}</option>
+                <option v-for="style in installedCslStyles" :key="style.id" :value="style.path">{{ style.title }}</option>
               </optgroup>
             </select>
           </label>
@@ -5327,7 +5330,7 @@
         aria-label="Live preview"
         tabindex="-1"
         @scroll="syncEditorScrollFromPreview"
-        @click="(e: MouseEvent) => { const a = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null; if (a) { const href = a.getAttribute('href') || ''; const blockMatch = href.match(/^!?\[\[(.+?)(?:#(.+?))?\]\]$/); if (blockMatch) { e.preventDefault(); void navigateToBlockRef(blockMatch[1], blockMatch[2] || ''); } } }"
+        @click="(e: MouseEvent) => { const a = (e.target as HTMLElement).closest('a[data-wiki-target]') as HTMLAnchorElement | null; if (a) { const target = a.getAttribute('data-wiki-target') || ''; const hashIdx = target.indexOf('#'); if (hashIdx !== -1) { e.preventDefault(); void navigateToBlockRef(target.slice(0, hashIdx), target.slice(hashIdx + 1)); } } }"
       >
         <section v-if="store.mode === 'export'" class="export-preview-summary" aria-label="Export preview summary">
           <div>
@@ -8123,6 +8126,7 @@
       </header>
       <div class="track-changes-body">
         <div class="track-changes-actions">
+          <button type="button" @click="suggestDeleteSelection" :disabled="!store.suggestionMode" title="Mark selected text as a deletion suggestion">− Delete selection</button>
           <button type="button" class="primary" @click="acceptAllSuggestions" :disabled="!activeSuggestions.length">Accept all ({{ activeSuggestions.length }})</button>
           <button type="button" @click="rejectAllSuggestions" :disabled="!activeSuggestions.length">Reject all</button>
           <button type="button" @click="refreshSuggestions">↻ Refresh</button>
@@ -10038,12 +10042,12 @@ title: PARA Workspace Index
   Promise.all(
     dirs.map(dir => invoke('save_file_as', {
       path: `${store.workspaceRoot}/${dir}/_INDEX.md`,
-      content: `---\ntitle: ${dir}\n---\n\n# ${dir}\n\n`,
+      text: `---\ntitle: ${dir}\n---\n\n# ${dir}\n\n`,
     }).catch(() => null))
   ).then(() =>
     invoke('save_file_as', {
       path: `${store.workspaceRoot}/_PARA-INDEX.md`,
-      content: indexContent,
+      text: indexContent,
     })
   ).then(() => {
     store.statusMessage = 'PARA workspace scaffolded — Projects, Areas, Resources, Archives created.';
@@ -10083,6 +10087,34 @@ function applyCslFilePath(path: string): void {
 // ── Track changes ─────────────────────────────────────────────────────────────
 const trackChangesOpen = ref(false);
 const activeSuggestions = ref<Array<{ id: string; kind: string; text: string; author: string; line: number }>>([]);
+
+async function suggestDeleteSelection(): Promise<void> {
+  if (!editorView || !store.suggestionMode) return;
+  const sel = editorView.state.selection.main;
+  if (sel.empty) { store.statusMessage = 'Select text to mark as a deletion suggestion.'; return; }
+  const selectedText = editorView.state.sliceDoc(sel.from, sel.to);
+  try {
+    const marker = await invoke<string>('create_delete_suggestion', {
+      textToDelete: selectedText,
+      author: store.auditAuthor || 'reviewer',
+    });
+    editorView.dispatch({ changes: { from: sel.from, to: sel.to, insert: marker } });
+    await refreshSuggestions();
+  } catch (e) { store.statusMessage = `Suggestion error: ${e}`; }
+}
+
+async function suggestInsertAtCursor(insertText: string): Promise<void> {
+  if (!editorView || !store.suggestionMode) return;
+  const pos = editorView.state.selection.main.head;
+  try {
+    const marker = await invoke<string>('create_insert_suggestion', {
+      textToInsert: insertText,
+      author: store.auditAuthor || 'reviewer',
+    });
+    editorView.dispatch({ changes: { from: pos, to: pos, insert: marker } });
+    await refreshSuggestions();
+  } catch (e) { store.statusMessage = `Suggestion error: ${e}`; }
+}
 
 async function refreshSuggestions(): Promise<void> {
   const text = active.value?.text || '';
@@ -10152,7 +10184,7 @@ async function navigateToBlockRef(refPath: string, headingId: string): Promise<v
 }
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
-interface CanvasNode { id: string; type: 'document' | 'note' | 'image'; x: number; y: number; w: number; h: number; content: string; path?: string }
+interface CanvasNode { id: string; type: 'document' | 'note'; x: number; y: number; w: number; h: number; content: string; path?: string }
 interface CanvasEdge { id: string; source: string; target: string; label: string }
 const canvasNodes = ref<CanvasNode[]>([]);
 const canvasEdges = ref<CanvasEdge[]>([]);
@@ -10218,7 +10250,7 @@ function saveCanvasState(): void {
   const state = { nodes: canvasNodes.value, edges: canvasEdges.value };
   invoke('save_file_as', {
     path: `${store.workspaceRoot}/.neditor-canvas.json`,
-    content: JSON.stringify(state, null, 2),
+    text: JSON.stringify(state, null, 2),
   }).catch(() => null);
 }
 
@@ -13953,6 +13985,8 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "graph", label: "Knowledge Graph", help: "Visualise wiki-link connections across all workspace documents.", run: () => { store.mode = "graph"; buildKnowledgeGraph(); } },
           { id: "canvas", label: "Canvas View", help: "Spatially arrange documents and notes on an infinite whiteboard.", run: () => { store.mode = "canvas"; loadCanvasState(); } },
           { id: "track-changes", label: "Track Changes", help: "Review and accept or reject inline suggestions.", run: () => { trackChangesOpen.value = true; refreshSuggestions(); } },
+          { id: "suggest-delete", label: "Suggest Delete", help: "Mark selected text as a tracked deletion.", run: () => void suggestDeleteSelection() },
+          { id: "suggest-insert", label: "Suggest Insert", help: "Wrap clipboard text as a tracked insertion at cursor.", run: () => { navigator.clipboard.readText().then(t => void suggestInsertAtCursor(t)).catch(() => void suggestInsertAtCursor('…')); } },
           { id: "minimap-toggle", label: "Toggle Minimap", help: "Show or hide the document structure minimap.", run: () => { store.showMinimap = !store.showMinimap; } },
         ],
       },

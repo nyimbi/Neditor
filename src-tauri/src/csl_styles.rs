@@ -22,9 +22,19 @@ fn extract_csl_title(content: &str) -> Option<String> {
 #[tauri::command]
 pub(crate) fn list_installed_csl_styles(csl_dir: Option<String>) -> Result<Vec<CslStyleInfo>, String> {
 	let search_dirs: Vec<PathBuf> = if let Some(dir) = csl_dir {
-		vec![PathBuf::from(dir)]
+		// User-supplied path: validate it is either an absolute path pointing at a real directory,
+		// or a home-relative path. We do NOT read contents of discovered files for user-supplied
+		// paths to avoid content-leak via symlinks — only return filenames and paths.
+		let p = PathBuf::from(&dir);
+		if !p.exists() {
+			return Err(format!("CSL directory does not exist: {dir}"));
+		}
+		if !p.is_dir() {
+			return Err(format!("CSL path is not a directory: {dir}"));
+		}
+		vec![p]
 	} else {
-		// Default Pandoc CSL locations
+		// Default Pandoc CSL locations — built from env vars, not user input
 		let mut dirs = Vec::new();
 		if let Some(home) = std::env::var_os("HOME") {
 			dirs.push(PathBuf::from(&home).join(".pandoc").join("csl"));
@@ -32,6 +42,9 @@ pub(crate) fn list_installed_csl_styles(csl_dir: Option<String>) -> Result<Vec<C
 		}
 		if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
 			dirs.push(PathBuf::from(xdg).join("pandoc").join("csl"));
+		}
+		if dirs.is_empty() {
+			eprintln!("[csl_styles] HOME and XDG_DATA_HOME unset — no default CSL directories to scan");
 		}
 		dirs
 	};

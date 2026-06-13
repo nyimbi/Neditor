@@ -1,3 +1,5 @@
+// Valid toolbar row IDs: "file" | "writing" | "review-navigation" | "view"
+// A preset's collapsedRows lists rows to ADD to the collapsed set (merged, not replaced).
 export interface WorkflowPreset {
 	id: string
 	label: string
@@ -18,7 +20,7 @@ export const WORKFLOW_PRESETS: WorkflowPreset[] = [
 		icon: "⚗",
 		exportTarget: "pdf",
 		sidebar: "references",
-		collapsedRows: ["row-business", "row-presentation"],
+		collapsedRows: [],
 		citationStyle: "apa",
 	},
 	{
@@ -28,7 +30,7 @@ export const WORKFLOW_PRESETS: WorkflowPreset[] = [
 		icon: "📋",
 		exportTarget: "docx",
 		sidebar: "templates",
-		collapsedRows: ["row-equations", "row-citations"],
+		collapsedRows: [],
 	},
 	{
 		id: "lab-notebook",
@@ -37,7 +39,7 @@ export const WORKFLOW_PRESETS: WorkflowPreset[] = [
 		icon: "🔬",
 		exportTarget: "pdf",
 		sidebar: "templates",
-		collapsedRows: ["row-business", "row-presentation"],
+		collapsedRows: [],
 		citationStyle: "apa",
 	},
 	{
@@ -47,7 +49,7 @@ export const WORKFLOW_PRESETS: WorkflowPreset[] = [
 		icon: "📊",
 		exportTarget: "pptx",
 		sidebar: "exports",
-		collapsedRows: ["row-equations", "row-citations", "row-business"],
+		collapsedRows: ["review-navigation"],
 		editorMode: "presentation",
 	},
 	{
@@ -57,7 +59,7 @@ export const WORKFLOW_PRESETS: WorkflowPreset[] = [
 		icon: "📓",
 		exportTarget: "html",
 		sidebar: "daily-notes",
-		collapsedRows: ["row-equations", "row-citations", "row-business", "row-presentation"],
+		collapsedRows: ["review-navigation", "view"],
 	},
 	{
 		id: "technical",
@@ -66,7 +68,7 @@ export const WORKFLOW_PRESETS: WorkflowPreset[] = [
 		icon: "⚙",
 		exportTarget: "html",
 		sidebar: "outline",
-		collapsedRows: ["row-citations", "row-business", "row-presentation"],
+		collapsedRows: [],
 	},
 ]
 
