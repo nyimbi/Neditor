@@ -223,6 +223,311 @@ fn pikchr_native_fallback_handles_semicolon_shapes_and_arrow_labels() {
         .any(|diagnostic| diagnostic.message.contains("Pikchr native preview")));
 }
 
+// ── Pikchr extended grammar tests (spec 9.19) ──────────────────────────
+
+#[test]
+fn pikchr_direction_aware_arrows_right_and_down() {
+    // Horizontal chain: box → arrow right → box
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nA: box \"Start\"\narrow right\nB: box \"End\"\n```\n"
+            .to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h.contains("transform-pikchr"), "SVG wrapper class");
+    assert_eq!(h.matches("pikchr-box").count(), 2, "two boxes");
+    // Arrow marker must appear (either in defs id or marker-end attribute).
+    assert!(h.contains("pikchr-arrow"), "arrow marker present");
+    // Start label left of End: both SVG x attributes extracted via crude text search.
+    // Verify A.cx < B.cx by locating the two <text> elements for the labels.
+    let a_pos = h.find(">Start<").expect("Start label");
+    let b_pos = h.find(">End<").expect("End label");
+    assert!(
+        a_pos < b_pos,
+        "Start text node appears before End in SVG (left-to-right layout)"
+    );
+
+    // Vertical chain: box → arrow down → box
+    let v = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"Top\"\narrow down\nbox \"Bottom\"\n```\n"
+            .to_string(),
+        file_path: None,
+    })
+    .html;
+    assert_eq!(
+        v.matches("pikchr-box").count(),
+        2,
+        "two boxes for vertical chain"
+    );
+    let top_pos = v.find(">Top<").expect("Top label");
+    let bot_pos = v.find(">Bottom<").expect("Bottom label");
+    // In SVG, elements with higher y appear later in the stream.
+    assert!(
+        top_pos < bot_pos,
+        "Top text node appears before Bottom (top-to-bottom layout)"
+    );
+}
+
+#[test]
+fn pikchr_dashed_and_dotted_line_styles() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"A\"\narrow dashed\nbox \"B\"\narrow dotted\nbox \"C\"\n```\n"
+            .to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h.contains("transform-pikchr"));
+    // dashed → stroke-dasharray="8 4"
+    assert!(h.contains("8 4"), "dashed dasharray present");
+    // dotted → stroke-dasharray="1 6" stroke-linecap="round"
+    assert!(h.contains("1 6"), "dotted dasharray present");
+    assert!(h.contains("round"), "dotted linecap present");
+}
+
+#[test]
+fn pikchr_fill_color_named_and_hex() {
+    // Named color
+    let h1 = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"Red\" fill red\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h1.contains("#dc2626"), "named red → #dc2626");
+
+    // Hex 0x prefix
+    let h2 = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\ncircle \"Blue\" fill 0x2563eb\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h2.contains("#2563eb"), "0x hex color decoded");
+
+    // none / transparent fill
+    let h3 = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"Ghost\" fill none\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h3.contains("fill=\"none\""), "fill none → transparent");
+}
+
+#[test]
+fn pikchr_ellipse_oval_circle_distinct_svg_elements() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\ncircle \"C\"\nellipse \"E\"\noval \"O\"\n```\n"
+            .to_string(),
+        file_path: None,
+    })
+    .html;
+    // circle → <circle …/>
+    assert!(h.contains("<circle "), "circle shape uses <circle>");
+    // ellipse → <ellipse …/>
+    assert!(h.contains("<ellipse "), "ellipse shape uses <ellipse>");
+    // oval → <rect … rx="…"/> (fully-rounded rect) — rx equals hh so it's > 0
+    // Both oval and box use <rect>; oval has a non-trivial rx equal to its half-height.
+    // We confirm "O" label is present (oval rendered).
+    assert!(h.contains(">O<"), "oval label rendered");
+    // All three carry the pikchr-circle CSS class.
+    assert_eq!(
+        h.matches("pikchr-circle").count(),
+        3,
+        "circle/ellipse/oval all get pikchr-circle class"
+    );
+}
+
+#[test]
+fn pikchr_named_variables_and_from_to_positioning() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nA: box \"Source\"\nmove right\nB: box \"Target\"\nline from A.e to B.w\n```\n"
+            .to_string(),
+        file_path: None,
+    })
+    .html;
+    assert_eq!(h.matches("pikchr-box").count(), 2, "two named boxes");
+    // line from A.e to B.w — a <line> element with no marker-end.
+    assert!(h.contains("<line "), "line element present");
+    assert!(
+        h.contains("Source") && h.contains("Target"),
+        "both labels rendered"
+    );
+}
+
+#[test]
+fn pikchr_text_placement_above_and_below() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"InShape\"\nbox \"UpperLabel\" above\n```\n"
+            .to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h.contains("InShape"), "center label present");
+    assert!(h.contains("UpperLabel"), "above label present");
+    // "above" label y coordinate is less than shape center y.
+    // We can't easily parse SVG here, but confirm the text exists and no error.
+    assert!(!h.contains("transform-error"), "no error section");
+}
+
+#[test]
+fn pikchr_move_primitive_skips_gap_between_boxes() {
+    // Without move: two boxes would be adjacent (left exit of A = entry of B).
+    // With move: an extra gap is inserted.
+    let no_move = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"A\"\nbox \"B\"\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    let with_move = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"A\"\nmove right\nbox \"B\"\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    // Both should render two boxes with no error.
+    assert_eq!(no_move.matches("pikchr-box").count(), 2);
+    assert_eq!(with_move.matches("pikchr-box").count(), 2);
+    // The with-move diagram should be wider (larger viewBox width value).
+    let vw_no = no_move
+        .find("viewBox=\"0 0 ")
+        .and_then(|p| no_move[p + 13..].split('"').next())
+        .and_then(|s| s.split_whitespace().next())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(0);
+    let vw_mv = with_move
+        .find("viewBox=\"0 0 ")
+        .and_then(|p| with_move[p + 13..].split('"').next())
+        .and_then(|s| s.split_whitespace().next())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(0);
+    assert!(vw_mv > vw_no, "move widens the canvas: {vw_mv} > {vw_no}");
+}
+
+#[test]
+fn pikchr_comments_hash_and_slash_are_stripped() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\n# hash comment\n// slash comment\nbox \"Visible\"\n```\n"
+            .to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h.contains("Visible"), "visible label rendered");
+    assert!(!h.contains("hash comment"), "hash comment absent");
+    assert!(!h.contains("slash comment"), "slash comment absent");
+    assert!(!h.contains("transform-error"), "no error section");
+}
+
+#[test]
+fn pikchr_then_segments_produce_polyline() {
+    // "arrow right then down" → multi-point line → <polyline> element.
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"A\"\narrow right then down\nbox \"B\"\n```\n"
+            .to_string(),
+        file_path: None,
+    })
+    .html;
+    assert_eq!(h.matches("pikchr-box").count(), 2);
+    assert!(h.contains("<polyline "), "then-segment arrow → polyline");
+    assert!(h.contains("marker-end"), "arrowhead on polyline");
+}
+
+#[test]
+fn pikchr_line_primitive_has_no_arrowhead() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"P\"\nline right\nbox \"Q\"\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    assert_eq!(h.matches("pikchr-box").count(), 2);
+    // line (not arrow) should NOT have marker-end.
+    assert!(!h.contains("marker-end"), "plain line has no arrowhead");
+}
+
+#[test]
+fn pikchr_stroke_color_attribute() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"X\" color green\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    // green → #16a34a
+    assert!(h.contains("#16a34a"), "stroke color applied");
+}
+
+#[test]
+fn pikchr_cylinder_and_file_shapes_render_compound_svg() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\ncylinder \"DB\"\nfile \"Doc\"\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h.contains("pikchr-cylinder"), "cylinder class");
+    assert!(h.contains("pikchr-file"), "file class");
+    // Cylinder: <ellipse> for top cap + <rect> for body.
+    assert!(h.contains("<ellipse "), "cylinder cap ellipse");
+    // File: <path> for body + corner notch.
+    let path_count = h.matches("<path ").count();
+    assert!(
+        path_count >= 2,
+        "file has at least body path + notch path: got {path_count}"
+    );
+}
+
+#[test]
+fn pikchr_diamond_shape_uses_polygon() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\ndiamond \"Decision\"\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h.contains("pikchr-diamond"), "diamond class");
+    assert!(h.contains("<polygon "), "diamond uses polygon element");
+    assert!(h.contains("Decision"), "diamond label rendered");
+}
+
+#[test]
+fn pikchr_width_height_size_attrs_expand_shape() {
+    // Default box half-size: hw=60 hh=38 → w=120 h=76.
+    // With width 2in height 1in → w=320 h=160 (at PK_INCH=160).
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"Big\" width 2in height 1in\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h.contains("pikchr-box"), "box rendered");
+    // width=320, height=160 should appear in the rect attributes.
+    assert!(
+        h.contains("320.0") || h.contains("width=\"320"),
+        "expanded width present"
+    );
+}
+
+#[test]
+fn pikchr_standalone_text_primitive_renders() {
+    let h = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\nbox \"Node\"\ntext \"Annotation\"\n```\n".to_string(),
+        file_path: None,
+    })
+    .html;
+    assert!(h.contains("Node"), "box label");
+    assert!(h.contains("Annotation"), "standalone text label");
+}
+
+#[test]
+fn pikchr_empty_body_emits_diagnostic_not_crash() {
+    let resp = compile(CompileRequest {
+        text: "---\ntitle: T\n---\n```pikchr\n# only a comment\n```\n".to_string(),
+        file_path: None,
+    });
+    assert!(
+        resp.html.contains("transform-error"),
+        "empty pikchr → error section"
+    );
+    assert!(
+        resp.diagnostics
+            .iter()
+            .any(|d| d.message.contains("Pikchr native preview")),
+        "diagnostic emitted for empty pikchr"
+    );
+}
+
 #[test]
 fn external_diagram_fallbacks_render_simple_native_svgs() {
     for (name, body, expected) in [

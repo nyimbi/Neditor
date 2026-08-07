@@ -72,120 +72,1044 @@ pub(crate) fn render_mermaid_svg(
     svg
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Pikchr native fallback renderer — spec 9.19
+//
+// Covers: box / circle / ellipse / oval / cylinder / diamond / file shapes;
+// arrow / line / spline connectors with right/left/up/down direction and
+// optional "then" multi-segments; move; standalone text; fill / color /
+// stroke colors (named + 0xRRGGBB / #RRGGBB); dashed / dotted / thick /
+// thin line styles; above / below / ljust / rjust text placement; named
+// object variables (A: box "…"); from ObjRef.compass to ObjRef.compass
+// and at ObjRef.compass positioning; # and // comment stripping.
+//
+// Uses a 2-D cursor model: cursor starts at (0,0), shapes are placed with
+// their entry edge at the cursor, and the cursor advances to the exit edge.
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Screen pixels per Pikchr inch (Pikchr's default unit is inches).
+const PK_INCH: f32 = 160.0;
+/// Default arrow / line segment length (0.5 in).
+const PK_ARROW_LEN: f32 = 0.5 * PK_INCH;
+/// Default move distance (0.5 in).
+const PK_MOVE_LEN: f32 = 0.5 * PK_INCH;
+/// Canvas padding around the bounding box.
+const PK_PAD: f32 = 20.0;
+
+// ─── Shape kind ────────────────────────────────────────────────────────
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum PkShape {
+    Box,
+    Circle,
+    Ellipse,
+    Oval,
+    Cylinder,
+    Diamond,
+    File,
+}
+
+impl PkShape {
+    /// Default (half-width, half-height) in pixels.
+    fn half_size(self) -> (f32, f32) {
+        match self {
+            PkShape::Box | PkShape::Diamond => (60.0, 38.0),
+            PkShape::Circle => (38.0, 38.0),
+            PkShape::Ellipse => (60.0, 32.0),
+            PkShape::Oval => (60.0, 22.0),
+            PkShape::Cylinder => (48.0, 44.0),
+            PkShape::File => (55.0, 40.0),
+        }
+    }
+
+    fn css_class(self) -> &'static str {
+        match self {
+            PkShape::Box => "pikchr-box",
+            PkShape::Circle | PkShape::Ellipse | PkShape::Oval => "pikchr-circle",
+            PkShape::Cylinder => "pikchr-cylinder",
+            PkShape::Diamond => "pikchr-diamond",
+            PkShape::File => "pikchr-file",
+        }
+    }
+}
+
+// ─── Direction ─────────────────────────────────────────────────────────
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+enum PkDir {
+    #[default]
+    Right,
+    Left,
+    Up,
+    Down,
+}
+
+impl PkDir {
+    fn vec(self) -> (f32, f32) {
+        match self {
+            PkDir::Right => (1.0, 0.0),
+            PkDir::Left => (-1.0, 0.0),
+            PkDir::Up => (0.0, -1.0),
+            PkDir::Down => (0.0, 1.0),
+        }
+    }
+
+    fn opposite(self) -> Self {
+        match self {
+            PkDir::Right => PkDir::Left,
+            PkDir::Left => PkDir::Right,
+            PkDir::Up => PkDir::Down,
+            PkDir::Down => PkDir::Up,
+        }
+    }
+}
+
+fn parse_pk_dir(s: &str) -> Option<PkDir> {
+    match s.to_ascii_lowercase().as_str() {
+        "right" => Some(PkDir::Right),
+        "left" => Some(PkDir::Left),
+        "up" => Some(PkDir::Up),
+        "down" => Some(PkDir::Down),
+        _ => None,
+    }
+}
+
+// ─── Text placement ────────────────────────────────────────────────────
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+enum PkPlace {
+    #[default]
+    Center,
+    Above,
+    Below,
+    Ljust,
+    Rjust,
+}
+
+fn parse_pk_place(s: &str) -> Option<PkPlace> {
+    match s.to_ascii_lowercase().as_str() {
+        "above" => Some(PkPlace::Above),
+        "below" => Some(PkPlace::Below),
+        "ljust" => Some(PkPlace::Ljust),
+        "rjust" => Some(PkPlace::Rjust),
+        _ => None,
+    }
+}
+
+// ─── Colors ────────────────────────────────────────────────────────────
+
+#[derive(Clone, Debug, Default, PartialEq)]
+enum PkColor {
+    #[default]
+    Default,
+    None,
+    Rgb(u8, u8, u8),
+}
+
+impl PkColor {
+    fn to_svg(&self, default: &str) -> String {
+        match self {
+            PkColor::Default => default.to_string(),
+            PkColor::None => "none".to_string(),
+            PkColor::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
+        }
+    }
+}
+
+fn parse_pk_color(s: &str) -> PkColor {
+    match s.to_ascii_lowercase().as_str() {
+        "none" | "transparent" => PkColor::None,
+        "red" => PkColor::Rgb(220, 38, 38),
+        "green" => PkColor::Rgb(22, 163, 74),
+        "blue" => PkColor::Rgb(37, 99, 235),
+        "white" => PkColor::Rgb(255, 255, 255),
+        "black" => PkColor::Rgb(0, 0, 0),
+        "gray" | "grey" => PkColor::Rgb(107, 114, 128),
+        "lightgray" | "lightgrey" => PkColor::Rgb(209, 213, 219),
+        "darkgray" | "darkgrey" => PkColor::Rgb(75, 85, 99),
+        "yellow" => PkColor::Rgb(234, 179, 8),
+        "orange" => PkColor::Rgb(249, 115, 22),
+        "purple" => PkColor::Rgb(147, 51, 234),
+        "pink" => PkColor::Rgb(236, 72, 153),
+        "cyan" | "aqua" => PkColor::Rgb(6, 182, 212),
+        "brown" => PkColor::Rgb(146, 64, 14),
+        _ => {
+            let hex = s.strip_prefix("0x").or_else(|| s.strip_prefix('#'));
+            if let Some(h) = hex {
+                if h.len() == 6 {
+                    if let (Ok(r), Ok(g), Ok(b)) = (
+                        u8::from_str_radix(&h[0..2], 16),
+                        u8::from_str_radix(&h[2..4], 16),
+                        u8::from_str_radix(&h[4..6], 16),
+                    ) {
+                        return PkColor::Rgb(r, g, b);
+                    }
+                }
+            }
+            PkColor::Default
+        }
+    }
+}
+
+// ─── Style ─────────────────────────────────────────────────────────────
+
+#[derive(Clone, Debug, Default)]
+struct PkStyle {
+    fill: PkColor,
+    stroke: PkColor,
+    dashed: bool,
+    dotted: bool,
+    thickness: Option<f32>,
+}
+
+impl PkStyle {
+    fn sw(&self, default: f32) -> f32 {
+        self.thickness.unwrap_or(default)
+    }
+
+    fn dash_attr(&self) -> String {
+        if self.dotted {
+            " stroke-dasharray=\"1 6\" stroke-linecap=\"round\"".to_string()
+        } else if self.dashed {
+            " stroke-dasharray=\"8 4\"".to_string()
+        } else {
+            String::new()
+        }
+    }
+}
+
+// ─── Canvas items ──────────────────────────────────────────────────────
+
+struct PkShapeItem {
+    shape: PkShape,
+    cx: f32,
+    cy: f32,
+    hw: f32,
+    hh: f32,
+    labels: Vec<(String, PkPlace)>,
+    style: PkStyle,
+}
+
+struct PkLineItem {
+    /// Two or more (x,y) waypoints; arrowhead at last point when arrow_end.
+    points: Vec<(f32, f32)>,
+    arrow_end: bool,
+    arrow_start: bool,
+    label: Option<(String, PkPlace)>,
+    style: PkStyle,
+}
+
+struct PkTextItem {
+    x: f32,
+    y: f32,
+    content: String,
+    placement: PkPlace,
+}
+
+enum PkItem {
+    Shape(PkShapeItem),
+    Line(PkLineItem),
+    Text(PkTextItem),
+}
+
+// ─── Named-object registry (for from/to/at) ────────────────────────────
+
+struct PkObj {
+    cx: f32,
+    cy: f32,
+    hw: f32,
+    hh: f32,
+}
+
+impl PkObj {
+    fn compass(&self, pt: &str) -> (f32, f32) {
+        let (cx, cy, hw, hh) = (self.cx, self.cy, self.hw, self.hh);
+        match pt {
+            "n" | "north" | "top" => (cx, cy - hh),
+            "s" | "south" | "bottom" => (cx, cy + hh),
+            "e" | "east" | "right" => (cx + hw, cy),
+            "w" | "west" | "left" => (cx - hw, cy),
+            "ne" => (cx + hw, cy - hh),
+            "nw" => (cx - hw, cy - hh),
+            "se" => (cx + hw, cy + hh),
+            "sw" => (cx - hw, cy + hh),
+            _ => (cx, cy), // "center", "c", or unknown
+        }
+    }
+
+    fn exit(&self, dir: PkDir) -> (f32, f32) {
+        match dir {
+            PkDir::Right => self.compass("e"),
+            PkDir::Left => self.compass("w"),
+            PkDir::Up => self.compass("n"),
+            PkDir::Down => self.compass("s"),
+        }
+    }
+}
+
+// ─── Layout state ──────────────────────────────────────────────────────
+
+struct PkState {
+    lx: f32,
+    ly: f32,
+    dir: PkDir,
+    names: HashMap<String, PkObj>,
+    items: Vec<PkItem>,
+}
+
+impl PkState {
+    fn new() -> Self {
+        Self {
+            lx: 0.0,
+            ly: 0.0,
+            dir: PkDir::Right,
+            names: HashMap::new(),
+            items: Vec::new(),
+        }
+    }
+
+    fn resolve(&self, r: &str) -> Option<(f32, f32)> {
+        let (obj, compass) = r.split_once('.').unwrap_or((r, "center"));
+        self.names.get(obj).map(|o| o.compass(compass))
+    }
+
+    fn place_shape(
+        &mut self,
+        shape: PkShape,
+        hw: f32,
+        hh: f32,
+        labels: Vec<(String, PkPlace)>,
+        style: PkStyle,
+        name: Option<&str>,
+        at: Option<(f32, f32)>,
+    ) {
+        let (dx, dy) = self.dir.vec();
+        let (cx, cy) = at.unwrap_or((self.lx + dx * hw, self.ly + dy * hh));
+        let obj = PkObj { cx, cy, hw, hh };
+        let (ex, ey) = obj.exit(self.dir);
+        self.lx = ex;
+        self.ly = ey;
+        if let Some(n) = name {
+            self.names.insert(n.to_string(), PkObj { cx, cy, hw, hh });
+        }
+        self.items.push(PkItem::Shape(PkShapeItem {
+            shape,
+            cx,
+            cy,
+            hw,
+            hh,
+            labels,
+            style,
+        }));
+    }
+
+    fn place_line(
+        &mut self,
+        dir: PkDir,
+        len: f32,
+        arrow_end: bool,
+        arrow_start: bool,
+        label: Option<(String, PkPlace)>,
+        style: PkStyle,
+        from: Option<(f32, f32)>,
+        to: Option<(f32, f32)>,
+        then_segs: Vec<(PkDir, f32)>,
+        name: Option<&str>,
+    ) {
+        let (x1, y1) = from.unwrap_or((self.lx, self.ly));
+        let (dx, dy) = dir.vec();
+        let end = to.unwrap_or_else(|| (x1 + dx * len, y1 + dy * len));
+        let mut pts = vec![(x1, y1), end];
+        for (sdir, slen) in &then_segs {
+            let &(px, py) = pts.last().unwrap();
+            let (sdx, sdy) = sdir.vec();
+            pts.push((px + sdx * slen, py + sdy * slen));
+        }
+        let &(ex, ey) = pts.last().unwrap();
+        self.lx = ex;
+        self.ly = ey;
+        if let Some(n) = name {
+            let cx = (x1 + ex) / 2.0;
+            let cy = (y1 + ey) / 2.0;
+            self.names.insert(
+                n.to_string(),
+                PkObj {
+                    cx,
+                    cy,
+                    hw: (ex - x1).abs() / 2.0,
+                    hh: (ey - y1).abs() / 2.0,
+                },
+            );
+        }
+        self.items.push(PkItem::Line(PkLineItem {
+            points: pts,
+            arrow_end,
+            arrow_start,
+            label,
+            style,
+        }));
+    }
+}
+
+// ─── Tokeniser ─────────────────────────────────────────────────────────
+
+fn pk_tokens(s: &str) -> Vec<&str> {
+    let b = s.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i].is_ascii_whitespace() {
+            i += 1;
+            continue;
+        }
+        if b[i] == b'"' {
+            let start = i;
+            i += 1;
+            while i < b.len() && b[i] != b'"' {
+                i += 1;
+            }
+            if i < b.len() {
+                i += 1;
+            }
+            out.push(&s[start..i]);
+        } else {
+            let start = i;
+            while i < b.len() && !b[i].is_ascii_whitespace() && b[i] != b'"' {
+                i += 1;
+            }
+            out.push(&s[start..i]);
+        }
+    }
+    out
+}
+
+fn pk_unquote(s: &str) -> &str {
+    s.strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .unwrap_or(s)
+}
+
+/// Parse a number that Pikchr treats as inches; returns pixels.
+fn pk_parse_num(s: &str) -> Option<f32> {
+    let s = s.trim_end_matches(|c: char| c.is_alphabetic());
+    s.parse::<f32>().ok().map(|n| n * PK_INCH)
+}
+
+// ─── Attribute block parser ────────────────────────────────────────────
+
+struct PkAttrs {
+    dir: Option<PkDir>,
+    len: Option<f32>,
+    width: Option<f32>,
+    height: Option<f32>,
+    style: PkStyle,
+    labels: Vec<(String, PkPlace)>,
+    at: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
+    then_segs: Vec<(PkDir, f32)>,
+    arrow_start: bool, // bidirectional (<->)
+}
+
+impl Default for PkAttrs {
+    fn default() -> Self {
+        Self {
+            dir: None,
+            len: None,
+            width: None,
+            height: None,
+            style: PkStyle::default(),
+            labels: Vec::new(),
+            at: None,
+            from: None,
+            to: None,
+            then_segs: Vec::new(),
+            arrow_start: false,
+        }
+    }
+}
+
+fn parse_pk_attrs(tokens: &[&str]) -> PkAttrs {
+    let mut a = PkAttrs::default();
+    let mut i = 0;
+    let mut after_then = false;
+
+    while i < tokens.len() {
+        let t = tokens[i];
+        let tl = t.to_ascii_lowercase();
+
+        if t.starts_with('"') {
+            // Quoted label; check if the next token is a placement modifier.
+            let content = pk_unquote(t).to_string();
+            let place = if i + 1 < tokens.len() {
+                if let Some(p) = parse_pk_place(tokens[i + 1]) {
+                    i += 1;
+                    p
+                } else {
+                    PkPlace::Center
+                }
+            } else {
+                PkPlace::Center
+            };
+            a.labels.push((content, place));
+            i += 1;
+            continue;
+        }
+
+        if tl == "then" {
+            after_then = true;
+            i += 1;
+            continue;
+        }
+
+        if let Some(dir) = parse_pk_dir(&tl) {
+            // Peek for optional length after the direction.
+            let seg_len = if i + 1 < tokens.len() {
+                pk_parse_num(tokens[i + 1]).map(|n| {
+                    i += 1;
+                    n
+                })
+            } else {
+                None
+            };
+            if after_then {
+                a.then_segs.push((dir, seg_len.unwrap_or(PK_ARROW_LEN)));
+                after_then = false;
+            } else {
+                a.dir = Some(dir);
+                if let Some(n) = seg_len {
+                    a.len = Some(n);
+                }
+            }
+            i += 1;
+            continue;
+        }
+        after_then = false;
+
+        match tl.as_str() {
+            "dashed" => a.style.dashed = true,
+            "dotted" => a.style.dotted = true,
+            "thick" => a.style.thickness = Some(4.0),
+            "thin" => a.style.thickness = Some(1.0),
+            "fill" => {
+                i += 1;
+                if i < tokens.len() {
+                    a.style.fill = parse_pk_color(tokens[i]);
+                }
+            }
+            "color" | "stroke" => {
+                i += 1;
+                if i < tokens.len() {
+                    a.style.stroke = parse_pk_color(tokens[i]);
+                }
+            }
+            "width" | "wd" => {
+                i += 1;
+                if i < tokens.len() {
+                    a.width = pk_parse_num(tokens[i]);
+                }
+            }
+            "height" | "ht" => {
+                i += 1;
+                if i < tokens.len() {
+                    a.height = pk_parse_num(tokens[i]);
+                }
+            }
+            "radius" | "rad" => {
+                i += 1;
+                if let Some(r) = tokens.get(i).and_then(|t| pk_parse_num(t)) {
+                    a.width = Some(r * 2.0);
+                    a.height = Some(r * 2.0);
+                }
+            }
+            "len" | "length" => {
+                i += 1;
+                if i < tokens.len() {
+                    a.len = pk_parse_num(tokens[i]);
+                }
+            }
+            "at" => {
+                i += 1;
+                if i < tokens.len() {
+                    a.at = Some(tokens[i].to_string());
+                }
+            }
+            "from" => {
+                i += 1;
+                if i < tokens.len() {
+                    a.from = Some(tokens[i].to_string());
+                }
+            }
+            "to" => {
+                i += 1;
+                if i < tokens.len() {
+                    a.to = Some(tokens[i].to_string());
+                }
+            }
+            "<->" => a.arrow_start = true,
+            _ => {
+                // Standalone placement modifier (applies to last label pushed so far).
+                if let Some(p) = parse_pk_place(&tl) {
+                    if let Some((_, pl)) = a.labels.last_mut() {
+                        *pl = p;
+                    }
+                } else if let Some(n) = pk_parse_num(t) {
+                    if a.len.is_none() {
+                        a.len = Some(n);
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    a
+}
+
+// ─── Statement parser ──────────────────────────────────────────────────
+
+fn pk_strip_comment(line: &str) -> &str {
+    // Strip # comments (not inside quotes) and // comments.
+    let mut in_q = false;
+    let b = line.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'"' {
+            in_q = !in_q;
+        }
+        if !in_q {
+            if b[i] == b'#' {
+                return &line[..i];
+            }
+            if i + 1 < b.len() && b[i] == b'/' && b[i + 1] == b'/' {
+                return &line[..i];
+            }
+        }
+        i += 1;
+    }
+    line
+}
+
+fn parse_pk_statement(state: &mut PkState, stmt: &str) {
+    let stmt = stmt.trim();
+    if stmt.is_empty() {
+        return;
+    }
+    // Skip macro / control structures (require expression evaluator).
+    let lower = stmt.to_ascii_lowercase();
+    if lower.starts_with("if ")
+        || lower.starts_with("for ")
+        || lower.starts_with("define ")
+        || lower.starts_with("print ")
+        || lower.starts_with("assert ")
+    {
+        return;
+    }
+
+    let toks = pk_tokens(stmt);
+    if toks.is_empty() {
+        return;
+    }
+
+    let mut idx = 0;
+    // Optional "Name:" label.
+    let name: Option<&str> = if !toks[0].starts_with('"') && toks[0].ends_with(':') {
+        let n = toks[0].trim_end_matches(':');
+        idx += 1;
+        if n.is_empty() {
+            None
+        } else {
+            Some(n)
+        }
+    } else {
+        None
+    };
+
+    if idx >= toks.len() {
+        return;
+    }
+    let cmd = toks[idx].to_ascii_lowercase();
+    idx += 1;
+    let rest = &toks[idx..];
+
+    match cmd.as_str() {
+        "box" | "circle" | "ellipse" | "oval" | "cylinder" | "diamond" | "file" => {
+            let shape = match cmd.as_str() {
+                "box" => PkShape::Box,
+                "circle" => PkShape::Circle,
+                "ellipse" => PkShape::Ellipse,
+                "oval" => PkShape::Oval,
+                "cylinder" => PkShape::Cylinder,
+                "diamond" => PkShape::Diamond,
+                _ => PkShape::File,
+            };
+            let a = parse_pk_attrs(rest);
+            let (def_hw, def_hh) = shape.half_size();
+            let hw = a.width.map(|w| w / 2.0).unwrap_or(def_hw);
+            let hh = a.height.map(|h| h / 2.0).unwrap_or(def_hh);
+            if let Some(d) = a.dir {
+                state.dir = d;
+            }
+            let at = a.at.as_deref().and_then(|r| state.resolve(r));
+            state.place_shape(shape, hw, hh, a.labels, a.style, name, at);
+        }
+        "arrow" => {
+            let a = parse_pk_attrs(rest);
+            let dir = a.dir.unwrap_or(state.dir);
+            state.dir = dir;
+            let len = a.len.unwrap_or(PK_ARROW_LEN);
+            let from = a.from.as_deref().and_then(|r| state.resolve(r));
+            let to = a.to.as_deref().and_then(|r| state.resolve(r));
+            let lbl = a.labels.into_iter().next();
+            state.place_line(
+                dir,
+                len,
+                true,
+                a.arrow_start,
+                lbl,
+                a.style,
+                from,
+                to,
+                a.then_segs,
+                name,
+            );
+        }
+        "line" | "spline" => {
+            let a = parse_pk_attrs(rest);
+            let dir = a.dir.unwrap_or(state.dir);
+            state.dir = dir;
+            let len = a.len.unwrap_or(PK_ARROW_LEN);
+            let from = a.from.as_deref().and_then(|r| state.resolve(r));
+            let to = a.to.as_deref().and_then(|r| state.resolve(r));
+            let lbl = a.labels.into_iter().next();
+            // "line" has no arrowhead by default; bidirectional (<->) adds start.
+            state.place_line(
+                dir,
+                len,
+                a.arrow_start,
+                false,
+                lbl,
+                a.style,
+                from,
+                to,
+                a.then_segs,
+                name,
+            );
+        }
+        "move" => {
+            let a = parse_pk_attrs(rest);
+            let dir = a.dir.unwrap_or(state.dir);
+            state.dir = dir;
+            let len = a.len.unwrap_or(PK_MOVE_LEN);
+            let (dx, dy) = dir.vec();
+            state.lx += dx * len;
+            state.ly += dy * len;
+        }
+        "text" => {
+            let a = parse_pk_attrs(rest);
+            for (content, placement) in a.labels {
+                state.items.push(PkItem::Text(PkTextItem {
+                    x: state.lx,
+                    y: state.ly,
+                    content,
+                    placement,
+                }));
+            }
+        }
+        _ => {}
+    }
+}
+
+fn parse_pk_diagram(body: &str) -> PkState {
+    let mut state = PkState::new();
+    for line in body.lines() {
+        let line = pk_strip_comment(line);
+        for stmt in line.split(';').map(str::trim).filter(|s| !s.is_empty()) {
+            parse_pk_statement(&mut state, stmt);
+        }
+    }
+    state
+}
+
+// ─── Bounding-box helper ───────────────────────────────────────────────
+
+fn pk_bbox(items: &[PkItem]) -> (f32, f32, f32, f32) {
+    let mut x0 = f32::INFINITY;
+    let mut y0 = f32::INFINITY;
+    let mut x1 = f32::NEG_INFINITY;
+    let mut y1 = f32::NEG_INFINITY;
+    for item in items {
+        match item {
+            PkItem::Shape(s) => {
+                x0 = x0.min(s.cx - s.hw);
+                y0 = y0.min(s.cy - s.hh);
+                x1 = x1.max(s.cx + s.hw);
+                y1 = y1.max(s.cy + s.hh);
+                // Account for labels placed outside the shape.
+                for (_, p) in &s.labels {
+                    if *p == PkPlace::Above {
+                        y0 = y0.min(s.cy - s.hh - 20.0);
+                    }
+                    if *p == PkPlace::Below {
+                        y1 = y1.max(s.cy + s.hh + 20.0);
+                    }
+                }
+            }
+            PkItem::Line(l) => {
+                for &(px, py) in &l.points {
+                    x0 = x0.min(px);
+                    y0 = y0.min(py);
+                    x1 = x1.max(px);
+                    y1 = y1.max(py);
+                }
+            }
+            PkItem::Text(t) => {
+                x0 = x0.min(t.x - 50.0);
+                y0 = y0.min(t.y - 18.0);
+                x1 = x1.max(t.x + 50.0);
+                y1 = y1.max(t.y + 18.0);
+            }
+        }
+    }
+    if x0 == f32::INFINITY {
+        (0.0, 0.0, 200.0, 100.0)
+    } else {
+        (x0, y0, x1, y1)
+    }
+}
+
+// ─── SVG emitter ───────────────────────────────────────────────────────
+
+fn pk_emit_shape(svg: &mut String, s: &PkShapeItem, ox: f32, oy: f32) {
+    let cx = s.cx + ox;
+    let cy = s.cy + oy;
+    let hw = s.hw;
+    let hh = s.hh;
+    let x = cx - hw;
+    let y = cy - hh;
+    let w = hw * 2.0;
+    let h = hh * 2.0;
+    let fill = s.style.fill.to_svg("#eff6ff");
+    let stroke = s.style.stroke.to_svg("#275DA8");
+    let sw = s.style.sw(2.0);
+    let dash = s.style.dash_attr();
+    let cls = s.shape.css_class();
+
+    match s.shape {
+        PkShape::Box => {
+            svg.push_str(&format!(
+                "<rect class=\"pikchr-node {cls}\" x=\"{x:.1}\" y=\"{y:.1}\" width=\"{w:.1}\" height=\"{h:.1}\" rx=\"6\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>"
+            ));
+        }
+        PkShape::Circle => {
+            let r = hw.min(hh);
+            svg.push_str(&format!(
+                "<circle class=\"pikchr-node {cls}\" cx=\"{cx:.1}\" cy=\"{cy:.1}\" r=\"{r:.1}\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>"
+            ));
+        }
+        PkShape::Ellipse => {
+            svg.push_str(&format!(
+                "<ellipse class=\"pikchr-node {cls}\" cx=\"{cx:.1}\" cy=\"{cy:.1}\" rx=\"{hw:.1}\" ry=\"{hh:.1}\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>"
+            ));
+        }
+        PkShape::Oval => {
+            // Oval = rectangle with fully-rounded short ends.
+            svg.push_str(&format!(
+                "<rect class=\"pikchr-node {cls}\" x=\"{x:.1}\" y=\"{y:.1}\" width=\"{w:.1}\" height=\"{h:.1}\" rx=\"{hh:.1}\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>"
+            ));
+        }
+        PkShape::Cylinder => {
+            let cap = hh * 0.22; // cap ellipse half-height
+            let body_y = y + cap;
+            let body_h = h - cap;
+            svg.push_str(&format!(
+                "<rect class=\"pikchr-node {cls}\" x=\"{x:.1}\" y=\"{body_y:.1}\" width=\"{w:.1}\" height=\"{body_h:.1}\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>"
+            ));
+            svg.push_str(&format!(
+                "<ellipse cx=\"{cx:.1}\" cy=\"{body_y:.1}\" rx=\"{hw:.1}\" ry=\"{cap:.1}\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>"
+            ));
+            // Bottom arc: cubic Bézier curving downward.
+            svg.push_str(&format!(
+                "<path d=\"M{x:.1},{:.1} C{x:.1},{:.1} {:.1},{:.1} {:.1},{:.1}\" fill=\"none\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>",
+                y + h - cap,
+                y + h + cap,
+                x + w, y + h + cap,
+                x + w, y + h - cap
+            ));
+        }
+        PkShape::Diamond => {
+            svg.push_str(&format!(
+                "<polygon class=\"pikchr-node {cls}\" points=\"{cx:.1},{y:.1} {:.1},{cy:.1} {cx:.1},{:.1} {x:.1},{cy:.1}\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>",
+                x + w, y + h
+            ));
+        }
+        PkShape::File => {
+            let notch = hw * 0.28;
+            svg.push_str(&format!(
+                "<path class=\"pikchr-node {cls}\" d=\"M{x:.1},{y:.1} H{:.1} L{:.1},{:.1} V{:.1} H{x:.1} Z\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>",
+                x + w - notch, x + w, y + notch, y + h
+            ));
+            svg.push_str(&format!(
+                "<path d=\"M{:.1},{y:.1} V{:.1} H{:.1}\" fill=\"none\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}/>",
+                x + w - notch, y + notch, x + w
+            ));
+        }
+    }
+
+    for (label, place) in &s.labels {
+        if label.is_empty() {
+            continue;
+        }
+        let (tx, ty, anchor) = match place {
+            PkPlace::Center => (cx, cy + 5.0, "middle"),
+            PkPlace::Above => (cx, y - 5.0, "middle"),
+            PkPlace::Below => (cx, y + h + 15.0, "middle"),
+            PkPlace::Ljust => (x + 5.0, cy + 5.0, "start"),
+            PkPlace::Rjust => (x + w - 5.0, cy + 5.0, "end"),
+        };
+        svg.push_str(&format!(
+            "<text x=\"{tx:.1}\" y=\"{ty:.1}\" font-size=\"14\" text-anchor=\"{anchor}\" fill=\"#111827\">{}</text>",
+            escape_html(label)
+        ));
+    }
+}
+
+fn pk_emit_line(svg: &mut String, l: &PkLineItem, ox: f32, oy: f32) {
+    if l.points.len() < 2 {
+        return;
+    }
+    let stroke = l.style.stroke.to_svg("#275DA8");
+    let sw = l.style.sw(2.0);
+    let dash = l.style.dash_attr();
+    let end_marker = if l.arrow_end {
+        " marker-end=\"url(#pikchr-arrow)\""
+    } else {
+        ""
+    };
+    let start_marker = if l.arrow_start {
+        " marker-start=\"url(#pikchr-arrow-start)\""
+    } else {
+        ""
+    };
+
+    if l.points.len() == 2 {
+        let (x1, y1) = l.points[0];
+        let (x2, y2) = l.points[1];
+        svg.push_str(&format!(
+            "<line class=\"pikchr-arrow\" x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}{end_marker}{start_marker}/>",
+            x1 + ox, y1 + oy, x2 + ox, y2 + oy
+        ));
+    } else {
+        let pts: String = l
+            .points
+            .iter()
+            .map(|(px, py)| format!("{:.1},{:.1}", px + ox, py + oy))
+            .collect::<Vec<_>>()
+            .join(" ");
+        svg.push_str(&format!(
+            "<polyline class=\"pikchr-arrow\" points=\"{pts}\" fill=\"none\" stroke=\"{stroke}\" stroke-width=\"{sw}\"{dash}{end_marker}{start_marker}/>"
+        ));
+    }
+
+    if let Some((label, place)) = &l.label {
+        if !label.is_empty() {
+            let n = l.points.len();
+            let mid = if n % 2 == 1 {
+                l.points[n / 2]
+            } else {
+                let (ax, ay) = l.points[n / 2 - 1];
+                let (bx, by) = l.points[n / 2];
+                ((ax + bx) / 2.0, (ay + by) / 2.0)
+            };
+            let (tx, ty, anchor) = match place {
+                PkPlace::Below => (mid.0 + ox, mid.1 + oy + 15.0, "middle"),
+                PkPlace::Ljust => (mid.0 + ox - 4.0, mid.1 + oy + 5.0, "end"),
+                PkPlace::Rjust => (mid.0 + ox + 4.0, mid.1 + oy + 5.0, "start"),
+                _ => (mid.0 + ox, mid.1 + oy - 6.0, "middle"),
+            };
+            svg.push_str(&format!(
+                "<text x=\"{tx:.1}\" y=\"{ty:.1}\" font-size=\"12\" text-anchor=\"{anchor}\" fill=\"#475569\">{}</text>",
+                escape_html(label)
+            ));
+        }
+    }
+}
+
+fn pk_emit_text(svg: &mut String, t: &PkTextItem, ox: f32, oy: f32) {
+    let (tx, ty, anchor) = match t.placement {
+        PkPlace::Above => (t.x + ox, t.y + oy - 6.0, "middle"),
+        PkPlace::Below => (t.x + ox, t.y + oy + 15.0, "middle"),
+        PkPlace::Ljust => (t.x + ox, t.y + oy, "start"),
+        PkPlace::Rjust => (t.x + ox, t.y + oy, "end"),
+        PkPlace::Center => (t.x + ox, t.y + oy, "middle"),
+    };
+    svg.push_str(&format!(
+        "<text x=\"{tx:.1}\" y=\"{ty:.1}\" font-size=\"14\" text-anchor=\"{anchor}\" fill=\"#111827\">{}</text>",
+        escape_html(&t.content)
+    ));
+}
+
+fn emit_pk_svg(state: &PkState) -> String {
+    let (bx0, by0, bx1, by1) = pk_bbox(&state.items);
+    let ox = PK_PAD - bx0;
+    let oy = PK_PAD - by0;
+    let vw = ((bx1 - bx0) + 2.0 * PK_PAD).ceil() as i32;
+    let vh = ((by1 - by0) + 2.0 * PK_PAD).ceil() as i32;
+
+    let mut svg = format!(
+        "<svg class=\"transform transform-pikchr\" xmlns=\"http://www.w3.org/2000/svg\" \
+         viewBox=\"0 0 {vw} {vh}\" role=\"img\">\
+         <defs>\
+         <marker id=\"pikchr-arrow\" markerWidth=\"10\" markerHeight=\"7\" refX=\"9\" refY=\"3.5\" \
+           orient=\"auto\" markerUnits=\"strokeWidth\">\
+           <path d=\"M0,0 L0,7 L10,3.5 z\" fill=\"#275DA8\"/>\
+         </marker>\
+         <marker id=\"pikchr-arrow-start\" markerWidth=\"10\" markerHeight=\"7\" refX=\"1\" refY=\"3.5\" \
+           orient=\"auto-start-reverse\" markerUnits=\"strokeWidth\">\
+           <path d=\"M0,0 L0,7 L10,3.5 z\" fill=\"#275DA8\"/>\
+         </marker>\
+         </defs>"
+    );
+
+    // Lines drawn before shapes so shapes occlude line endpoints cleanly.
+    for item in &state.items {
+        if let PkItem::Line(l) = item {
+            pk_emit_line(&mut svg, l, ox, oy);
+        }
+    }
+    for item in &state.items {
+        if let PkItem::Shape(s) = item {
+            pk_emit_shape(&mut svg, s, ox, oy);
+        }
+    }
+    for item in &state.items {
+        if let PkItem::Text(t) = item {
+            pk_emit_text(&mut svg, t, ox, oy);
+        }
+    }
+
+    svg.push_str("</svg>");
+    svg
+}
+
 pub(crate) fn render_pikchr_svg(
     body: &str,
     artifact_diags: &mut Vec<DocumentDiagnostic>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> String {
-    let diagram = parse_pikchr_diagram(body);
-    if diagram.nodes.is_empty() {
+    let state = parse_pk_diagram(body);
+    if state.items.is_empty() {
         let diagnostic = diag(
             "warning",
             "Pikchr native preview did not find any supported shape nodes.",
             None,
             None,
-            Some("Use simple statements such as box \"Start\"; arrow; diamond \"Decision\", or configure an external Pikchr engine."),
+            Some("Use statements such as box \"Start\"; arrow right; diamond \"Decision\". Configure an external Pikchr engine for full grammar support."),
         );
         artifact_diags.push(diagnostic.clone());
         diagnostics.push(diagnostic);
         return "<section class=\"transform transform-pikchr transform-error\">No Pikchr nodes found</section>".to_string();
     }
-    let has_arrows = diagram.explicit_arrows || diagram.nodes.len() > 1;
-    let width = diagram.nodes.len().max(1) * 190 + 60;
-    let mut svg = format!(
-        "<svg class=\"transform transform-pikchr\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} 180\" role=\"img\"><defs><marker id=\"pikchr-arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"8\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\"><path d=\"M0,0 L0,6 L9,3 z\" fill=\"#275DA8\"/></marker></defs>"
-    );
-    for (index, node) in diagram.nodes.iter().enumerate() {
-        let x = 40 + index * 190;
-        let y = 62;
-        if has_arrows && index + 1 < diagram.nodes.len() {
-            svg.push_str(&format!(
-                "<line x1=\"{}\" y1=\"90\" x2=\"{}\" y2=\"90\" stroke=\"#275DA8\" stroke-width=\"3\" marker-end=\"url(#pikchr-arrow)\"/>",
-                x + 120,
-                x + 180
-            ));
-            if let Some(label) = diagram
-                .connector_labels
-                .get(index)
-                .and_then(|label| label.as_ref())
-                .filter(|label| !label.trim().is_empty())
-            {
-                svg.push_str(&format!(
-                    "<text x=\"{}\" y=\"76\" text-anchor=\"middle\" font-size=\"12\" fill=\"#475569\">{}</text>",
-                    x + 150,
-                    escape_html(label)
-                ));
-            }
-        }
-        match node.shape {
-            PikchrShape::Circle => {
-                svg.push_str(&format!(
-                    "<ellipse class=\"pikchr-node pikchr-circle\" cx=\"{}\" cy=\"90\" rx=\"60\" ry=\"34\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
-                    x + 60
-                ));
-            }
-            PikchrShape::Cylinder => {
-                svg.push_str(&format!(
-                    "<rect class=\"pikchr-node pikchr-cylinder\" x=\"{x}\" y=\"{}\" width=\"120\" height=\"46\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
-                    y + 10
-                ));
-                svg.push_str(&format!(
-                    "<ellipse cx=\"{}\" cy=\"{}\" rx=\"60\" ry=\"12\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
-                    x + 60,
-                    y + 10
-                ));
-                svg.push_str(&format!(
-                    "<path d=\"M{x} {} C{x} {} {} {} {} {}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
-                    y + 56,
-                    y + 72,
-                    x + 120,
-                    y + 72,
-                    x + 120,
-                    y + 56
-                ));
-            }
-            PikchrShape::Diamond => {
-                svg.push_str(&format!(
-                    "<polygon class=\"pikchr-node pikchr-diamond\" points=\"{},{} {},{} {},{} {},{}\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
-                    x + 60,
-                    y,
-                    x + 120,
-                    y + 28,
-                    x + 60,
-                    y + 56,
-                    x,
-                    y + 28
-                ));
-            }
-            PikchrShape::File => {
-                svg.push_str(&format!(
-                    "<path class=\"pikchr-node pikchr-file\" d=\"M{x} {y} H{} L{} {} V{} H{x} Z\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
-                    x + 92,
-                    x + 120,
-                    y + 28,
-                    y + 56
-                ));
-                svg.push_str(&format!(
-                    "<path d=\"M{} {y} V{} H{}\" fill=\"none\" stroke=\"#275DA8\" stroke-width=\"2\"/>",
-                    x + 92,
-                    y + 28,
-                    x + 120
-                ));
-            }
-            PikchrShape::Box => {
-                svg.push_str(&format!(
-                    "<rect class=\"pikchr-node pikchr-box\" x=\"{x}\" y=\"{y}\" width=\"120\" height=\"56\" rx=\"6\" fill=\"#eff6ff\" stroke=\"#275DA8\" stroke-width=\"2\"/>"
-                ));
-            }
-        }
-        svg.push_str(&format!(
-            "<text x=\"{}\" y=\"95\" text-anchor=\"middle\" font-size=\"14\" fill=\"#111827\">{}</text>",
-            x + 60,
-            escape_html(&node.label)
-        ));
-    }
-    svg.push_str("</svg>");
-    svg
+    emit_pk_svg(&state)
 }
 
 pub(crate) fn render_dot_svg(
@@ -312,92 +1236,6 @@ fn render_simple_graph_svg(name: &str, graph: &MermaidGraph) -> String {
     }
     svg.push_str("</svg>");
     svg
-}
-
-#[derive(Clone, Copy)]
-enum PikchrShape {
-    Box,
-    Circle,
-    Cylinder,
-    Diamond,
-    File,
-}
-
-struct PikchrNode {
-    shape: PikchrShape,
-    label: String,
-}
-
-struct PikchrDiagram {
-    nodes: Vec<PikchrNode>,
-    connector_labels: Vec<Option<String>>,
-    explicit_arrows: bool,
-}
-
-fn parse_pikchr_diagram(body: &str) -> PikchrDiagram {
-    let mut diagram = PikchrDiagram {
-        nodes: Vec::new(),
-        connector_labels: Vec::new(),
-        explicit_arrows: false,
-    };
-    for statement in pikchr_statements(body) {
-        if let Some(node) = parse_pikchr_node(statement) {
-            diagram.nodes.push(node);
-        } else if pikchr_command(statement) == Some("arrow") {
-            diagram.explicit_arrows = true;
-            diagram
-                .connector_labels
-                .push(extract_first_quoted(statement));
-        }
-    }
-    diagram
-}
-
-fn pikchr_statements(body: &str) -> impl Iterator<Item = &str> {
-    body.lines()
-        .flat_map(|line| line.split(';'))
-        .map(str::trim)
-        .filter(|statement| !statement.is_empty())
-}
-
-fn parse_pikchr_node(statement: &str) -> Option<PikchrNode> {
-    let command = pikchr_command(statement)?;
-    let shape = match command {
-        "box" => PikchrShape::Box,
-        "circle" | "ellipse" | "oval" => PikchrShape::Circle,
-        "cylinder" => PikchrShape::Cylinder,
-        "diamond" => PikchrShape::Diamond,
-        "file" => PikchrShape::File,
-        _ => return None,
-    };
-    Some(PikchrNode {
-        shape,
-        label: pikchr_label(statement, command),
-    })
-}
-
-fn pikchr_command(statement: &str) -> Option<&str> {
-    statement
-        .trim_start()
-        .split(|ch: char| ch.is_whitespace() || ch == '(')
-        .next()
-        .filter(|command| !command.is_empty())
-}
-
-fn pikchr_label(line: &str, command: &str) -> String {
-    extract_first_quoted(line)
-        .or_else(|| {
-            let rest = line.trim_start_matches(command).trim();
-            (!rest.is_empty()).then(|| rest.to_string())
-        })
-        .unwrap_or_else(|| command.to_string())
-}
-
-fn extract_first_quoted(text: &str) -> Option<String> {
-    let start = text.find('"')?;
-    let after_start = &text[start + 1..];
-    let end = after_start.find('"')?;
-    Some(after_start[..end].to_string())
 }
 
 #[derive(Debug)]
@@ -756,7 +1594,7 @@ fn parse_plantuml_declaration_node(text: &str) -> MermaidNode {
             };
         }
     }
-    if let Some(label) = extract_first_quoted(text) {
+    if let Some(label) = first_quoted(text) {
         let id = normalize_plain_node_id(&label);
         return MermaidNode {
             id,
@@ -764,6 +1602,12 @@ fn parse_plantuml_declaration_node(text: &str) -> MermaidNode {
         };
     }
     parse_plain_graph_node(text)
+}
+
+fn first_quoted(text: &str) -> Option<String> {
+    let start = text.find('"')? + 1;
+    let end = text[start..].find('"')?;
+    Some(text[start..start + end].to_string())
 }
 
 fn split_plantuml_alias(text: &str) -> Option<(&str, &str)> {
