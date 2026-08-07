@@ -1,0 +1,4 @@
+[toolchain]
+# Pins to ≥1.77.2 to close CVE-2024-24576 (BatBadBut — .bat/.cmd argument
+# injection on Windows).  We also reject .bat/.cmd engine paths in code (F7).
+channel = "1.82"

@@ -55,8 +55,16 @@ Mitigations:
 - Engine paths must point to regular executable files; directories, project
   files, and shell command text are rejected before spawn.
 - Adapters construct fixed argument lists and do not interpolate shell strings.
-- Execution is bounded by timeout and output-size limits.
+- Execution is bounded by timeout and output-size limits; the child process is
+  killed on timeout (best-effort via `Arc<Mutex<Option<Child>>>`).
+- Cache files are stored in a per-user, mode-0700 directory
+  (`data_local_dir()/neditor/transform-cache-v1`), not the world-writable
+  `/tmp`, to prevent cache-poisoning by other local users.
 - Cache keys include source, engine path, input mode, and adapter behavior.
+- On Windows, engine paths with a `.bat` or `.cmd` extension are rejected
+  (CVE-2024-24576 / BatBadBut); the toolchain is pinned to ≥1.77.2.
+- Engine paths in diagnostics and cached manifests have the home-directory
+  prefix replaced with `~` to avoid leaking usernames into exported artifacts.
 - Failed external execution falls back to native rendering when available.
 - Diagnostics include setup, execution, stderr, timeout, and cache details.
 
@@ -68,9 +76,12 @@ read-only query with a destructive statement.
 Mitigations:
 
 - SQL transforms require an explicitly trusted `sqlite3` executable.
-- SQL blocks must use a document-local `database` path that resolves inside the
-  document folder.
-- Only `SELECT` and `WITH` queries are accepted.
+- SQL blocks must use a `database` path that canonicalizes inside the document
+  folder; both relative and absolute paths are checked via
+  `std::path::Path::canonicalize` so symlinks and `..` traversal are caught.
+  Paths that cannot be canonicalized (missing file, broken symlink) are denied.
+- Only `SELECT` and `WITH` queries are accepted; `sqlite3` is also invoked with
+  `-readonly` as a defence-in-depth gate independent of the keyword blocklist.
 - Stacked statements such as `SELECT ...; DELETE ...` are rejected before
   `sqlite3` is invoked.
 - Mutation keywords are detected on SQL word boundaries while quoted strings

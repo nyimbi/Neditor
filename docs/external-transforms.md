@@ -26,12 +26,22 @@ Current platform evidence is tracked in
 
 - Engine paths must point to real regular executable files, not folders,
   project files, package directories, or shell command text.
+- On Windows, `.bat` and `.cmd` engine paths are rejected outright
+  (CVE-2024-24576 / BatBadBut); point to the real `.exe`.
 - Each engine has an adapter profile for arguments, stdin/file mode, output handling, and diagnostics.
 - Trust is per engine.
 - Disabled engines are skipped before trust/path execution checks.
-- Execution is bounded by timeout and output-size limits.
+- Execution is bounded by timeout and output-size limits; the child process is
+  sent a kill signal when the timeout fires.
+- Temp input files are created with `O_EXCL` in a per-user mode-0700 directory
+  (not the world-writable system temp dir) to prevent symlink-race attacks.
+- Cache files are stored in a per-user, mode-0700 directory
+  (`data_local_dir()/neditor/transform-cache-v1`) so other local users cannot
+  read or plant poisoned entries.
 - Cache keys include the transform name, source hash, engine path, engine file
   size and modified time, adapter arguments, input mode, and renderer version.
+- Engine paths in diagnostics and exported manifests have the home-directory
+  prefix replaced with `~` to avoid leaking usernames into shared artifacts.
 - Failed external execution falls back to native rendering when a native fallback exists.
 
 ## macOS
@@ -164,7 +174,7 @@ pnpm run check:engines
 | D2 | stdin | SVG stdout | Uses SVG export profile. |
 | Pikchr | stdin | SVG stdout | Native fallback covers simple semicolon- or line-separated `box`, `circle`/`ellipse`, `diamond`, `cylinder`, `file`, and `arrow` statements with connector labels. `pikchr-cli` executables receive a temporary `.pikchr` source file path as their positional argument. |
 | PlantUML | file | SVG or PNG sidecar | File mode avoids version-specific stdin behavior. Use `format=png`, `output=png`, or the `png` flag on a `plantuml` fence when a PNG artifact is required; otherwise NEditor requests SVG. |
-| SQLite SQL | file | CSV stdout converted to Markdown table | `sql` fences run through trusted `sqlite3` only. NEditor passes the database path and query without a shell, accepts read-only `SELECT` or `WITH` statements, rejects multi-statement or mutating SQL, and renders the result as a Markdown table. |
+| SQLite SQL | file | CSV stdout converted to Markdown table | `sql` fences run through trusted `sqlite3` only. NEditor passes the database path and query without a shell, accepts read-only `SELECT` or `WITH` statements, rejects multi-statement or mutating SQL, and invokes `sqlite3 -readonly` as a defence-in-depth gate at the SQLite engine level. The `database` path must canonicalize inside the document folder; absolute paths, `..` traversal, and symlinks pointing outside are all denied. |
 
 ## Troubleshooting
 

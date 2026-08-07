@@ -67,33 +67,53 @@ impl TransformExecutionOptions {
             .cloned()
     }
 
-    pub(crate) fn resolve_document_path(&self, value: &str) -> PathBuf {
+    /// Resolve `value` relative to the document directory and canonicalize the
+    /// result so symlinks and `..` components are fully resolved.  Returns an
+    /// error if the path does not exist or if canonicalization fails.
+    ///
+    /// Callers should call [`Self::document_relative_path_escapes`] first to
+    /// get a clear error message; this method provides a second canonicalized
+    /// path for the actual spawn call.
+    pub(crate) fn resolve_document_path(&self, value: &str) -> Result<PathBuf, String> {
         let path = PathBuf::from(value);
-        if path.is_absolute() {
+        let candidate = if path.is_absolute() {
             path
         } else if let Some(document_dir) = &self.document_dir {
             document_dir.join(path)
         } else {
             path
-        }
+        };
+        // Canonicalize resolves symlinks and strips `..` so the path handed to
+        // the spawned process is clean and fully absolute.
+        candidate.canonicalize().map_err(|e| {
+            format!(
+                "Cannot resolve database path '{}': {e}",
+                candidate.display()
+            )
+        })
     }
 
+    /// Returns `true` when `value` resolves outside the document directory.
+    ///
+    /// Both absolute paths (e.g. `/home/user/.mozilla/firefox/places.sqlite`,
+    /// `C:\Users\…\db.sqlite`, UNC `\\server\share\…`) and relative paths with
+    /// `..` traversal or symlinks are checked via canonicalization.  A missing
+    /// file, a broken symlink, or a failed canonicalize is treated as a
+    /// potential escape and returns `true` (deny).
     pub(crate) fn document_relative_path_escapes(&self, value: &str) -> bool {
         let path = PathBuf::from(value);
         let Some(document_dir) = &self.document_dir else {
             return false;
         };
-        if path.is_absolute() {
-            return false;
-        }
-        let resolved = document_dir.join(&path);
-        // Invariant: callers must ensure the resolved path already exists on disk
-        // (e.g. the is_file() check in sql.rs) before calling this function.
-        // If canonicalization still fails after the file is confirmed to exist
-        // (e.g. a race or a broken symlink), we treat it as a potential escape
-        // and deny access rather than falling back to the ParentDir heuristic,
-        // which cannot detect symlink-based escapes.
-        match (document_dir.canonicalize(), resolved.canonicalize()) {
+        // Resolve absolute paths directly; join relative ones to document_dir.
+        // Both branches are then canonicalized and compared — this closes the
+        // bypass (F10) where an absolute path bypassed the check entirely.
+        let candidate = if path.is_absolute() {
+            path
+        } else {
+            document_dir.join(&path)
+        };
+        match (document_dir.canonicalize(), candidate.canonicalize()) {
             (Ok(base), Ok(target)) => !target.starts_with(base),
             _ => true,
         }
@@ -143,6 +163,123 @@ fn string_map_option(options: &Value, key: &str) -> HashMap<String, String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn opts_with_dir(dir: &std::path::Path) -> TransformExecutionOptions {
+        TransformExecutionOptions {
+            document_dir: Some(dir.to_path_buf()),
+            ..Default::default()
+        }
+    }
+
+    // ── F10: absolute-path bypass ─────────────────────────────────────────────
+
+    /// An absolute path to a real location clearly outside the doc dir must
+    /// be detected as an escape.
+    #[cfg(unix)]
+    #[test]
+    fn absolute_path_outside_doc_dir_escapes() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let opts = opts_with_dir(dir.path());
+        // /tmp always exists and is outside any per-run TempDir on Unix.
+        assert!(
+            opts.document_relative_path_escapes("/tmp"),
+            "/tmp must be detected as an escape"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn absolute_path_outside_doc_dir_escapes_windows() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let opts = opts_with_dir(dir.path());
+        assert!(opts.document_relative_path_escapes(r"C:\Windows"));
+    }
+
+    /// An absolute path that resolves **inside** the doc dir is allowed.
+    #[test]
+    fn absolute_path_inside_doc_dir_does_not_escape() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let file = dir.path().join("data.sqlite");
+        fs::write(&file, b"").unwrap();
+        let opts = opts_with_dir(dir.path());
+        let abs = file.to_str().unwrap();
+        assert!(
+            !opts.document_relative_path_escapes(abs),
+            "absolute path to a file inside doc dir must not be flagged"
+        );
+    }
+
+    // ── `..` traversal ────────────────────────────────────────────────────────
+
+    /// A relative path with `..` that escapes must be detected.  The target
+    /// file does not need to exist — canonicalize failure is treated as deny.
+    #[test]
+    fn dotdot_traversal_is_detected_as_escape() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let opts = opts_with_dir(dir.path());
+        assert!(
+            opts.document_relative_path_escapes("../../etc/passwd"),
+            ".. traversal must be detected"
+        );
+    }
+
+    /// A relative path that stays inside the dir is allowed.
+    #[test]
+    fn relative_path_inside_dir_is_allowed() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let file = dir.path().join("db.sqlite");
+        fs::write(&file, b"").unwrap();
+        let opts = opts_with_dir(dir.path());
+        assert!(
+            !opts.document_relative_path_escapes("db.sqlite"),
+            "relative path to an existing file inside doc dir must not be flagged"
+        );
+    }
+
+    // ── Symlink escape (Unix only) ────────────────────────────────────────────
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_pointing_outside_dir_escapes() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let link = dir.path().join("evil.sqlite");
+        // Symlink points to /tmp — outside the doc dir.
+        std::os::unix::fs::symlink("/tmp", &link).unwrap();
+        let opts = opts_with_dir(dir.path());
+        assert!(
+            opts.document_relative_path_escapes("evil.sqlite"),
+            "symlink pointing outside doc dir must be detected"
+        );
+    }
+
+    // ── resolve_document_path ─────────────────────────────────────────────────
+
+    #[test]
+    fn resolve_document_path_canonicalizes_existing_file() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let file = dir.path().join("db.sqlite");
+        fs::write(&file, b"").unwrap();
+        let opts = opts_with_dir(dir.path());
+        let resolved = opts.resolve_document_path("db.sqlite").unwrap();
+        assert!(resolved.is_absolute());
+        assert!(resolved.exists());
+    }
+
+    #[test]
+    fn resolve_document_path_returns_error_for_nonexistent() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let opts = opts_with_dir(dir.path());
+        assert!(
+            opts.resolve_document_path("no-such-file.sqlite").is_err(),
+            "missing file must return an error"
+        );
+    }
 }
 
 fn bool_map_option(options: &Value, key: &str) -> HashMap<String, bool> {

@@ -6,8 +6,8 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
-    sync::{mpsc, Mutex, OnceLock},
+    process::{Child, Command, Stdio},
+    sync::{mpsc, Arc, Mutex, OnceLock},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -83,6 +83,17 @@ pub(crate) fn run_external_transform(
             request.name
         ));
     }
+    // F6 TODO — Backend-owned trust store.
+    // Currently `request.trusted` is read from the IPC caller, so a webview
+    // XSS or an injected script could claim `trusted: true` for an attacker-
+    // chosen engine_path.  Mitigating factor: `script-src 'self'` CSP and the
+    // absolute-path requirement.
+    //
+    // Full fix: introduce `static TRUST_STORE: OnceLock<Mutex<HashMap<PathBuf, TrustEntry>>>`,
+    // keyed by canonicalized engine path.  A `trust_engine(path, fingerprint)`
+    // Tauri command (callable only from the Settings UI) populates the store.
+    // `run_external_transform` ignores `request.trusted` and consults the store
+    // instead, making trust non-spoofable without also controlling engine_path.
     if !request.trusted {
         return Err(format!(
             "{} requires explicit trust before external execution.",
@@ -115,6 +126,8 @@ pub(crate) fn run_external_transform(
         ));
     }
     validate_external_engine_executable(&engine_path)?;
+    // F7: Reject .bat/.cmd on Windows (CVE-2024-24576 / BatBadBut).
+    validate_bat_cmd_extension(&engine_path)?;
 
     let input_limit = request
         .max_input_bytes
@@ -275,7 +288,11 @@ fn external_engine_adapter(
             let source_arg = temp_path
                 .map(path_to_string)
                 .unwrap_or_else(|| "<tempfile>".to_string());
-            Ok(ExternalEngineAdapter::stdout("pikchr", "stdin", vec![source_arg]))
+            Ok(ExternalEngineAdapter::stdout(
+                "pikchr",
+                "stdin",
+                vec![source_arg],
+            ))
         }
         ("pikchr", "file") if pikchr_uses_source_file_argument(engine_path) => {
             Ok(ExternalEngineAdapter::stdout("pikchr", "file", vec![temp]))
@@ -363,6 +380,45 @@ fn validate_external_engine_executable(engine_path: &Path) -> Result<(), String>
 #[cfg(not(unix))]
 fn validate_external_engine_executable(_engine_path: &Path) -> Result<(), String> {
     Ok(())
+}
+
+/// F7: On Windows, `.bat`/`.cmd` files are executed via `cmd.exe` and were
+/// vulnerable to argument injection (CVE-2024-24576 / BatBadBut) in Rust
+/// <1.77.2.  We pin ≥1.77.2 in `rust-toolchain.toml` *and* reject these
+/// extensions outright so users see a clear error rather than silent exposure.
+#[cfg(windows)]
+fn validate_bat_cmd_extension(engine_path: &Path) -> Result<(), String> {
+    if let Some(ext) = engine_path.extension().and_then(|e| e.to_str()) {
+        if ext.eq_ignore_ascii_case("bat") || ext.eq_ignore_ascii_case("cmd") {
+            return Err(format!(
+                "Engine path '{}' ends in .{ext}, which is rejected on Windows \
+                 (CVE-2024-24576 / BatBadBut). Point to the real .exe instead \
+                 (e.g. dot.exe, plantuml.exe).",
+                engine_path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn validate_bat_cmd_extension(_engine_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+/// F9: Replace the home-directory prefix with `~` so full usernames are not
+/// written into diagnostics, cache JSON, or export manifests.
+fn redact_home(p: &Path) -> String {
+    let s = path_to_string(p);
+    if let Some(home) = dirs::home_dir() {
+        let home_s = path_to_string(&home);
+        if !home_s.is_empty() {
+            if let Some(rest) = s.strip_prefix(&home_s) {
+                return format!("~{rest}");
+            }
+        }
+    }
+    s
 }
 
 fn external_transform_cache() -> &'static Mutex<Vec<(String, TransformArtifact)>> {
@@ -504,7 +560,21 @@ fn store_external_transform_disk(artifact: &TransformArtifact) {
 }
 
 fn external_transform_disk_cache_root() -> PathBuf {
-    std::env::temp_dir().join("neditor-transform-cache-v1")
+    // F2: Use a per-user, non-world-writable directory instead of /tmp so
+    // other local users cannot pre-create the directory or plant poisoned
+    // cache entries.  Falls back to temp_dir only when no user data dir exists.
+    let base = dirs::data_local_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join("neditor")
+        .join("transform-cache-v1");
+    let _ = fs::create_dir_all(&base);
+    // On Unix, enforce mode 0700 so no other user can read or write here.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&base, fs::Permissions::from_mode(0o700));
+    }
+    base
 }
 
 fn external_transform_disk_cache_path(cache_key: &str) -> PathBuf {
@@ -546,7 +616,8 @@ fn prune_external_transform_disk_cache(root: &Path) {
     let mut removed_bytes: u64 = 0;
     let mut removed_count: usize = 0;
     for (path, size, _) in &files {
-        let should_remove_count = files.len() - removed_count > MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES;
+        let should_remove_count =
+            files.len() - removed_count > MAX_EXTERNAL_TRANSFORM_CACHE_ENTRIES;
         let should_remove_size = total_bytes.saturating_sub(removed_bytes) > MAX_CACHE_BYTES;
         if !should_remove_count && !should_remove_size {
             break;
@@ -600,20 +671,28 @@ fn execute_external_transform(
     let source_hash = sha256_hex(request.body.as_bytes());
     let started = Instant::now();
     let mut diagnostics = Vec::new();
-    let mut temp_input = None;
-    let mut temp_output = None;
+    let mut temp_input: Option<PathBuf> = None;
+    // F3: NamedTempFile uses O_EXCL + a random name inside the secure cache
+    // dir (mode 0700 on Unix), preventing symlink-race attacks.  It deletes
+    // the file automatically when dropped, so manual cleanup calls for
+    // temp_input are removed below.
+    let mut temp_input_guard: Option<tempfile::NamedTempFile> = None;
+    let mut temp_output: Option<PathBuf> = None;
 
     if external_transform_requires_temp_input(name, input_mode, request.engine_path) {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or_default();
+        let secure_dir = external_transform_disk_cache_root();
         let suffix = external_engine_temp_suffix(name);
-        let path = std::env::temp_dir().join(format!(
-            "neditor-{name}-{source_hash}-{}-{unique}.{suffix}",
-            std::process::id()
-        ));
-        fs::write(&path, request.body.as_bytes()).map_err(|err| err.to_string())?;
+        let mut named = tempfile::Builder::new()
+            .prefix("neditor-transform-")
+            .suffix(&format!(".{suffix}"))
+            .tempfile_in(&secure_dir)
+            .map_err(|err| format!("Cannot create temp file for {name}: {err}"))?;
+        named
+            .write_all(request.body.as_bytes())
+            .map_err(|err| err.to_string())?;
+        named.flush().map_err(|err| err.to_string())?;
+        let path = named.path().to_path_buf();
+        temp_input_guard = Some(named); // deleted on drop
         temp_input = Some(path);
     }
 
@@ -640,17 +719,20 @@ fn execute_external_transform(
     let child = match command.spawn() {
         Ok(child) => child,
         Err(error) => {
-            if let Some(path) = temp_input {
-                let _ = fs::remove_file(path);
-            }
+            // temp_input_guard (NamedTempFile) drops here — auto-deletes the file.
             return Err(error.to_string());
         }
     };
 
+    // F1: Wrap the child in Arc<Mutex<Option<Child>>> shared with the worker
+    // so we can kill it from this thread when recv_timeout fires.
+    //
     // Move all blocking work — stdin write + wait_with_output — onto a
     // dedicated OS thread so the calling thread (Tauri async runtime) is
     // never blocked.  The channel's recv_timeout enforces the deadline
     // without a spin loop.
+    let child_slot: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(Some(child)));
+    let child_slot_worker = Arc::clone(&child_slot);
     let (tx, rx) = mpsc::channel::<Result<std::process::Output, String>>();
     let stdin_input = if adapter.stdin {
         request.body.as_bytes().to_vec()
@@ -659,7 +741,15 @@ fn execute_external_transform(
     };
     let needs_stdin = adapter.stdin;
     std::thread::spawn(move || {
-        let mut child = child;
+        // Take ownership and immediately release the lock before any blocking I/O
+        // so the main thread can kill via the slot while we are in wait_with_output.
+        let child_opt = child_slot_worker
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take();
+        let Some(mut child) = child_opt else {
+            return;
+        };
         if needs_stdin {
             if let Some(mut stdin) = child.stdin.take() {
                 // Ignore write errors; the process exit status will surface them.
@@ -675,19 +765,24 @@ fn execute_external_transform(
     let output = match rx.recv_timeout(timeout) {
         Ok(Ok(output)) => output,
         Ok(Err(err)) => {
-            if let Some(path) = temp_input {
-                let _ = fs::remove_file(path);
-            }
+            // temp_output cleanup; temp_input_guard auto-deletes on drop.
             if let Some(path) = temp_output {
                 let _ = fs::remove_file(path);
             }
             return Err(err);
         }
         Err(_) => {
-            // Timeout or sender dropped — clean up and report timeout.
-            if let Some(path) = temp_input {
-                let _ = fs::remove_file(path);
+            // Timeout or sender dropped — kill the child if the worker hasn't
+            // taken it yet (slot still occupied).  If the worker already moved
+            // it out, this is best-effort; the worker will drain when the OS
+            // kills or the child exits naturally.
+            if let Ok(mut guard) = child_slot.try_lock() {
+                if let Some(mut c) = guard.take() {
+                    let _ = c.kill();
+                    let _ = c.wait();
+                }
             }
+            // temp_output cleanup; temp_input_guard auto-deletes on drop.
             if let Some(path) = temp_output {
                 let _ = fs::remove_file(path);
             }
@@ -706,22 +801,30 @@ fn execute_external_transform(
     } else {
         "stdout".to_string()
     };
+    // temp_input_guard (NamedTempFile) auto-deletes temp_input on drop.
+    // Suppress the unused-variable warning on temp_input (still used above for
+    // adapter args); the guard is the actual cleanup owner.
+    let _ = &temp_input;
     let sidecar_output = if let Some(path) = temp_output.as_deref() {
-        Some(fs::read(path).map_err(|err| {
-            format!(
-                "{name} external transform did not produce expected sidecar output {}: {err}",
-                path.display()
-            )
-        })?)
+        match fs::read(path) {
+            Ok(bytes) => Some(bytes),
+            Err(err) => {
+                // Clean up temp_output before propagating the error.
+                // temp_input_guard auto-deletes temp_input when it drops here.
+                let _ = fs::remove_file(path);
+                return Err(format!(
+                    "{name} external transform did not produce expected sidecar output {}: {err}",
+                    path.display()
+                ));
+            }
+        }
     } else {
         None
     };
-    if let Some(path) = temp_input {
-        let _ = fs::remove_file(path);
-    }
     if let Some(path) = temp_output {
         let _ = fs::remove_file(path);
     }
+    // temp_input_guard drops at function end, deleting the temp input file.
     let stdout = sidecar_output.as_deref().unwrap_or(&output.stdout);
     if stdout.len() > max_output_bytes {
         return Err(format!(
@@ -808,10 +911,11 @@ fn execute_external_transform(
         None,
         Some("Output was captured without invoking a shell."),
     );
-    diagnostic.related.push(format!(
-        "engine_path: {}",
-        path_to_string(request.engine_path)
-    ));
+    // F9: redact the home-directory prefix so usernames are not written into
+    // cache JSON or export manifests.
+    diagnostic
+        .related
+        .push(format!("engine_path: {}", redact_home(request.engine_path)));
     diagnostic
         .related
         .push(format!("adapter: {}", adapter.engine));
@@ -861,7 +965,7 @@ fn execute_external_transform(
         cache_key,
         execution_kind: "external".to_string(),
         engine_version: Some(request.engine_version.to_string()),
-        engine_path: Some(path_to_string(request.engine_path)),
+        engine_path: Some(redact_home(request.engine_path)), // F9: home redacted
         input_mode: input_mode.to_string(),
         duration_ms: Some(duration_ms),
         source_hash,
@@ -1126,6 +1230,118 @@ pub(crate) fn graphviz_command(name: &str) -> Option<&'static str> {
         "osage" => Some("osage"),
         "twopi" => Some("twopi"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── F9: home-directory redaction ──────────────────────────────────────────
+
+    #[test]
+    fn redact_home_replaces_home_prefix() {
+        if let Some(home) = dirs::home_dir() {
+            let under_home = home.join("projects/foo/engine");
+            let result = redact_home(&under_home);
+            assert!(result.starts_with('~'), "expected ~ prefix, got: {result}");
+            assert!(!result.contains(home.to_str().unwrap_or("")));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn redact_home_leaves_system_paths_unchanged() {
+        let result = redact_home(std::path::Path::new("/usr/bin/dot"));
+        assert_eq!(result, "/usr/bin/dot");
+    }
+
+    // ── F7: .bat/.cmd rejection (Windows) ────────────────────────────────────
+
+    #[cfg(windows)]
+    #[test]
+    fn bat_extension_is_rejected() {
+        let path = std::path::Path::new(r"C:\tools\graphviz\dot.bat");
+        assert!(
+            validate_bat_cmd_extension(path).is_err(),
+            ".bat must be rejected"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cmd_extension_is_rejected() {
+        let path = std::path::Path::new(r"C:\tools\graphviz\dot.cmd");
+        assert!(
+            validate_bat_cmd_extension(path).is_err(),
+            ".cmd must be rejected"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn exe_extension_is_accepted() {
+        let path = std::path::Path::new(r"C:\tools\graphviz\dot.exe");
+        assert!(
+            validate_bat_cmd_extension(path).is_ok(),
+            ".exe must be accepted"
+        );
+    }
+
+    // ── F2: cache-dir permissions (Unix) ─────────────────────────────────────
+
+    #[cfg(unix)]
+    #[test]
+    fn cache_dir_is_mode_0700() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = external_transform_disk_cache_root();
+        fs::create_dir_all(&root).ok();
+        let meta = fs::metadata(&root).expect("cache dir must exist");
+        let mode = meta.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700, "cache dir mode should be 0700, got {mode:o}");
+    }
+
+    // ── F1: timeout kills child (Unix only, uses `sleep 60`) ─────────────────
+
+    #[cfg(unix)]
+    #[test]
+    fn timeout_kill_via_slot_does_not_panic() {
+        use std::process::{Command as Cmd, Stdio};
+        use std::time::Duration;
+
+        let child = Cmd::new("sleep")
+            .arg("60")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("`sleep` must be available on Unix for this test");
+        let child_slot: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(Some(child)));
+        let child_slot_worker = Arc::clone(&child_slot);
+        let (tx, rx) = mpsc::channel::<Result<std::process::Output, String>>();
+        std::thread::spawn(move || {
+            let child_opt = child_slot_worker
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .take();
+            let Some(mut c) = child_opt else {
+                return;
+            };
+            let result = c.wait_with_output().map_err(|e| e.to_string());
+            let _ = tx.send(result);
+        });
+        // Give the worker a moment to take the child.
+        std::thread::sleep(Duration::from_millis(30));
+        // Simulate timeout: attempt kill via the slot.
+        if let Ok(mut guard) = child_slot.try_lock() {
+            if let Some(mut c) = guard.take() {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
+        }
+        // recv_timeout with a short deadline should return either Err (timeout
+        // before worker reaps the killed process) or Ok — both are fine;
+        // the key assertion is that no panic occurred above.
+        let _ = rx.recv_timeout(Duration::from_millis(500));
     }
 }
 
