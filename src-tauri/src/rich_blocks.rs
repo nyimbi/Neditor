@@ -168,12 +168,12 @@ pub(crate) fn render_equations(markdown: &str) -> String {
                 format!("Equation {equation_number}: {}", caption.trim())
             };
             output.push_str(&format!(
-                "<figure class=\"equation\" id=\"{}\" data-caption=\"{}\"><div class=\"math-rendered math-display\" data-katex=\"{}\" data-katex-display role=\"math\" aria-label=\"{}\">{}</div><details class=\"math-source\"><summary>LaTeX source</summary><pre><code>{}</code></pre></details><figcaption>{}</figcaption></figure>\n",
+                "<figure class=\"equation\" id=\"{}\" data-caption=\"{}\"><div class=\"math-rendered math-display\" data-katex=\"{}\" data-katex-display role=\"math\" aria-label=\"{}\">{}</div><details class=\"math-source\"><summary>LaTeX</summary><pre><code>{}</code></pre></details><figcaption>{}</figcaption></figure>\n",
                 escape_html(&id),
                 escape_html(caption.trim()),
                 escape_html(latex),
                 escape_html(latex),
-                escape_html(latex),
+                latex_to_html(latex),
                 escape_html(latex),
                 escape_html(&rendered_caption)
             ));
@@ -199,7 +199,7 @@ fn render_inline_math(line: &str) -> String {
                 "<span class=\"math math-inline\" role=\"math\" aria-label=\"{}\"><span class=\"math-rendered\" data-katex=\"{}\">{}</span><code class=\"math-source-inline\">{}</code></span>",
                 escape_html(math),
                 escape_html(math),
-                escape_html(math),
+                latex_to_html(math),
                 escape_html(math)
             ));
             rest = &after_start[end + 2..];
@@ -211,6 +211,538 @@ fn render_inline_math(line: &str) -> String {
     output.push_str(rest);
     output
 }
+
+// ─── LaTeX → HTML renderer ────────────────────────────────────────────────────
+
+/// Convert a LaTeX math expression to semantic HTML with structured span/table markup.
+pub(crate) fn latex_to_html(latex: &str) -> String {
+    let chars: Vec<char> = latex.chars().collect();
+    let mut pos = 0;
+    latex_render(&chars, &mut pos)
+}
+
+fn latex_render(chars: &[char], pos: &mut usize) -> String {
+    let mut out = String::new();
+    while *pos < chars.len() {
+        match chars[*pos] {
+            '}' => break,
+            '{' => {
+                *pos += 1;
+                let inner = latex_render(chars, pos);
+                if chars.get(*pos) == Some(&'}') {
+                    *pos += 1;
+                }
+                out.push_str(&inner);
+            }
+            '\\' => {
+                *pos += 1;
+                if chars.get(*pos) == Some(&'\\') {
+                    *pos += 1; // row break — skip in non-matrix context
+                } else {
+                    let cmd = latex_read_cmd(chars, pos);
+                    out.push_str(&latex_cmd(&cmd, chars, pos));
+                }
+            }
+            '^' => {
+                *pos += 1;
+                out.push_str(&format!("<sup>{}</sup>", latex_group(chars, pos)));
+            }
+            '_' => {
+                *pos += 1;
+                out.push_str(&format!("<sub>{}</sub>", latex_group(chars, pos)));
+            }
+            '&' => {
+                *pos += 1;
+            }
+            '<' => {
+                out.push_str("&lt;");
+                *pos += 1;
+            }
+            '>' => {
+                out.push_str("&gt;");
+                *pos += 1;
+            }
+            '\n' | '\r' => {
+                out.push(' ');
+                *pos += 1;
+            }
+            ch => {
+                out.push(ch);
+                *pos += 1;
+            }
+        }
+    }
+    out
+}
+
+fn latex_read_cmd(chars: &[char], pos: &mut usize) -> String {
+    if *pos >= chars.len() {
+        return String::new();
+    }
+    if chars[*pos].is_ascii_alphabetic() {
+        let mut name = String::new();
+        while chars
+            .get(*pos)
+            .map(|c| c.is_ascii_alphabetic())
+            .unwrap_or(false)
+        {
+            name.push(chars[*pos]);
+            *pos += 1;
+        }
+        // Do NOT skip trailing spaces — the space after a word command is part
+        // of the surrounding content (e.g. `x \ge 0` → `x ≥ 0`).
+        name
+    } else {
+        let c = chars[*pos];
+        *pos += 1;
+        c.to_string()
+    }
+}
+
+fn latex_skip_ws(chars: &[char], pos: &mut usize) {
+    while matches!(
+        chars.get(*pos),
+        Some(' ') | Some('\t') | Some('\n') | Some('\r')
+    ) {
+        *pos += 1;
+    }
+}
+
+/// Parse a {group} or a single char/command, return rendered HTML.
+fn latex_group(chars: &[char], pos: &mut usize) -> String {
+    latex_skip_ws(chars, pos);
+    if chars.get(*pos) == Some(&'{') {
+        *pos += 1;
+        let content = latex_render(chars, pos);
+        if chars.get(*pos) == Some(&'}') {
+            *pos += 1;
+        }
+        content
+    } else if chars.get(*pos) == Some(&'\\') {
+        *pos += 1;
+        let cmd = latex_read_cmd(chars, pos);
+        latex_cmd(&cmd, chars, pos)
+    } else if *pos < chars.len() {
+        let ch = chars[*pos];
+        *pos += 1;
+        match ch {
+            '<' => "&lt;".to_string(),
+            '>' => "&gt;".to_string(),
+            other => other.to_string(),
+        }
+    } else {
+        String::new()
+    }
+}
+
+/// Parse optional [bracket] and return its raw text.
+fn latex_bracket(chars: &[char], pos: &mut usize) -> Option<String> {
+    latex_skip_ws(chars, pos);
+    if chars.get(*pos) != Some(&'[') {
+        return None;
+    }
+    *pos += 1;
+    let mut content = String::new();
+    let mut depth = 1i32;
+    while *pos < chars.len() {
+        match chars[*pos] {
+            '[' => {
+                depth += 1;
+                content.push('[');
+                *pos += 1;
+            }
+            ']' => {
+                depth -= 1;
+                *pos += 1;
+                if depth == 0 {
+                    break;
+                }
+                content.push(']');
+            }
+            ch => {
+                content.push(ch);
+                *pos += 1;
+            }
+        }
+    }
+    Some(content)
+}
+
+/// Read a raw {group} without rendering (for environment names).
+fn latex_group_raw(chars: &[char], pos: &mut usize) -> String {
+    latex_skip_ws(chars, pos);
+    if chars.get(*pos) != Some(&'{') {
+        return String::new();
+    }
+    *pos += 1;
+    let mut content = String::new();
+    let mut depth = 1i32;
+    while *pos < chars.len() {
+        match chars[*pos] {
+            '{' => {
+                depth += 1;
+                content.push('{');
+                *pos += 1;
+            }
+            '}' => {
+                depth -= 1;
+                *pos += 1;
+                if depth == 0 {
+                    break;
+                }
+                content.push('}');
+            }
+            ch => {
+                content.push(ch);
+                *pos += 1;
+            }
+        }
+    }
+    content
+}
+
+/// Collect raw char tokens for a matrix body, splitting rows and cells.
+fn latex_matrix_body(chars: &[char], pos: &mut usize) -> Vec<Vec<String>> {
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut row: Vec<String> = Vec::new();
+    let mut cell: Vec<char> = Vec::new();
+
+    while *pos < chars.len() {
+        if chars[*pos] == '\\' {
+            // Check for \end{
+            if *pos + 4 < chars.len() {
+                let snip: String = chars[*pos..*pos + 5].iter().collect();
+                if snip == "\\end{" {
+                    *pos += 5;
+                    while *pos < chars.len() && chars[*pos] != '}' {
+                        *pos += 1;
+                    }
+                    if *pos < chars.len() {
+                        *pos += 1;
+                    }
+                    let s: String = cell.iter().collect();
+                    row.push(s.trim().to_string());
+                    if !row.iter().all(|c| c.is_empty()) {
+                        rows.push(row);
+                    }
+                    return rows;
+                }
+            }
+            // Check for \\ (row separator)
+            if chars.get(*pos + 1) == Some(&'\\') {
+                let s: String = cell.iter().collect();
+                row.push(s.trim().to_string());
+                rows.push(std::mem::take(&mut row));
+                cell.clear();
+                *pos += 2;
+                latex_skip_ws(chars, pos);
+                continue;
+            }
+            cell.push(chars[*pos]);
+            *pos += 1;
+        } else if chars[*pos] == '&' {
+            let s: String = cell.iter().collect();
+            row.push(s.trim().to_string());
+            cell.clear();
+            *pos += 1;
+        } else {
+            cell.push(chars[*pos]);
+            *pos += 1;
+        }
+    }
+    rows
+}
+
+fn latex_render_matrix(rows: Vec<Vec<String>>, kind: &str) -> String {
+    let mut html = format!("<span class=\"math-matrix {kind}\"><table>");
+    for row in rows {
+        html.push_str("<tr>");
+        for cell in row {
+            html.push_str(&format!("<td>{}</td>", latex_to_html(cell.trim())));
+        }
+        html.push_str("</tr>");
+    }
+    html.push_str("</table></span>");
+    html
+}
+
+fn latex_cmd(cmd: &str, chars: &[char], pos: &mut usize) -> String {
+    match cmd {
+        // Greek uppercase
+        "Gamma" => "Γ".into(),
+        "Delta" => "Δ".into(),
+        "Theta" => "Θ".into(),
+        "Lambda" => "Λ".into(),
+        "Pi" => "Π".into(),
+        "Sigma" => "Σ".into(),
+        "Phi" => "Φ".into(),
+        "Psi" => "Ψ".into(),
+        "Omega" => "Ω".into(),
+        "Upsilon" => "Υ".into(),
+        "Xi" => "Ξ".into(),
+        // Greek lowercase
+        "alpha" => "α".into(),
+        "beta" => "β".into(),
+        "gamma" => "γ".into(),
+        "delta" => "δ".into(),
+        "epsilon" | "varepsilon" => "ε".into(),
+        "zeta" => "ζ".into(),
+        "eta" => "η".into(),
+        "theta" | "vartheta" => "θ".into(),
+        "iota" => "ι".into(),
+        "kappa" => "κ".into(),
+        "lambda" => "λ".into(),
+        "mu" => "μ".into(),
+        "nu" => "ν".into(),
+        "xi" => "ξ".into(),
+        "pi" | "varpi" => "π".into(),
+        "rho" | "varrho" => "ρ".into(),
+        "sigma" | "varsigma" => "σ".into(),
+        "tau" => "τ".into(),
+        "upsilon" => "υ".into(),
+        "phi" | "varphi" => "φ".into(),
+        "chi" => "χ".into(),
+        "psi" => "ψ".into(),
+        "omega" => "ω".into(),
+        // Math operators
+        "sum" => "∑".into(),
+        "prod" => "∏".into(),
+        "int" => "∫".into(),
+        "partial" => "∂".into(),
+        "nabla" => "∇".into(),
+        "infty" => "∞".into(),
+        "pm" => "±".into(),
+        "mp" => "∓".into(),
+        "cdot" => "·".into(),
+        "times" => "×".into(),
+        "div" => "÷".into(),
+        "cdots" => "⋯".into(),
+        "vdots" => "⋮".into(),
+        "ddots" => "⋱".into(),
+        "ldots" | "dots" => "…".into(),
+        // Relations
+        "approx" => "≈".into(),
+        "sim" => "∼".into(),
+        "equiv" => "≡".into(),
+        "ne" | "neq" => "≠".into(),
+        "le" | "leq" => "≤".into(),
+        "ge" | "geq" => "≥".into(),
+        "ll" => "≪".into(),
+        "gg" => "≫".into(),
+        // Set / logic
+        "in" => "∈".into(),
+        "notin" => "∉".into(),
+        "subset" => "⊂".into(),
+        "supset" => "⊃".into(),
+        "subseteq" => "⊆".into(),
+        "supseteq" => "⊇".into(),
+        "cup" => "∪".into(),
+        "cap" => "∩".into(),
+        "emptyset" => "∅".into(),
+        "forall" => "∀".into(),
+        "exists" => "∃".into(),
+        "land" | "wedge" => "∧".into(),
+        "lor" | "vee" => "∨".into(),
+        "lnot" | "neg" => "¬".into(),
+        // Arrows
+        "to" | "rightarrow" => "→".into(),
+        "leftarrow" | "gets" => "←".into(),
+        "Rightarrow" => "⇒".into(),
+        "Leftarrow" => "⟸".into(),
+        "Leftrightarrow" | "iff" => "⟺".into(),
+        "leftrightarrow" => "↔".into(),
+        "mapsto" => "↦".into(),
+        // Functions
+        "lim" => "lim".into(),
+        "limsup" => "lim sup".into(),
+        "liminf" => "lim inf".into(),
+        "sup" => "sup".into(),
+        "inf" => "inf".into(),
+        "max" => "max".into(),
+        "min" => "min".into(),
+        "det" => "det".into(),
+        "dim" => "dim".into(),
+        "exp" => "exp".into(),
+        "gcd" => "gcd".into(),
+        "ker" => "ker".into(),
+        "log" => "log".into(),
+        "ln" => "ln".into(),
+        "sin" => "sin".into(),
+        "cos" => "cos".into(),
+        "tan" => "tan".into(),
+        "arcsin" => "arcsin".into(),
+        "arccos" => "arccos".into(),
+        "arctan" => "arctan".into(),
+        "Pr" => "Pr".into(),
+        "Re" => "ℜ".into(),
+        "Im" => "ℑ".into(),
+        // Misc symbols
+        "ell" => "ℓ".into(),
+        "hbar" => "ℏ".into(),
+        "angle" => "∠".into(),
+        "perp" => "⊥".into(),
+        "mid" => "∣".into(),
+        "therefore" => "∴".into(),
+        "dag" | "dagger" => "†".into(),
+        // Delimiters (consume next char)
+        "left" => {
+            latex_skip_ws(chars, pos);
+            if *pos < chars.len() {
+                let d = chars[*pos];
+                *pos += 1;
+                if d == '\\' {
+                    let cmd2 = latex_read_cmd(chars, pos);
+                    match cmd2.as_str() {
+                        "langle" => "⟨".into(),
+                        "rangle" => "⟩".into(),
+                        "lfloor" => "⌊".into(),
+                        "rfloor" => "⌋".into(),
+                        "lceil" => "⌈".into(),
+                        "rceil" => "⌉".into(),
+                        "." => String::new(),
+                        other => other.into(),
+                    }
+                } else {
+                    match d {
+                        '<' => "&lt;".into(),
+                        '>' => "&gt;".into(),
+                        other => other.to_string(),
+                    }
+                }
+            } else {
+                String::new()
+            }
+        }
+        "right" => {
+            latex_skip_ws(chars, pos);
+            if *pos < chars.len() {
+                let d = chars[*pos];
+                *pos += 1;
+                if d == '\\' {
+                    let cmd2 = latex_read_cmd(chars, pos);
+                    match cmd2.as_str() {
+                        "rangle" => "⟩".into(),
+                        "langle" => "⟨".into(),
+                        "rfloor" => "⌋".into(),
+                        "lfloor" => "⌊".into(),
+                        "rceil" => "⌉".into(),
+                        "lceil" => "⌈".into(),
+                        "." => String::new(),
+                        other => other.into(),
+                    }
+                } else {
+                    match d {
+                        '<' => "&lt;".into(),
+                        '>' => "&gt;".into(),
+                        other => other.to_string(),
+                    }
+                }
+            } else {
+                String::new()
+            }
+        }
+        // One-arg with optional bracket
+        "sqrt" => {
+            let idx = latex_bracket(chars, pos);
+            let arg = latex_group(chars, pos);
+            match idx {
+                Some(i) => format!("<span class=\"math-root-index\">{i}</span>√{arg}"),
+                None => format!("√{arg}"),
+            }
+        }
+        // Two-arg
+        "frac" => {
+            let num = latex_group(chars, pos);
+            let den = latex_group(chars, pos);
+            format!(
+                "<span class=\"math-frac\"><span class=\"math-num\">{num}</span><span class=\"math-den\">{den}</span></span>"
+            )
+        }
+        // One-arg wrappers
+        "overline" | "bar" => {
+            format!(
+                "<span class=\"math-overline\">{}</span>",
+                latex_group(chars, pos)
+            )
+        }
+        "underline" => {
+            format!(
+                "<span class=\"math-underline\">{}</span>",
+                latex_group(chars, pos)
+            )
+        }
+        "hat" | "widehat" => {
+            format!(
+                "<span class=\"math-hat\">{}</span>",
+                latex_group(chars, pos)
+            )
+        }
+        "vec" | "overrightarrow" => {
+            format!(
+                "<span class=\"math-vec\">{}</span>",
+                latex_group(chars, pos)
+            )
+        }
+        "text" | "textrm" | "textbf" | "textit" | "textsf" => {
+            format!(
+                "<span class=\"math-text\">{}</span>",
+                latex_group(chars, pos)
+            )
+        }
+        "mathbb" => {
+            format!(
+                "<span class=\"math-blackboard\">{}</span>",
+                latex_group(chars, pos)
+            )
+        }
+        "mathcal" => {
+            format!(
+                "<span class=\"math-calligraphic\">{}</span>",
+                latex_group(chars, pos)
+            )
+        }
+        "mathrm" | "operatorname" => {
+            format!(
+                "<span class=\"math-roman\">{}</span>",
+                latex_group(chars, pos)
+            )
+        }
+        "mathbf" | "boldsymbol" => {
+            format!("<strong>{}</strong>", latex_group(chars, pos))
+        }
+        "mathit" => {
+            format!("<em>{}</em>", latex_group(chars, pos))
+        }
+        "widetilde" | "tilde" => {
+            format!(
+                "<span class=\"math-hat\" title=\"tilde\">{}</span>",
+                latex_group(chars, pos)
+            )
+        }
+        // Matrix environments
+        "begin" => {
+            let env = latex_group_raw(chars, pos);
+            let rows = latex_matrix_body(chars, pos);
+            let kind = match env.trim() {
+                "bmatrix" => "matrix-square",
+                "Bmatrix" => "matrix-curly",
+                "pmatrix" => "matrix-round",
+                "vmatrix" => "matrix-vertical",
+                "cases" | "cases*" => "matrix-cases",
+                _ => "matrix-plain",
+            };
+            latex_render_matrix(rows, kind)
+        }
+        // Spacing
+        "," | ";" | ":" | "!" => "\u{200B}".into(),
+        "quad" => "&ensp;".into(),
+        "qquad" => "&emsp;".into(),
+        // Fallback: emit command name
+        other => other.into(),
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 
 pub(crate) fn render_callouts(markdown: &str) -> String {
     let lines = markdown.lines().collect::<Vec<_>>();
