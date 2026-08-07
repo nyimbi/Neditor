@@ -75,3 +75,38 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `desktop_workflow_smoke_export_path` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates deterministic native workflow export and conflict-copy paths under `.tmp/desktop-smoke/` |
 | `emit_desktop_workflow_smoke_menu_command` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates guarded native menu-event routing for `File` -> `Export` -> `HTML Export` |
 | `write_desktop_workflow_smoke_report` | `src-tauri/src/lib.rs` | `pnpm run test:desktop-smoke` with `NEDITOR_DESKTOP_SMOKE_LAUNCH=1` validates the guarded native workflow report when `NEDITOR_DESKTOP_WORKFLOW_SMOKE_REPORT` is set |
+| `accept_all_suggestions` | `src-tauri/src/track_changes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `accept_suggestion` | `src-tauri/src/track_changes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `analyze_readability` | `src-tauri/src/readability.rs` | `readability::tests::test_readability_scores`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `build_workspace_link_graph` | `src-tauri/src/link_graph.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `check_document_approval` | `src-tauri/src/backlinks.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `check_ollama_health` | `src-tauri/src/ollama_models.rs` | `ollama_models::tests::ollama_tags_endpoint_normalizes_native_chat_urls`; `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `cli_queue_file_path` | `src-tauri/src/cli_ipc.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `collect_workspace_tasks` | `src-tauri/src/task_aggregator.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `compare_documents` | `src-tauri/src/document_compare.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `create_delete_suggestion` | `src-tauri/src/track_changes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `create_insert_suggestion` | `src-tauri/src/track_changes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `delete_ollama_model` | `src-tauri/src/ollama_models.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `drain_cli_open_queue` | `src-tauri/src/cli_ipc.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `fetch_rest_source` | `src-tauri/src/data_exchange.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `find_backlinks` | `src-tauri/src/backlinks.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `find_unlinked_mentions` | `src-tauri/src/backlinks.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `fire_webhook` | `src-tauri/src/webhooks.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `get_humanize_prompt` | `src-tauri/src/ai_humanizer.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `import_document` | `src-tauri/src/pandoc_import.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `list_daily_notes` | `src-tauri/src/daily_notes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `list_installed_csl_styles` | `src-tauri/src/csl_styles.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `list_suggestions` | `src-tauri/src/track_changes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `lookup_doi` | `src-tauri/src/citation_discovery.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `open_daily_note` | `src-tauri/src/daily_notes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `pull_ollama_model` | `src-tauri/src/ollama_models.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `read_audit_log` | `src-tauri/src/audit.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `read_showcase_document` | `src-tauri/src/filesystem.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `record_audit_event` | `src-tauri/src/audit.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `register_instance` | `src-tauri/src/cli_ipc.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `reject_all_suggestions` | `src-tauri/src/track_changes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `reject_suggestion` | `src-tauri/src/track_changes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `resolve_block_reference` | `src-tauri/src/block_refs.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `run_mail_merge` | `src-tauri/src/mail_merge.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `search_workspace` | `src-tauri/src/search.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `show_ollama_model_info` | `src-tauri/src/ollama_models.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |

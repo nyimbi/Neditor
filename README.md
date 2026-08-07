@@ -132,8 +132,10 @@ capabilities:
 - [NEditor capability showcase](examples/showcase/neditor-capability-showcase.md)
 - [Board paper](examples/board-paper.md)
 - [Consulting report](examples/consulting-report.md)
+- [Technical architecture](examples/technical-architecture.md)
 - [Research report](examples/research-report.md)
 - [Proposal budget](examples/proposal-budget.md)
+- [AI-assisted draft](examples/ai-assisted-draft.md)
 
 Inside the app, choose **Help -> Open Capability Showcase** and then
 **Help -> Guided Demo** to walk through the shipped showcase with real tables,

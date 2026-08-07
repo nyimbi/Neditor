@@ -1,9 +1,11 @@
 ---
-title: AI Assisted Policy Draft
-version: 0.3.0
-status: draft
-author: Policy Team
-classification: internal-draft
+title: AI-Assisted Product Brief
+subtitle: Human-reviewed draft with AI provenance trail
+version: 1.0.0
+status: approved
+approvedBy: Product Lead
+approvedAt: 2026-06-15T10:00:00Z
+classification: internal
 targetPersona:
   - Teams using AI chat output
   - Product and engineering teams
@@ -12,34 +14,60 @@ positioning:
   sourceOfTruth: Markdown source file
   cloudSync: false
 toc: true
-layout:
-  header: "{{title}}"
-  footer: "Draft | Page {{page}}"
 ---
 
-# AI Assisted Policy Draft
+# AI-Assisted Product Brief
 
 [TOC]
 
-## Draft Policy
+## Purpose
 
-Managers should classify customer documents before sharing them outside the
-company and record the release status before export.
-
-<!-- comment: author: Reviewer | at: 2026-05-20 | open | Verify that the policy matches the latest legal guidance. -->
+This brief captures the product positioning for the next release cycle. The
+initial draft was generated with AI assistance and reviewed by the product team
+before approval.
 
 ```ai-source
-provider: OpenAI
-model: gpt-5.4
-date: 2026-05-20
-promptSummary: policy draft outline from internal notes
-reviewedBy: Policy Team
-reviewedAt: 2026-05-20T14:00:00Z
+provider: Ollama
+endpoint: http://localhost:11434
+model: llama3.1
+date: 2026-06-14
+promptSummary: Draft product positioning brief for local-first document workbench
+reviewedBy: Product Lead
+reviewedAt: 2026-06-15T09:00:00Z
 status: human-reviewed
 ```
 
+<!-- comment: author: Product Lead | at: 2026-06-15 | resolved | Verify positioning claims against v2 release notes before circulation. -->
+
+## Problem Statement
+
+Teams using AI chat tools produce unstructured output — long threads, code
+snippets mixed with prose, and no audit trail. NEditor gives that output a
+governed home: structured Markdown, front-matter metadata, and export-ready
+artifacts.
+
+```ai-source
+provider: Claude
+model: claude-opus-4
+date: 2026-06-14
+promptSummary: Refine problem statement for clarity and specificity
+status: human-reviewed
+reviewedBy: Product Lead
+reviewedAt: 2026-06-15T09:30:00Z
+```
+
+<!-- comment: author: Engineering Lead | at: 2026-06-15 | resolved | Align "audit trail" language with compliance team wording. -->
+
+## Positioning Statement
+
+For **product and engineering teams** who need to turn AI-generated content into
+governed documents, NEditor is a local-first document workbench that compiles
+Markdown to structured exports — unlike cloud-based editors, it keeps all data
+on the author's device with no background sync.
+
 ## Review Checklist
 
-- [x] Human review completed
-- [ ] Legal sign-off recorded
-- [ ] Release status updated before final export
+- [x] AI provenance blocks present for all generated sections
+- [x] Human reviewer sign-off recorded in front matter
+- [x] Comments attached to sections requiring follow-up
+- [x] Export readiness verified for HTML, PDF, and DOCX

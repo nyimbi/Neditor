@@ -1,9 +1,10 @@
 ---
-title: Local Document Automation Architecture
-version: 1.1.0
+title: Platform Architecture Overview
+subtitle: System design reference for engineering teams
+version: 1.0.0
 status: approved
-approvedBy: Architecture Council
-approvedAt: 2026-05-20T11:00:00Z
+approvedBy: Engineering Lead
+approvedAt: 2026-06-01T09:00:00Z
 classification: internal
 targetPersona:
   - Technical writers
@@ -14,43 +15,60 @@ positioning:
   sourceOfTruth: Markdown source file
   cloudSync: false
 toc: true
-layout:
-  header: "{{title}}"
-  footer: "Page {{page}} of {{pages}}"
 ---
 
-# Local Document Automation Architecture
+# Platform Architecture Overview
 
 [TOC]
 
-## Context
+## System Context
 
-The system keeps document compilation, export, and file ownership local while
-allowing optional user-installed transform engines.
+The platform is a local-first document workbench. All editing and compilation
+happen on the author's device — no background cloud sync, no server-side
+rendering pipeline.
 
 ```mermaid
-flowchart LR
-  Editor[Editor] --> Compiler[Compiler]
-  Compiler --> Preview[Preview]
-  Compiler --> Export[Export Pipeline]
-  Export --> Manifest[Manifest]
+flowchart TD
+  Author[Author] --> Editor[Markdown Editor]
+  Editor --> Compiler[Rust Compiler]
+  Compiler --> Preview[Live Preview]
+  Compiler --> Export[Export Engine]
+  Export --> HTML[HTML]
+  Export --> PDF[PDF]
+  Export --> DOCX[DOCX]
 ```
 
-## Components
+<!-- comment: author: Engineering Lead | at: 2026-06-01 | resolved | Confirm that the export engine diagram matches the v2 release. -->
+
+## Delivery Timeline
 
 ```timeline
-2026-05-20: Local compiler baseline
-2026-06-03: Desktop workflow smoke tests
-2026-06-17: Export fixture audit
+2026-04-01: Core Markdown compiler | owner=Core | status=complete
+2026-05-01: Transform pipeline | owner=Transforms | status=complete
+2026-06-01: Export engine v1 | owner=Export | milestone=Release v1
+2026-07-01: AI-assisted drafting | owner=AI | status=planned
 ```
+
+## Architecture Decision Record
 
 ```adr
 Status: accepted
-Decision: Keep Rust compiler as the export source of truth
-Consequence: Browser preview cannot become the authoritative PDF backend
+Context: The document compiler must produce deterministic output across platforms.
+Decision: All rendering logic runs in a Rust library crate compiled for desktop via Tauri.
+Consequences: No server dependency; offline-first by design; test coverage via cargo test.
 ```
 
-## Export Boundary
+## Component Inventory
 
-All business export targets consume the semantic document model rather than raw
-preview HTML.
+| Component | Language | Responsibility |
+| --- | --- | --- |
+| Compiler | Rust | Markdown → HTML, source maps, diagnostics |
+| Transform pipeline | Rust | Code fence → SVG/HTML artifacts |
+| Export engine | Rust | HTML → PDF/DOCX/PPTX/ZIP |
+| Frontend | Vue 3 | Editor UI, live preview, IPC |
+
+## Key Design Constraints
+
+1. All computation is local — no network calls during compilation.
+2. Output is deterministic — same source produces identical artifacts.
+3. Diagnostics are structured — severity, line, column, suggestion.
