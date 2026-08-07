@@ -1,9 +1,9 @@
 # NEditor Partials Burn-Down List
 
 Generated: 2026-08-07  
-Source: docs/spec-completion-matrix.md (57 Partial rows at HEAD `53583fc`)
+Source: docs/spec-completion-matrix.md (56 Partial rows; 9.19 Pikchr flipped Complete by `17fdd3c`; evidence narrowed by sweep commits `c64f36d`, `a907f13`, `1c71784`, `d5270a3`, `135bf07`)
 
-Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engine × 7, AI runtime × 2, Signing × 1, Live service × 1, Performance × 1, Security review × 1
+Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engine × 6, AI runtime × 2, Signing × 1, Live service × 1, Performance × 1, Security review × 1
 
 ---
 
@@ -39,7 +39,7 @@ Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engi
 
 **Blocking category**: Cross-platform CI  
 **Estimated effort**: ≤1d  
-**Concrete next step**: Run the full native workflow bundle on a Windows or Linux host via `scripts/run-tauri-webdriver.mjs` and verify multi-include watcher edge cases appear in `.tmp/desktop-webdriver/report.json`.
+**Concrete next step**: `c64f36d` proves save-as atomic root relocation in 4 new tests (macOS). Remaining: run the full native workflow bundle on a Windows or Linux host via `scripts/run-tauri-webdriver.mjs` and verify multi-include watcher edge cases appear in `.tmp/desktop-webdriver/report.json`.
 
 ---
 
@@ -139,7 +139,7 @@ Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engi
 
 **Blocking category**: Cross-platform CI  
 **Estimated effort**: ≤1d  
-**Concrete next step**: Run the WebDriver native workflow bundle on a Windows or Linux supported host and verify `frontMatterEvidence` in `.tmp/desktop-webdriver/report.json` covers filter-insertion and variable-jump assertions.
+**Concrete next step**: `a907f13` proves `{{key | filter}}` renders empty on missing variables and variable-jump line accuracy (macOS). Remaining: run the WebDriver native workflow bundle on a Windows or Linux supported host and verify `frontMatterEvidence` in `.tmp/desktop-webdriver/report.json` covers filter-insertion and variable-jump assertions.
 
 ---
 
@@ -197,7 +197,7 @@ Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engi
 
 **Blocking category**: External engine  
 **Estimated effort**: ≤1wk  
-**Concrete next step**: Integrate a full CSL processor (e.g. `citeproc-rs`) into `src-tauri/src/transforms/` to replace the current deterministic alias approach, then add a test in `src-tauri/src/tests/` proving APA, Chicago, and IEEE citation format fidelity.
+**Concrete next step**: `1c71784` promoted Harvard, Chicago notes-bibliography, ACM, and ACS to first-class native styles (5 new tests). Remaining: integrate a full CSL processor (e.g. `citeproc-rs`) into `src-tauri/src/transforms/` for styles beyond the 9 deterministic native ones, add a SearXNG citation-lookup smoke test, and run the native workflow bundle on a supported host to produce `bibliographyEvidence` in `.tmp/desktop-webdriver/report.json`.
 
 ---
 
@@ -246,14 +246,6 @@ Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engi
 **Blocking category**: Cross-platform CI  
 **Estimated effort**: ≤1d  
 **Concrete next step**: Run the native WebDriver workflow on a Windows or Linux host and verify `documentVariableEvidence` (data-source variable insertion and currency filter) appears in `.tmp/desktop-webdriver/report.json`.
-
----
-
-### 9.19 Pikchr diagrams — Native fallback/external setup and diagnostics
-
-**Blocking category**: External engine  
-**Estimated effort**: ≤1d  
-**Concrete next step**: Run `pnpm run test:rendered-exports` with a fixture containing a complex Pikchr diagram (arrow labeling, box groups), open the HTML artifact, and verify the SVG renders the full diagram correctly beyond the bounded smoke subset.
 
 ---
 
@@ -311,7 +303,7 @@ Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engi
 
 **Blocking category**: Manual QA  
 **Estimated effort**: ≤1h  
-**Concrete next step**: Run `pnpm run test:rendered-exports` with a TopoJSON fixture containing topology arcs (e.g. county boundaries), open the HTML artifact, and verify shared boundaries stitch correctly.
+**Concrete next step**: `d5270a3` adds antimeridian splitting for lines, rings, and polygons. Remaining: run `pnpm run test:rendered-exports` with a TopoJSON fixture containing topology arcs (e.g. county boundaries), open the HTML artifact, and verify shared boundaries and antimeridian-split geometries render correctly.
 
 ---
 
@@ -319,7 +311,7 @@ Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engi
 
 **Blocking category**: Manual QA  
 **Estimated effort**: ≤1d  
-**Concrete next step**: Run `pnpm run test:rendered-exports` with the STL fixture, open the HTML artifact in a browser, and verify the WebGL canvas renders the 3D mesh with correct lighting and silhouette before orbit interaction is attempted.
+**Concrete next step**: `d5270a3` adds real 3-point Lambertian per-facet shading. Remaining: run `pnpm run test:rendered-exports` with the STL fixture, open the HTML artifact in a browser, and verify the rendered mesh shows correct Lambertian shading per-facet and a clean silhouette before orbit interaction is attempted.
 
 ---
 
@@ -411,7 +403,7 @@ Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engi
 
 **Blocking category**: External engine  
 **Estimated effort**: ≤1wk  
-**Concrete next step**: Integrate a full CSL processor into `src-tauri/src/transforms/` (same path as 9.12), add a SearXNG citation-lookup smoke test in `src-tauri/src/tests/`, and verify a live SearXNG search at `search.lindela.io:8888` returns and formats a bibliography entry.
+**Concrete next step**: `1c71784` promoted Harvard, Chicago notes-bibliography, ACM, and ACS to first-class native styles (5 new tests). Remaining: integrate a full CSL processor into `src-tauri/src/transforms/` (same path as 9.12) for styles beyond the 9 deterministic native ones, add a SearXNG citation-lookup smoke test, and run the native workflow bundle on a supported host to produce cross-platform citation evidence.
 
 ---
 
@@ -445,7 +437,7 @@ Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engi
 
 **Blocking category**: Security review  
 **Estimated effort**: >1wk  
-**Concrete next step**: Engage a third-party security auditor to review `src-tauri/src/transforms/external.rs` and the Tauri IPC command surface in `src-tauri/src/lib.rs` for shell-injection, path-traversal, and privilege-escalation vectors.
+**Concrete next step**: `135bf07` closed 3 HIGH findings (canonicalized document-local paths, kill-on-timeout, secure cache dir) and 5 lower findings (sqlite -readonly, installer hardening). Remaining: engage a third-party security auditor to review `src-tauri/src/transforms/external.rs` and the Tauri IPC command surface in `src-tauri/src/lib.rs` for any residual shell-injection, path-traversal, or privilege-escalation vectors; also collect cross-platform release-process proof.
 
 ---
 
@@ -483,13 +475,13 @@ Blocking-category counts: Manual QA × 36, Cross-platform CI × 8, External engi
 
 ---
 
-*57 Partial entries. Blocking-category summary:*
+*56 Partial entries (9.19 Pikchr removed — flipped Complete by `17fdd3c`). Blocking-category summary:*
 
 | Blocking category | Count |
 |---|---|
 | Manual QA | 36 |
 | Cross-platform CI | 8 |
-| External engine | 7 |
+| External engine | 6 |
 | AI runtime | 2 |
 | Signing | 1 |
 | Live service | 1 |
