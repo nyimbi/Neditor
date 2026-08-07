@@ -597,13 +597,6 @@ fn bibliography_key_location(body: &str, key: &str, start_line: usize) -> Option
     bibliography_key_location_for_occurrence(body, key, start_line, 0)
 }
 
-fn is_word_boundary(s: &str, byte_pos: usize) -> bool {
-    let before = s[..byte_pos].chars().next_back();
-    let after = s[byte_pos..].chars().next();
-    let is_ident = |ch: char| ch.is_ascii_alphanumeric() || ch == '_';
-    !before.is_some_and(is_ident) && !after.is_some_and(is_ident)
-}
-
 fn bibliography_key_location_for_occurrence(
     body: &str,
     key: &str,
@@ -613,20 +606,32 @@ fn bibliography_key_location_for_occurrence(
     if key.is_empty() {
         return None;
     }
+    let is_ident = |ch: char| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-');
     let mut seen = 0usize;
     for (index, line) in body.lines().enumerate() {
         let mut search_from = 0usize;
         while let Some(relative_col) = line[search_from..].find(key) {
             let column_index = search_from + relative_col;
-            if is_word_boundary(line, column_index)
-                && is_word_boundary(line, column_index + key.len())
-            {
+            let end_index = column_index + key.len();
+            // Start boundary: char before key must not be an ident char
+            let start_ok = line[..column_index]
+                .chars()
+                .next_back()
+                .map(|c| !is_ident(c))
+                .unwrap_or(true);
+            // End boundary: char after key must not be an ident char
+            let end_ok = line[end_index..]
+                .chars()
+                .next()
+                .map(|c| !is_ident(c))
+                .unwrap_or(true);
+            if start_ok && end_ok {
                 if seen == occurrence {
                     return Some((start_line + index, column_index + 1));
                 }
                 seen += 1;
             }
-            search_from = column_index + key.len().max(1);
+            search_from = end_index.max(search_from + 1);
         }
     }
     None

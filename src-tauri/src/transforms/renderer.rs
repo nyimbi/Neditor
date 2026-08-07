@@ -10,9 +10,7 @@ use super::{
     external::{graphviz_command, run_external_transform, ExternalTransformRequest},
     options::TransformExecutionOptions,
     qr, sql,
-    structured::{
-        self, render_decision_table_html, render_toml_html,
-    },
+    structured::{self, render_decision_table_html, render_toml_html},
     transform_cache_key,
     visual_data::{render_geojson_svg, render_stl_svg, render_topojson_svg, render_vega_lite_svg},
     TransformArtifact,
@@ -160,10 +158,6 @@ pub(crate) fn supported_transform(name: &str) -> bool {
             | "gantt"
             | "decision-table"
             | "toml"
-            | "python"
-            | "r"
-            | "ditaa"
-            | "gnuplot"
     )
 }
 
@@ -244,8 +238,7 @@ fn render_external_transform(
 }
 
 fn external_transform_supported(name: &str) -> bool {
-    graphviz_command(name).is_some()
-        || matches!(name, "pikchr" | "plantuml" | "d2" | "python" | "r" | "ditaa" | "gnuplot")
+    graphviz_command(name).is_some() || matches!(name, "pikchr" | "plantuml" | "d2")
 }
 
 fn external_output_format(name: &str, fence_options: &Value) -> Option<String> {

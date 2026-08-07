@@ -279,6 +279,13 @@ fn merge_project_variable_defaults(
     source: &serde_json::Map<String, Value>,
 ) {
     for (key, value) in source {
+        // If the target has any literal dotted key in this namespace (e.g. "client.name" when
+        // source key is "client"), skip — the document's flat-key representation owns the
+        // namespace and should not be shadowed by a project-variable nested object.
+        let namespace_prefix = format!("{key}.");
+        if target.keys().any(|k| k.starts_with(&namespace_prefix)) {
+            continue;
+        }
         match (target.get_mut(key), value) {
             (Some(Value::Object(target_object)), Value::Object(source_object)) => {
                 merge_project_variable_defaults(target_object, source_object);

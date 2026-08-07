@@ -585,7 +585,7 @@ fn tokenize_expression(expression: &str) -> Result<Vec<FormulaToken>, String> {
                     index += 1;
                     FormulaToken::Equal
                 }
-                '=' => return Err("use '==' for equality comparisons".to_string()),
+                '=' => FormulaToken::Equal,
                 '!' if chars.get(index + 1) == Some(&'=') => {
                     index += 1;
                     FormulaToken::NotEqual
