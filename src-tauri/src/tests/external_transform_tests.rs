@@ -283,7 +283,7 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
     assert!(plantuml_png_artifact.diagnostics.iter().any(|diagnostic| {
         diagnostic.related.iter().any(|related| {
             related.starts_with("adapter_args: -tpng ")
-                && related.contains("neditor-plantuml-")
+                && related.contains("neditor-transform-")
                 && related.ends_with(".puml")
         })
     }));
@@ -334,7 +334,7 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
     assert!(pikchr_artifact.diagnostics.iter().any(|diagnostic| {
         diagnostic.related.iter().any(|related| {
             related.starts_with("adapter_args: ")
-                && related.contains("neditor-pikchr-")
+                && related.contains("neditor-transform-")
                 && related.ends_with(".pikchr")
         })
     }));

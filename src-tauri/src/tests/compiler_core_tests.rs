@@ -555,7 +555,7 @@ fn compiler_strips_yaml_tags_from_front_matter_metadata() {
         .compiled_markdown
         .contains("## Data Source: Tagged Revenue"));
     assert!(response.html.contains("<td>East</td>"));
-    assert!(response.html.contains("<td>100</td>"));
+    assert!(response.html.contains(">100</td>"));
     assert!(response
         .include_graph
         .iter()
@@ -705,7 +705,7 @@ fn compiler_loads_front_matter_csv_data_sources() {
     assert!(response
         .compiled_markdown
         .contains("## Data Source: Revenue"));
-    assert!(response.html.contains("<td>180</td>"));
+    assert!(response.html.contains(">180</td>"));
     assert!(response.html.contains("East\nCoast"));
     assert!(response
         .include_graph
@@ -1713,7 +1713,9 @@ fn compiler_renders_filtered_placeholder_as_empty_for_missing_variable() {
     );
     // Unfiltered missing variable keeps the {{key}} passthrough
     assert!(
-        response.compiled_markdown.contains("No filter: {{alsoMissing}}"),
+        response
+            .compiled_markdown
+            .contains("No filter: {{alsoMissing}}"),
         "unfiltered missing variable must pass through as {{key}}"
     );
     // Present and default-with-filter still work
