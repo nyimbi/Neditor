@@ -1668,3 +1668,83 @@ fn compiler_reports_broken_local_markdown_links() {
         .any(|related| related.contains("docs/missing-logo.svg")));
     fs::remove_dir_all(root).expect("clean link test dir");
 }
+
+#[test]
+fn compiler_renders_filtered_placeholder_as_empty_for_missing_variable() {
+    // Spec section 8: {{key | filter}} must render (produce output) even when the
+    // variable is missing from front matter.  Without a filter the raw {{key}}
+    // placeholder is kept as a visible reminder; with a filter the result is an
+    // empty string so the filter syntax does not appear verbatim in output.
+    let response = compile(CompileRequest {
+        text: concat!(
+            "---\n",
+            "status: approved\n",
+            "client: Acme\n",
+            "---\n",
+            "# Filter Render\n",
+            "Missing upper: {{missing | upper}}\n",
+            "Missing lower: {{missing | lower}}\n",
+            "Missing trim: {{missing | trim}}\n",
+            "Missing currency: {{missingNum | currency}}\n",
+            "No filter: {{alsoMissing}}\n",
+            "Present: {{client | title}}\n",
+            "Default: {{owner | default:'Strategy' | upper}}\n",
+        )
+        .to_string(),
+        file_path: None,
+    });
+
+    // Filtered missing variables render as empty string (no raw {{...}} in output)
+    assert!(
+        response.compiled_markdown.contains("Missing upper: \n"),
+        "filtered missing variable must render as empty"
+    );
+    assert!(
+        response.compiled_markdown.contains("Missing lower: \n"),
+        "lowercase filter on missing must render as empty"
+    );
+    assert!(
+        response.compiled_markdown.contains("Missing trim: \n"),
+        "trim filter on missing must render as empty"
+    );
+    assert!(
+        response.compiled_markdown.contains("Missing currency: \n"),
+        "currency filter on missing must render as empty"
+    );
+    // Unfiltered missing variable keeps the {{key}} passthrough
+    assert!(
+        response.compiled_markdown.contains("No filter: {{alsoMissing}}"),
+        "unfiltered missing variable must pass through as {{key}}"
+    );
+    // Present and default-with-filter still work
+    assert!(response.compiled_markdown.contains("Present: Acme"));
+    assert!(response.compiled_markdown.contains("Default: STRATEGY"));
+
+    // Missing variable diagnostics are emitted regardless of filter presence
+    let missing_msgs: Vec<_> = response
+        .diagnostics
+        .iter()
+        .filter(|d| d.message.contains("Missing document variable"))
+        .map(|d| d.message.as_str())
+        .collect();
+    assert!(
+        missing_msgs.iter().any(|m| m.contains("missing")),
+        "missing variable with filter should emit diagnostic"
+    );
+    assert!(
+        missing_msgs.iter().any(|m| m.contains("missingNum")),
+        "missing numeric variable with filter should emit diagnostic"
+    );
+    assert!(
+        missing_msgs.iter().any(|m| m.contains("alsoMissing")),
+        "unfiltered missing variable should emit diagnostic"
+    );
+    // owner has a default so no missing diagnostic
+    assert!(
+        !response
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("Missing document variable: owner")),
+        "variable with default must not emit missing diagnostic"
+    );
+}

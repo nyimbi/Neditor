@@ -35,6 +35,7 @@ pub(crate) fn interpolate_variables(
                 source_position_after(token_line, token_column, token_source);
             let mut formula_token = false;
             let mut missing_variable_path = None;
+            let mut has_variable_filters = false;
             let replacement = if let Some(expr) = token.strip_prefix('=') {
                 formula_token = true;
                 match evaluate_inline_formula(expr, calculations) {
@@ -60,6 +61,7 @@ pub(crate) fn interpolate_variables(
                 }
             } else {
                 let variable = parse_variable_token(token);
+                has_variable_filters = !variable.filters.is_empty();
                 let replacement = metadata_lookup(metadata, variable.path)
                     .map(value_to_string)
                     .or_else(|| variable.default.clone());
@@ -103,7 +105,13 @@ pub(crate) fn interpolate_variables(
                     end_line,
                     token_end_column,
                 ));
-                output.push_str(&format!("{{{{{token}}}}}"));
+                // When the token has filters, render as empty string so the filter
+                // syntax does not leak into the compiled output as a raw placeholder.
+                // Tokens without filters keep the {{key}} passthrough as a visible
+                // reminder that the variable is not yet defined.
+                if !has_variable_filters {
+                    output.push_str(&format!("{{{{{token}}}}}"));
+                }
             }
             advance_source_position(&mut generated_line, &mut generated_column, token_source);
             rest = &after_start[end + 2..];
