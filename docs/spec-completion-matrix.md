@@ -1,6 +1,6 @@
 # NEditor Specification Completion Matrix
 
-Updated: 2026-05-27
+Updated: 2026-08-07
 
 Status vocabulary:
 
