@@ -24,14 +24,14 @@ pub(crate) fn render_vega_lite_svg(
     let mark = vega_lite_mark(&spec);
     if !matches!(
         mark.as_str(),
-        "bar" | "line" | "point" | "circle" | "square" | "area" | "tick" | "text" | "rule"
+        "bar" | "line" | "point" | "circle" | "square" | "area" | "tick" | "text" | "rule" | "rect"
     ) {
         let diagnostic = diag(
             "warning",
             format!("Unsupported Vega-Lite mark for native preview: {mark}"),
             None,
             None,
-            Some("Use bar, line, point, circle, square, area, tick, text, or rule marks for the native static preview."),
+            Some("Use bar, line, point, circle, square, area, tick, rect, text, or rule marks for the native static preview."),
         );
         artifact_diags.push(diagnostic.clone());
         diagnostics.push(diagnostic);
@@ -48,11 +48,27 @@ pub(crate) fn render_vega_lite_svg(
             diagnostics,
         );
     }
+    // rect heatmap: y is categorical (nominal/ordinal) — 2-D grid path
+    if mark == "rect" {
+        let y_type = vega_lite_encoding_scale_type(&spec, "y");
+        if y_type
+            .as_deref()
+            .is_some_and(|t| matches!(t, "nominal" | "ordinal"))
+        {
+            return render_vega_lite_rect_heatmap_path(
+                &spec,
+                color_field.as_deref(),
+                artifact_diags,
+                diagnostics,
+            );
+        }
+    }
     let Some(x_field) = vega_lite_encoding_field(&spec, "x") else {
         return vega_lite_missing_field("x", artifact_diags, diagnostics);
     };
     let y_field = vega_lite_encoding_field(&spec, "y");
     let size_field = vega_lite_encoding_field(&spec, "size");
+    let opacity_field = vega_lite_encoding_field(&spec, "opacity");
     let y_aggregate = vega_lite_encoding_aggregate(&spec, "y");
     if y_field.is_none() && !vega_lite_is_count_aggregate(y_aggregate.as_deref()) {
         return vega_lite_missing_field("y", artifact_diags, diagnostics);
@@ -64,6 +80,7 @@ pub(crate) fn render_vega_lite_svg(
         color_field.as_deref(),
         text_field.as_deref(),
         size_field.as_deref(),
+        opacity_field.as_deref(),
         y_aggregate.as_deref(),
     );
     if values.is_empty() {
@@ -94,6 +111,42 @@ pub(crate) fn render_vega_lite_svg(
         &y_title,
         y_aggregate.as_deref(),
     )
+}
+
+fn render_vega_lite_rect_heatmap_path(
+    spec: &Value,
+    color_field: Option<&str>,
+    artifact_diags: &mut Vec<DocumentDiagnostic>,
+    diagnostics: &mut Vec<DocumentDiagnostic>,
+) -> String {
+    let Some(x_field) = vega_lite_encoding_field(spec, "x") else {
+        return vega_lite_missing_field("x", artifact_diags, diagnostics);
+    };
+    let Some(y_field) = vega_lite_encoding_field(spec, "y") else {
+        return vega_lite_missing_field("y", artifact_diags, diagnostics);
+    };
+    // value dimension: color field if present, else fall back to a field named "value"
+    let value_field = color_field.unwrap_or("value");
+    let cells = vega_lite_heatmap_values(spec, &x_field, &y_field, value_field);
+    if cells.is_empty() {
+        let diagnostic = diag(
+            "warning",
+            "Vega-Lite rect heatmap native preview did not find any data.values rows.",
+            None,
+            None,
+            Some("Provide data.values rows with x, y, and a color/value field for the rect heatmap preview."),
+        );
+        artifact_diags.push(diagnostic.clone());
+        diagnostics.push(diagnostic);
+        return "<section class=\"transform transform-vega-lite transform-error\">No drawable Vega-Lite rect rows</section>".to_string();
+    }
+    let title = spec
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or("Vega-Lite heatmap");
+    let x_title = vega_lite_encoding_title(spec, "x").unwrap_or(x_field);
+    let y_title = vega_lite_encoding_title(spec, "y").unwrap_or(y_field);
+    render_vega_lite_heatmap_svg(title, &cells, &x_title, &y_title)
 }
 
 pub(crate) fn render_geojson_svg(
@@ -192,7 +245,7 @@ pub(crate) fn render_stl_svg(
     artifact_diags: &mut Vec<DocumentDiagnostic>,
     diagnostics: &mut Vec<DocumentDiagnostic>,
 ) -> String {
-    let Some(parsed) = parse_stl_vertices(body) else {
+    let Some(parsed) = parse_stl_facets(body) else {
         let diagnostic = diag(
             "warning",
             "STL transform did not contain ASCII vertices or base64-encoded binary STL data.",
@@ -205,11 +258,11 @@ pub(crate) fn render_stl_svg(
         return "<section class=\"transform transform-stl transform-error\">No STL vertices found</section>".to_string();
     };
     let StlParsedGeometry {
-        vertices,
+        facets,
         source_kind,
         coordinate_assumption,
     } = parsed;
-    if vertices.is_empty() {
+    if facets.is_empty() {
         let diagnostic = diag(
             "warning",
             "STL transform did not contain drawable vertex data.",
@@ -221,35 +274,28 @@ pub(crate) fn render_stl_svg(
         diagnostics.push(diagnostic);
         return "<section class=\"transform transform-stl transform-error\">No STL vertices found</section>".to_string();
     }
-    let triangles = vertices
-        .chunks(3)
-        .filter(|triangle| triangle.len() == 3)
-        .map(|triangle| StlTrianglePreview {
-            projected: triangle
+    let triangles = facets
+        .iter()
+        .map(|facet| StlTrianglePreview {
+            projected: facet
+                .vertices
                 .iter()
-                .map(|vertex| stl_isometric_position(*vertex))
+                .map(|&vertex| stl_isometric_position(vertex))
                 .collect::<Vec<_>>(),
-            average_z: triangle.iter().map(|(_, _, z)| *z).sum::<f64>() / 3.0,
+            average_z: facet.vertices.iter().map(|(_, _, z)| *z).sum::<f64>() / 3.0,
+            shade: stl_three_point_shade(facet.normal),
         })
         .collect::<Vec<_>>();
-    if triangles.is_empty() {
-        let diagnostic = diag(
-            "warning",
-            "STL transform did not contain complete ASCII triangle facets.",
-            None,
-            None,
-            Some("Provide vertex records in groups of three so the static STL preview can draw triangles."),
-        );
-        artifact_diags.push(diagnostic.clone());
-        diagnostics.push(diagnostic);
-        return "<section class=\"transform transform-stl transform-error\">No complete STL triangles found</section>".to_string();
-    }
     let positions = triangles
         .iter()
         .flat_map(|triangle| triangle.projected.iter().copied())
         .collect::<Vec<_>>();
     let (min_x, max_x, min_y, max_y) = geojson_bounds(&positions);
-    let (min_z, max_z) = stl_depth_bounds(&vertices);
+    let all_vertices = facets
+        .iter()
+        .flat_map(|facet| facet.vertices.iter().copied())
+        .collect::<Vec<_>>();
+    let (min_z, max_z) = stl_depth_bounds(&all_vertices);
     let mut sorted_triangles = triangles;
     sorted_triangles.sort_by(|left, right| {
         left.average_z
@@ -260,19 +306,21 @@ pub(crate) fn render_stl_svg(
         .iter()
         .map(|triangle| {
             let points = projected_points(&triangle.projected, min_x, max_x, min_y, max_y);
-            let opacity = stl_depth_opacity(triangle.average_z, min_z, max_z);
+            let (r, g, b) = stl_shade_to_rgb(triangle.shade);
             format!(
-                "<polygon points=\"{points}\" data-depth=\"{:.2}\" fill=\"rgba(39,93,168,{opacity:.2})\" stroke=\"#275DA8\" stroke-width=\"2\" stroke-linejoin=\"round\"/>",
-                triangle.average_z
+                "<polygon points=\"{points}\" data-depth=\"{:.2}\" data-shade=\"{:.2}\" fill=\"rgb({r},{g},{b})\" stroke=\"#1e3a5f\" stroke-width=\"2\" stroke-linejoin=\"round\"/>",
+                triangle.average_z,
+                triangle.shade,
             )
         })
         .collect::<Vec<_>>()
         .join("");
     let z_summary = stl_depth_summary(min_z, max_z);
+    let vertex_count = facets.len() * 3;
     format!(
         "<svg class=\"transform transform-stl\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 460\" role=\"img\" data-projection=\"isometric-depth-fit\" data-stl-source=\"{source_kind}\" data-coordinate-assumption=\"{coordinate_assumption}\"><rect x=\"24\" y=\"24\" width=\"852\" height=\"412\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#cbd5e1\"/>{triangle_polygons}<text x=\"34\" y=\"52\" font-size=\"16\" fill=\"#334155\">{} triangles / {} vertices{z_summary}</text></svg>",
         sorted_triangles.len(),
-        vertices.len(),
+        vertex_count,
     )
 }
 
@@ -299,6 +347,12 @@ fn vega_lite_encoding_title(spec: &Value, channel: &str) -> Option<String> {
         .and_then(Value::as_str)
         .filter(|value| !value.trim().is_empty())
         .map(ToString::to_string)
+}
+
+fn vega_lite_encoding_scale_type(spec: &Value, channel: &str) -> Option<String> {
+    spec.pointer(&format!("/encoding/{channel}/type"))
+        .and_then(Value::as_str)
+        .map(|s| s.trim().to_ascii_lowercase())
 }
 
 fn vega_lite_encoding_aggregate(spec: &Value, channel: &str) -> Option<String> {
@@ -330,6 +384,14 @@ struct VegaLiteDatum {
     series: Option<String>,
     text: Option<String>,
     size: Option<f64>,
+    opacity: Option<f64>,
+}
+
+#[derive(Clone, Debug)]
+struct VegaLiteHeatmapDatum {
+    x_label: String,
+    y_label: String,
+    value: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -359,6 +421,7 @@ fn vega_lite_values(
     color_field: Option<&str>,
     text_field: Option<&str>,
     size_field: Option<&str>,
+    opacity_field: Option<&str>,
     y_aggregate: Option<&str>,
 ) -> Vec<VegaLiteDatum> {
     let values = spec
@@ -387,12 +450,18 @@ fn vega_lite_values(
                     .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))
                     .filter(|value| value.is_finite())
             });
+            let opacity = opacity_field.and_then(|field| {
+                row.get(field)
+                    .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))
+                    .filter(|value| value.is_finite())
+            });
             Some(VegaLiteDatum {
                 label: x,
                 value: y,
                 series,
                 text,
                 size,
+                opacity,
             })
         })
         .collect::<Vec<_>>();
@@ -400,6 +469,32 @@ fn vega_lite_values(
         Some(aggregate) => aggregate_vega_lite_values(values, aggregate),
         None => values,
     }
+}
+
+fn vega_lite_heatmap_values(
+    spec: &Value,
+    x_field: &str,
+    y_field: &str,
+    value_field: &str,
+) -> Vec<VegaLiteHeatmapDatum> {
+    spec.pointer("/data/values")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|row| {
+            let x_label = row.get(x_field).map(value_to_axis_label)?;
+            let y_label = row.get(y_field).map(value_to_axis_label)?;
+            let value = row
+                .get(value_field)
+                .and_then(|v| v.as_f64().or_else(|| v.as_str()?.parse().ok()))
+                .unwrap_or(1.0);
+            Some(VegaLiteHeatmapDatum {
+                x_label,
+                y_label,
+                value,
+            })
+        })
+        .collect()
 }
 
 fn render_vega_lite_rule_svg(
@@ -558,6 +653,7 @@ fn aggregate_vega_lite_values(values: Vec<VegaLiteDatum>, aggregate: &str) -> Ve
                 series: bucket.series,
                 text: None,
                 size: None,
+                opacity: None,
             })
         })
         .collect()
@@ -619,20 +715,30 @@ fn render_vega_lite_chart_svg(
     let labels = unique_vega_labels(values);
     let series = unique_vega_series(values);
     let size_domain = VegaLiteSizeDomain::from_values(values);
+    let opacity_domain = VegaLiteOpacityDomain::from_values(values);
     let step = plot_width / labels.len().max(1);
     let aggregate_attr = y_aggregate
         .map(|aggregate| format!(" data-vega-aggregate=\"{}\"", escape_html(aggregate)))
         .unwrap_or_default();
+    // Build SVG: axes first, then grid (behind marks), then zero-line
     let mut svg = format!(
-        "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\" data-vega-mark=\"{}\"{aggregate_attr}><text x=\"72\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><line x1=\"72\" y1=\"262\" x2=\"770\" y2=\"262\" stroke=\"#94a3b8\"/><line x1=\"72\" y1=\"54\" x2=\"72\" y2=\"262\" stroke=\"#94a3b8\"/><line class=\"vega-zero-line\" x1=\"72\" y1=\"{:.1}\" x2=\"770\" y2=\"{:.1}\" stroke=\"#64748b\" stroke-dasharray=\"4 3\"/>",
+        "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\" data-vega-mark=\"{}\"{aggregate_attr}><text x=\"72\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><line x1=\"72\" y1=\"262\" x2=\"770\" y2=\"262\" stroke=\"#94a3b8\"/><line x1=\"72\" y1=\"54\" x2=\"72\" y2=\"262\" stroke=\"#94a3b8\"/>",
         escape_html(mark),
         escape_html(title),
-        domain.zero_y,
-        domain.zero_y
     );
+    render_vega_y_axis_grid(&mut svg, &domain);
+    svg.push_str(&format!(
+        "<line class=\"vega-zero-line\" x1=\"72\" y1=\"{:.1}\" x2=\"770\" y2=\"{:.1}\" stroke=\"#64748b\" stroke-dasharray=\"4 3\"/>",
+        domain.zero_y, domain.zero_y
+    ));
     render_vega_axis_labels(&mut svg, &labels, plot_left, step);
     render_vega_axis_titles(&mut svg, x_title, y_title);
-    if mark == "bar" {
+    if mark == "bar" || mark == "rect" {
+        let mark_class = if mark == "rect" {
+            "vega-rect-mark"
+        } else {
+            "vega-bar-mark"
+        };
         let series_count = series.len().max(1);
         let bar_width = ((step.saturating_sub(16)) / series_count).max(4);
         for datum in values {
@@ -652,12 +758,13 @@ fn render_vega_lite_chart_svg(
                 .as_deref()
                 .map(|series| format!(" data-series=\"{}\"", escape_html(series)))
                 .unwrap_or_default();
+            let opacity_attr = opacity_attr_for(&opacity_domain, datum.opacity);
             let y = domain.y(datum.value);
             let bar_y = y.min(domain.zero_y);
             let bar_height = (y - domain.zero_y).abs().max(1.0);
             let value_label = format_vega_value(datum.value);
             svg.push_str(&format!(
-                "<rect x=\"{x}\" y=\"{bar_y:.1}\" width=\"{bar_width}\" height=\"{bar_height:.1}\" fill=\"{color}\" data-label=\"{}\" data-value=\"{}\"{series_attr}/>",
+                "<rect class=\"{mark_class}\" x=\"{x}\" y=\"{bar_y:.1}\" width=\"{bar_width}\" height=\"{bar_height:.1}\" fill=\"{color}\" data-label=\"{}\" data-value=\"{}\"{series_attr}{opacity_attr}/>",
                 escape_html(&datum.label),
                 escape_html(&value_label)
             ));
@@ -687,6 +794,7 @@ fn render_vega_lite_chart_svg(
                         datum.value,
                         datum.text.as_deref(),
                         datum.size,
+                        datum.opacity,
                     ))
                 })
                 .collect::<Vec<_>>();
@@ -700,11 +808,11 @@ fn render_vega_lite_chart_svg(
                 let baseline = domain.zero_y;
                 let area_points = points
                     .iter()
-                    .map(|(x, y, _, _, _, _)| format!("{x},{y:.1}"))
+                    .map(|(x, y, _, _, _, _, _)| format!("{x},{y:.1}"))
                     .collect::<Vec<_>>()
                     .join(" ");
                 let area = match (points.first(), points.last()) {
-                    (Some((first_x, _, _, _, _, _)), Some((last_x, _, _, _, _, _))) => {
+                    (Some((first_x, _, _, _, _, _, _)), Some((last_x, _, _, _, _, _, _))) => {
                         format!("{first_x},{baseline:.1} {area_points} {last_x},{baseline:.1}")
                     }
                     _ => String::new(),
@@ -716,14 +824,14 @@ fn render_vega_lite_chart_svg(
             } else if mark == "line" {
                 let polyline = points
                     .iter()
-                    .map(|(x, y, _, _, _, _)| format!("{x},{y:.1}"))
+                    .map(|(x, y, _, _, _, _, _)| format!("{x},{y:.1}"))
                     .collect::<Vec<_>>()
                     .join(" ");
                 svg.push_str(&format!(
                     "<polyline points=\"{polyline}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"3\"{series_attr}/>"
                 ));
             }
-            for (x, y, label, value, text, size) in points {
+            for (x, y, label, value, text, size, opacity) in points {
                 let label = if series_name.is_empty() {
                     label.to_string()
                 } else {
@@ -733,10 +841,11 @@ fn render_vega_lite_chart_svg(
                 let size_attr = size
                     .map(|size| format!(" data-size=\"{}\"", escape_html(&format_vega_value(size))))
                     .unwrap_or_default();
+                let opacity_attr = opacity_attr_for(&opacity_domain, opacity);
                 if mark == "text" {
                     let text = text.unwrap_or(&value_label);
                     svg.push_str(&format!(
-                        "<text class=\"vega-text-mark\" x=\"{x}\" y=\"{:.1}\" font-size=\"13\" text-anchor=\"middle\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{size_attr}{series_attr}>{}</text>",
+                        "<text class=\"vega-text-mark\" x=\"{x}\" y=\"{:.1}\" font-size=\"13\" text-anchor=\"middle\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{size_attr}{opacity_attr}{series_attr}>{}</text>",
                         y - 7.0,
                         escape_html(&label),
                         escape_html(&value_label),
@@ -747,7 +856,7 @@ fn render_vega_lite_chart_svg(
                     let x1 = x.saturating_sub(10);
                     let x2 = x + 10;
                     svg.push_str(&format!(
-                        "<line class=\"vega-tick-mark\" x1=\"{x1}\" y1=\"{y:.1}\" x2=\"{x2}\" y2=\"{y:.1}\" stroke=\"{color}\" stroke-width=\"4\" stroke-linecap=\"round\" aria-label=\"{} {}\" data-value=\"{}\"{size_attr}{series_attr}/>",
+                        "<line class=\"vega-tick-mark\" x1=\"{x1}\" y1=\"{y:.1}\" x2=\"{x2}\" y2=\"{y:.1}\" stroke=\"{color}\" stroke-width=\"4\" stroke-linecap=\"round\" aria-label=\"{} {}\" data-value=\"{}\"{size_attr}{opacity_attr}{series_attr}/>",
                         escape_html(&label),
                         escape_html(&value_label),
                         escape_html(&value_label)
@@ -761,7 +870,7 @@ fn render_vega_lite_chart_svg(
                     let square_x = x as f64 - radius;
                     let square_y = y - radius;
                     svg.push_str(&format!(
-                        "<rect class=\"vega-square-mark\" x=\"{square_x:.1}\" y=\"{square_y:.1}\" width=\"{side:.1}\" height=\"{side:.1}\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{size_attr}{series_attr}/>",
+                        "<rect class=\"vega-square-mark\" x=\"{square_x:.1}\" y=\"{square_y:.1}\" width=\"{side:.1}\" height=\"{side:.1}\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{size_attr}{opacity_attr}{series_attr}/>",
                         escape_html(&label),
                         escape_html(&value_label),
                         escape_html(&value_label)
@@ -777,7 +886,7 @@ fn render_vega_lite_chart_svg(
                         .map(|domain| domain.radius(size))
                         .unwrap_or(5.0);
                     svg.push_str(&format!(
-                        "<circle{class_attr} cx=\"{x}\" cy=\"{y:.1}\" r=\"{radius:.1}\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{size_attr}{series_attr}/>",
+                        "<circle{class_attr} cx=\"{x}\" cy=\"{y:.1}\" r=\"{radius:.1}\" fill=\"{color}\" aria-label=\"{} {}\" data-value=\"{}\"{size_attr}{opacity_attr}{series_attr}/>",
                         escape_html(&label),
                         escape_html(&value_label),
                         escape_html(&value_label)
@@ -1046,6 +1155,181 @@ fn render_vega_legend(svg: &mut String, series: &[String]) {
             escape_html(series)
         ));
     }
+}
+
+// ── Opacity domain ────────────────────────────────────────────────────────────
+
+#[derive(Clone, Debug)]
+struct VegaLiteOpacityDomain {
+    min: f64,
+    max: f64,
+}
+
+impl VegaLiteOpacityDomain {
+    fn from_values(values: &[VegaLiteDatum]) -> Option<Self> {
+        let mut opacities = values
+            .iter()
+            .filter_map(|d| d.opacity)
+            .filter(|v| v.is_finite());
+        let first = opacities.next()?;
+        let (min, max) = opacities.fold((first, first), |(mn, mx), v| (mn.min(v), mx.max(v)));
+        Some(Self { min, max })
+    }
+
+    /// Map raw field value to an SVG opacity in [0.15, 1.0].
+    fn opacity(&self, raw: f64) -> f64 {
+        let range = (self.max - self.min).abs();
+        if range < f64::EPSILON {
+            return 0.8;
+        }
+        let t = ((raw - self.min) / range).clamp(0.0, 1.0);
+        0.15 + t * 0.85
+    }
+}
+
+/// Build an `opacity="…"` attribute string, or empty if no opacity data.
+fn opacity_attr_for(domain: &Option<VegaLiteOpacityDomain>, raw: Option<f64>) -> String {
+    let Some(domain) = domain else {
+        return String::new();
+    };
+    let Some(raw) = raw else {
+        return String::new();
+    };
+    format!(" opacity=\"{:.2}\"", domain.opacity(raw))
+}
+
+// ── Y-axis grid + tick labels ─────────────────────────────────────────────────
+
+fn render_vega_y_axis_grid(svg: &mut String, domain: &VegaLiteDomain) {
+    let n_ticks = 5usize;
+    for i in 0..=n_ticks {
+        let frac = i as f64 / n_ticks as f64;
+        let value = domain.min + frac * (domain.max - domain.min);
+        let y = domain.y(value);
+        let label = format_vega_value(value);
+        svg.push_str(&format!(
+            "<line class=\"vega-grid-line\" x1=\"72\" y1=\"{y:.1}\" x2=\"770\" y2=\"{y:.1}\" stroke=\"#e2e8f0\"/><text class=\"vega-y-tick\" x=\"66\" y=\"{:.1}\" font-size=\"11\" text-anchor=\"end\" fill=\"#64748b\">{}</text>",
+            y + 4.0,
+            escape_html(&label)
+        ));
+    }
+}
+
+// ── Heatmap renderer (rect mark, y = nominal/ordinal) ────────────────────────
+
+fn render_vega_lite_heatmap_svg(
+    title: &str,
+    cells: &[VegaLiteHeatmapDatum],
+    x_title: &str,
+    y_title: &str,
+) -> String {
+    let x_labels = unique_ordered_string_labels(cells.iter().map(|d| d.x_label.as_str()));
+    let y_labels = unique_ordered_string_labels(cells.iter().map(|d| d.y_label.as_str()));
+    let min_val = cells.iter().map(|d| d.value).fold(f64::INFINITY, f64::min);
+    let max_val = cells
+        .iter()
+        .map(|d| d.value)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let val_range = (max_val - min_val).abs().max(f64::EPSILON);
+
+    let width = 820usize;
+    let height = 340usize;
+    let plot_left = 80usize;
+    let plot_top = 54usize;
+    let plot_width = 670usize;
+    let plot_height = 220usize;
+    let cell_w = plot_width / x_labels.len().max(1);
+    let cell_h = plot_height / y_labels.len().max(1);
+
+    let mut svg = format!(
+        "<svg class=\"transform transform-vega-lite\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" role=\"img\" data-vega-mark=\"rect\" data-heatmap=\"true\"><text x=\"80\" y=\"34\" font-size=\"18\" fill=\"#111827\">{}</text><line x1=\"80\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"#94a3b8\"/><line x1=\"80\" y1=\"{plot_top}\" x2=\"80\" y2=\"{}\" stroke=\"#94a3b8\"/>",
+        escape_html(title),
+        plot_top + plot_height,
+        plot_left + plot_width,
+        plot_top + plot_height,
+        plot_top + plot_height,
+    );
+
+    // cells
+    for datum in cells {
+        let xi = x_labels
+            .iter()
+            .position(|l| l == &datum.x_label)
+            .unwrap_or(0);
+        let yi = y_labels
+            .iter()
+            .position(|l| l == &datum.y_label)
+            .unwrap_or(0);
+        let x = plot_left + xi * cell_w;
+        let y = plot_top + yi * cell_h;
+        let opacity = 0.15 + ((datum.value - min_val) / val_range) * 0.85;
+        let value_label = format_vega_value(datum.value);
+        svg.push_str(&format!(
+            "<rect class=\"vega-rect-mark\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"#275DA8\" fill-opacity=\"{opacity:.2}\" data-x=\"{}\" data-y=\"{}\" data-value=\"{}\"/>",
+            x + 1,
+            y + 1,
+            cell_w.saturating_sub(2),
+            cell_h.saturating_sub(2),
+            escape_html(&datum.x_label),
+            escape_html(&datum.y_label),
+            escape_html(&value_label),
+        ));
+    }
+
+    // x-axis labels
+    for (i, label) in x_labels.iter().enumerate() {
+        let lx = plot_left + i * cell_w + cell_w / 2;
+        svg.push_str(&format!(
+            "<text x=\"{}\" y=\"{}\" font-size=\"11\" text-anchor=\"middle\" fill=\"#334155\">{}</text>",
+            lx,
+            plot_top + plot_height + 16,
+            escape_html(label)
+        ));
+    }
+    // y-axis labels
+    for (i, label) in y_labels.iter().enumerate() {
+        let ly = plot_top + i * cell_h + cell_h / 2 + 4;
+        svg.push_str(&format!(
+            "<text x=\"74\" y=\"{ly}\" font-size=\"11\" text-anchor=\"end\" fill=\"#334155\">{}</text>",
+            escape_html(label)
+        ));
+    }
+    // color scale legend (min→max strip on right)
+    let legend_x = plot_left + plot_width + 16;
+    for step in 0..=10usize {
+        let frac = step as f64 / 10.0;
+        let ly = plot_top + (frac * plot_height as f64) as usize;
+        let lh = plot_height / 10 + 1;
+        let op = 0.15 + frac * 0.85;
+        svg.push_str(&format!(
+            "<rect x=\"{legend_x}\" y=\"{ly}\" width=\"14\" height=\"{lh}\" fill=\"#275DA8\" fill-opacity=\"{op:.2}\"/>",
+        ));
+    }
+    let min_label = format_vega_value(min_val);
+    let max_label = format_vega_value(max_val);
+    svg.push_str(&format!(
+        "<text x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"#64748b\">{}</text><text x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"#64748b\">{}</text>",
+        legend_x + 18, plot_top + plot_height,
+        escape_html(&min_label),
+        legend_x + 18, plot_top,
+        escape_html(&max_label),
+    ));
+
+    let mut svg_mut = svg;
+    render_vega_axis_titles(&mut svg_mut, x_title, y_title);
+    svg_mut.push_str("</svg>");
+    svg_mut
+}
+
+fn unique_ordered_string_labels<'a>(iter: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let mut seen = Vec::new();
+    for label in iter {
+        let s = label.to_string();
+        if !seen.iter().any(|l| l == &s) {
+            seen.push(s);
+        }
+    }
+    seen
 }
 
 #[derive(Clone, Debug)]
@@ -1356,16 +1640,26 @@ fn collect_topojson_object_shapes(
                 .get("arcs")
                 .and_then(|arcs| topojson_line_from_arc_refs(arcs, decoded_arcs))
             {
-                shapes.push(GeoShape::Line(line));
+                shapes.extend(
+                    split_line_at_antimeridian(line)
+                        .into_iter()
+                        .filter(|seg| seg.len() >= 2)
+                        .map(GeoShape::Line),
+                );
             }
         }
         "MultiLineString" => {
-            if let Some(lines) = object.get("arcs").and_then(Value::as_array).map(|items| {
-                items
-                    .iter()
-                    .filter_map(|line| topojson_line_from_arc_refs(line, decoded_arcs))
-            }) {
-                shapes.extend(lines.map(GeoShape::Line));
+            if let Some(lines) = object.get("arcs").and_then(Value::as_array) {
+                for item in lines {
+                    if let Some(line) = topojson_line_from_arc_refs(item, decoded_arcs) {
+                        shapes.extend(
+                            split_line_at_antimeridian(line)
+                                .into_iter()
+                                .filter(|seg| seg.len() >= 2)
+                                .map(GeoShape::Line),
+                        );
+                    }
+                }
             }
         }
         "Polygon" => {
@@ -1373,6 +1667,8 @@ fn collect_topojson_object_shapes(
                 items
                     .iter()
                     .filter_map(|ring| topojson_line_from_arc_refs(ring, decoded_arcs))
+                    .flat_map(split_line_at_antimeridian)
+                    .filter(|seg| seg.len() >= 3)
                     .collect::<Vec<_>>()
             }) {
                 if !rings.is_empty() {
@@ -1387,6 +1683,8 @@ fn collect_topojson_object_shapes(
                         items
                             .iter()
                             .filter_map(|ring| topojson_line_from_arc_refs(ring, decoded_arcs))
+                            .flat_map(split_line_at_antimeridian)
+                            .filter(|seg| seg.len() >= 3)
                             .collect::<Vec<_>>()
                     }) {
                         if !rings.is_empty() {
@@ -1421,6 +1719,28 @@ fn collect_topojson_object_shapes(
         }
         _ => {}
     }
+}
+
+/// Split a decoded geographic arc at antimeridian crossings (|Δlon| > 180°).
+/// Each sub-segment is returned as its own vec; callers filter by minimum length.
+fn split_line_at_antimeridian(line: Vec<(f64, f64)>) -> Vec<Vec<(f64, f64)>> {
+    if line.len() < 2 {
+        return vec![line];
+    }
+    let mut result: Vec<Vec<(f64, f64)>> = Vec::new();
+    let mut current: Vec<(f64, f64)> = Vec::new();
+    for point in line {
+        if let Some(&prev) = current.last() {
+            if (point.0 - prev.0).abs() > 180.0 {
+                result.push(std::mem::take(&mut current));
+            }
+        }
+        current.push(point);
+    }
+    if !current.is_empty() {
+        result.push(current);
+    }
+    result
 }
 
 fn topojson_line_from_arc_refs(
@@ -1473,16 +1793,90 @@ fn apply_topojson_transform(
 }
 
 #[derive(Clone, Debug)]
+struct StlFacet {
+    /// Unit surface normal (computed from cross product if file normal is degenerate).
+    normal: (f64, f64, f64),
+    vertices: [(f64, f64, f64); 3],
+}
+
+#[derive(Clone, Debug)]
 struct StlTrianglePreview {
     projected: Vec<(f64, f64)>,
     average_z: f64,
+    shade: f64,
 }
 
 #[derive(Clone, Debug)]
 struct StlParsedGeometry {
-    vertices: Vec<(f64, f64, f64)>,
+    facets: Vec<StlFacet>,
     source_kind: &'static str,
     coordinate_assumption: &'static str,
+}
+
+// --- STL 3-point Lambertian lighting helpers ---
+
+fn stl_normalize3((x, y, z): (f64, f64, f64)) -> (f64, f64, f64) {
+    let len = (x * x + y * y + z * z).sqrt();
+    if len < f64::EPSILON {
+        (0.0, 0.0, 1.0)
+    } else {
+        (x / len, y / len, z / len)
+    }
+}
+
+fn stl_dot3((ax, ay, az): (f64, f64, f64), (bx, by, bz): (f64, f64, f64)) -> f64 {
+    ax * bx + ay * by + az * bz
+}
+
+fn stl_cross3((ax, ay, az): (f64, f64, f64), (bx, by, bz): (f64, f64, f64)) -> (f64, f64, f64) {
+    (ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx)
+}
+
+fn compute_stl_face_normal(
+    v0: (f64, f64, f64),
+    v1: (f64, f64, f64),
+    v2: (f64, f64, f64),
+) -> (f64, f64, f64) {
+    let e1 = (v1.0 - v0.0, v1.1 - v0.1, v1.2 - v0.2);
+    let e2 = (v2.0 - v0.0, v2.1 - v0.1, v2.2 - v0.2);
+    stl_normalize3(stl_cross3(e1, e2))
+}
+
+/// Returns a unit normal: uses the provided `n` if it has non-negligible length,
+/// otherwise falls back to the cross product of the triangle edges.
+fn stl_validated_normal(
+    n: (f64, f64, f64),
+    v0: (f64, f64, f64),
+    v1: (f64, f64, f64),
+    v2: (f64, f64, f64),
+) -> (f64, f64, f64) {
+    let len_sq = n.0 * n.0 + n.1 * n.1 + n.2 * n.2;
+    if len_sq < 1e-8 {
+        compute_stl_face_normal(v0, v1, v2)
+    } else {
+        let len = len_sq.sqrt();
+        (n.0 / len, n.1 / len, n.2 / len)
+    }
+}
+
+/// Three-point Lambertian shading: key (upper-right-front), fill (left), rim (behind-top).
+/// Returns a [0,1] brightness value.
+fn stl_three_point_shade(normal: (f64, f64, f64)) -> f64 {
+    let key_dir = stl_normalize3((0.6, 0.8, 0.5));
+    let fill_dir = stl_normalize3((-0.8, 0.2, 0.4));
+    let rim_dir = stl_normalize3((0.0, -0.5, -0.8));
+    let key = stl_dot3(normal, key_dir).max(0.0) * 0.65;
+    let fill = stl_dot3(normal, fill_dir).max(0.0) * 0.25;
+    let rim = stl_dot3(normal, rim_dir).max(0.0) * 0.35;
+    (0.12_f64 + key + fill + rim).clamp(0.0, 1.0)
+}
+
+/// Map a [0,1] shade value to an RGB blue-palette color (dark navy → bright periwinkle).
+fn stl_shade_to_rgb(shade: f64) -> (u8, u8, u8) {
+    let r = (15.0 + shade * 115.0).round() as u8;
+    let g = (40.0 + shade * 135.0).round() as u8;
+    let b = (90.0 + shade * 150.0).round() as u8;
+    (r, g, b)
 }
 
 fn stl_isometric_position((x, y, z): (f64, f64, f64)) -> (f64, f64) {
@@ -1524,43 +1918,78 @@ fn format_stl_number(value: f64) -> String {
     }
 }
 
-fn parse_ascii_stl_vertices(body: &str) -> Vec<(f64, f64, f64)> {
-    body.lines()
-        .filter_map(|line| {
-            let mut parts = line.split_whitespace();
-            if parts.next()? != "vertex" {
-                return None;
+fn parse_ascii_stl_facets(body: &str) -> Vec<StlFacet> {
+    let mut facets = Vec::new();
+    let mut current_normal: Option<(f64, f64, f64)> = None;
+    let mut current_vertices: Vec<(f64, f64, f64)> = Vec::new();
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("facet normal ") {
+            let mut parts = rest.split_whitespace();
+            if let (Some(nx), Some(ny), Some(nz)) = (parts.next(), parts.next(), parts.next()) {
+                if let (Ok(nx), Ok(ny), Ok(nz)) =
+                    (nx.parse::<f64>(), ny.parse::<f64>(), nz.parse::<f64>())
+                {
+                    if nx.is_finite() && ny.is_finite() && nz.is_finite() {
+                        current_normal = Some((nx, ny, nz));
+                    }
+                }
             }
-            Some((
-                parts.next()?.parse().ok()?,
-                parts.next()?.parse().ok()?,
-                parts.next()?.parse().ok()?,
-            ))
-        })
-        .collect()
+        } else if let Some(rest) = trimmed.strip_prefix("vertex ") {
+            let mut parts = rest.split_whitespace();
+            if let (Some(x), Some(y), Some(z)) = (parts.next(), parts.next(), parts.next()) {
+                if let (Ok(x), Ok(y), Ok(z)) =
+                    (x.parse::<f64>(), y.parse::<f64>(), z.parse::<f64>())
+                {
+                    if x.is_finite() && y.is_finite() && z.is_finite() {
+                        current_vertices.push((x, y, z));
+                    }
+                }
+            }
+        } else if trimmed == "endfacet" {
+            if current_vertices.len() == 3 {
+                let [v0, v1, v2] = [
+                    current_vertices[0],
+                    current_vertices[1],
+                    current_vertices[2],
+                ];
+                let normal = match current_normal {
+                    Some(n) => stl_validated_normal(n, v0, v1, v2),
+                    None => compute_stl_face_normal(v0, v1, v2),
+                };
+                facets.push(StlFacet {
+                    normal,
+                    vertices: [v0, v1, v2],
+                });
+            }
+            current_vertices.clear();
+            current_normal = None;
+        }
+    }
+    facets
 }
 
-fn parse_stl_vertices(body: &str) -> Option<StlParsedGeometry> {
-    let ascii_vertices = parse_ascii_stl_vertices(body);
-    if !ascii_vertices.is_empty() {
+fn parse_stl_facets(body: &str) -> Option<StlParsedGeometry> {
+    let ascii_facets = parse_ascii_stl_facets(body);
+    if !ascii_facets.is_empty() {
         return Some(StlParsedGeometry {
-            vertices: ascii_vertices,
+            facets: ascii_facets,
             source_kind: "ascii",
             coordinate_assumption: "ascii-stl-xyz",
         });
     }
-    let vertices = parse_base64_binary_stl_vertices(body)?;
+    let facets = parse_base64_binary_stl_facets(body)?;
     Some(StlParsedGeometry {
-        vertices,
+        facets,
         source_kind: "binary-base64",
         coordinate_assumption: "binary-stl-base64-xyz",
     })
 }
 
-fn parse_base64_binary_stl_vertices(body: &str) -> Option<Vec<(f64, f64, f64)>> {
+fn parse_base64_binary_stl_facets(body: &str) -> Option<Vec<StlFacet>> {
     let payload = stl_base64_payload(body)?;
     let bytes = decode_base64_payload(payload)?;
-    parse_binary_stl_vertices(&bytes)
+    parse_binary_stl_facets(&bytes)
 }
 
 fn stl_base64_payload(body: &str) -> Option<&str> {
@@ -1585,7 +2014,7 @@ fn stl_base64_payload(body: &str) -> Option<&str> {
     Some(trimmed)
 }
 
-fn parse_binary_stl_vertices(bytes: &[u8]) -> Option<Vec<(f64, f64, f64)>> {
+fn parse_binary_stl_facets(bytes: &[u8]) -> Option<Vec<StlFacet>> {
     if bytes.len() < 84 {
         return None;
     }
@@ -1594,23 +2023,49 @@ fn parse_binary_stl_vertices(bytes: &[u8]) -> Option<Vec<(f64, f64, f64)>> {
     if bytes.len() < expected_len {
         return None;
     }
-    let mut vertices = Vec::with_capacity(triangle_count.saturating_mul(3));
+    let mut facets = Vec::with_capacity(triangle_count);
     for triangle_index in 0..triangle_count {
-        let triangle_start = 84 + triangle_index * 50;
-        for vertex_index in 0..3 {
-            let vertex_start = triangle_start + 12 + vertex_index * 12;
-            let vertex = (
-                read_le_f32(bytes, vertex_start)? as f64,
-                read_le_f32(bytes, vertex_start + 4)? as f64,
-                read_le_f32(bytes, vertex_start + 8)? as f64,
-            );
-            if !(vertex.0.is_finite() && vertex.1.is_finite() && vertex.2.is_finite()) {
-                return None;
-            }
-            vertices.push(vertex);
+        let base = 84 + triangle_index * 50;
+        // Bytes 0-11 of each 50-byte record are the face normal (3 × f32 LE).
+        let file_normal = (
+            read_le_f32(bytes, base)? as f64,
+            read_le_f32(bytes, base + 4)? as f64,
+            read_le_f32(bytes, base + 8)? as f64,
+        );
+        let v0 = (
+            read_le_f32(bytes, base + 12)? as f64,
+            read_le_f32(bytes, base + 16)? as f64,
+            read_le_f32(bytes, base + 20)? as f64,
+        );
+        let v1 = (
+            read_le_f32(bytes, base + 24)? as f64,
+            read_le_f32(bytes, base + 28)? as f64,
+            read_le_f32(bytes, base + 32)? as f64,
+        );
+        let v2 = (
+            read_le_f32(bytes, base + 36)? as f64,
+            read_le_f32(bytes, base + 40)? as f64,
+            read_le_f32(bytes, base + 44)? as f64,
+        );
+        if !(v0.0.is_finite()
+            && v0.1.is_finite()
+            && v0.2.is_finite()
+            && v1.0.is_finite()
+            && v1.1.is_finite()
+            && v1.2.is_finite()
+            && v2.0.is_finite()
+            && v2.1.is_finite()
+            && v2.2.is_finite())
+        {
+            return None;
         }
+        let normal = stl_validated_normal(file_normal, v0, v1, v2);
+        facets.push(StlFacet {
+            normal,
+            vertices: [v0, v1, v2],
+        });
     }
-    Some(vertices)
+    Some(facets)
 }
 
 fn read_le_f32(bytes: &[u8], offset: usize) -> Option<f32> {

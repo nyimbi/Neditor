@@ -1419,8 +1419,10 @@ endsolid depth"
         .contains("2 triangles / 6 vertices / z-depth 10"));
     assert!(artifact.html.contains("data-depth=\"0.00\""));
     assert!(artifact.html.contains("data-depth=\"10.00\""));
-    assert!(artifact.html.contains("rgba(39,93,168,0.18)"));
-    assert!(artifact.html.contains("rgba(39,93,168,0.36)"));
+    // Lambertian 3-point lighting replaces flat depth-opacity fill.
+    assert!(!artifact.html.contains("rgba(39,93,168,"));
+    assert!(artifact.html.contains("data-shade="));
+    assert!(artifact.html.contains("fill=\"rgb("));
     assert!(artifact.html.find("data-depth=\"0.00\"") < artifact.html.find("data-depth=\"10.00\""));
     assert!(artifact.diagnostics.is_empty());
 }
@@ -1444,6 +1446,81 @@ fn stl_transform_renders_base64_binary_static_svg_preview() {
         .contains("2 triangles / 6 vertices / z-depth 1"));
     assert!(artifact.html.contains("data-depth=\"0.00\""));
     assert!(artifact.html.contains("data-depth=\"1.00\""));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
+// spec 10.4.8 — three-point lighting: different normals produce different shade values
+fn stl_transform_three_point_lighting_varies_with_normal() {
+    let artifact = run_transform(
+        "stl".to_string(),
+        // Two triangles: one facing camera (+Z normal), one facing away (-Z normal).
+        "solid lighting\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 10 0 0\nvertex 0 10 0\nendloop\nendfacet\nfacet normal 0 0 -1\nouter loop\nvertex 0 0 1\nvertex 10 0 1\nvertex 0 10 1\nendloop\nendfacet\nendsolid lighting".to_string(),
+    )
+    .expect("stl 3-point lighting test");
+
+    assert!(artifact.html.contains("data-shade="));
+    assert!(artifact.html.contains("fill=\"rgb("));
+    // Extract the two data-shade values and assert they differ.
+    let shades: Vec<&str> = artifact
+        .html
+        .split("data-shade=\"")
+        .skip(1)
+        .filter_map(|s| s.split('"').next())
+        .collect();
+    assert_eq!(shades.len(), 2, "expected exactly two triangles with shade");
+    assert_ne!(
+        shades[0], shades[1],
+        "shade must differ between +Z and -Z normals; got both = {}",
+        shades[0]
+    );
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
+// spec 10.4.7 — TopoJSON antimeridian: arcs crossing ±180° longitude must not draw
+// a horizontal slash across the map (each crossing splits the arc into sub-segments).
+fn topojson_transform_splits_antimeridian_crossing_arcs() {
+    // Arc in raw topology coords (identity transform): four points where the third
+    // and fourth cross the antimeridian relative to the first two.
+    // Decoded positions: (170,50) → (186,50) [no cross] → (-170,50) [|Δ|=356>180, split] → (-186,50).
+    // After split: segment-1 = [(170,50),(186,50)], segment-2 = [(-170,50),(-186,50)].
+    let artifact = run_transform(
+        "topojson".to_string(),
+        r#"{"type":"Topology","objects":{"route":{"type":"LineString","arcs":[0]}},"arcs":[[[170,50],[16,0],[-356,0],[-16,0]]]}"#.to_string(),
+    )
+    .expect("topojson antimeridian test");
+
+    assert!(artifact.html.contains("transform-topojson"));
+    // Two line segments instead of one continuous line.
+    assert!(
+        artifact.html.contains("2 lines"),
+        "expected 2 split line segments, got: {}",
+        artifact.html
+    );
+    // No single polyline should span the full SVG width (which would indicate the crossing
+    // was rendered as a long horizontal slash). Check that no polyline contains both the
+    // far-left projected x (≈48) and far-right projected x (≈852) in one points= string.
+    for polyline in artifact.html.split("<polyline").skip(1) {
+        let points_attr = polyline.split("points=\"").nth(1).unwrap_or("");
+        let coords: Vec<f64> = points_attr
+            .split('"')
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .filter_map(|pair| pair.split(',').next()?.parse().ok())
+            .collect();
+        if let (Some(&min_x), Some(&max_x)) = (
+            coords.iter().reduce(|a, b| if a < b { a } else { b }),
+            coords.iter().reduce(|a, b| if a > b { a } else { b }),
+        ) {
+            assert!(
+                (max_x - min_x) < 600.0,
+                "polyline spans {:.0}px — antimeridian split not applied",
+                max_x - min_x
+            );
+        }
+    }
     assert!(artifact.diagnostics.is_empty());
 }
 
@@ -1675,7 +1752,7 @@ fn vega_lite_unsupported_marks_report_supported_static_subset() {
         .suggestion
         .as_deref()
         .is_some_and(|suggestion| suggestion
-            .contains("bar, line, point, circle, square, area, tick, text, or rule"))));
+            .contains("bar, line, point, circle, square, area, tick, rect, text, or rule"))));
 }
 
 #[test]
@@ -1702,4 +1779,113 @@ fn mermaid_transform_renders_simple_flowchart_svg() {
         mermaid.get("execution").and_then(Value::as_str),
         Some("rust-native-svg")
     );
+}
+
+// ── spec 10.4.4 Vega-Lite broader grammar support ────────────────────────────
+
+#[test]
+fn vega_lite_rect_mark_renders_quantitative_bar_svg() {
+    // rect with quantitative y → bar-like rendering with vega-rect-mark class
+    let artifact = run_transform(
+        "vega-lite".to_string(),
+        r#"{"mark":"rect","title":"Monthly Budget","data":{"values":[{"month":"Jan","budget":4200},{"month":"Feb","budget":3800},{"month":"Mar","budget":5100}]},"encoding":{"x":{"field":"month","type":"ordinal"},"y":{"field":"budget","type":"quantitative","title":"Budget ($)"}}}"#.to_string(),
+    )
+    .expect("vega-lite rect quantitative transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-vega-lite"));
+    assert!(artifact.html.contains("Monthly Budget"));
+    assert!(artifact.html.contains("vega-rect-mark"));
+    assert!(!artifact.html.contains("Unsupported Vega-Lite mark"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
+fn vega_lite_rect_heatmap_renders_2d_grid_svg() {
+    // rect with nominal y → heatmap path: cells colored by value field
+    let artifact = run_transform(
+        "vega-lite".to_string(),
+        r#"{"mark":"rect","title":"Risk Heatmap","data":{"values":[{"team":"Legal","week":"W1","risk":72},{"team":"Legal","week":"W2","risk":58},{"team":"Finance","week":"W1","risk":44},{"team":"Finance","week":"W2","risk":91}]},"encoding":{"x":{"field":"week","type":"ordinal","title":"Week"},"y":{"field":"team","type":"nominal","title":"Team"},"color":{"field":"risk","type":"quantitative"}}}"#.to_string(),
+    )
+    .expect("vega-lite rect heatmap transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-vega-lite"));
+    assert!(artifact.html.contains("Risk Heatmap"));
+    assert!(artifact.html.contains("vega-rect-mark"));
+    assert!(artifact.html.contains("data-heatmap=\"true\""));
+    assert!(artifact.html.contains("data-x=\"W1\""));
+    assert!(artifact.html.contains("data-y=\"Legal\""));
+    // color scale legend present
+    assert!(artifact.html.contains("fill-opacity"));
+    assert!(!artifact.html.contains("Unsupported Vega-Lite mark"));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
+fn vega_lite_opacity_encoding_applied_to_point_marks() {
+    // opacity encoding field should produce opacity="…" attributes on marks
+    let artifact = run_transform(
+        "vega-lite".to_string(),
+        r#"{"mark":"point","title":"Confidence Scatter","data":{"values":[{"label":"A","score":80,"confidence":0.9},{"label":"B","score":55,"confidence":0.4},{"label":"C","score":70,"confidence":0.6}]},"encoding":{"x":{"field":"label","type":"nominal"},"y":{"field":"score","type":"quantitative"},"opacity":{"field":"confidence","type":"quantitative"}}}"#.to_string(),
+    )
+    .expect("vega-lite opacity transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("transform-vega-lite"));
+    assert!(artifact.html.contains("Confidence Scatter"));
+    assert!(artifact.html.contains("vega-point-mark"));
+    assert!(artifact.html.contains("opacity="));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
+fn vega_lite_y_axis_grid_lines_and_tick_labels_rendered() {
+    // y-axis grid lines and tick labels must appear in any chart SVG
+    let artifact = run_transform(
+        "vega-lite".to_string(),
+        r#"{"mark":"bar","title":"Sales","data":{"values":[{"region":"North","sales":1200},{"region":"South","sales":950}]},"encoding":{"x":{"field":"region","type":"nominal"},"y":{"field":"sales","type":"quantitative","title":"Sales"}}}"#.to_string(),
+    )
+    .expect("vega-lite grid transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("vega-grid-line"));
+    assert!(artifact.html.contains("vega-y-tick"));
+    // at least some numeric tick labels present (0 or the max value)
+    assert!(artifact.html.contains("fill=\"#64748b\""));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
+fn vega_lite_opacity_encoding_applied_to_bar_marks() {
+    // opacity encoding on bar marks should produce opacity attributes
+    let artifact = run_transform(
+        "vega-lite".to_string(),
+        r#"{"mark":"bar","title":"Weighted Bars","data":{"values":[{"label":"X","value":100,"weight":0.8},{"label":"Y","value":60,"weight":0.3}]},"encoding":{"x":{"field":"label","type":"nominal"},"y":{"field":"value","type":"quantitative"},"opacity":{"field":"weight","type":"quantitative"}}}"#.to_string(),
+    )
+    .expect("vega-lite bar opacity transform");
+
+    assert_eq!(artifact.output_kind, "svg");
+    assert!(artifact.html.contains("vega-bar-mark"));
+    assert!(artifact.html.contains("opacity="));
+    assert!(artifact.diagnostics.is_empty());
+}
+
+#[test]
+fn vega_lite_nominal_and_ordinal_scale_types_accepted_without_error() {
+    // Both nominal and ordinal x types must render without diagnostics
+    for scale_type in ["nominal", "ordinal"] {
+        let spec = format!(
+            r#"{{"mark":"line","title":"Scale Test","data":{{"values":[{{"period":"Q1","v":10}},{{"period":"Q2","v":20}}]}},"encoding":{{"x":{{"field":"period","type":"{scale_type}"}},"y":{{"field":"v","type":"quantitative"}}}}}}"#
+        );
+        let artifact =
+            run_transform("vega-lite".to_string(), spec).expect("vega-lite scale type transform");
+        assert_eq!(artifact.output_kind, "svg");
+        assert!(artifact.html.contains("transform-vega-lite"));
+        assert!(
+            artifact.diagnostics.is_empty(),
+            "diagnostics for {scale_type}: {:?}",
+            artifact.diagnostics
+        );
+    }
 }
