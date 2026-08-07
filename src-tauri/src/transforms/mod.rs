@@ -12,6 +12,7 @@ pub(crate) mod qr;
 pub(crate) mod renderer;
 pub(crate) mod sql;
 pub(crate) mod structured;
+pub(crate) mod trust_store;
 pub(crate) mod visual_data;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -7,7 +7,7 @@ use super::{
     },
     chart::render_chart_svg,
     diagram,
-    external::{graphviz_command, run_external_transform, ExternalTransformRequest},
+    external::{graphviz_command, run_external_transform_compile_path, ExternalTransformRequest},
     options::TransformExecutionOptions,
     qr, sql,
     structured::{self, render_decision_table_html, render_toml_html},
@@ -206,18 +206,31 @@ fn render_external_transform(
         ));
         return None;
     };
+    // Trust is checked here from workspace options — the compile path is
+    // Rust-internal and does not go through the backend trust store.
+    if !options.trusted(name) {
+        diagnostics.push(diag(
+            "warning",
+            format!(
+                "{name} external transform failed: {name} requires explicit trust before external execution."
+            ),
+            None,
+            None,
+            Some("Trust the engine in Settings > Transforms before rendering."),
+        ));
+        return None;
+    }
     let request = ExternalTransformRequest {
         name: name.to_string(),
         body: body.to_string(),
         engine_path: Some(engine_path),
-        trusted: options.trusted(name),
         input_mode: options.input_mode(name),
         output_format: external_output_format(name, fence_options),
         timeout_ms: options.timeout_ms,
         max_input_bytes: None,
         max_output_bytes: None,
     };
-    match run_external_transform(request) {
+    match run_external_transform_compile_path(request) {
         Ok(mut artifact) => {
             artifact.source = body.to_string();
             artifact.options = fence_options.clone();

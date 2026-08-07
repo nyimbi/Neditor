@@ -1686,6 +1686,12 @@ Initial commands:
 - `list_snapshots`
 - `restore_snapshot`
 
+Engine trust commands:
+
+- `trust_external_engine`
+- `revoke_external_engine`
+- `list_trusted_engines`
+
 Productization and setup commands:
 
 - `pending_cli_open_paths`

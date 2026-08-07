@@ -1538,6 +1538,14 @@ export const useDocumentsStore = defineStore("documents", {
       }
     },
     async setTransformTrust(name: string, trusted: boolean) {
+      const enginePath = this.transformEnginePaths[name]?.trim();
+      if (enginePath) {
+        if (trusted) {
+          await invoke("trust_external_engine", { engine_path: enginePath, transform_name: name }).catch(() => {});
+        } else {
+          await invoke("revoke_external_engine", { engine_path: enginePath }).catch(() => {});
+        }
+      }
       this.trustedTransformEngines = setTransformBooleanFlag(this.trustedTransformEngines, name, trusted);
       await this.persistWorkspace();
     },
@@ -1723,7 +1731,6 @@ export const useDocumentsStore = defineStore("documents", {
             name,
             body: externalTransformProbeBody(name),
             engine_path: this.transformEnginePaths[name] || "",
-            trusted: Boolean(this.trustedTransformEngines[name]),
             input_mode: this.transformInputModes[name] || "stdin",
             timeout_ms: this.transformTimeoutMs,
             max_input_bytes: engine.limits.maxInputBytes ?? null,
@@ -1732,7 +1739,12 @@ export const useDocumentsStore = defineStore("documents", {
         });
         Object.assign(this, applyTransformProbeSuccessState(this.transformProbeResults, name, response));
       } catch (error) {
-        Object.assign(this, applyTransformProbeFailureState(this.transformProbeResults, name, error));
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.startsWith("TRUST_REQUIRED:")) {
+          Object.assign(this, applyTransformProbeFailureState(this.transformProbeResults, name, new Error("Engine not trusted — enable trust in settings before probing.")));
+        } else {
+          Object.assign(this, applyTransformProbeFailureState(this.transformProbeResults, name, error));
+        }
       }
     },
     async previewAiPaste(text: string, options: AiCleanupOptions) {

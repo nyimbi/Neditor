@@ -8,19 +8,29 @@ fn external_transforms_are_trust_gated_and_limited() {
             "#!/bin/sh\nprintf '<svg data-args=\"%s\">' \"$*\"\nfor arg in \"$@\"; do if [ -f \"$arg\" ]; then cat \"$arg\"; fi; done\ncat\nprintf '</svg>'\n",
         );
     let graphviz_path = path_to_string(&graphviz);
-    let trust_error = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: "digraph {}".to_string(),
-        engine_path: Some(graphviz_path.clone()),
-        trusted: false,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(1024),
-    })
+
+    // Empty store → engine not trusted → TRUST_REQUIRED error.
+    let store = TrustStore::ephemeral();
+    let trust_error = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "digraph {}".to_string(),
+            engine_path: Some(graphviz_path.clone()),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .unwrap_err();
-    assert!(trust_error.contains("explicit trust"));
+    assert!(trust_error.starts_with("TRUST_REQUIRED:"));
+
+    // Grant trust, then run the remaining sub-cases.
+    store
+        .grant(graphviz.clone(), "dot".to_string())
+        .expect("grant graphviz trust");
 
     let unique_body = format!(
         "<svg>{}</svg>",
@@ -29,46 +39,52 @@ fn external_transforms_are_trust_gated_and_limited() {
             .expect("system time should be after epoch")
             .as_nanos()
     );
-    let limit_error = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: "1234".to_string(),
-        engine_path: Some(graphviz_path.clone()),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(3),
-        max_output_bytes: Some(1024),
-    })
+    let limit_error = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "1234".to_string(),
+            engine_path: Some(graphviz_path.clone()),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(3),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .unwrap_err();
     assert!(limit_error.contains("above the 3 byte limit"));
 
-    let output_limit_error = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: "1234".to_string(),
-        engine_path: Some(graphviz_path.clone()),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(3),
-    })
+    let output_limit_error = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "1234".to_string(),
+            engine_path: Some(graphviz_path.clone()),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(3),
+        },
+        &store,
+    )
     .unwrap_err();
     assert!(output_limit_error.contains("output is"));
     assert!(output_limit_error.contains("above the 3 byte limit"));
 
-    let stdin_artifact = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: unique_body.clone(),
-        engine_path: Some(graphviz_path.clone()),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(1024),
-    })
+    let stdin_artifact = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: unique_body.clone(),
+            engine_path: Some(graphviz_path.clone()),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .expect("stdin external transform");
     assert_eq!(stdin_artifact.execution_kind, "external");
     assert_eq!(stdin_artifact.input_mode, "stdin");
@@ -119,17 +135,19 @@ fn external_transforms_are_trust_gated_and_limited() {
         .engine_version
         .as_deref()
         .is_some_and(|version| version.contains("file-size:")));
-    let cached_artifact = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: unique_body.clone(),
-        engine_path: Some(graphviz_path.clone()),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(1024),
-    })
+    let cached_artifact = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: unique_body.clone(),
+            engine_path: Some(graphviz_path.clone()),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .expect("cached stdin external transform");
     assert_eq!(cached_artifact.cache_key, stdin_artifact.cache_key);
     assert_eq!(cached_artifact.output_hash, stdin_artifact.output_hash);
@@ -149,17 +167,19 @@ fn external_transforms_are_trust_gated_and_limited() {
             .any(|related| related == &format!("cache_key: {}", cached_artifact.cache_key))
     }));
     transforms::external::clear_external_transform_memory_cache_for_tests();
-    let persistent_cached_artifact = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: unique_body,
-        engine_path: Some(graphviz_path.clone()),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(1024),
-    })
+    let persistent_cached_artifact = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: unique_body,
+            engine_path: Some(graphviz_path.clone()),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .expect("persistent cached stdin external transform");
     assert_eq!(
         persistent_cached_artifact.cache_key,
@@ -180,17 +200,19 @@ fn external_transforms_are_trust_gated_and_limited() {
                 .any(|related| related.starts_with("cached_output_bytes: "))
         }));
 
-    let file_artifact = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: "digraph {}".to_string(),
-        engine_path: Some(graphviz_path),
-        trusted: true,
-        input_mode: Some("file".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(1024),
-    })
+    let file_artifact = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "digraph {}".to_string(),
+            engine_path: Some(graphviz_path),
+            input_mode: Some("file".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .expect("file external transform");
     assert_eq!(file_artifact.input_mode, "file");
     assert!(file_artifact.html.contains("digraph"));
@@ -201,21 +223,28 @@ fn external_transforms_are_trust_gated_and_limited() {
 #[cfg(unix)]
 #[test]
 fn external_transform_adapters_shape_engine_specific_invocations() {
+    let store = TrustStore::ephemeral();
+
     let d2 = write_executable_script(
         "d2-adapter",
         "#!/bin/sh\ncat >/dev/null\nprintf '<svg data-args=\"%s\">d2</svg>' \"$*\"\n",
     );
-    let d2_artifact = run_external_transform(ExternalTransformRequest {
-        name: "d2".to_string(),
-        body: "source -> target".to_string(),
-        engine_path: Some(path_to_string(&d2)),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(2048),
-    })
+    store
+        .grant(d2.clone(), "d2".to_string())
+        .expect("grant d2 trust");
+    let d2_artifact = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "d2".to_string(),
+            body: "source -> target".to_string(),
+            engine_path: Some(path_to_string(&d2)),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(2048),
+        },
+        &store,
+    )
     .expect("d2 adapter transform");
     assert!(d2_artifact.html.contains("data-args=\"- -\""));
     assert!(d2_artifact.diagnostics.iter().any(|diagnostic| {
@@ -229,17 +258,22 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
             "plantuml-adapter",
             "#!/bin/sh\nlast=\"\"\nfor arg in \"$@\"; do last=\"$arg\"; done\nout=\"${last%.*}.svg\"\nprintf '<svg data-args=\"%s\">plantuml sidecar</svg>' \"$*\" > \"$out\"\n",
         );
-    let plantuml_artifact = run_external_transform(ExternalTransformRequest {
-        name: "plantuml".to_string(),
-        body: "@startuml\nAlice -> Bob: hi\n@enduml".to_string(),
-        engine_path: Some(path_to_string(&plantuml)),
-        trusted: true,
-        input_mode: Some("file".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(2048),
-    })
+    store
+        .grant(plantuml.clone(), "plantuml".to_string())
+        .expect("grant plantuml trust");
+    let plantuml_artifact = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "plantuml".to_string(),
+            body: "@startuml\nAlice -> Bob: hi\n@enduml".to_string(),
+            engine_path: Some(path_to_string(&plantuml)),
+            input_mode: Some("file".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(2048),
+        },
+        &store,
+    )
     .expect("plantuml file adapter transform");
     assert!(plantuml_artifact.html.contains("plantuml sidecar"));
     assert!(plantuml_artifact.html.contains("-tsvg"));
@@ -261,17 +295,22 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
             "plantuml-png-adapter",
             "#!/bin/sh\nlast=\"\"\nfor arg in \"$@\"; do last=\"$arg\"; done\nout=\"${last%.*}.png\"\nprintf 'png-bytes' > \"$out\"\n",
         );
-    let plantuml_png_artifact = run_external_transform(ExternalTransformRequest {
-        name: "plantuml".to_string(),
-        body: "@startuml\nAlice -> Bob: hi\n@enduml".to_string(),
-        engine_path: Some(path_to_string(&plantuml_png)),
-        trusted: true,
-        input_mode: Some("file".to_string()),
-        output_format: Some("png".to_string()),
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(2048),
-    })
+    store
+        .grant(plantuml_png.clone(), "plantuml".to_string())
+        .expect("grant plantuml_png trust");
+    let plantuml_png_artifact = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "plantuml".to_string(),
+            body: "@startuml\nAlice -> Bob: hi\n@enduml".to_string(),
+            engine_path: Some(path_to_string(&plantuml_png)),
+            input_mode: Some("file".to_string()),
+            output_format: Some("png".to_string()),
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(2048),
+        },
+        &store,
+    )
     .expect("plantuml png file adapter transform");
     assert_eq!(plantuml_png_artifact.output_kind, "png");
     assert!(plantuml_png_artifact
@@ -317,18 +356,23 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
         .permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(&pikchr_cli, permissions).expect("make fake pikchr-cli executable");
+    store
+        .grant(pikchr_cli.clone(), "pikchr".to_string())
+        .expect("grant pikchr_cli trust");
     let pikchr_body = "box \"CI\"; arrow; box \"Done\"".to_string();
-    let pikchr_artifact = run_external_transform(ExternalTransformRequest {
-        name: "pikchr".to_string(),
-        body: pikchr_body.clone(),
-        engine_path: Some(path_to_string(&pikchr_cli)),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(2048),
-    })
+    let pikchr_artifact = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "pikchr".to_string(),
+            body: pikchr_body.clone(),
+            engine_path: Some(path_to_string(&pikchr_cli)),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(2048),
+        },
+        &store,
+    )
     .expect("pikchr-cli positional source path adapter transform");
     assert!(pikchr_artifact.html.contains(&pikchr_body));
     assert!(pikchr_artifact.diagnostics.iter().any(|diagnostic| {
@@ -350,17 +394,22 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
         .permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(&pikchr_stdin, permissions).expect("make fake pikchr stdin executable");
-    let pikchr_stdin_artifact = run_external_transform(ExternalTransformRequest {
-        name: "pikchr".to_string(),
-        body: pikchr_body.clone(),
-        engine_path: Some(path_to_string(&pikchr_stdin)),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(2048),
-    })
+    store
+        .grant(pikchr_stdin.clone(), "pikchr".to_string())
+        .expect("grant pikchr_stdin trust");
+    let pikchr_stdin_artifact = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "pikchr".to_string(),
+            body: pikchr_body.clone(),
+            engine_path: Some(path_to_string(&pikchr_stdin)),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(2048),
+        },
+        &store,
+    )
     .expect("pikchr stdin marker adapter transform");
     assert!(pikchr_stdin_artifact.html.contains(&pikchr_body));
     assert!(pikchr_stdin_artifact.diagnostics.iter().any(|diagnostic| {
@@ -429,6 +478,8 @@ fn external_transform_adapters_shape_engine_specific_invocations() {
 fn external_transform_cache_invalidates_when_trusted_executable_changes() {
     use std::os::unix::fs::PermissionsExt;
 
+    let store = TrustStore::ephemeral();
+
     let script = write_executable_script(
         "graphviz-cache-identity",
         "#!/bin/sh\ncat >/dev/null\nprintf '<svg>engine-v1</svg>'\n",
@@ -442,17 +493,23 @@ fn external_transform_cache_invalidates_when_trusted_executable_changes() {
             .as_nanos()
     );
 
-    let first = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: body.clone(),
-        engine_path: Some(script_path.clone()),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(4096),
-    })
+    // Grant trust for v1 binary; run succeeds.
+    store
+        .grant(script.clone(), "dot".to_string())
+        .expect("grant v1 trust");
+    let first = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: body.clone(),
+            engine_path: Some(script_path.clone()),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(4096),
+        },
+        &store,
+    )
     .expect("initial external transform");
     assert!(first.html.contains("engine-v1"));
     let first_version = first
@@ -460,6 +517,7 @@ fn external_transform_cache_invalidates_when_trusted_executable_changes() {
         .clone()
         .expect("first engine version identity");
 
+    // Rewrite the binary — different byte-size, which changes the fingerprint.
     fs::write(
         &script,
         "#!/bin/sh\ncat >/dev/null\nprintf '<svg>engine-v2-with-new-size</svg>'\n# identity padding\n",
@@ -471,18 +529,44 @@ fn external_transform_cache_invalidates_when_trusted_executable_changes() {
     permissions.set_mode(0o755);
     fs::set_permissions(&script, permissions).expect("keep rewritten executable");
 
-    let second = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body,
-        engine_path: Some(script_path),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(4096),
-    })
-    .expect("external transform after executable rewrite");
+    // F6: a swapped binary auto-evicts trust — the run returns TRUST_REQUIRED.
+    let evicted_err = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: body.clone(),
+            engine_path: Some(script_path.clone()),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(4096),
+        },
+        &store,
+    )
+    .unwrap_err();
+    assert!(
+        evicted_err.starts_with("TRUST_REQUIRED:"),
+        "swapped binary should require re-trust, got: {evicted_err}"
+    );
+
+    // Explicit re-grant for the v2 binary; run now succeeds.
+    store
+        .grant(script.clone(), "dot".to_string())
+        .expect("grant v2 trust");
+    let second = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body,
+            engine_path: Some(script_path),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(4096),
+        },
+        &store,
+    )
+    .expect("external transform after re-trust");
 
     assert!(second.html.contains("engine-v2-with-new-size"));
     assert_ne!(second.cache_key, first.cache_key);
@@ -591,6 +675,7 @@ fn external_transform_conformance_runs_installed_engines() {
         },
     ];
 
+    let store = TrustStore::ephemeral();
     let mut verified = Vec::new();
     let mut skipped = Vec::new();
     for case in cases {
@@ -598,17 +683,22 @@ fn external_transform_conformance_runs_installed_engines() {
             skipped.push(case.name);
             continue;
         };
-        let artifact = run_external_transform(ExternalTransformRequest {
-            name: case.name.to_string(),
-            body: case.body,
-            engine_path: Some(path_to_string(&path)),
-            trusted: true,
-            input_mode: Some(case.input_mode.to_string()),
-            output_format: None,
-            timeout_ms: Some(15_000),
-            max_input_bytes: Some(16_384),
-            max_output_bytes: Some(1_048_576),
-        })
+        store
+            .grant(path.clone(), case.name.to_string())
+            .expect("grant conformance engine trust");
+        let artifact = run_external_transform_inner(
+            ExternalTransformRequest {
+                name: case.name.to_string(),
+                body: case.body,
+                engine_path: Some(path_to_string(&path)),
+                input_mode: Some(case.input_mode.to_string()),
+                output_format: None,
+                timeout_ms: Some(15_000),
+                max_input_bytes: Some(16_384),
+                max_output_bytes: Some(1_048_576),
+            },
+            &store,
+        )
         .unwrap_or_else(|error| {
             panic!(
                 "{} conformance failed with {}: {error}",
@@ -1020,17 +1110,23 @@ fn external_transform_rejects_non_executable_engine_path() {
     let script = std::env::temp_dir().join(format!("neditor-not-executable-{unique}.sh"));
     fs::write(&script, "#!/bin/sh\ncat\n").expect("write non-executable script");
 
-    let error = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: "digraph {}".to_string(),
-        engine_path: Some(path_to_string(&script)),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(1024),
-    })
+    let store = TrustStore::ephemeral();
+    store
+        .grant(script.clone(), "dot".to_string())
+        .expect("grant non-executable script trust");
+    let error = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "digraph {}".to_string(),
+            engine_path: Some(path_to_string(&script)),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .unwrap_err();
 
     let _ = fs::remove_file(script);
@@ -1046,17 +1142,23 @@ fn external_transform_rejects_directory_engine_path_before_spawn() {
     let directory = std::env::temp_dir().join(format!("neditor-engine-dir-{unique}"));
     fs::create_dir(&directory).expect("create fake engine directory");
 
-    let error = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: "digraph {}".to_string(),
-        engine_path: Some(path_to_string(&directory)),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(1024),
-    })
+    let store = TrustStore::ephemeral();
+    store
+        .grant(directory.clone(), "dot".to_string())
+        .expect("grant directory path trust");
+    let error = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "digraph {}".to_string(),
+            engine_path: Some(path_to_string(&directory)),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .unwrap_err();
 
     let _ = fs::remove_dir(directory);
@@ -1081,18 +1183,24 @@ fn external_transform_timeout_covers_blocked_stdin() {
     permissions.set_mode(0o755);
     fs::set_permissions(&script, permissions).expect("make script executable");
 
+    let store = TrustStore::ephemeral();
+    store
+        .grant(script.clone(), "dot".to_string())
+        .expect("grant blocked stdin script trust");
     let started = std::time::Instant::now();
-    let error = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: "x".repeat(512 * 1024),
-        engine_path: Some(path_to_string(&script)),
-        trusted: true,
-        input_mode: Some("stdin".to_string()),
-        output_format: None,
-        timeout_ms: Some(50),
-        max_input_bytes: Some(1024 * 1024),
-        max_output_bytes: Some(1024),
-    })
+    let error = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "x".repeat(512 * 1024),
+            engine_path: Some(path_to_string(&script)),
+            input_mode: Some("stdin".to_string()),
+            output_format: None,
+            timeout_ms: Some(50),
+            max_input_bytes: Some(1024 * 1024),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .unwrap_err();
 
     let _ = fs::remove_file(script);
@@ -1121,17 +1229,23 @@ fn external_transform_exit_errors_include_stderr() {
     permissions.set_mode(0o755);
     fs::set_permissions(&script, permissions).expect("make script executable");
 
-    let error = run_external_transform(ExternalTransformRequest {
-        name: "dot".to_string(),
-        body: "digraph {}".to_string(),
-        engine_path: Some(path_to_string(&script)),
-        trusted: true,
-        input_mode: Some("file".to_string()),
-        output_format: None,
-        timeout_ms: Some(1000),
-        max_input_bytes: Some(1024),
-        max_output_bytes: Some(1024),
-    })
+    let store = TrustStore::ephemeral();
+    store
+        .grant(script.clone(), "dot".to_string())
+        .expect("grant stderr script trust");
+    let error = run_external_transform_inner(
+        ExternalTransformRequest {
+            name: "dot".to_string(),
+            body: "digraph {}".to_string(),
+            engine_path: Some(path_to_string(&script)),
+            input_mode: Some("file".to_string()),
+            output_format: None,
+            timeout_ms: Some(1000),
+            max_input_bytes: Some(1024),
+            max_output_bytes: Some(1024),
+        },
+        &store,
+    )
     .unwrap_err();
 
     let _ = fs::remove_file(script);

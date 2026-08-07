@@ -5023,6 +5023,16 @@
           <p v-for="engine in store.transformEngines.filter((candidate) => !candidate.requiresExecution)" :key="engine.name" class="engine-summary">
             {{ engine.name }}: {{ engine.execution }} | {{ engine.installationLabel }} | {{ engine.securitySummary }}
           </p>
+          <section class="trust-store-panel" aria-label="Backend trust store">
+            <h4>Backend trust store <button type="button" @click="loadTrustStore" title="Refresh">↻</button></h4>
+            <p v-if="!trustedEngineStore.length" class="sidebar-hint">No engines currently trusted in the backend store.</p>
+            <article v-for="entry in trustedEngineStore" :key="entry.engine_path" class="trust-store-entry">
+              <strong>{{ entry.transform_name }}</strong>
+              <small :class="entry.valid ? 'trust-valid' : 'trust-invalid'">{{ entry.valid ? "fingerprint valid" : "fingerprint mismatch — re-trust required" }}</small>
+              <code class="trust-path">{{ entry.engine_path }}</code>
+              <button type="button" @click="revokeEngineFromStore(entry.engine_path)">Revoke</button>
+            </article>
+          </section>
           </section>
         </template>
 
@@ -10065,6 +10075,7 @@ async function loadInstalledCslStyles(): Promise<void> {
 }
 
 watch(() => store.sidebar, (s) => { if (s === 'references') loadInstalledCslStyles(); });
+watch(() => store.sidebar, (s) => { if (s === 'settings') loadTrustStore(); });
 
 function applyCslFilePath(path: string): void {
   const doc = active.value;
@@ -11720,6 +11731,19 @@ const watchStatus = computed(() => {
   const suffix = store.watchedPaths.length === 1 ? "path" : "paths";
   return `${label}: ${store.watchedPaths.length} ${suffix}`;
 });
+interface TrustedEngineStoreEntry { engine_path: string; transform_name: string; valid: boolean; granted_at: number }
+const trustedEngineStore = ref<TrustedEngineStoreEntry[]>([]);
+async function loadTrustStore() {
+  try {
+    trustedEngineStore.value = await invoke<TrustedEngineStoreEntry[]>("list_trusted_engines");
+  } catch {
+    trustedEngineStore.value = [];
+  }
+}
+async function revokeEngineFromStore(enginePath: string) {
+  await invoke("revoke_external_engine", { engine_path: enginePath }).catch(() => {});
+  await loadTrustStore();
+}
 const externalTransformTrustPrompts = computed<TransformTrustPrompt[]>(() => {
   const text = active.value?.text || "";
   return store.externalTransformEngines

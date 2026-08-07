@@ -4,18 +4,26 @@ use serde_json::{json, Value};
 use std::{collections::BTreeSet, fs, path::Path, path::PathBuf};
 
 mod ai_cleanup;
+mod ai_humanizer;
+mod audit;
+mod backlinks;
 mod bibliography;
+mod block_refs;
 mod calculations;
 mod citation_discovery;
 pub mod cli;
+mod cli_ipc;
 mod compile_options;
 mod compiler;
 mod compiler_support;
 mod compiler_types;
+mod csl_styles;
+mod daily_notes;
 mod data_exchange;
 mod diagnostics;
 mod diagnostics_types;
 mod document_ast;
+mod document_compare;
 mod export;
 mod export_commands;
 mod export_media;
@@ -31,78 +39,54 @@ mod google_auth;
 mod html_preview;
 mod indexing;
 mod layout;
+mod link_graph;
 mod link_validation;
 mod local_agents;
+mod mail_merge;
 mod manifest;
 mod markdown_tables;
 mod ollama_models;
 mod paged_document;
+mod pandoc_import;
 mod provenance;
+mod readability;
 mod references;
 mod review;
 mod rfp_import;
 mod rich_blocks;
+mod search;
 mod snapshot;
 mod snapshot_metadata;
 mod snapshot_storage;
 mod source_mapping;
 mod table_cells;
 mod tables;
+mod task_aggregator;
+mod track_changes;
 mod transform_install;
 mod transforms;
-mod ai_humanizer;
-mod audit;
-mod backlinks;
-mod cli_ipc;
-mod document_compare;
-mod mail_merge;
-mod pandoc_import;
-mod search;
 mod tts;
 mod utils;
 mod validation;
 mod variables;
 mod webhooks;
 mod workspace_files;
-mod readability;
-mod daily_notes;
-mod task_aggregator;
-mod csl_styles;
-mod link_graph;
-mod block_refs;
-mod track_changes;
 
 use ai_cleanup::cleanup_ai_paste;
 #[cfg(test)]
 use ai_cleanup::AiCleanupRequest;
+use ai_humanizer::get_humanize_prompt;
+use audit::{read_audit_log, record_audit_event};
+use backlinks::{check_document_approval, find_backlinks, find_unlinked_mentions};
+use block_refs::resolve_block_reference;
 use citation_discovery::{
     download_citation_source, list_citation_sources, lookup_doi, search_citation_sources,
 };
-use ai_humanizer::get_humanize_prompt;
-use audit::{record_audit_event, read_audit_log};
-use backlinks::{check_document_approval, find_backlinks, find_unlinked_mentions};
-use readability::analyze_readability;
-use daily_notes::{open_daily_note, list_daily_notes};
-use task_aggregator::collect_workspace_tasks;
-use csl_styles::list_installed_csl_styles;
-use link_graph::build_workspace_link_graph;
-use block_refs::resolve_block_reference;
-use track_changes::{
-    create_delete_suggestion, create_insert_suggestion,
-    accept_suggestion, reject_suggestion,
-    accept_all_suggestions, reject_all_suggestions,
-    list_suggestions,
-};
-use cli_ipc::{cli_queue_file_path, drain_cli_open_queue, register_instance};
-use document_compare::compare_documents;
-use mail_merge::run_mail_merge;
-use pandoc_import::import_document;
-use search::search_workspace;
-use webhooks::fire_webhook;
 use cli::{
     cli_deploy_plan, configure_default_markdown_reader, create_support_bundle,
     default_markdown_reader_plan, deploy_cli, pending_cli_open_paths,
 };
+use cli_ipc::{cli_queue_file_path, drain_cli_open_queue, register_instance};
 #[cfg(test)]
 use compiler::compile;
 pub(crate) use compiler::compile_with_options;
@@ -110,10 +94,13 @@ use compiler::{compile_document, compile_document_with_options, run_transform};
 pub(crate) use compiler_types::{
     CompileRequest, CompileResponse, ExportManifest, Heading, IncludeEdge, SourceMapEntry,
 };
+use csl_styles::list_installed_csl_styles;
+use daily_notes::{list_daily_notes, open_daily_note};
 use data_exchange::{export_markdown_tables, fetch_rest_source, import_spreadsheet_table};
 pub(crate) use diagnostics::{diag, DocumentDiagnostic};
 #[cfg(test)]
 use document_ast::DocumentBlock;
+use document_compare::compare_documents;
 #[cfg(test)]
 use export::{
     render_blog_publish_package_bytes, render_docx_bytes, render_epub_bytes, render_full_html,
@@ -148,23 +135,38 @@ use google_auth::{
     cancel_google_oauth_sign_in, poll_google_oauth_sign_in, start_google_oauth_sign_in,
     GoogleAuthState,
 };
+use link_graph::build_workspace_link_graph;
 use local_agents::{import_local_agent_response, prepare_local_agent_handoff};
+use mail_merge::run_mail_merge;
 use ollama_models::{
     check_ollama_health, delete_ollama_model, list_ollama_models, pull_ollama_model,
     show_ollama_model_info,
 };
+use pandoc_import::import_document;
+use readability::analyze_readability;
 use rfp_import::import_rfp_source;
+use search::search_workspace;
 use snapshot::{create_snapshot, list_snapshots, restore_snapshot};
+use task_aggregator::collect_workspace_tasks;
 use tauri::{
     menu::{Menu, MenuItemBuilder, SubmenuBuilder},
     AppHandle, Emitter, Manager, Runtime,
 };
+use track_changes::{
+    accept_all_suggestions, accept_suggestion, create_delete_suggestion, create_insert_suggestion,
+    list_suggestions, reject_all_suggestions, reject_suggestion,
+};
 use transform_install::{install_transform_handlers, list_transform_handler_installers};
-#[cfg(test)]
-use transforms::external::ExternalTransformRequest;
 use transforms::external::{list_transform_engines, run_external_transform};
 #[cfg(test)]
+use transforms::external::{run_external_transform_inner, ExternalTransformRequest};
+#[cfg(test)]
 use transforms::renderer::supported_transform;
+#[cfg(test)]
+use transforms::trust_store::TransformTrustStore as TrustStore;
+use transforms::trust_store::{
+    list_trusted_engines, revoke_external_engine, trust_external_engine, TransformTrustStore,
+};
 use tts::{
     download_tts_model, inspect_native_tts, read_text_aloud, stop_text_aloud, NativeTtsState,
 };
@@ -173,6 +175,7 @@ pub(crate) use utils::{
     metadata_string, metadata_string_list, path_to_string, render_export_template, sha256_hex,
     sha256_uri, value_to_string,
 };
+use webhooks::fire_webhook;
 use workspace_files::list_workspace_files;
 #[cfg(test)]
 use workspace_files::WorkspaceFileRequest;
@@ -187,6 +190,7 @@ pub fn run() {
                 let _ = app.emit("neditor-menu-command", id);
             }
         })
+        .manage(TransformTrustStore::load_or_default())
         .manage(FileWatcherState::default())
         .manage(GoogleAuthState::default())
         .manage(NativeTtsState::default())
@@ -248,6 +252,9 @@ pub fn run() {
             install_transform_handlers,
             run_transform,
             run_external_transform,
+            trust_external_engine,
+            revoke_external_engine,
+            list_trusted_engines,
             cleanup_ai_paste,
             search_citation_sources,
             download_citation_source,

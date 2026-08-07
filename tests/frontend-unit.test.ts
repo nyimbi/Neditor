@@ -919,6 +919,15 @@ test("transform settings helpers clear trust and clamp runtime preferences", () 
   deepEqual(probeFailure.transformProbeResults.plantuml.diagnostics, ["Java not found"]);
   equal(probeFailure.transformProbeResults.dot.ok, true);
   equal(probeFailure.statusMessage, "plantuml transform probe failed");
+
+  // TRUST_REQUIRED backend response redirected into a friendly message by the store action
+  const trustRequiredFailure = applyTransformProbeFailureState(
+    {},
+    "d2",
+    new Error("Engine not trusted — enable trust in settings before probing."),
+  );
+  equal(trustRequiredFailure.transformProbeResults.d2.ok, false);
+  ok(trustRequiredFailure.transformProbeResults.d2.message.includes("trust"), "TRUST_REQUIRED failure message mentions trust");
 });
 
 test("database profiles normalize secret-free SQL transform scaffolds", () => {
@@ -10231,6 +10240,14 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes("No external executable path is configured"));
   ok(app.includes("External executable path is trusted"));
   ok(app.includes("External execution is disabled"));
+  ok(app.includes("list_trusted_engines"), "settings panel calls list_trusted_engines");
+  ok(app.includes("trust_external_engine"), "trust toggle calls trust_external_engine backend");
+  ok(app.includes("revoke_external_engine"), "revoke calls revoke_external_engine backend");
+  ok(app.includes("trustedEngineStore"), "trust store ref is wired into settings template");
+  ok(app.includes("loadTrustStore"), "trust store is loaded when settings sidebar opens");
+  ok(app.includes("revokeEngineFromStore"), "revoke button calls revokeEngineFromStore");
+  ok(app.includes("fingerprint valid"), "trust store shows fingerprint validity");
+  ok(app.includes("fingerprint mismatch"), "trust store flags mismatched fingerprints");
   ok(app.includes('aria-label="Transform handler installer"'));
   ok(app.includes("Download and install transform handlers"));
   ok(app.includes("Download/install all handlers"));

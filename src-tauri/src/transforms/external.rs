@@ -1,3 +1,4 @@
+use super::trust_store::{TransformTrustStore, TRUST_REQUIRED_PREFIX};
 use super::{transform_cache_key, TransformArtifact};
 use crate::{diagnostics::diag, escape_html, path_to_string, sha256_hex};
 use serde::Deserialize;
@@ -27,7 +28,6 @@ pub(crate) struct ExternalTransformRequest {
     pub(crate) name: String,
     pub(crate) body: String,
     pub(crate) engine_path: Option<String>,
-    pub(crate) trusted: bool,
     pub(crate) input_mode: Option<String>,
     pub(crate) output_format: Option<String>,
     pub(crate) timeout_ms: Option<u64>,
@@ -73,46 +73,12 @@ pub(crate) fn list_transform_engines() -> Vec<Value> {
     ]
 }
 
-#[tauri::command]
-pub(crate) fn run_external_transform(
+/// Shared execution core — trust must be verified by the caller before this
+/// is invoked.  Handles path validation, limits, caching, and spawning.
+fn run_external_transform_core(
     request: ExternalTransformRequest,
+    engine_path: PathBuf,
 ) -> Result<TransformArtifact, String> {
-    if !external_transform_supported(&request.name) {
-        return Err(format!(
-            "External execution is not available for transform '{}'.",
-            request.name
-        ));
-    }
-    // F6 TODO — Backend-owned trust store.
-    // Currently `request.trusted` is read from the IPC caller, so a webview
-    // XSS or an injected script could claim `trusted: true` for an attacker-
-    // chosen engine_path.  Mitigating factor: `script-src 'self'` CSP and the
-    // absolute-path requirement.
-    //
-    // Full fix: introduce `static TRUST_STORE: OnceLock<Mutex<HashMap<PathBuf, TrustEntry>>>`,
-    // keyed by canonicalized engine path.  A `trust_engine(path, fingerprint)`
-    // Tauri command (callable only from the Settings UI) populates the store.
-    // `run_external_transform` ignores `request.trusted` and consults the store
-    // instead, making trust non-spoofable without also controlling engine_path.
-    if !request.trusted {
-        return Err(format!(
-            "{} requires explicit trust before external execution.",
-            request.name
-        ));
-    }
-
-    let engine_path = request
-        .engine_path
-        .as_deref()
-        .map(str::trim)
-        .filter(|path| !path.is_empty())
-        .ok_or_else(|| format!("Missing engine path for {}.", request.name))?;
-    let engine_path = PathBuf::from(engine_path);
-    if !engine_path.is_absolute() {
-        return Err(
-            "Engine path must be absolute; shell lookup is intentionally disabled.".to_string(),
-        );
-    }
     let engine_metadata = fs::metadata(&engine_path).map_err(|err| {
         format!(
             "Engine path does not exist or cannot be read: {} ({err})",
@@ -182,6 +148,67 @@ pub(crate) fn run_external_transform(
     })?;
     store_external_transform(artifact.clone());
     Ok(artifact)
+}
+
+/// Parse and minimally validate the engine path from a request.
+fn parse_engine_path(request: &ExternalTransformRequest) -> Result<PathBuf, String> {
+    let raw = request
+        .engine_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .ok_or_else(|| format!("Missing engine path for {}.", request.name))?;
+    let path = PathBuf::from(raw);
+    if !path.is_absolute() {
+        return Err(
+            "Engine path must be absolute; shell lookup is intentionally disabled.".to_string(),
+        );
+    }
+    Ok(path)
+}
+
+/// IPC/test entry point.  F6: ignores any `trusted` flag the frontend might
+/// supply; consults the backend-owned `TransformTrustStore` exclusively.
+pub(crate) fn run_external_transform_inner(
+    request: ExternalTransformRequest,
+    store: &TransformTrustStore,
+) -> Result<TransformArtifact, String> {
+    if !external_transform_supported(&request.name) {
+        return Err(format!(
+            "External execution is not available for transform '{}'.",
+            request.name
+        ));
+    }
+    let engine_path = parse_engine_path(&request)?;
+    // F6: trust gate — returns a structured prefix the frontend can detect.
+    if !store.is_trusted(&engine_path) {
+        return Err(format!("{} {}", TRUST_REQUIRED_PREFIX, request.name));
+    }
+    run_external_transform_core(request, engine_path)
+}
+
+/// Compile-pipeline entry point used by `renderer.rs`.  Trust is checked by
+/// the caller from workspace `TransformExecutionOptions`; this function must
+/// only be called after that check passes.
+pub(crate) fn run_external_transform_compile_path(
+    request: ExternalTransformRequest,
+) -> Result<TransformArtifact, String> {
+    if !external_transform_supported(&request.name) {
+        return Err(format!(
+            "External execution is not available for transform '{}'.",
+            request.name
+        ));
+    }
+    let engine_path = parse_engine_path(&request)?;
+    run_external_transform_core(request, engine_path)
+}
+
+#[tauri::command]
+pub(crate) fn run_external_transform(
+    request: ExternalTransformRequest,
+    state: tauri::State<'_, TransformTrustStore>,
+) -> Result<TransformArtifact, String> {
+    run_external_transform_inner(request, &state)
 }
 
 fn external_transform_supported(name: &str) -> bool {

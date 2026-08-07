@@ -58,6 +58,9 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `install_transform_handlers` | `src-tauri/src/transform_install.rs` | `transform_install_tests::transform_handler_install_steps_are_allowlisted` |
 | `run_transform` | `src-tauri/src/compiler.rs` | `transform_tests::transform_registry_covers_required_first_release_transforms`; `transform_tests::transform_aliases_render_through_canonical_artifacts` |
 | `run_external_transform` | `src-tauri/src/transforms/external.rs` | `external_transform_tests::external_transform_adapters_shape_engine_specific_invocations`; `external_transform_tests::external_transform_cache_invalidates_when_trusted_executable_changes` |
+| `trust_external_engine` | `src-tauri/src/transforms/trust_store.rs` | `trust_store_tests::trust_store_grant_makes_path_trusted` |
+| `revoke_external_engine` | `src-tauri/src/transforms/trust_store.rs` | `trust_store_tests::trust_store_revoke_removes_trust` |
+| `list_trusted_engines` | `src-tauri/src/transforms/trust_store.rs` | `trust_store_tests::trust_store_list_reports_validity` |
 | `cleanup_ai_paste` | `src-tauri/src/ai_cleanup.rs` | `ai_cleanup_tests::ai_cleanup_normalizes_chat_artifacts`; `ai_cleanup_tests::ai_cleanup_converts_rich_html_clipboard_content`; `ai_cleanup_tests::ai_cleanup_normalizes_ai_code_fence_variants` |
 | `search_citation_sources` | `src-tauri/src/citation_discovery.rs` | `citation_discovery::tests::duckduckgo_result_links_decode_target_url`; References source-search UI wiring is statically covered by `tests/frontend-unit.test.ts` |
 | `download_citation_source` | `src-tauri/src/citation_discovery.rs` | `citation_discovery::tests::citation_source_directory_is_document_associated`; References source-download UI wiring is statically covered by `tests/frontend-unit.test.ts` |
