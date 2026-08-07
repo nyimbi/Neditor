@@ -1646,6 +1646,44 @@ test("watch context helpers resolve active roots includes and stale contexts", (
   deepEqual(watchedPathsForContext(["/actual/root.md"], context), ["/actual/root.md"]);
 });
 
+// spec 5.1: after save-as the active document path differs from the stale
+// watchContext.rootPath, so isCurrentWatchContext must return false, causing
+// the old-watcher events to be discarded and syncFileWatcher to rebuild the
+// watcher on the new path.
+test("isCurrentWatchContext returns false after save-as path change (spec 5.1)", () => {
+  const originalPath = "/project/draft.md";
+  const savedAsPath = "/project/final.md";
+  const oldContext = {
+    documentId: "doc-1",
+    rootPath: originalPath,
+    openRootPaths: [],
+    includedPaths: [],
+    signature: `doc-1\nnative\nroot:${originalPath}`,
+  };
+  const docAfterSaveAs = { id: "doc-1", path: savedAsPath };
+
+  // The old watcher context is no longer current once doc.path changed.
+  equal(
+    isCurrentWatchContext(oldContext, oldContext, docAfterSaveAs),
+    false,
+    "old watcher context must be invalidated when doc.path changes to save-as destination",
+  );
+
+  // Once syncFileWatcher rebuilds with the new path the new context is current.
+  const newContext = {
+    documentId: "doc-1",
+    rootPath: savedAsPath,
+    openRootPaths: [],
+    includedPaths: [],
+    signature: `doc-1\nnative\nroot:${savedAsPath}`,
+  };
+  equal(
+    isCurrentWatchContext(newContext, newContext, docAfterSaveAs),
+    true,
+    "new watcher context built on save-as destination must be considered current",
+  );
+});
+
 test("table parsing preserves captions, alignment, and escaped pipes", () => {
   const [table] = parseMarkdownTables(
     'Table: Regional revenue {#tbl:revenue}\n| Region | Revenue | Note |\n| :--- | ---: | --- |\n| East | $1,200 | margin\\|stable |\n',
@@ -3117,6 +3155,85 @@ test("front matter managers expand dotted metadata keys", () => {
   ok(rows.some((row) => row.key === "deal.account.tier" && row.value === "Strategic"));
   ok(rows.some((row) => row.key === "deal.account.region" && row.value === "EMEA"));
   ok(!rows.some((row) => row.key === "brand.color"));
+});
+
+// Spec section 8: variable rows must carry the correct 1-indexed document line
+// number so that "Go to variable" in the References sidebar navigates to the
+// exact YAML key line in the source editor.
+test("front matter variable rows carry correct source line numbers for jump-to-source", () => {
+  const source = [
+    "---",            // line 1
+    "title: My Doc",  // line 2
+    "author: Jane",   // line 3
+    "client:",        // line 4
+    "  name: Acme",   // line 5
+    "  region: EMEA", // line 6
+    "emptyVal:",      // line 7
+    "---",            // line 8
+    "",
+    "# Body",
+  ].join("\n");
+
+  const rows = parseFrontMatterVariables(source);
+
+  const titleRow = rows.find((r) => r.key === "title");
+  ok(titleRow, "title row must exist");
+  equal(titleRow!.line, 2, "title must be on line 2");
+
+  const authorRow = rows.find((r) => r.key === "author");
+  ok(authorRow, "author row must exist");
+  equal(authorRow!.line, 3, "author must be on line 3");
+
+  const nameRow = rows.find((r) => r.key === "client.name");
+  ok(nameRow, "client.name row must exist");
+  equal(nameRow!.line, 5, "client.name must be on line 5");
+
+  const regionRow = rows.find((r) => r.key === "client.region");
+  ok(regionRow, "client.region row must exist");
+  equal(regionRow!.line, 6, "client.region must be on line 6");
+
+  const emptyRow = rows.find((r) => r.key === "emptyVal");
+  ok(emptyRow, "emptyVal row must exist");
+  equal(emptyRow!.line, 7, "emptyVal must be on line 7");
+
+  // All line numbers must be positive (goToSourceTarget requires line > 0)
+  ok(rows.every((r) => r.line > 0), "all variable rows must have a positive line number");
+});
+
+// Spec section 8: the "Add variable" button in the References sidebar appends a
+// new key to existing front matter and also bootstraps front matter from scratch.
+test("front matter managers append new variable key to existing and absent front matter", () => {
+  const withFrontMatter = [
+    "---",
+    "title: Report",
+    "status: draft",
+    "---",
+    "",
+    "# Body",
+  ].join("\n");
+
+  // Insert a brand-new key (not updating an existing one)
+  const afterInsert = upsertFrontMatterField(withFrontMatter, "client", '"Acme Corp"');
+  ok(afterInsert.includes('client: "Acme Corp"'), "new key must appear in front matter");
+  ok(afterInsert.includes("title: Report"), "existing keys must be preserved");
+  ok(afterInsert.includes("status: draft"), "other existing keys must be preserved");
+  // New key must sit inside the front matter fence, before the closing ---
+  const insertLines = afterInsert.split("\n");
+  const closingDash = insertLines.findIndex((l, i) => i > 0 && l.trim() === "---");
+  const clientLine = insertLines.findIndex((l) => l.startsWith("client:"));
+  ok(clientLine > 0 && clientLine < closingDash, "new variable must be inside front matter fence");
+
+  // The inserted variable must be discoverable by parseFrontMatterVariables
+  const rows = parseFrontMatterVariables(afterInsert);
+  ok(rows.some((r) => r.key === "client" && r.value === "Acme Corp"), "appended variable must be parseable");
+
+  // Also bootstraps front matter when the document has none
+  const noFm = "# Plain Doc\n\nSome content.\n";
+  const bootstrapped = upsertFrontMatterField(noFm, "reviewer", '"QA Lead"');
+  ok(bootstrapped.startsWith("---\n"), "front matter must be created from scratch");
+  ok(bootstrapped.includes('reviewer: "QA Lead"'), "new key must appear after bootstrap");
+  const bootstrapRows = parseFrontMatterVariables(bootstrapped);
+  ok(bootstrapRows.some((r) => r.key === "reviewer" && r.value === "QA Lead"), "bootstrapped variable must be parseable");
 });
 
 test("Vim keybinding word helpers follow modal editor cursor semantics", () => {

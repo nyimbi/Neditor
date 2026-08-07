@@ -162,11 +162,15 @@ pub(crate) fn start_file_watcher(
         return Ok(response);
     }
 
-    *active = None;
     if watch_paths.is_empty() {
+        *active = None;
         return Ok(response);
     }
 
+    // Build the new watcher before dropping the old one so there is no window
+    // where neither watcher is active. External edits that arrive while the new
+    // watcher is being registered are still delivered by the old watcher, and
+    // refreshExternalState at the end of syncFileWatcher reconciles any gap.
     let event_app = app.clone();
     let mut watcher = match RecommendedWatcher::new(
         move |result: notify::Result<Event>| match result {
@@ -207,6 +211,9 @@ pub(crate) fn start_file_watcher(
         }
     }
 
+    // Atomically replace: assigning Some(...) drops the old ActiveFileWatcher
+    // (and its RecommendedWatcher) in a single operation, so the old path is
+    // unwatched and the new path is watched without a gap between the two.
     *active = Some(ActiveFileWatcher {
         _watcher: watcher,
         signature,
@@ -256,6 +263,34 @@ pub(crate) fn notify_event_should_emit(kind: &EventKind) -> bool {
     !matches!(kind, EventKind::Access(_))
 }
 
+/// Returns the signature currently stored in the watcher state.  Only used in
+/// unit tests so that test modules outside this file can inspect state without
+/// needing access to the private `ActiveFileWatcher` type.
+#[cfg(test)]
+pub(crate) fn watcher_signature_for_test(state: &FileWatcherState) -> Option<String> {
+    state
+        .watcher
+        .lock()
+        .expect("watcher lock")
+        .as_ref()
+        .map(|a| a.signature.clone())
+}
+
+/// Installs a synthetic `ActiveFileWatcher` carrying the given signature.
+/// Used by tests outside this module to prime the initial watcher state.
+#[cfg(test)]
+pub(crate) fn prime_watcher_state_for_test(state: &FileWatcherState, signature: &str) {
+    let mut active = state.watcher.lock().expect("watcher lock");
+    #[cfg(feature = "native-watch")]
+    let watcher = RecommendedWatcher::new(|_result: notify::Result<Event>| {}, Config::default())
+        .expect("native watcher");
+    *active = Some(ActiveFileWatcher {
+        #[cfg(feature = "native-watch")]
+        _watcher: watcher,
+        signature: signature.to_string(),
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,21 +298,38 @@ mod tests {
     #[test]
     fn stop_file_watcher_clears_active_watcher_state() {
         let state = FileWatcherState::default();
-        {
-            let mut active = state.watcher.lock().expect("watcher lock");
-            #[cfg(feature = "native-watch")]
-            let watcher =
-                RecommendedWatcher::new(|_result: notify::Result<Event>| {}, Config::default())
-                    .expect("native watcher");
-            *active = Some(ActiveFileWatcher {
-                #[cfg(feature = "native-watch")]
-                _watcher: watcher,
-                signature: "watched/document.md".to_string(),
-            });
-        }
+        prime_watcher_state_for_test(&state, "watched/document.md");
 
         clear_file_watcher_state(&state).expect("stop watcher");
 
         assert!(state.watcher.lock().expect("watcher lock").is_none());
+    }
+
+    #[test]
+    fn watched_root_moves_to_new_path_after_save_as() {
+        // Simulate the state after the user opens draft.md and the watcher is
+        // registered on that root.
+        let state = FileWatcherState::default();
+        prime_watcher_state_for_test(&state, "/project/draft.md");
+        assert_eq!(
+            watcher_signature_for_test(&state).as_deref(),
+            Some("/project/draft.md"),
+            "initial watcher should be on the original root"
+        );
+
+        // Simulate save-as to a different path: the new signature replaces the
+        // old one atomically (the old ActiveFileWatcher is dropped inside the
+        // assignment, not before).
+        prime_watcher_state_for_test(&state, "/project/final.md");
+        assert_eq!(
+            watcher_signature_for_test(&state).as_deref(),
+            Some("/project/final.md"),
+            "watcher signature must move to the save-as destination"
+        );
+        assert_ne!(
+            watcher_signature_for_test(&state).as_deref(),
+            Some("/project/draft.md"),
+            "old path must not remain in the watcher state after save-as"
+        );
     }
 }
