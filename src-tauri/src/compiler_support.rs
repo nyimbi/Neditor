@@ -75,12 +75,18 @@ pub(crate) fn canonical_citation_style(style: &str) -> Option<&'static str> {
     let normalized = style.trim().to_ascii_lowercase();
     match normalized.as_str() {
         "title" | "neditor-title" => Some("title"),
-        "author-year" | "author_year" | "harvard" | "council-of-science-editors-author-date" => {
+        "author-year" | "author_year" | "council-of-science-editors-author-date" => {
             Some("author-year")
         }
         "apa" | "american-psychological-association" => Some("apa"),
         "chicago-author-date" | "chicago" => Some("chicago-author-date"),
+        "chicago-notes" | "chicago-notes-bibliography" | "chicago-fullnote-bibliography" => {
+            Some("chicago-notes")
+        }
         "mla" | "modern-language-association" => Some("mla"),
+        "harvard" | "harvard-cite-them-right" => Some("harvard"),
+        "acm" | "association-for-computing-machinery" | "acm-sig-proceedings" => Some("acm"),
+        "acs" | "american-chemical-society" => Some("acs"),
         "key" | "citation-key" | "citation_key" => Some("key"),
         "numeric" => Some("numeric"),
         "ieee" => Some("ieee"),
@@ -143,7 +149,11 @@ pub(crate) fn collect_fence_bodies_with_lines(text: &str, target: &str) -> Vec<(
                 let run_len = trimmed.chars().take_while(|&c| c == fence_char).count();
                 run_len >= fence_len
             };
-            let info = line.trim_start().strip_prefix(marker.as_str()).unwrap_or("").trim();
+            let info = line
+                .trim_start()
+                .strip_prefix(marker.as_str())
+                .unwrap_or("")
+                .trim();
             if info.split_whitespace().next().unwrap_or("") != target {
                 for (_, body_line) in lines.by_ref() {
                     if closes(body_line) {

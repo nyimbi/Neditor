@@ -791,3 +791,165 @@ fn document_ast_preserves_multiple_citation_keys() {
         .2
         .contains("data-citation-keys=\"porter1985 doe2026\""));
 }
+
+// ── Spec 9.12 / 15: real CSL-style renderers ─────────────────────────────
+
+#[test]
+fn csl_style_harvard_renders_author_date_with_comma_and_initials() {
+    // Harvard distinguishes from APA/Chicago by (a) comma between author and year
+    // in the in-text citation and (b) using initials in the bibliography entry.
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Harvard Style\nstatus: approved\napprovedBy: QA\ncitationStyle: harvard\n---\n# Harvard Style\nSingle [@porter1985, p. 42].\nTwo authors [@doe2026].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter, Michael E.},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe, Jane and Smith, John},\n year={2026},\n journal={Business Evidence Review},\n volume={4},\n number={2},\n pages={10--18},\n doi={10.1000/example}\n}\n```\n[BIBLIOGRAPHY]\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    // In-text: "(Author, Year)" — comma distinguishes Harvard from APA "(Author Year)"
+    assert!(
+        response.html.contains("(Porter, 1985, p. 42)"),
+        "expected '(Porter, 1985, p. 42)' in html:\n{}",
+        response.html
+    );
+    assert!(
+        response.html.contains("(Doe and Smith, 2026)"),
+        "expected '(Doe and Smith, 2026)' in html:\n{}",
+        response.html
+    );
+    // Bibliography: author with initials, year in parens after name
+    assert!(
+        response
+            .compiled_markdown
+            .contains("- **porter1985**. Porter, M. E. (1985). Competitive Advantage."),
+        "{}",
+        response.compiled_markdown
+    );
+    assert!(
+        response.compiled_markdown.contains(
+            "- **doe2026**. Doe, J. and Smith, J. (2026). Evidence Based Reports. Business Evidence Review, 4(2), pp. 10--18. doi: 10.1000/example"
+        ),
+        "{}",
+        response.compiled_markdown
+    );
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|d| d.message.contains("Unsupported citation style")));
+}
+
+#[test]
+fn csl_style_chicago_notes_renders_numeric_with_full_name_bibliography() {
+    // Chicago notes-bibliography: numeric in-text, inverted first author,
+    // article titles in double quotes, journal details with "no." for issue.
+    let response = compile(CompileRequest {
+        text: "---\ntitle: Chicago Notes\nstatus: approved\napprovedBy: QA\ncitationStyle: chicago-notes\n---\n# Chicago Notes\nClaim [@doe2026, p. 12].\n\n```bibtex\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe, Jane and Smith, John},\n year={2026},\n journal={Business Evidence Review},\n volume={4},\n number={2},\n pages={10--18},\n doi={10.1000/example}\n}\n```\n[BIBLIOGRAPHY]\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert!(response.html.contains("[1, p. 12]"), "{}", response.html);
+    assert!(
+        response.compiled_markdown.contains(
+            r#"- [1] **doe2026**. Doe, Jane, and John Smith. "Evidence Based Reports". Business Evidence Review 4, no. 2 (2026): 10--18. doi:10.1000/example."#
+        ),
+        "{}",
+        response.compiled_markdown
+    );
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|d| d.message.contains("Unsupported citation style")));
+}
+
+#[test]
+fn csl_style_acm_renders_natural_order_authors_and_year_prominent() {
+    // ACM: numeric [N] in-text; all authors in natural (Given Family) order;
+    // year appears after authors rather than at the end.
+    let response = compile(CompileRequest {
+        text: "---\ntitle: ACM Style\nstatus: approved\napprovedBy: QA\ncitationStyle: acm\n---\n# ACM Style\nSingle [@porter1985].\nArticle [@doe2026].\n\n```bibtex\n@book{porter1985,\n title={Competitive Advantage},\n author={Porter, Michael E.},\n year={1985}\n}\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe, Jane and Smith, John},\n year={2026},\n journal={Business Evidence Review},\n volume={4},\n number={2},\n pages={10--18},\n doi={10.1000/example}\n}\n```\n[BIBLIOGRAPHY]\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert!(response.html.contains("[1]"), "{}", response.html);
+    assert!(response.html.contains("[2]"), "{}", response.html);
+    // Single author: inverted → natural (only one name, same either way)
+    assert!(
+        response
+            .compiled_markdown
+            .contains("- [1] **porter1985**. Michael E. Porter. 1985. Competitive Advantage."),
+        "{}",
+        response.compiled_markdown
+    );
+    // Two authors: all natural order, "and" before last
+    assert!(
+        response.compiled_markdown.contains(
+            "- [2] **doe2026**. Jane Doe and John Smith. 2026. Evidence Based Reports. Business Evidence Review 4, 2 (2026), 10--18. doi:10.1000/example"
+        ),
+        "{}",
+        response.compiled_markdown
+    );
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|d| d.message.contains("Unsupported citation style")));
+}
+
+#[test]
+fn csl_style_acs_renders_semicolon_separated_initials_and_year_in_source() {
+    // ACS: numeric [N] in-text; "Family, G. M.; Family2, G. M." author format;
+    // year appears inside the journal source string (after journal name).
+    let response = compile(CompileRequest {
+        text: "---\ntitle: ACS Style\nstatus: approved\napprovedBy: QA\ncitationStyle: acs\n---\n# ACS Style\nClaim [@doe2026, sec. 3].\n\n```bibtex\n@article{doe2026,\n title={Evidence Based Reports},\n author={Doe, Jane and Smith, John},\n year={2026},\n journal={Business Evidence Review},\n volume={4},\n number={2},\n pages={10--18},\n doi={10.1000/example}\n}\n```\n[BIBLIOGRAPHY]\n"
+            .to_string(),
+        file_path: None,
+    });
+
+    assert!(response.html.contains("[1, sec. 3]"), "{}", response.html);
+    assert!(
+        response.compiled_markdown.contains(
+            "- [1] **doe2026**. Doe, J.; Smith, J. Evidence Based Reports. Business Evidence Review 2026, 4, 10--18. doi:10.1000/example"
+        ),
+        "{}",
+        response.compiled_markdown
+    );
+    assert!(!response
+        .diagnostics
+        .iter()
+        .any(|d| d.message.contains("Unsupported citation style")));
+}
+
+#[test]
+fn csl_all_ten_styles_recognized_without_unsupported_warning() {
+    // Regression: every style in the spec-10 set must be accepted without a
+    // "Unsupported citation style" diagnostic.
+    let styles = [
+        "apa",
+        "mla",
+        "chicago-author-date",
+        "chicago-notes",
+        "harvard",
+        "ieee",
+        "vancouver",
+        "acm",
+        "acs",
+        "nature",
+    ];
+    let text_for = |style: &str| {
+        format!(
+            "---\ntitle: Style Check\nstatus: approved\napprovedBy: QA\ncitationStyle: {style}\n---\n# Style Check\nClaim [@porter1985].\n\n```bibtex\n@book{{porter1985, title={{Competitive Advantage}}, author={{Porter}}, year={{1985}}}}\n```\n[BIBLIOGRAPHY]\n"
+        )
+    };
+    for style in styles {
+        let response = compile(CompileRequest {
+            text: text_for(style),
+            file_path: None,
+        });
+        assert!(
+            !response
+                .diagnostics
+                .iter()
+                .any(|d| d.message.contains("Unsupported citation style")),
+            "style '{style}' triggered unsupported-style warning"
+        );
+    }
+}

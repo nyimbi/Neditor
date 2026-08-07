@@ -542,7 +542,12 @@ fn hayagriva_entry_spans(body: &str, start_line: usize) -> Vec<HayagrivaEntrySpa
                 starts.push((byte_offset, line_index, key.to_string(), column));
             }
         }
-        byte_offset += line.len() + if body[byte_offset + line.len()..].starts_with("\r\n") { 2 } else { 1 };
+        byte_offset += line.len()
+            + if body[byte_offset + line.len()..].starts_with("\r\n") {
+                2
+            } else {
+                1
+            };
     }
     starts
         .iter()
@@ -1245,6 +1250,12 @@ fn citation_label(
             (None, Some(year)) => year.clone(),
             (None, None) => entry.title.clone(),
         },
+        "harvard" => match (&entry.author, &entry.issued) {
+            (Some(author), Some(year)) => format!("{}, {year}", citation_author_label(author)),
+            (Some(author), None) => citation_author_label(author),
+            (None, Some(year)) => year.clone(),
+            (None, None) => entry.title.clone(),
+        },
         "mla" => entry
             .author
             .as_deref()
@@ -1263,7 +1274,15 @@ fn citation_label(
 pub(crate) fn is_numeric_citation_style(style: &str) -> bool {
     matches!(
         style,
-        "numeric" | "ieee" | "vancouver" | "nature" | "ama" | "elsevier-vancouver"
+        "numeric"
+            | "ieee"
+            | "vancouver"
+            | "nature"
+            | "ama"
+            | "elsevier-vancouver"
+            | "chicago-notes"
+            | "acm"
+            | "acs"
     )
 }
 
@@ -1325,7 +1344,26 @@ pub(crate) fn bibliography_entry_markdown(
             entry.key,
             chicago_author_date_reference(entry)
         ),
+        "chicago-notes" => format!(
+            "- [{}] **{}**. {}",
+            index + 1,
+            entry.key,
+            chicago_notes_reference(entry)
+        ),
         "mla" => format!("- **{}**. {}", entry.key, mla_reference(entry)),
+        "harvard" => format!("- **{}**. {}", entry.key, harvard_reference(entry)),
+        "acm" => format!(
+            "- [{}] **{}**. {}",
+            index + 1,
+            entry.key,
+            acm_reference(entry)
+        ),
+        "acs" => format!(
+            "- [{}] **{}**. {}",
+            index + 1,
+            entry.key,
+            acs_reference(entry)
+        ),
         "author-year" => {
             let author_year = [entry.author.as_deref(), entry.issued.as_deref()]
                 .into_iter()
@@ -1723,4 +1761,355 @@ fn sentence_author(author: &str) -> String {
     } else {
         format!("{normalized}.")
     }
+}
+
+// ── Author-name parsing and formatting helpers ─────────────────────────────
+
+/// Split a single author string into (family, given).
+/// Handles "Family, Given" (BibTeX inverted) and "Given Family" (natural order).
+fn parse_author_parts(author: &str) -> (&str, Option<&str>) {
+    let trimmed = author.trim();
+    if let Some(comma) = trimmed.find(',') {
+        let family = trimmed[..comma].trim();
+        let given = trimmed[comma + 1..].trim();
+        return (family, (!given.is_empty()).then_some(given));
+    }
+    // "Given [Middle] Family" — last whitespace-delimited token is the family name
+    if let Some(space) = trimmed.rfind(|ch: char| ch.is_whitespace()) {
+        let family = trimmed[space..].trim();
+        let given = trimmed[..space].trim();
+        return (family, (!given.is_empty()).then_some(given));
+    }
+    (trimmed, None)
+}
+
+/// Convert a given-name string to period-separated initials.
+/// "Michael Edward" → "M. E."   "J." → "J."
+fn given_to_initials(given: &str) -> String {
+    given
+        .split_whitespace()
+        .filter_map(|part| {
+            part.trim_end_matches('.')
+                .chars()
+                .next()
+                .map(|ch| format!("{ch}."))
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Format an " and "-delimited author string as "Family, G. M.; Family2, G. M."
+/// Used by ACS (threshold 10) and similar semicolon-separated styles.
+fn format_authors_initials_semicolon(authors_str: &str, et_al_threshold: usize) -> String {
+    let authors: Vec<&str> = authors_str
+        .split(" and ")
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    if authors.is_empty() {
+        return authors_str.to_string();
+    }
+    let (display, et_al) = if authors.len() > et_al_threshold {
+        (&authors[..1], true)
+    } else {
+        (authors.as_slice(), false)
+    };
+    let mut parts: Vec<String> = display
+        .iter()
+        .map(|a| {
+            let (family, given) = parse_author_parts(a);
+            match given {
+                Some(g) => format!("{family}, {}", given_to_initials(g)),
+                None => family.to_string(),
+            }
+        })
+        .collect();
+    if et_al {
+        parts.push("et al.".to_string());
+    }
+    parts.join("; ")
+}
+
+/// Format an " and "-delimited author string as "Family, G. M. and Family2, G. M."
+/// Used by Harvard (threshold 6).
+fn format_authors_initials_and(authors_str: &str, et_al_threshold: usize) -> String {
+    let authors: Vec<&str> = authors_str
+        .split(" and ")
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    if authors.is_empty() {
+        return authors_str.to_string();
+    }
+    let (display, et_al) = if authors.len() > et_al_threshold {
+        (&authors[..1], true)
+    } else {
+        (authors.as_slice(), false)
+    };
+    let parts: Vec<String> = display
+        .iter()
+        .map(|a| {
+            let (family, given) = parse_author_parts(a);
+            match given {
+                Some(g) => format!("{family}, {}", given_to_initials(g)),
+                None => family.to_string(),
+            }
+        })
+        .collect();
+    let result = match parts.as_slice() {
+        [] => String::new(),
+        [single] => single.clone(),
+        [first, second] => format!("{first} and {second}"),
+        _ => {
+            let (last, rest) = parts.split_last().unwrap();
+            format!("{}, and {last}", rest.join(", "))
+        }
+    };
+    if et_al {
+        format!("{result} et al.")
+    } else {
+        result
+    }
+}
+
+/// Convert "Family, Given" → "Given Family" (no-op if already natural order).
+fn invert_author_name(author: &str) -> String {
+    let trimmed = author.trim();
+    if trimmed.contains(',') {
+        let (family, given) = parse_author_parts(trimmed);
+        match given {
+            Some(g) => format!("{g} {family}"),
+            None => family.to_string(),
+        }
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Format authors for Chicago notes: first author inverted, remaining natural order.
+/// "Doe, Jane and Smith, John" → "Doe, Jane, and John Smith"
+fn format_authors_chicago_notes(authors_str: &str) -> String {
+    let authors: Vec<&str> = authors_str
+        .split(" and ")
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    match authors.as_slice() {
+        [] => authors_str.to_string(),
+        [single] => single.to_string(),
+        [first, rest @ ..] => {
+            let normals: Vec<String> = rest.iter().map(|a| invert_author_name(a)).collect();
+            let (last, prev) = normals.split_last().unwrap();
+            if prev.is_empty() {
+                format!("{first}, and {last}")
+            } else {
+                format!("{first}, {}, and {last}", prev.join(", "))
+            }
+        }
+    }
+}
+
+/// Format authors for ACM: all in natural order ("Given Family"), "and" before last.
+/// "Doe, Jane and Smith, John" → "Jane Doe and John Smith"
+fn format_authors_acm(authors_str: &str) -> String {
+    let authors: Vec<&str> = authors_str
+        .split(" and ")
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    if authors.is_empty() {
+        return authors_str.to_string();
+    }
+    let parts: Vec<String> = authors.iter().map(|a| invert_author_name(a)).collect();
+    match parts.as_slice() {
+        [] => String::new(),
+        [single] => single.clone(),
+        [first, second] => format!("{first} and {second}"),
+        _ => {
+            let (last, rest) = parts.split_last().unwrap();
+            format!("{}, and {last}", rest.join(", "))
+        }
+    }
+}
+
+// ── Harvard ────────────────────────────────────────────────────────────────
+
+fn harvard_reference(entry: &BibliographyEntry) -> String {
+    let mut parts = Vec::new();
+    let author_str = entry
+        .author
+        .as_deref()
+        .map(|a| format_authors_initials_and(a, 6));
+    match (&author_str, &entry.issued) {
+        (Some(author), Some(year)) => parts.push(format!("{author} ({year}).")),
+        (Some(author), None) => parts.push(ensure_period(author)),
+        (None, Some(year)) => parts.push(format!("({year}).")),
+        (None, None) => {}
+    }
+    parts.push(ensure_period(&entry.title));
+    if let Some(source) = harvard_publication_source(entry) {
+        parts.push(ensure_period(&source));
+    } else if let Some(publisher) = publisher_or_institution(entry) {
+        parts.push(ensure_period(publisher));
+    }
+    if let Some(link) = doi_or_url_reference(entry, true) {
+        parts.push(link);
+    }
+    parts.join(" ")
+}
+
+fn harvard_publication_source(entry: &BibliographyEntry) -> Option<String> {
+    let container = journal_or_container(entry)?;
+    let mut source = container.to_string();
+    if let Some(volume) = entry_field(entry, &["volume"]) {
+        source.push_str(", ");
+        source.push_str(volume);
+        if let Some(issue) = entry_field(entry, &["number", "issue"]) {
+            source.push('(');
+            source.push_str(issue);
+            source.push(')');
+        }
+    }
+    if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+        source.push_str(", pp. ");
+        source.push_str(pages);
+    }
+    Some(source)
+}
+
+// ── Chicago notes-bibliography ─────────────────────────────────────────────
+
+fn chicago_notes_reference(entry: &BibliographyEntry) -> String {
+    let mut parts = Vec::new();
+    if let Some(author) = entry.author.as_deref() {
+        parts.push(ensure_period(&format_authors_chicago_notes(author)));
+    }
+    // Article/chapter titles in double quotes; book/thesis titles plain.
+    let title = if journal_or_container(entry).is_some() {
+        format!("\"{}\"", entry.title)
+    } else {
+        entry.title.clone()
+    };
+    if let Some(source) = chicago_notes_publication_source(entry) {
+        parts.push(format!("{title}."));
+        parts.push(ensure_period(&source));
+    } else {
+        parts.push(ensure_period(&title));
+        match (publisher_or_institution(entry), entry.issued.as_deref()) {
+            (Some(publisher), Some(year)) => {
+                parts.push(ensure_period(&format!("{publisher}, {year}")))
+            }
+            (Some(publisher), None) => parts.push(ensure_period(publisher)),
+            (None, Some(year)) => parts.push(ensure_period(year)),
+            (None, None) => {}
+        }
+    }
+    if let Some(doi) = entry_field(entry, &["doi", "DOI"]) {
+        parts.push(ensure_period(&format!("doi:{}", clean_doi(doi))));
+    } else if let Some(url) = entry_field(entry, &["url", "URL"]) {
+        parts.push(ensure_period(url));
+    }
+    parts.join(" ")
+}
+
+fn chicago_notes_publication_source(entry: &BibliographyEntry) -> Option<String> {
+    let container = journal_or_container(entry)?;
+    let mut source = container.to_string();
+    if let Some(volume) = entry_field(entry, &["volume"]) {
+        source.push(' ');
+        source.push_str(volume);
+    }
+    if let Some(issue) = entry_field(entry, &["number", "issue"]) {
+        source.push_str(", no. ");
+        source.push_str(issue);
+    }
+    if let Some(year) = entry.issued.as_deref() {
+        source.push_str(&format!(" ({year})"));
+    }
+    if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+        source.push_str(": ");
+        source.push_str(pages);
+    }
+    Some(source)
+}
+
+// ── ACM ───────────────────────────────────────────────────────────────────
+
+fn acm_reference(entry: &BibliographyEntry) -> String {
+    let mut parts = Vec::new();
+    if let Some(author) = entry.author.as_deref() {
+        parts.push(ensure_period(&format_authors_acm(author)));
+    }
+    if let Some(year) = entry.issued.as_deref() {
+        parts.push(format!("{year}."));
+    }
+    parts.push(ensure_period(&entry.title));
+    if let Some(source) = acm_publication_source(entry) {
+        parts.push(ensure_period(&source));
+    } else if let Some(publisher) = publisher_or_institution(entry) {
+        parts.push(ensure_period(publisher));
+    }
+    if let Some(link) = doi_or_url_reference(entry, false) {
+        parts.push(link);
+    }
+    parts.join(" ")
+}
+
+fn acm_publication_source(entry: &BibliographyEntry) -> Option<String> {
+    let container = journal_or_container(entry)?;
+    let mut source = container.to_string();
+    if let Some(volume) = entry_field(entry, &["volume"]) {
+        source.push(' ');
+        source.push_str(volume);
+    }
+    if let Some(issue) = entry_field(entry, &["number", "issue"]) {
+        source.push_str(", ");
+        source.push_str(issue);
+    }
+    if let Some(year) = entry.issued.as_deref() {
+        source.push_str(&format!(" ({year})"));
+    }
+    if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+        source.push_str(", ");
+        source.push_str(pages);
+    }
+    Some(source)
+}
+
+// ── ACS ───────────────────────────────────────────────────────────────────
+
+fn acs_reference(entry: &BibliographyEntry) -> String {
+    let mut parts = Vec::new();
+    if let Some(author) = entry.author.as_deref() {
+        // ACS: "Family, G. M.; Family2, G. M." — threshold 10 before et al.
+        parts.push(format_authors_initials_semicolon(author, 10));
+    }
+    parts.push(ensure_period(&entry.title));
+    if let Some(source) = acs_publication_source(entry) {
+        parts.push(ensure_period(&source));
+    } else if let Some(publisher) = publisher_or_institution(entry) {
+        parts.push(ensure_period(publisher));
+    }
+    if let Some(link) = doi_or_url_reference(entry, false) {
+        parts.push(link);
+    }
+    parts.join(" ")
+}
+
+fn acs_publication_source(entry: &BibliographyEntry) -> Option<String> {
+    let container = journal_or_container(entry)?;
+    let mut source = container.to_string();
+    if let Some(year) = entry.issued.as_deref() {
+        source.push(' ');
+        source.push_str(year);
+    }
+    if let Some(volume) = entry_field(entry, &["volume"]) {
+        source.push_str(", ");
+        source.push_str(volume);
+    }
+    if let Some(pages) = entry_field(entry, &["pages", "page"]) {
+        source.push_str(", ");
+        source.push_str(pages);
+    }
+    Some(source)
 }
