@@ -123,8 +123,44 @@ jobs:
       - name: Build frontend
         run: pnpm run build
 
+      # Windows: stage the PFX so Tauri bundler can sign the installer.
+      # WINDOWS_CERTIFICATE is read by Tauri as a base64-encoded .pfx file.
+      # No registry Developer Mode key is required for signing; msedgedriver is
+      # already installed via the selenium-chromium-edge-driver Chocolatey package
+      # (step above).  If a future Tauri version needs a file path rather than
+      # a base64 blob, write it here:
+      #   $certPath = Join-Path $env:RUNNER_TEMP "neditor-sign.pfx"
+      #   [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+      #   "TAURI_WINDOWS_CERTIFICATE_FILE=$certPath" >> $env:GITHUB_ENV
+      # TODO(human): verify whether your Tauri version reads WINDOWS_CERTIFICATE
+      # as a raw base64 string or requires a decoded file on disk.
+      - name: Import Windows signing certificate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+        run: |
+          if (-not $env:WINDOWS_CERT_PFX_BASE64) {
+            Write-Warning "WINDOWS_CERT_PFX_BASE64 secret is empty; build will not be signed."
+          } else {
+            Write-Host "Windows signing certificate present; Tauri will sign via WINDOWS_CERTIFICATE."
+          }
+
       - name: Build Tauri packages
         timeout-minutes: 45
+        # Signing env vars are optional: if the secrets are absent the build
+        # still succeeds but the binaries will be unsigned.
+        env:
+          # macOS codesign + notarization (unused on this job's matrix legs but
+          # harmless to forward; Tauri ignores unknown-platform vars).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows Authenticode signing
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: node scripts/run-tauri-build.mjs --bundles "${{ matrix.bundles }}"
 
       - name: Run Linux Tauri WebDriver workflow
@@ -375,3 +411,290 @@ jobs:
           if-no-files-found: error
           path: |
             .tmp/accessibility/**
+
+  # ---------------------------------------------------------------------------
+  # macOS package build, signing, notarization, and desktop smoke test.
+  #
+  # NOTE: run-tauri-webdriver.mjs explicitly rejects darwin (lines 139-147 of
+  # the script) — WebDriver is not supported on macOS by the current Tauri
+  # driver implementation.  macOS proof therefore consists of:
+  #   • a signed + notarized DMG (package artifact)
+  #   • desktop smoke test (check-desktop-smoke.mjs + check-desktop-dmg.mjs)
+  #   • macOS native command workflow run via cargo test
+  #
+  # Spec-matrix rows closed once secrets land:
+  #   • macos-native-launch-current-binary-proof      (cluster B)
+  #   • macos-native-window-visibility-proof          (cluster B)
+  #   • release-signing-and-notarization / darwin     (cluster B)
+  #
+  # TODO(human): if a future Tauri release adds Safari WebDriver support on
+  # macOS, replace the smoke-test steps with xvfb-free WebDriver steps and
+  # add the darwin platform spec to check-platform-evidence.mjs.
+  # ---------------------------------------------------------------------------
+  platform-proof-macos:
+    name: macOS package, signing, and smoke proof
+    runs-on: macos-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # Import the P12 certificate into a temporary keychain so codesign(1) can
+      # find it.  Tauri also reads APPLE_CERTIFICATE as a base64 blob — the
+      # keychain import is an additional safety net for tools that call codesign
+      # directly (e.g. xcrun notarytool staple).
+      # TODO(human): if APPLE_CERTIFICATE alone is sufficient for your Tauri
+      # version, remove the keychain steps to reduce attack surface.
+      - name: Import Apple signing certificate into keychain
+        if: env.APPLE_CERT_P12_BASE64 != ''
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 20)"
+          CERT_PATH="$RUNNER_TEMP/neditor-apple.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/neditor-build.keychain-db"
+          echo "$APPLE_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 900 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERT_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "NEDITOR_KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          rm -f "$CERT_PATH"
+        shell: bash
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm run build
+
+      # Tauri reads APPLE_CERTIFICATE (base64 .p12), APPLE_CERTIFICATE_PASSWORD,
+      # APPLE_ID, APPLE_PASSWORD, and APPLE_TEAM_ID for signing + notarization.
+      # Build will succeed without them but the DMG will be unsigned.
+      - name: Build macOS Tauri DMG
+        timeout-minutes: 45
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NEDITOR_TAURI_BUILD_PROGRESS_MS: ${{ env.NEDITOR_TAURI_BUILD_PROGRESS_MS }}
+        run: node scripts/run-tauri-build.mjs --bundles dmg
+
+      # xcrun notarytool staple is already handled by Tauri when APPLE_ID is set.
+      # This step is a belt-and-suspenders verification that the staple actually
+      # landed; it does not re-submit for notarization.
+      # TODO(human): remove if your CI times out on staple polling — Tauri's
+      # built-in notarize waits for approval before returning.
+      - name: Verify notarization staple
+        if: env.APPLE_ID != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+        run: |
+          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          if [ -z "$DMG" ]; then
+            echo "::warning::No .dmg found to staple-verify; skipping."
+          else
+            xcrun stapler validate "$DMG" && echo "Staple OK: $DMG"
+          fi
+
+      # Desktop smoke: cargo test (native command workflow) + bounded GUI launch.
+      # NEDITOR_DESKTOP_SMOKE_LAUNCH=1 tells check-desktop-smoke.mjs to spawn
+      # the actual .app and wait for the native window to appear.
+      - name: Run macOS desktop smoke test
+        timeout-minutes: 15
+        env:
+          NEDITOR_DESKTOP_SMOKE_LAUNCH: "1"
+          NEDITOR_DESKTOP_SMOKE_TIMEOUT_MS: "60000"
+          NEDITOR_DESKTOP_SMOKE_ATTEMPTS: "3"
+        run: pnpm run test:desktop-smoke
+
+      - name: Check macOS desktop DMG
+        run: pnpm run test:desktop-dmg
+
+      # Collect macOS signing evidence (darwin leg of collect-release-signing-evidence.mjs).
+      # This writes .tmp/release-signing/external/darwin/signing-evidence.json.
+      - name: Collect macOS release signing evidence
+        if: env.APPLE_ID != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+        run: |
+          DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          if [ -n "$DMG" ]; then
+            pnpm run collect:release-signing -- \
+              --platform darwin \
+              --artifact "dmg=$DMG"
+          else
+            echo "::warning::No DMG found; skipping signing evidence collection."
+          fi
+
+      - name: Delete temporary keychain
+        if: always() && env.NEDITOR_KEYCHAIN_PATH != ''
+        run: security delete-keychain "$NEDITOR_KEYCHAIN_PATH"
+
+      - name: Upload macOS platform evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: neditor-platform-evidence-darwin
+          if-no-files-found: warn
+          path: |
+            .tmp/tauri-build/report.json
+            .tmp/desktop-smoke/**
+            .tmp/release-signing/external/darwin/**
+            src-tauri/target/release/bundle/dmg/*.dmg
+
+      - name: Upload macOS platform evidence JSON
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: neditor-platform-evidence-darwin-json
+          if-no-files-found: warn
+          path: |
+            .tmp/tauri-build/report.json
+            .tmp/desktop-smoke/native-command-report.json
+            .tmp/desktop-smoke/native-window-report.json
+            .tmp/release-signing/external/darwin/signing-evidence.json
+
+  # ---------------------------------------------------------------------------
+  # Evidence kit: aggregates all platform JSON reports, validates the full
+  # evidence contract, and uploads the signed release evidence bundle.
+  #
+  # Spec-matrix rows closed once all upstream jobs pass:
+  #   • windows-linux-tauri-webdriver-execution       (cluster B)
+  #   • windows-package-artifact-proof               (cluster B)
+  #   • linux-package-artifact-proof                 (cluster B)
+  #   • macos-native-launch-current-binary-proof     (cluster B)
+  #   • macos-native-window-visibility-proof         (cluster B)
+  #   • release-signing-and-notarization             (cluster B)
+  #   • cross-platform-ci-evidence                   (cluster B)  ← primary gate
+  #   • native-workflow-bundle-100-assertions        (cluster B)
+  # ---------------------------------------------------------------------------
+  evidence-kit:
+    name: Assemble release evidence kit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # fail-fast: false on upstream jobs means this runs even if one platform
+    # failed; the check:evidence-kit step will surface the gap explicitly.
+    needs:
+      - browser-workflows
+      - platform-proof
+      - platform-proof-macos
+      - optional-engine-proof
+      - rendered-export-review
+      - accessibility-review
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Download all per-platform JSON artifacts into the paths that
+      # collect-release-evidence-kit.mjs expects under .tmp/.
+      - name: Download Windows platform evidence JSON
+        uses: actions/download-artifact@v4
+        with:
+          name: neditor-platform-evidence-win32-json
+          path: .tmp/platform-evidence-win32-json
+        continue-on-error: true
+
+      - name: Download Linux platform evidence JSON
+        uses: actions/download-artifact@v4
+        with:
+          name: neditor-platform-evidence-linux-json
+          path: .tmp/platform-evidence-linux-json
+        continue-on-error: true
+
+      - name: Download macOS platform evidence JSON
+        uses: actions/download-artifact@v4
+        with:
+          name: neditor-platform-evidence-darwin-json
+          path: .tmp/platform-evidence-darwin-json
+        continue-on-error: true
+
+      - name: Download browser workflow evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: neditor-browser-workflow-evidence
+          path: .tmp/browser-workflow-evidence
+        continue-on-error: true
+
+      # Merge downloaded evidence into the directory tree that the kit collector
+      # and validator expect.
+      - name: Stage downloaded evidence under .tmp
+        run: |
+          # platform-evidence JSON
+          mkdir -p .tmp/platform-evidence/external/win32
+          mkdir -p .tmp/platform-evidence/external/linux
+          cp -r .tmp/platform-evidence-win32-json/. .tmp/ 2>/dev/null || true
+          cp -r .tmp/platform-evidence-linux-json/. .tmp/ 2>/dev/null || true
+          # desktop-smoke JSON from macOS job
+          mkdir -p .tmp/desktop-smoke
+          cp .tmp/platform-evidence-darwin-json/desktop-smoke/native-command-report.json \
+             .tmp/desktop-smoke/ 2>/dev/null || true
+          cp .tmp/platform-evidence-darwin-json/desktop-smoke/native-window-report.json \
+             .tmp/desktop-smoke/ 2>/dev/null || true
+          # release-signing evidence from macOS job
+          mkdir -p .tmp/release-signing/external/darwin
+          cp .tmp/platform-evidence-darwin-json/release-signing/external/darwin/signing-evidence.json \
+             .tmp/release-signing/external/darwin/ 2>/dev/null || true
+          # browser workflow evidence
+          cp -r .tmp/browser-workflow-evidence/. .tmp/ 2>/dev/null || true
+
+      - name: Validate Windows + Linux platform evidence contract
+        run: pnpm run check:platform-evidence
+
+      - name: Collect release evidence kit
+        env:
+          NEDITOR_AI_PROVIDER_API_KEY: ${{ secrets.AI_PROVIDER_API_KEY }}
+          NEDITOR_GOOGLE_DRIVE_OAUTH_JSON: ${{ secrets.GOOGLE_DRIVE_OAUTH_JSON }}
+        run: pnpm run collect:evidence-kit
+
+      - name: Validate evidence kit contract
+        run: pnpm run check:evidence-kit
+
+      - name: Upload release evidence kit
+        uses: actions/upload-artifact@v7
+        with:
+          name: neditor-release-evidence-kit
+          if-no-files-found: error
+          path: |
+            .tmp/release-evidence-kit/**
+            .tmp/platform-evidence/report.json
