@@ -1,6 +1,6 @@
 # NEditor IPC Command Coverage
 
-Updated: 2026-05-22
+Updated: 2026-08-14
 
 This table tracks the full registered Tauri IPC command surface, including the
 initial commands required by `docs/specification.md` section 25.4 and later
