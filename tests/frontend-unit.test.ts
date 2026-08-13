@@ -7392,6 +7392,10 @@ test("configuration setup helpers score readiness and generate context-aware ass
     supportBundleStatus: "",
     supportBundleRecommendationCount: 0,
     supportBundleEvidenceAttentionCount: 0,
+    pandocAvailable: true,
+    curlAvailable: true,
+    webhookCount: 0,
+    auditEnabled: false,
   });
   equal(formatConfigurationSetupSummary(status), "7/10 setup areas ready");
   equal(status.items.find((item) => item.id === "tts")?.done, false);
@@ -7439,6 +7443,10 @@ test("configuration setup helpers score readiness and generate context-aware ass
     supportBundleStatus: "",
     supportBundleRecommendationCount: 0,
     supportBundleEvidenceAttentionCount: 0,
+    pandocAvailable: true,
+    curlAvailable: true,
+    webhookCount: 0,
+    auditEnabled: false,
   });
   equal(assistance.stepId, "transforms");
   ok(assistance.suggestedAnswer.includes("Ready engines: 2"));
@@ -7482,6 +7490,10 @@ test("configuration setup helpers score readiness and generate context-aware ass
     supportBundleStatus: "",
     supportBundleRecommendationCount: 0,
     supportBundleEvidenceAttentionCount: 0,
+    pandocAvailable: true,
+    curlAvailable: true,
+    webhookCount: 0,
+    auditEnabled: false,
   });
   equal(releaseAssistance.stepId, "release");
   ok(releaseAssistance.suggestedAnswer.includes("Resolve blocked (1), stale (1), manual (2), credentialed (1), and cross-platform (1) lanes"));
@@ -7525,6 +7537,10 @@ test("configuration setup helpers score readiness and generate context-aware ass
     supportBundleStatus: "preview ready",
     supportBundleRecommendationCount: 4,
     supportBundleEvidenceAttentionCount: 2,
+    pandocAvailable: true,
+    curlAvailable: true,
+    webhookCount: 0,
+    auditEnabled: false,
   });
   equal(supportAssistance.stepId, "support");
   ok(supportAssistance.suggestedAnswer.includes("Support bundle preview is ready"));
@@ -7547,6 +7563,10 @@ test("configuration setup helpers score readiness and generate context-aware ass
     releaseEvidenceSummary: "3 complete | 1 blocked | 2 manual | 1 credentialed | 1 cross-platform | 1 stale | 0 ready-to-send",
     supportBundleStatus: "preview ready",
     supportBundleRecommendationCount: 4,
+    pandocAvailable: true,
+    curlAvailable: true,
+    webhookCount: 0,
+    auditEnabled: false,
   });
   deepEqual(sections.map((section) => section.id), ["overview", "appearance", "files", "exports", "google-auth", "ai", "transforms", "release", "support"]);
   equal(sections.find((section) => section.id === "transforms")?.summary, "6 external engines; 3 installer plan");
@@ -8637,6 +8657,22 @@ test("workspace persistence state helper builds normalized store snapshots", () 
       },
     ],
     documentMemoryText: "[terminology] ARR: Annual recurring revenue",
+    webhookConfigs: [],
+    auditEnabled: false,
+    auditAuthor: "",
+    auditMaxBytes: 0,
+    searchMaxResults: 200,
+    searchDefaultCaseSensitive: false,
+    humanizerDefaultMode: "standard",
+    compareMaxLines: 5000,
+    compareIgnoreWhitespace: true,
+    pandocBinaryPath: "",
+    curlBinaryPath: "",
+    restFetchAllowedHosts: [],
+    restFetchTimeoutMs: 30_000,
+    mailMergeRequireWorkspaceRoot: false,
+    mailMergeMaxRecords: 1000,
+    mailMergeDefaultDelimiter: ",",
   });
 
   equal(workspace.schemaVersion, WORKSPACE_SCHEMA_VERSION);
@@ -8728,6 +8764,22 @@ test("workspace persistence state helper applies persisted preferences and resto
     customDocumentOutlineTemplates: [],
     customVersionedClauses: [],
     documentMemoryText: "",
+    webhookConfigs: [],
+    auditEnabled: false,
+    auditAuthor: "",
+    auditMaxBytes: 0,
+    searchMaxResults: 200,
+    searchDefaultCaseSensitive: false,
+    humanizerDefaultMode: "standard",
+    compareMaxLines: 5000,
+    compareIgnoreWhitespace: true,
+    pandocBinaryPath: "",
+    curlBinaryPath: "",
+    restFetchAllowedHosts: [],
+    restFetchTimeoutMs: 30_000,
+    mailMergeRequireWorkspaceRoot: false,
+    mailMergeMaxRecords: 1000,
+    mailMergeDefaultDelimiter: ",",
   } satisfies Parameters<typeof applyPersistedWorkspacePreferenceState>[0];
 
   const result = applyPersistedWorkspacePreferenceState(
