@@ -4373,7 +4373,17 @@ fn ned_cli_read_aloud_builds_consent_gated_tts_plans() {
     assert_eq!(report["dryRun"], true);
     assert_eq!(report["modelDownload"]["acknowledged"], true);
     assert_eq!(report["modelDownload"]["approximateSize"], "~305 MB");
-    assert_eq!(report["command"]["args"][1], "<text:48 chars>");
+    // G18: supertonic now pipes text via --stdin; the text must not appear in
+    // argv (args[1] is "--stdin", text is redacted in the "stdin" field).
+    assert_eq!(report["command"]["args"][1], "--stdin");
+    assert_eq!(report["command"]["usesStdin"], true);
+    assert!(
+        report["command"]["stdin"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("<text:"),
+        "stdin field should be a redacted <text:N chars> placeholder"
+    );
     assert!(!outcome.message.contains("confidential quarterly plan"));
     assert!(script_path.is_file());
     let script = fs::read_to_string(&script_path).expect("read generated TTS script");

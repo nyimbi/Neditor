@@ -694,7 +694,10 @@ pub(crate) fn run_cli_with_args_and_stdin(
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(7000);
             run_serve_mode(port);
-            Ok(CliOutcome { message: String::new(), exit_code: 0 })
+            Ok(CliOutcome {
+                message: String::new(),
+                exit_code: 0,
+            })
         }
         other => Err(format!("Unknown ned command '{other}'.\n\n{}", help_text())),
     }
@@ -717,16 +720,18 @@ pub(crate) fn run_serve_mode(port: u16) {
         let path = request.url().to_string();
         let method = request.method().as_str().to_uppercase();
         let response = match (method.as_str(), path.as_str()) {
-            ("GET", "/health") => {
-                Response::from_string(r#"{"status":"ok","app":"neditor"}"#)
-                    .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
-            }
+            ("GET", "/health") => Response::from_string(r#"{"status":"ok","app":"neditor"}"#)
+                .with_header(Header::from_bytes("Content-Type", "application/json").unwrap()),
             ("POST", "/compile") => {
                 let mut body = String::new();
                 const MAX_BODY: u64 = 16 * 1024 * 1024; // 16 MB
                 let read_ok = {
                     use std::io::Read;
-                    request.as_reader().take(MAX_BODY).read_to_string(&mut body).is_ok()
+                    request
+                        .as_reader()
+                        .take(MAX_BODY)
+                        .read_to_string(&mut body)
+                        .is_ok()
                 };
                 if read_ok {
                     if let Ok(req) = serde_json::from_str::<serde_json::Value>(&body) {
@@ -735,17 +740,22 @@ pub(crate) fn run_serve_mode(port: u16) {
                         let compile_req = crate::compiler_types::CompileRequest { text, file_path };
                         let result = crate::compile_with_options(compile_req, &Default::default());
                         let json = serde_json::to_string(&result).unwrap_or_default();
-                        Response::from_string(json)
-                            .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+                        Response::from_string(json).with_header(
+                            Header::from_bytes("Content-Type", "application/json").unwrap(),
+                        )
                     } else {
                         Response::from_string(r#"{"error":"invalid JSON body"}"#)
                             .with_status_code(400)
-                            .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+                            .with_header(
+                                Header::from_bytes("Content-Type", "application/json").unwrap(),
+                            )
                     }
                 } else {
                     Response::from_string(r#"{"error":"body read error"}"#)
                         .with_status_code(400)
-                        .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+                        .with_header(
+                            Header::from_bytes("Content-Type", "application/json").unwrap(),
+                        )
                 }
             }
             _ => Response::from_string(r#"{"error":"not found"}"#)
@@ -8961,8 +8971,16 @@ fn open_paths_in_neditor(paths: &[String]) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         for path in paths {
-            Command::new("cmd")
-                .args(["/C", "start", "", path])
+            // G11: NUL bytes corrupt Windows API calls; newlines are also illegal.
+            if path.chars().any(|c| c == '\0' || c == '\n') {
+                return Err(format!(
+                    "Path '{path}' contains characters that cannot be safely opened."
+                ));
+            }
+            // G11: Use explorer.exe directly — no cmd /C shell wrapper, so shell
+            // metacharacters (&, |, %) in file names are not interpreted.
+            Command::new("explorer.exe")
+                .arg(path)
                 .stdin(Stdio::null())
                 .spawn()
                 .map_err(|err| format!("Could not open {path}: {err}"))?;
@@ -9084,6 +9102,19 @@ fn windows_default_reader_plan(enabled: bool) -> DefaultMarkdownReaderResponse {
 
 fn apply_default_reader_commands(commands: &[String]) -> Result<(), String> {
     for command in commands {
+        // G13: today all commands are compile-time constant duti invocations
+        // (e.g. "duti -s com.neditor.app public.markdown all"). split_whitespace
+        // is safe for those, but future format strings that interpolate runtime
+        // data could become argument-injection vectors. Reject shell metacharacters
+        // as a maintenance safety net so the class can never silently regress.
+        if command
+            .chars()
+            .any(|c| matches!(c, '&' | '|' | ';' | '$' | '`' | '<' | '>' | '\n' | '\0'))
+        {
+            return Err(format!(
+                "Default-reader command contains disallowed characters: {command}"
+            ));
+        }
         let mut parts = command.split_whitespace();
         let program = parts.next().ok_or_else(|| "empty command".to_string())?;
         let args = parts.collect::<Vec<_>>();
@@ -9108,15 +9139,38 @@ fn command_available(command: &str) -> bool {
 }
 
 fn git_head_commit() -> Option<String> {
-    let output = Command::new("git")
+    // G14: apply a 5-second kill-on-timeout so a hostile fsmonitor hook in a
+    // repository cannot wedge the CLI startup path indefinitely.
+    use std::io::Read as _;
+    let mut child = Command::new("git")
         .args(["rev-parse", "HEAD"])
         .stdin(Stdio::null())
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
         .ok()?;
-    if !output.status.success() {
-        return None;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return None;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(_) => {
+                let _ = child.kill();
+                return None;
+            }
+        }
     }
-    let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let mut stdout = child.stdout.take()?;
+    let mut buf = String::new();
+    stdout.read_to_string(&mut buf).ok()?;
+    let commit = buf.trim().to_string();
     if commit.is_empty() {
         None
     } else {
@@ -19097,11 +19151,24 @@ fn target_extension(target: &str) -> &'static str {
 }
 
 fn stdout_temp_output_path(target: &str) -> PathBuf {
+    // G12: use a private per-user directory rather than world-writable /tmp
+    // to prevent symlink pre-plant races that could redirect the export write
+    // to an attacker-chosen file.
+    let secure_dir = dirs::data_local_dir()
+        .unwrap_or_else(env::temp_dir)
+        .join("neditor")
+        .join("ned-stdout-tmp");
+    let _ = fs::create_dir_all(&secure_dir);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&secure_dir, fs::Permissions::from_mode(0o700));
+    }
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos())
         .unwrap_or_default();
-    env::temp_dir().join(format!(
+    secure_dir.join(format!(
         "neditor-ned-stdout-{}-{nanos}.{}",
         std::process::id(),
         target_extension(target)
