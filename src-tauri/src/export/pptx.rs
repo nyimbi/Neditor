@@ -238,14 +238,19 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
     );
     title_slide.layout = PptxLayout::Title;
     let mut slides = vec![title_slide];
-    let global_bg: Option<String> = match options.get("presentationTheme").and_then(|v| v.as_str()).unwrap_or("corporate") {
-        "minimal"   => None,
-        "dark"      => Some("111821".to_string()),
-        "nature"    => Some("1a3326".to_string()),
-        "warm"      => Some("2d1b0e".to_string()),
-        _           => Some("1f3a5f".to_string()),
+    let global_bg: Option<String> = match options
+        .get("presentationTheme")
+        .and_then(|v| v.as_str())
+        .unwrap_or("corporate")
+    {
+        "minimal" => None,
+        "dark" => Some("111821".to_string()),
+        "nature" => Some("1a3326".to_string()),
+        "warm" => Some("2d1b0e".to_string()),
+        _ => Some("1f3a5f".to_string()),
     };
-    let global_transition: Option<String> = options.get("presentationTransition")
+    let global_transition: Option<String> = options
+        .get("presentationTransition")
         .and_then(|v| v.as_str())
         .filter(|s| *s != "none")
         .map(String::from);
@@ -430,8 +435,12 @@ fn build_pptx_slides(response: &CompileResponse, options: &Value) -> Vec<PptxSli
         })
         .collect();
     for slide in &mut slides {
-        if slide.bg_color.is_none() { slide.bg_color = global_bg.clone(); }
-        if slide.transition.is_none() { slide.transition = global_transition.clone(); }
+        if slide.bg_color.is_none() {
+            slide.bg_color = global_bg.clone();
+        }
+        if slide.transition.is_none() {
+            slide.transition = global_transition.clone();
+        }
     }
     slides
 }
@@ -737,10 +746,10 @@ pub(crate) fn render_pptx_theme_xml(options: &Value) -> String {
         .unwrap_or("corporate")
     {
         "minimal" => ("Minimal", "1e293b", "ffffff", "475569", "275DA8"),
-        "dark"    => ("Dark",    "0f172a", "f1f5f9", "1e293b", "0f766e"),
-        "nature"  => ("Nature",  "1a3326", "f0fdf4", "14532d", "4ade80"),
-        "warm"    => ("Warm",    "2d1b0e", "fefce8", "451a03", "f59e0b"),
-        _         => ("Corporate", "1f3a5f", "ffffff", "2d5f8a", "4b9cd3"),
+        "dark" => ("Dark", "0f172a", "f1f5f9", "1e293b", "0f766e"),
+        "nature" => ("Nature", "1a3326", "f0fdf4", "14532d", "4ade80"),
+        "warm" => ("Warm", "2d1b0e", "fefce8", "451a03", "f59e0b"),
+        _ => ("Corporate", "1f3a5f", "ffffff", "2d5f8a", "4b9cd3"),
     };
     format!(
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="{name}"><a:themeElements><a:clrScheme name="{name}"><a:dk1><a:srgbClr val="{dk1}"/></a:dk1><a:lt1><a:srgbClr val="{lt1}"/></a:lt1><a:dk2><a:srgbClr val="{dk2}"/></a:dk2><a:lt2><a:srgbClr val="e2e8f0"/></a:lt2><a:accent1><a:srgbClr val="{accent}"/></a:accent1><a:accent2><a:srgbClr val="f59e0b"/></a:accent2><a:accent3><a:srgbClr val="10b981"/></a:accent3><a:accent4><a:srgbClr val="8b5cf6"/></a:accent4><a:accent5><a:srgbClr val="ef4444"/></a:accent5><a:accent6><a:srgbClr val="0ea5e9"/></a:accent6><a:hlink><a:srgbClr val="{accent}"/></a:hlink><a:folHlink><a:srgbClr val="94a3b8"/></a:folHlink></a:clrScheme><a:fontScheme name="{name}"><a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="{name}"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>"#
@@ -824,13 +833,17 @@ fn render_pptx_slide(slide: &PptxSlide, pictures: &[PptxSlidePicture]) -> String
     let bg_xml = slide.bg_color.as_deref()
         .map(|c| format!("<p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>", c))
         .unwrap_or_default();
-    let transition_xml = slide.transition.as_deref().map(|t| match t {
-        "fade" => "<p:transition spd=\"med\"><p:fade/></p:transition>",
-        "push" => "<p:transition spd=\"med\"><p:push dir=\"l\"/></p:transition>",
-        "wipe" => "<p:transition spd=\"fast\"><p:wipe dir=\"l\"/></p:transition>",
-        "zoom" => "<p:transition spd=\"med\"><p:zoom dir=\"in\"/></p:transition>",
-        _ => "",
-    }).unwrap_or("");
+    let transition_xml = slide
+        .transition
+        .as_deref()
+        .map(|t| match t {
+            "fade" => "<p:transition spd=\"med\"><p:fade/></p:transition>",
+            "push" => "<p:transition spd=\"med\"><p:push dir=\"l\"/></p:transition>",
+            "wipe" => "<p:transition spd=\"fast\"><p:wipe dir=\"l\"/></p:transition>",
+            "zoom" => "<p:transition spd=\"med\"><p:zoom dir=\"in\"/></p:transition>",
+            _ => "",
+        })
+        .unwrap_or("");
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld>{bg_xml}<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{header}{content_shapes}{tables}{pictures}{footer}</p:spTree></p:cSld>{transition_xml}</p:sld>"#,
         pictures = picture_shapes

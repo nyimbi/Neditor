@@ -27,7 +27,10 @@ struct InstanceInfo {
 pub(crate) fn register_neditor_instance() {
     let dir = neditor_ipc_dir();
     if let Err(e) = fs::create_dir_all(&dir) {
-        eprintln!("[neditor cli_ipc] WARNING: cannot create IPC dir '{}': {e}", dir.display());
+        eprintln!(
+            "[neditor cli_ipc] WARNING: cannot create IPC dir '{}': {e}",
+            dir.display()
+        );
         return;
     }
     let info = InstanceInfo {
@@ -90,7 +93,8 @@ pub(crate) fn queue_paths_for_open(paths: &[String]) -> Result<(), String> {
         .open(&qf)
         .map_err(|e| e.to_string())?;
     for path in paths {
-        let line = serde_json::to_string(path).map_err(|e| format!("Cannot serialize path: {e}"))?;
+        let line =
+            serde_json::to_string(path).map_err(|e| format!("Cannot serialize path: {e}"))?;
         writeln!(file, "{line}").map_err(|e| e.to_string())?;
     }
     Ok(())

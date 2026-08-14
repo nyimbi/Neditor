@@ -4,7 +4,7 @@ use std::{fs, path::PathBuf};
 #[derive(Debug, Deserialize)]
 pub struct MailMergeRequest {
     pub template_path: String,
-    pub data_path: String,   // CSV or JSON file path
+    pub data_path: String, // CSV or JSON file path
     pub output_dir: String,
     pub filename_field: String, // which CSV column to use as output filename
     pub workspace_root: Option<String>, // when set, all paths must be contained within it
@@ -18,7 +18,9 @@ fn parse_delimited_line(line: &str, sep: char) -> Vec<String> {
     let mut chars = line.chars().peekable();
     while let Some(c) = chars.next() {
         match c {
-            '"' if !in_quotes => { in_quotes = true; }
+            '"' if !in_quotes => {
+                in_quotes = true;
+            }
             '"' if in_quotes => {
                 if chars.peek() == Some(&'"') {
                     chars.next(); // escaped double-quote inside quoted field
@@ -31,7 +33,9 @@ fn parse_delimited_line(line: &str, sep: char) -> Vec<String> {
                 fields.push(current.trim().to_string());
                 current = String::new();
             }
-            _ => { current.push(c); }
+            _ => {
+                current.push(c);
+            }
         }
     }
     fields.push(current.trim().to_string());
@@ -75,7 +79,10 @@ fn canonicalize_with_missing_tail(p: &std::path::Path) -> Result<PathBuf, String
         .map_err(|e| format!("Cannot resolve path '{}': {e}", p.display()))?;
 
     // Re-append the missing tail components (they were collected in reverse order).
-    let result = parts.iter().rev().fold(canon_ancestor, |acc, part| acc.join(part));
+    let result = parts
+        .iter()
+        .rev()
+        .fold(canon_ancestor, |acc, part| acc.join(part));
     Ok(result)
 }
 
@@ -106,20 +113,28 @@ pub(crate) fn run_mail_merge(request: MailMergeRequest) -> Result<MailMergeResul
     let data_path_safe = safe_path(&request.data_path, &request.workspace_root)?;
     let out_dir_safe = safe_path(&request.output_dir, &request.workspace_root)?;
 
-    let template = fs::read_to_string(&template_path)
-        .map_err(|e| format!("Cannot read template: {e}"))?;
+    let template =
+        fs::read_to_string(&template_path).map_err(|e| format!("Cannot read template: {e}"))?;
     let data_path = PathBuf::from(&data_path_safe);
-    let ext = data_path.extension().and_then(|e| e.to_str()).unwrap_or_default();
+    let ext = data_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or_default();
     let records: Vec<std::collections::HashMap<String, String>> = if ext == "csv" || ext == "tsv" {
         let sep = if ext == "tsv" { '\t' } else { ',' };
         let content = fs::read_to_string(&data_path).map_err(|e| e.to_string())?;
         let mut lines = content.lines();
         let headers = parse_delimited_line(lines.next().unwrap_or_default(), sep);
-        lines.map(|line| {
-            let values = parse_delimited_line(line, sep);
-            headers.iter().zip(values.into_iter().chain(std::iter::repeat(String::new())))
-                .map(|(k, v)| (k.clone(), v)).collect()
-        }).collect()
+        lines
+            .map(|line| {
+                let values = parse_delimited_line(line, sep);
+                headers
+                    .iter()
+                    .zip(values.into_iter().chain(std::iter::repeat(String::new())))
+                    .map(|(k, v)| (k.clone(), v))
+                    .collect()
+            })
+            .collect()
     } else if ext == "json" {
         let content = fs::read_to_string(&data_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&content).map_err(|e| e.to_string())?
@@ -135,7 +150,8 @@ pub(crate) fn run_mail_merge(request: MailMergeRequest) -> Result<MailMergeResul
         for (key, value) in record {
             merged = merged.replace(&format!("{{{{{key}}}}}"), value);
         }
-        let filename = record.get(&request.filename_field)
+        let filename = record
+            .get(&request.filename_field)
             .map(|s| s.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"))
             .unwrap_or_else(|| format!("document_{}", output_paths.len() + 1));
         let out_path = out_dir.join(format!("{filename}.md"));
@@ -144,5 +160,9 @@ pub(crate) fn run_mail_merge(request: MailMergeRequest) -> Result<MailMergeResul
             Err(e) => errors.push(format!("{filename}: {e}")),
         }
     }
-    Ok(MailMergeResult { generated: output_paths.len(), output_paths, errors })
+    Ok(MailMergeResult {
+        generated: output_paths.len(),
+        output_paths,
+        errors,
+    })
 }

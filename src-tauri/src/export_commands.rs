@@ -151,9 +151,7 @@ pub(crate) fn export_document(request: ExportRequest) -> Result<ExportResponse, 
         "markdown-bundle" | "markdown" => {
             render_markdown_bundle_bytes(&compile_response, &manifest)?
         }
-        "blog" | "substack" => {
-            render_blog_publish_package_bytes(&compile_response, &manifest)?
-        }
+        "blog" | "substack" => render_blog_publish_package_bytes(&compile_response, &manifest)?,
         "latex" => render_latex_bytes(&compile_response, &manifest)?,
         "google-docs" => render_google_docs_package_bytes(&compile_response, &manifest)?,
         "epub" => render_epub_bytes(&compile_response, &manifest)?,

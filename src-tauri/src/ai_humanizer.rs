@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize)]
 pub struct HumanizeRequest {
     pub text: String,
-    pub mode: String,  // "light", "standard", "heavy"
+    pub mode: String, // "light", "standard", "heavy"
 }
 
 #[derive(Debug, Serialize)]
@@ -34,10 +34,10 @@ pub(crate) fn get_humanize_prompt(request: HumanizeRequest) -> Result<HumanizeRe
         ("delve into ", "explore "),
         ("In conclusion, ", ""),
         ("To summarize, ", ""),
-        ("In summary, ", ""),      // remove directly; avoids producing "To summarize, " after it was already erased
+        ("In summary, ", ""), // remove directly; avoids producing "To summarize, " after it was already erased
         ("leveraging ", "using "),
         ("Leveraging ", "Using "),
-        ("utilize the ", "use the "),  // specific pattern before the general "utilize " match
+        ("utilize the ", "use the "), // specific pattern before the general "utilize " match
         ("Utilize the ", "Use the "),
         ("utilize ", "use "),
         ("Utilize ", "Use "),
@@ -56,7 +56,11 @@ pub(crate) fn get_humanize_prompt(request: HumanizeRequest) -> Result<HumanizeRe
         if result.contains(pattern) {
             result = result.replace(pattern, replacement);
             if !replacement.is_empty() {
-                changes.push(format!("Replaced \"{}\" with \"{}\"", pattern.trim(), replacement.trim()));
+                changes.push(format!(
+                    "Replaced \"{}\" with \"{}\"",
+                    pattern.trim(),
+                    replacement.trim()
+                ));
             } else {
                 changes.push(format!("Removed \"{}\"", pattern.trim()));
             }
@@ -74,5 +78,8 @@ pub(crate) fn get_humanize_prompt(request: HumanizeRequest) -> Result<HumanizeRe
         result = result.replace("In terms of ", "For ");
     }
 
-    Ok(HumanizeResponse { humanized: result, changes })
+    Ok(HumanizeResponse {
+        humanized: result,
+        changes,
+    })
 }

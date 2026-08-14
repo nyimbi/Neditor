@@ -152,7 +152,10 @@ fn convert_wiki_links(html: &str) -> String {
         let after = &rest[start + 2..];
         if let Some(end) = after.find("]]") {
             let link_text = &after[..end];
-            let (display, target) = link_text.split_once('|').map(|(t, d)| (d.trim(), t.trim())).unwrap_or((link_text, link_text));
+            let (display, target) = link_text
+                .split_once('|')
+                .map(|(t, d)| (d.trim(), t.trim()))
+                .unwrap_or((link_text, link_text));
             out.push_str(&format!(
                 "<a class=\"wiki-link\" data-wiki-target=\"{}\" href=\"#\">[[{}]]</a>",
                 crate::escape_html(target),

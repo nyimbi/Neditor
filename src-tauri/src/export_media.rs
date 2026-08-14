@@ -292,7 +292,9 @@ fn xml_attr_value<'a>(tag: &'a str, attr: &str) -> Option<&'a str> {
         let after_boundary = after
             .chars()
             .next()
-            .map(|ch| ch == '=' || !matches!(ch, ':' | '-' | '_' | '.') && !ch.is_ascii_alphanumeric())
+            .map(|ch| {
+                ch == '=' || !matches!(ch, ':' | '-' | '_' | '.') && !ch.is_ascii_alphanumeric()
+            })
             .unwrap_or(false);
         if is_name_boundary && after_boundary && after.starts_with('=') {
             let value = after[1..].trim_start();

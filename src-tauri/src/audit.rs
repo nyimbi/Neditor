@@ -1,6 +1,10 @@
-use serde::{Deserialize, Serialize};
-use std::{fs, io::{BufRead, BufReader, Read, Seek, SeekFrom, Write}, path::PathBuf};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use std::{
+    fs,
+    io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
+    path::PathBuf,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditEntry {
@@ -64,15 +68,26 @@ pub(crate) fn record_audit_event(request: RecordAuditRequest) -> Result<(), Stri
         status: request.status,
     };
     let line = serde_json::to_string(&entry).map_err(|e| e.to_string())?;
-    let mut file = fs::OpenOptions::new().create(true).append(true).open(&audit_path).map_err(|e| e.to_string())?;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&audit_path)
+        .map_err(|e| e.to_string())?;
     writeln!(file, "{line}").map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-pub(crate) fn read_audit_log(workspace_root: String, limit: usize) -> Result<Vec<AuditEntry>, String> {
-    let audit_path = PathBuf::from(&workspace_root).join(".neditor").join("audit.jsonl");
-    if !audit_path.exists() { return Ok(Vec::new()); }
+pub(crate) fn read_audit_log(
+    workspace_root: String,
+    limit: usize,
+) -> Result<Vec<AuditEntry>, String> {
+    let audit_path = PathBuf::from(&workspace_root)
+        .join(".neditor")
+        .join("audit.jsonl");
+    if !audit_path.exists() {
+        return Ok(Vec::new());
+    }
 
     let limit = limit.min(1000);
 
@@ -98,7 +113,8 @@ pub(crate) fn read_audit_log(workspace_root: String, limit: usize) -> Result<Vec
     // If the file is smaller than TAIL_BYTES, read from the start; the first
     // line may be a partial line so we skip it and let the filter drop it.
     let seek_pos = file_len.saturating_sub(TAIL_BYTES);
-    file.seek(SeekFrom::Start(seek_pos)).map_err(|e| e.to_string())?;
+    file.seek(SeekFrom::Start(seek_pos))
+        .map_err(|e| e.to_string())?;
 
     let mut tail_buf = Vec::with_capacity((file_len - seek_pos) as usize);
     file.read_to_end(&mut tail_buf).map_err(|e| e.to_string())?;

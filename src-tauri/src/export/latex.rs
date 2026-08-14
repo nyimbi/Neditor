@@ -338,7 +338,10 @@ fn render_latex_block(block: &DocumentBlock, template: &LatexTemplateSpec) -> St
             format!("\\begin{{itemize}}[leftmargin=*]\n{items}\\end{{itemize}}\n\n")
         }
         DocumentBlock::BlockQuote { text, .. } => {
-            format!("\\begin{{quote}}\n{}\n\\end{{quote}}\n\n", latex_escape(text))
+            format!(
+                "\\begin{{quote}}\n{}\n\\end{{quote}}\n\n",
+                latex_escape(text)
+            )
         }
         DocumentBlock::CodeBlock { language, code, .. } => {
             let label = language.as_deref().unwrap_or("text");
@@ -361,12 +364,14 @@ fn render_latex_block(block: &DocumentBlock, template: &LatexTemplateSpec) -> St
             alt,
             caption,
             ..
-        } => render_latex_figure(id.as_deref(), src.as_deref(), alt.as_deref(), caption.as_deref()),
+        } => render_latex_figure(
+            id.as_deref(),
+            src.as_deref(),
+            alt.as_deref(),
+            caption.as_deref(),
+        ),
         DocumentBlock::Equation {
-            id,
-            caption,
-            text,
-            ..
+            id, caption, text, ..
         } => {
             let mut output = String::new();
             if let Some(caption) = caption {
@@ -500,7 +505,9 @@ fn render_latex_figure(
     output.push_str("\\begin{figure}[h]\n\\centering\n");
     let use_fbox = source.starts_with("data:")
         || source.trim().is_empty()
-        || !source.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '/'));
+        || !source
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '/'));
     if use_fbox {
         output.push_str(&format!(
             "\\fbox{{\\parbox{{0.85\\linewidth}}{{{}}}}}\n",

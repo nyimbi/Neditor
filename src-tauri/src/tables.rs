@@ -606,7 +606,8 @@ fn cell_ref_from_parts(column: &[char], row: &[char]) -> Option<(usize, usize)> 
         if !upper.is_ascii_uppercase() {
             return None;
         }
-        acc.checked_mul(26)?.checked_add((upper as u8 - b'A' + 1) as usize)
+        acc.checked_mul(26)?
+            .checked_add((upper as u8 - b'A' + 1) as usize)
     })?;
     let row_index = row.iter().collect::<String>().parse::<usize>().ok()?;
     if column_index == 0 || row_index == 0 {

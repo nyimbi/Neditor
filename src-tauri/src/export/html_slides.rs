@@ -13,13 +13,7 @@ pub(crate) fn render_html_slides_bytes(response: &CompileResponse, options: &Val
     let (bg, text_color, accent) = theme_colors(theme_id);
     let slides = build_html_slides(response, options);
     let html = render_html_slides_document(
-        response,
-        &slides,
-        bg,
-        text_color,
-        accent,
-        transition,
-        theme_id,
+        response, &slides, bg, text_color, accent, transition, theme_id,
     );
     html.into_bytes()
 }
@@ -503,7 +497,9 @@ fn render_slide_div(
         index + 1,
         total
     );
-    let accent_bar = if slide.layout == HtmlSlideLayout::Title || slide.layout == HtmlSlideLayout::Section {
+    let accent_bar = if slide.layout == HtmlSlideLayout::Title
+        || slide.layout == HtmlSlideLayout::Section
+    {
         format!(
             r#"<div style="width:60px;height:4px;background:{};border-radius:2px;margin-bottom:1em"></div>"#,
             escape_html(accent)
