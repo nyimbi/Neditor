@@ -319,6 +319,12 @@ fn search_tavily(
             "--location",
             "--silent",
             "--show-error",
+            "--proto",
+            "=http,https",
+            "--proto-redir",
+            "=http,https",
+            "--max-redirs",
+            "5",
             "--max-time",
             "30",
             "-X",
@@ -327,6 +333,7 @@ fn search_tavily(
             "Content-Type: application/json",
             "--data",
             &body,
+            "--",
             "https://api.tavily.com/search",
         ])
         .output()
@@ -774,22 +781,11 @@ fn trim_to_char_boundary(value: &str, start: usize, max_len: usize) -> String {
 }
 
 fn is_http_url(value: &str) -> bool {
-    let lower = value.trim().to_ascii_lowercase();
-    lower.starts_with("https://") || lower.starts_with("http://")
+    crate::net_guard::is_http_url(value)
 }
 
 fn validate_http_url(value: &str, label: &str) -> Result<String, String> {
-    let trimmed = value.trim();
-    if !is_http_url(trimmed) {
-        return Err(format!("{label} must be an http:// or https:// URL."));
-    }
-    if trimmed
-        .chars()
-        .any(|character| character == '\0' || character == '\n' || character == '\r')
-    {
-        return Err(format!("{label} cannot contain control characters."));
-    }
-    Ok(trimmed.to_string())
+    crate::net_guard::validate_http_url(value, label)
 }
 
 fn search_engine_label(value: &Value) -> Option<String> {
@@ -1013,10 +1009,48 @@ pub struct DoiLookupRequest {
 
 #[tauri::command]
 pub(crate) fn lookup_doi(request: DoiLookupRequest) -> Result<String, String> {
-    let doi = request.doi.trim().trim_start_matches("https://doi.org/").trim_start_matches("doi:");
-    let url = format!("https://api.crossref.org/works/{}/transform/application/x-bibtex", doi);
+    let doi = request
+        .doi
+        .trim()
+        .trim_start_matches("https://doi.org/")
+        .trim_start_matches("doi:");
+    // G6: validate DOI against a strict character allowlist to prevent
+    // control-character injection into the URL and curl argument list.
+    if doi.len() < 4 || doi.len() > 255 {
+        return Err(format!(
+            "DOI '{doi}' has an unexpected length ({} characters).",
+            doi.len()
+        ));
+    }
+    if !doi
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '/' | '_' | '-'))
+    {
+        return Err(format!(
+            "DOI '{doi}' contains unsupported characters. Only ASCII letters, digits, '.', '/', '_', '-' are allowed."
+        ));
+    }
+    let url = format!(
+        "https://api.crossref.org/works/{}/transform/application/x-bibtex",
+        doi
+    );
     let output = std::process::Command::new("curl")
-        .args(["-sL", "--fail", "--max-time", "10", "--user-agent", "NEditor/0.1 (mailto:support@neditor.app)", &url])
+        .args([
+            "-sL",
+            "--fail",
+            "--proto",
+            "=http,https",
+            "--proto-redir",
+            "=http,https",
+            "--max-redirs",
+            "5",
+            "--max-time",
+            "10",
+            "--user-agent",
+            "NEditor/0.1 (mailto:support@neditor.app)",
+            "--",
+            &url,
+        ])
         .output()
         .map_err(|e| e.to_string())?;
     if !output.status.success() {
@@ -1025,7 +1059,9 @@ pub(crate) fn lookup_doi(request: DoiLookupRequest) -> Result<String, String> {
     }
     let bibtex = String::from_utf8_lossy(&output.stdout).to_string();
     if bibtex.trim().is_empty() || !bibtex.contains('@') {
-        return Err(format!("No BibTeX found for DOI: {doi}. Check the DOI is correct."));
+        return Err(format!(
+            "No BibTeX found for DOI: {doi}. Check the DOI is correct."
+        ));
     }
     Ok(bibtex)
 }

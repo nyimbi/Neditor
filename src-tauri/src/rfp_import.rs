@@ -2,10 +2,9 @@ use crate::path_to_string;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    io::{Cursor, Read, Seek},
+    io::{Cursor, Read, Seek, Write as IoWrite},
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    time::{SystemTime, UNIX_EPOCH},
 };
 use zip::ZipArchive;
 
@@ -178,8 +177,13 @@ fn import_pdf(
 }
 
 fn extract_pdf_text_from_path(path: &Path, warnings: &mut Vec<String>) -> Result<String, String> {
-    let output = Command::new("pdftotext")
+    // G8: resolve pdftotext via which to prevent PATH substitution attacks;
+    // pass "--" before the file path to prevent argument injection.
+    let pdftotext = which::which("pdftotext")
+        .map_err(|_| "PDF import needs the pdftotext utility on this machine, or paste extracted RFP text manually: command not found".to_string())?;
+    let output = Command::new(pdftotext)
         .arg("-layout")
+        .arg("--") // G8: prevent path starting with "-" being parsed as a flag
         .arg(path)
         .arg("-")
         .stdout(Stdio::piped())
@@ -207,15 +211,25 @@ fn extract_pdf_text_from_bytes(
     url: &str,
     warnings: &mut Vec<String>,
 ) -> Result<String, String> {
-    let temp_path = temp_rfp_download_path("pdf");
-    fs::write(&temp_path, bytes).map_err(|err| {
-        format!(
-            "Could not stage downloaded PDF RFP from {url} at {}: {err}",
-            temp_path.display()
-        )
-    })?;
-    let result = extract_pdf_text_from_path(&temp_path, warnings);
-    let _ = fs::remove_file(&temp_path);
+    // G9/G10: use a private per-user temp directory and NamedTempFile for
+    // Drop-based cleanup (runs even on panic, preventing temp-file leaks and
+    // symlink-race attacks against world-writable /tmp).
+    let secure_dir = rfp_secure_temp_dir()
+        .map_err(|e| format!("Could not prepare secure temp directory for PDF staging: {e}"))?;
+    let mut tmp = tempfile::Builder::new()
+        .prefix("neditor-rfp-")
+        .suffix(".pdf")
+        .tempfile_in(&secure_dir)
+        .map_err(|e| format!("Could not create secure temp file for PDF from {url}: {e}"))?;
+    tmp.as_file_mut()
+        .write_all(bytes)
+        .map_err(|e| format!("Could not write downloaded PDF from {url} to temp file: {e}"))?;
+    // Flush so pdftotext sees the full content.
+    tmp.as_file_mut()
+        .sync_all()
+        .map_err(|e| format!("Could not sync temp PDF from {url}: {e}"))?;
+    let result = extract_pdf_text_from_path(tmp.path(), warnings);
+    // tmp is dropped here — NamedTempFile removes the file on Drop.
     result
 }
 
@@ -480,15 +494,21 @@ fn bytes_look_like_docx(bytes: &[u8]) -> bool {
         .unwrap_or(false)
 }
 
-fn temp_rfp_download_path(extension: &str) -> PathBuf {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-    std::env::temp_dir().join(format!(
-        "neditor-rfp-download-{}-{unique}.{extension}",
-        std::process::id()
-    ))
+/// Return a per-user private directory for RFP temp files.
+///
+/// Uses `dirs::data_local_dir()` which resolves to `~/Library/Application Support`
+/// on macOS, `%LOCALAPPDATA%` on Windows, and `~/.local/share` on Linux —
+/// all user-private by default (not world-writable like /tmp).
+fn rfp_secure_temp_dir() -> Result<PathBuf, String> {
+    let base = dirs::data_local_dir().unwrap_or_else(std::env::temp_dir);
+    let dir = base.join("neditor").join("rfp-import-tmp");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+    }
+    Ok(dir)
 }
 
 fn request_path(request: &ImportRfpSourceRequest) -> Result<PathBuf, String> {
