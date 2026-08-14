@@ -118,8 +118,10 @@ pub(crate) fn restore_git_revision(request: GitRestoreRequest) -> Result<FileRes
     let tree_path = canonical_path
         .strip_prefix(&repo_root)
         .map_err(|_| "File is not inside the repository root.".to_string())?;
-    let tree_path_str = tree_path.to_str().ok_or_else(|| "File path is not valid UTF-8.".to_string())?;
+    let tree_path_str = tree_path
+        .to_str()
+        .ok_or_else(|| "File path is not valid UTF-8.".to_string())?;
     let content = run_git(&cwd, &["show", &format!("{revision}:{tree_path_str}")])?;
     fs::write(&path, content.as_bytes()).map_err(|err| err.to_string())?;
-    read_file(path_to_string(&path))
+    read_file(path_to_string(&path), None)
 }

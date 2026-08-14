@@ -21,8 +21,9 @@ fn watch_file_reflects_new_root_after_save_as() {
     fs::write(&old_path, "# Draft").expect("write draft");
     fs::write(&new_path, "# Final").expect("write final");
 
-    let old_root = path_to_string(&old_path);
-    let new_root = path_to_string(&new_path);
+    // Canonicalize so comparisons are stable on macOS where /var → /private/var.
+    let old_root = path_to_string(&old_path.canonicalize().expect("canonical old_path"));
+    let new_root = path_to_string(&new_path.canonicalize().expect("canonical new_path"));
 
     let old_response: WatchFileResponse = watch_file(WatchFileRequest {
         root: old_root.clone(),

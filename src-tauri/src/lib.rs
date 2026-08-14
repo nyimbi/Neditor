@@ -45,6 +45,7 @@ mod local_agents;
 mod mail_merge;
 mod manifest;
 mod markdown_tables;
+mod net_guard;
 mod ollama_models;
 mod paged_document;
 mod pandoc_import;

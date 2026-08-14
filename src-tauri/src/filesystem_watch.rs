@@ -62,7 +62,7 @@ pub(crate) fn watch_file(request: WatchFileRequest) -> Result<WatchFileResponse,
     let mut paths = Vec::new();
     let mut seen = HashSet::new();
     for (path, role) in expanded_watch_paths(request) {
-        let metadata = file_metadata(path)?;
+        let metadata = file_metadata(path, None)?;
         if seen.insert(metadata.path.clone()) {
             paths.push(WatchedFileMetadata {
                 path: metadata.path,

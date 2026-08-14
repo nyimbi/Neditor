@@ -63,12 +63,18 @@ fn desktop_native_command_workflow_smoke_uses_real_files_and_exports() {
         path: path_to_string(&root_doc),
         text: source.clone(),
         expected_hash: Some("ignored-for-save-as".to_string()),
+        workspace_root: None,
     })
     .expect("save desktop smoke source");
-    assert_eq!(saved.path, path_to_string(&root_doc));
+    // save_file_as canonicalises the path; compare both sides canonically
+    // so the test is stable on macOS where /var → /private/var.
+    assert_eq!(
+        saved.path,
+        path_to_string(&root_doc.canonicalize().expect("canonical root_doc"))
+    );
     assert!(saved.text.contains("Native Workflow Smoke"));
 
-    let opened = open_file(path_to_string(&root_doc)).expect("open desktop smoke source");
+    let opened = open_file(path_to_string(&root_doc), None).expect("open desktop smoke source");
     assert_eq!(opened.hash, saved.hash);
     assert!(opened.text.contains("!include chapters/summary.md"));
 

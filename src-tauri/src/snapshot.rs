@@ -95,7 +95,11 @@ pub(crate) fn create_snapshot(
             .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("md"))
             .collect();
         if md_files.len() >= MAX_SNAPSHOTS {
-            md_files.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH));
+            md_files.sort_by_key(|e| {
+                e.metadata()
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+            });
             let remove_count = (md_files.len() + 1).saturating_sub(MAX_SNAPSHOTS);
             for entry in md_files.into_iter().take(remove_count) {
                 let _ = fs::remove_file(entry.path());
@@ -212,7 +216,10 @@ pub(crate) fn list_snapshots(
         let metadata = match serde_json::from_str::<Value>(&metadata_text) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("[neditor snapshot] WARNING: skipping corrupt metadata '{}': {e}", path.display());
+                eprintln!(
+                    "[neditor snapshot] WARNING: skipping corrupt metadata '{}': {e}",
+                    path.display()
+                );
                 continue;
             }
         };
@@ -346,7 +353,7 @@ fn restore_snapshot_from_root(
     let metadata = serde_json::from_str::<Value>(&metadata_text)
         .map_err(|_| "Snapshot restore metadata is not valid JSON.".to_string())?;
     validate_snapshot_source(&metadata, active_file_path)?;
-    read_file(path_to_string(&snapshot_path))
+    read_file(path_to_string(&snapshot_path), None)
 }
 
 fn validate_snapshot_source(
@@ -488,8 +495,11 @@ mod tests {
             let base = format!("2024010{i}T000000Z-auto");
             fs::write(root.join(format!("{base}.md")), format!("# snap {i}"))
                 .expect("write snapshot");
-            fs::write(root.join(format!("{base}.json")), format!("{{\"label\":\"{i}\"}}"))
-                .expect("write metadata");
+            fs::write(
+                root.join(format!("{base}.json")),
+                format!("{{\"label\":\"{i}\"}}"),
+            )
+            .expect("write metadata");
         }
         // Prune keeping only 3.
         let removed = prune_old_snapshots(&root, 3).expect("prune snapshots");
@@ -502,8 +512,14 @@ mod tests {
         // The 3 newest must survive.
         for i in 2..5u8 {
             let base = format!("2024010{i}T000000Z-auto");
-            assert!(root.join(format!("{base}.md")).exists(), "snap {i} .md missing");
-            assert!(root.join(format!("{base}.json")).exists(), "snap {i} .json missing");
+            assert!(
+                root.join(format!("{base}.md")).exists(),
+                "snap {i} .md missing"
+            );
+            assert!(
+                root.join(format!("{base}.json")).exists(),
+                "snap {i} .json missing"
+            );
         }
         fs::remove_dir_all(root).expect("clean prune test");
     }

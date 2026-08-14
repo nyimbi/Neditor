@@ -16,6 +16,7 @@ fn file_duplicate_and_rename_commands_move_content() {
     let duplicated = duplicate_file(DuplicateFileRequest {
         from: path_to_string(&source),
         to: path_to_string(&copy),
+        workspace_root: None,
     })
     .expect("duplicate file");
     assert_eq!(duplicated.text, "hello");
@@ -23,6 +24,7 @@ fn file_duplicate_and_rename_commands_move_content() {
     let metadata = rename_file(RenameFileRequest {
         from: path_to_string(&copy),
         to: path_to_string(&renamed),
+        workspace_root: None,
     })
     .expect("rename file");
     assert!(metadata.exists);
@@ -115,8 +117,10 @@ fn reveal_command_for_existing_path_is_platform_specific_and_argument_safe() {
 
     #[cfg(target_os = "windows")]
     {
+        // G2: program is "explorer", args are ["/select,", path] as separate
+        // argv entries so commas in file names don't bleed into the flag.
         assert_eq!(command.program, "explorer");
-        assert_eq!(command.args, vec![format!("/select,{canonical}")]);
+        assert_eq!(command.args, vec!["/select,".to_string(), canonical]);
     }
 
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -156,6 +160,7 @@ fn save_file_rejects_stale_expected_hash() {
         path: path_to_string(&doc),
         text: "local".to_string(),
         expected_hash: Some(sha256_hex(b"old")),
+        workspace_root: None,
     });
 
     assert!(result
@@ -182,13 +187,14 @@ fn stable_file_ipc_aliases_open_save_as_and_watch_paths() {
     fs::write(&included, "# Intro\n{{include ../appendices/risk.md}}").expect("write include");
     fs::write(&nested, "# Risk").expect("write nested include");
 
-    let opened = open_file(path_to_string(&doc)).expect("open file alias");
+    let opened = open_file(path_to_string(&doc), None).expect("open file alias");
     assert!(opened.text.contains("# Root"));
 
     let saved = save_file_as(SaveFileRequest {
         path: path_to_string(&copy),
         text: "# Copy".to_string(),
         expected_hash: Some("stale-hash-ignored-for-save-as".to_string()),
+        workspace_root: None,
     })
     .expect("save file as alias");
     assert_eq!(saved.text, "# Copy");
