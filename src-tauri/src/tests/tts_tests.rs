@@ -14,11 +14,13 @@ fn tts_command_builders_use_argument_safe_native_engines() {
     .expect("supertonic command");
 
     assert_eq!(supertonic.program, "supertonic");
+    // G18: text is piped via stdin (--stdin flag) rather than exposed in
+    // /proc/<pid>/cmdline; the text value itself must not appear in args.
     assert_eq!(
         supertonic.args,
         vec![
             "say",
-            "Read this selected paragraph.",
+            "--stdin",
             "--model",
             "supertonic-3",
             "--voice",
@@ -29,7 +31,10 @@ fn tts_command_builders_use_argument_safe_native_engines() {
             "1.20",
         ]
     );
-    assert_eq!(supertonic.stdin_text, None);
+    assert_eq!(
+        supertonic.stdin_text,
+        Some("Read this selected paragraph.".to_string())
+    );
 
     let empty = crate::tts::native_tts_command_for_request(&crate::tts::NativeTtsRequest {
         engine: "supertonic-cli".to_string(),

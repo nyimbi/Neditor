@@ -255,9 +255,11 @@ fn supertonic_command(request: &NativeTtsRequest, text: &str) -> Result<NativeTt
         ));
     }
     let command_path = safe_command_path(request.command_path.as_deref())?;
+    // G18: pass text via stdin (--stdin flag) instead of as an argv value so
+    // the document body does not appear in /proc/<pid>/cmdline on Linux.
     let mut args = vec![
         "say".to_string(),
-        text.to_string(),
+        "--stdin".to_string(),
         "--model".to_string(),
         "supertonic-3".to_string(),
     ];
@@ -279,7 +281,8 @@ fn supertonic_command(request: &NativeTtsRequest, text: &str) -> Result<NativeTt
     Ok(NativeTtsCommand {
         program: command_path,
         args,
-        stdin_text: None,
+        // G18: text piped via stdin rather than exposed in /proc/*/cmdline.
+        stdin_text: Some(text.to_string()),
     })
 }
 

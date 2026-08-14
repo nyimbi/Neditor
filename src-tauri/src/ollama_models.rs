@@ -69,9 +69,17 @@ fn fetch_ollama_tags(
         "NEditor Ollama model discovery".to_string(),
     ];
     if let Some((header, value)) = ollama_auth_header(auth_header, api_key, key_env) {
+        // G19: sanitise header value — reject CRLF / NUL injection.
+        if !crate::net_guard::is_safe_header_value(&value) {
+            return Err("Ollama auth header value contains invalid characters.".to_string());
+        }
         args.push("-H".to_string());
         args.push(format!("{header}: {value}"));
     }
+    // G20: "--" prevents endpoint starting with "-" being parsed as a curl flag.
+    // ollama_tags_endpoint already enforces http(s):// prefix, so this is
+    // defence-in-depth against future refactors that skip that check.
+    args.push("--".to_string());
     args.push(endpoint.to_string());
     let output = Command::new("curl")
         .args(args)
@@ -219,12 +227,22 @@ pub(crate) fn check_ollama_health(endpoint: String) -> OllamaHealthResult {
         .trim_end_matches("/api/tags");
     let tags_url = format!("{base}/api/tags");
     let output = std::process::Command::new("curl")
-        .args(["-sL", "--max-time", "3", "--write-out", "\n%{http_code}", &tags_url])
+        .args([
+            "-sL",
+            "--max-time",
+            "3",
+            "--write-out",
+            "\n%{http_code}",
+            &tags_url,
+        ])
         .output();
     match output {
         Err(e) => OllamaHealthResult {
-            running: false, endpoint: base.to_string(), model_count: 0,
-            version: String::new(), error: e.to_string(),
+            running: false,
+            endpoint: base.to_string(),
+            model_count: 0,
+            version: String::new(),
+            error: e.to_string(),
         },
         Ok(out) => {
             let raw = String::from_utf8_lossy(&out.stdout);
@@ -232,8 +250,11 @@ pub(crate) fn check_ollama_health(endpoint: String) -> OllamaHealthResult {
             let status: u32 = status_str.trim().parse().unwrap_or(0);
             if status < 200 || status >= 300 {
                 return OllamaHealthResult {
-                    running: false, endpoint: base.to_string(), model_count: 0,
-                    version: String::new(), error: format!("HTTP {status}"),
+                    running: false,
+                    endpoint: base.to_string(),
+                    model_count: 0,
+                    version: String::new(),
+                    error: format!("HTTP {status}"),
                 };
             }
             let model_count = serde_json::from_str::<serde_json::Value>(body.trim())
@@ -250,7 +271,13 @@ pub(crate) fn check_ollama_health(endpoint: String) -> OllamaHealthResult {
                     .and_then(|v| v.get("version")?.as_str().map(String::from))
                     .unwrap_or_default()
             };
-            OllamaHealthResult { running: true, endpoint: base.to_string(), model_count, version, error: String::new() }
+            OllamaHealthResult {
+                running: true,
+                endpoint: base.to_string(),
+                model_count,
+                version,
+                error: String::new(),
+            }
         }
     }
 }
@@ -271,21 +298,44 @@ pub(crate) struct OllamaPullResult {
 
 #[tauri::command]
 pub(crate) fn pull_ollama_model(request: OllamaPullRequest) -> Result<OllamaPullResult, String> {
-    let base = request.endpoint.trim_end_matches('/')
-        .trim_end_matches("/api/chat").trim_end_matches("/api/generate").trim_end_matches("/api/tags");
+    let base = request
+        .endpoint
+        .trim_end_matches('/')
+        .trim_end_matches("/api/chat")
+        .trim_end_matches("/api/generate")
+        .trim_end_matches("/api/tags");
     let pull_url = format!("{base}/api/pull");
     let body = serde_json::json!({ "name": &request.model, "stream": false }).to_string();
     let output = std::process::Command::new("curl")
-        .args(["-sL", "--max-time", "600", "-X", "POST",
-               "-H", "Content-Type: application/json", "-d", &body, &pull_url])
-        .output().map_err(|e| e.to_string())?;
+        .args([
+            "-sL",
+            "--max-time",
+            "600",
+            "-X",
+            "POST",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &body,
+            &pull_url,
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
     let raw = String::from_utf8_lossy(&output.stdout);
     let status_msg = serde_json::from_str::<serde_json::Value>(raw.trim())
-        .ok().and_then(|v| v.get("status")?.as_str().map(String::from)).unwrap_or_default();
-    let success = output.status.success() && (status_msg == "success" || raw.contains("\"success\""));
+        .ok()
+        .and_then(|v| v.get("status")?.as_str().map(String::from))
+        .unwrap_or_default();
+    let success =
+        output.status.success() && (status_msg == "success" || raw.contains("\"success\""));
     Ok(OllamaPullResult {
-        success, model: request.model,
-        error: if success { String::new() } else { raw.trim().chars().take(300).collect() },
+        success,
+        model: request.model,
+        error: if success {
+            String::new()
+        } else {
+            raw.trim().chars().take(300).collect()
+        },
         status: status_msg,
     })
 }
@@ -298,17 +348,35 @@ pub(crate) struct OllamaDeleteRequest {
 
 #[tauri::command]
 pub(crate) fn delete_ollama_model(request: OllamaDeleteRequest) -> Result<(), String> {
-    let base = request.endpoint.trim_end_matches('/')
-        .trim_end_matches("/api/chat").trim_end_matches("/api/generate").trim_end_matches("/api/tags");
+    let base = request
+        .endpoint
+        .trim_end_matches('/')
+        .trim_end_matches("/api/chat")
+        .trim_end_matches("/api/generate")
+        .trim_end_matches("/api/tags");
     let delete_url = format!("{base}/api/delete");
     let body = serde_json::json!({ "name": &request.model }).to_string();
     let output = std::process::Command::new("curl")
-        .args(["-sL", "--max-time", "30", "-X", "DELETE",
-               "-H", "Content-Type: application/json", "-d", &body, &delete_url])
-        .output().map_err(|e| e.to_string())?;
+        .args([
+            "-sL",
+            "--max-time",
+            "30",
+            "-X",
+            "DELETE",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &body,
+            &delete_url,
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stdout);
-        return Err(format!("Delete failed: {}", err.trim().chars().take(200).collect::<String>()));
+        return Err(format!(
+            "Delete failed: {}",
+            err.trim().chars().take(200).collect::<String>()
+        ));
     }
     Ok(())
 }
@@ -323,27 +391,57 @@ pub(crate) struct OllamaModelInfo {
 }
 
 #[tauri::command]
-pub(crate) fn show_ollama_model_info(endpoint: String, model: String) -> Result<OllamaModelInfo, String> {
-    let base = endpoint.trim_end_matches('/')
-        .trim_end_matches("/api/chat").trim_end_matches("/api/generate").trim_end_matches("/api/tags");
+pub(crate) fn show_ollama_model_info(
+    endpoint: String,
+    model: String,
+) -> Result<OllamaModelInfo, String> {
+    let base = endpoint
+        .trim_end_matches('/')
+        .trim_end_matches("/api/chat")
+        .trim_end_matches("/api/generate")
+        .trim_end_matches("/api/tags");
     let show_url = format!("{base}/api/show");
     let body = serde_json::json!({ "name": &model }).to_string();
     let output = std::process::Command::new("curl")
-        .args(["-sL", "--max-time", "10", "-X", "POST",
-               "-H", "Content-Type: application/json", "-d", &body, &show_url])
-        .output().map_err(|e| e.to_string())?;
+        .args([
+            "-sL",
+            "--max-time",
+            "10",
+            "-X",
+            "POST",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &body,
+            &show_url,
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
     let v: serde_json::Value = serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
     let details = v.get("details");
     let modelinfo = v.get("model_info");
     let context_length = modelinfo
-        .and_then(|m| m.get("llama.context_length").or_else(|| m.get("context_length")))
-        .and_then(|c| c.as_u64()).unwrap_or(0);
+        .and_then(|m| {
+            m.get("llama.context_length")
+                .or_else(|| m.get("context_length"))
+        })
+        .and_then(|c| c.as_u64())
+        .unwrap_or(0);
     Ok(OllamaModelInfo {
         name: model,
-        family: details.and_then(|d| d.get("family")?.as_str()).unwrap_or_default().to_string(),
-        parameter_size: details.and_then(|d| d.get("parameter_size")?.as_str()).unwrap_or_default().to_string(),
+        family: details
+            .and_then(|d| d.get("family")?.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        parameter_size: details
+            .and_then(|d| d.get("parameter_size")?.as_str())
+            .unwrap_or_default()
+            .to_string(),
         context_length,
-        quantization: details.and_then(|d| d.get("quantization_level")?.as_str()).unwrap_or_default().to_string(),
+        quantization: details
+            .and_then(|d| d.get("quantization_level")?.as_str())
+            .unwrap_or_default()
+            .to_string(),
     })
 }
 

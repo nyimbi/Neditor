@@ -120,8 +120,9 @@ pub(crate) fn start_google_oauth_sign_in(
     let sessions = state.sessions.clone();
     let active_listeners = state.active_listeners.clone();
     let expected_state = state_id.clone();
+    let callback_port = port;
     thread::spawn(move || {
-        listen_for_google_callback(listener, sessions, expected_state);
+        listen_for_google_callback(listener, sessions, expected_state, callback_port);
         if let Ok(mut count) = active_listeners.lock() {
             *count = count.saturating_sub(1);
         }
@@ -193,12 +194,13 @@ fn listen_for_google_callback(
     listener: TcpListener,
     sessions: Arc<Mutex<HashMap<String, GoogleAuthSession>>>,
     expected_state: String,
+    expected_port: u16,
 ) {
     for _ in 0..(SESSION_TTL_SECONDS * 2) {
         match listener.accept() {
             Ok((mut stream, _)) => {
                 let request = read_http_request(&mut stream);
-                let result = parse_callback_request(&request);
+                let result = parse_callback_request(&request, expected_port);
                 let response_html = callback_html(result.as_ref().err().map(String::as_str));
                 let _ = write_http_response(&mut stream, response_html);
                 if let Ok(callback) = result {
@@ -262,13 +264,32 @@ fn callback_html(error: Option<&str>) -> String {
     )
 }
 
-fn parse_callback_request(request: &str) -> Result<GoogleCallback, String> {
-    let request_line = request.lines().next().unwrap_or_default();
+fn parse_callback_request(request: &str, expected_port: u16) -> Result<GoogleCallback, String> {
+    let mut lines = request.lines();
+    let request_line = lines.next().unwrap_or_default();
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or_default();
     let target = parts.next().unwrap_or_default();
     if method != "GET" {
         return Err("Unsupported Google OAuth callback method".to_string());
+    }
+    // Spot-check Host header: must be 127.0.0.1:<port> or localhost:<port>.
+    // This prevents DNS-rebinding attacks where an external page smuggles a
+    // request to our loopback listener by pointing their domain at 127.0.0.1.
+    let host_header = lines
+        .find(|line| line.to_ascii_lowercase().starts_with("host:"))
+        .and_then(|line| line.splitn(2, ':').nth(1))
+        .map(str::trim)
+        .unwrap_or_default();
+    let allowed_hosts = [
+        format!("127.0.0.1:{expected_port}"),
+        format!("localhost:{expected_port}"),
+    ];
+    if !host_header.is_empty() && !allowed_hosts.iter().any(|h| h == host_header) {
+        return Err(format!(
+            "Google OAuth callback Host header '{}' does not match the expected loopback address.",
+            host_header
+        ));
     }
     let (path, query) = target.split_once('?').unwrap_or((target, ""));
     if path != CALLBACK_PATH {
@@ -464,8 +485,10 @@ mod tests {
 
     #[test]
     fn google_oauth_callback_parser_decodes_code_state_and_error() {
+        // Requests without a Host header are accepted (no host to validate).
         let parsed = parse_callback_request(
             "GET /google-oauth-callback?code=abc%20123&state=state%2Bvalue HTTP/1.1\r\n\r\n",
+            1234,
         )
         .unwrap();
         assert_eq!(
@@ -478,9 +501,33 @@ mod tests {
         );
         let denied = parse_callback_request(
             "GET /google-oauth-callback?error=access_denied&state=s HTTP/1.1\r\n\r\n",
+            1234,
         )
         .unwrap();
         assert_eq!(denied.error.as_deref(), Some("access_denied"));
+    }
+
+    #[test]
+    fn google_oauth_callback_rejects_foreign_host_header() {
+        // DNS-rebinding guard: Host header pointing to an external domain must be rejected.
+        let result = parse_callback_request(
+            "GET /google-oauth-callback?code=abc&state=s HTTP/1.1\r\nHost: evil.example.com\r\n\r\n",
+            9876,
+        );
+        assert!(result.is_err(), "foreign Host header should be rejected");
+        assert!(result.unwrap_err().contains("Host header"));
+    }
+
+    #[test]
+    fn google_oauth_callback_accepts_correct_host_header() {
+        let result = parse_callback_request(
+            "GET /google-oauth-callback?code=abc&state=s HTTP/1.1\r\nHost: 127.0.0.1:9876\r\n\r\n",
+            9876,
+        );
+        assert!(
+            result.is_ok(),
+            "loopback Host header should be accepted: {result:?}"
+        );
     }
 
     #[test]
