@@ -772,16 +772,44 @@ pub struct FetchRestSourceResponse {
 }
 
 #[tauri::command]
-pub(crate) fn fetch_rest_source(request: FetchRestSourceRequest) -> Result<FetchRestSourceResponse, String> {
-    // Use curl to fetch the REST endpoint (avoids native TLS complexity)
+pub(crate) fn fetch_rest_source(
+    request: FetchRestSourceRequest,
+) -> Result<FetchRestSourceResponse, String> {
+    // G4: validate URL (rejects file://, dash-prefixed args, control chars).
+    let validated_url = crate::net_guard::validate_http_url(&request.url, "REST data source URL")?;
+
     let mut cmd = std::process::Command::new("curl");
-    cmd.args(["-sL", "--max-time", "15", "-w", "\n%{http_code}", "-H", "Accept: application/json"]);
+    cmd.args([
+        "--proto",
+        "=http,https",
+        "--proto-redir",
+        "=http,https",
+        "--max-redirs",
+        "5",
+        "--max-filesize",
+        "10485760", // 10 MiB
+        "-sL",
+        "--max-time",
+        "15",
+        "-w",
+        "\n%{http_code}",
+        "-H",
+        "Accept: application/json",
+    ]);
+    // G4: sanitise custom headers — reject CRLF and non-ASCII names.
     if let Some(headers) = &request.headers {
         for (k, v) in headers {
+            if !crate::net_guard::is_safe_header_name(k) {
+                return Err(format!("Invalid header name: {k}"));
+            }
+            if !crate::net_guard::is_safe_header_value(v) {
+                return Err(format!("Invalid header value for {k}"));
+            }
             cmd.args(["-H", &format!("{k}: {v}")]);
         }
     }
-    cmd.arg(&request.url);
+    // G4: "--" prevents URL starting with "-" being parsed as a curl flag.
+    cmd.arg("--").arg(&validated_url);
     let output = cmd.output().map_err(|e| e.to_string())?;
     let raw = String::from_utf8_lossy(&output.stdout);
     let (body, status_str) = raw.rsplit_once('\n').unwrap_or((&raw, "0"));
