@@ -5032,6 +5032,13 @@
               <code class="trust-path">{{ entry.engine_path }}</code>
               <button type="button" @click="revokeEngineFromStore(entry.engine_path)">Revoke</button>
             </article>
+            <details class="trust-add-form">
+              <summary>Trust an engine</summary>
+              <label>Engine path <input v-model="trustEnginePath" type="text" placeholder="/absolute/path/to/engine" /></label>
+              <label>Transform name <input v-model="trustEngineName" type="text" placeholder="engine-name" /></label>
+              <button type="button" @click="trustExternalEngine">Trust engine</button>
+              <p v-if="trustEngineError" class="sidebar-hint trust-error">{{ trustEngineError }}</p>
+            </details>
           </section>
           </section>
         </template>
@@ -11743,6 +11750,20 @@ async function loadTrustStore() {
 async function revokeEngineFromStore(enginePath: string) {
   await invoke("revoke_external_engine", { engine_path: enginePath }).catch(() => {});
   await loadTrustStore();
+}
+const trustEnginePath = ref("");
+const trustEngineName = ref("");
+const trustEngineError = ref("");
+async function trustExternalEngine() {
+  trustEngineError.value = "";
+  try {
+    await invoke("trust_external_engine", { engine_path: trustEnginePath.value.trim(), transform_name: trustEngineName.value.trim() });
+    trustEnginePath.value = "";
+    trustEngineName.value = "";
+    await loadTrustStore();
+  } catch (err) {
+    trustEngineError.value = String(err);
+  }
 }
 const externalTransformTrustPrompts = computed<TransformTrustPrompt[]>(() => {
   const text = active.value?.text || "";
