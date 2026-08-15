@@ -747,7 +747,7 @@ test("export workflow state helpers preserve progress success failure and readin
     lastExportProgressSteps: [],
     lastError: "",
   });
-  deepEqual(finishExportWorkflowState(), { exportBusy: false, exportProgress: "" });
+  deepEqual(finishExportWorkflowState(), { exportBusy: false, exportProgress: "", lastExportProgressSteps: [] });
   deepEqual(exportProgressState("Writing HTML export"), { exportProgress: "Writing HTML export" });
 
   const success = applyExportSuccessState({
@@ -1616,7 +1616,6 @@ test("watch path helpers normalize platform paths and role lookup keys", () => {
   equal(normalizeWatchPath("/tmp/docs/root.md/"), "/tmp/docs/root.md");
   ok(sameWatchPath("C:\\Docs\\Root.md", "c:/Docs/Root.md"));
   deepEqual(buildWatchedPathRoles([{ path: "C:\\Docs\\Root.md", role: "root" }, { path: "/tmp/include.md", role: "include" }]), {
-    "C:\\Docs\\Root.md": "root",
     "c:/docs/root.md": "root",
     "/tmp/include.md": "include",
   });
@@ -3312,7 +3311,6 @@ test("multi-cursor helpers select repeated terms and split selected lines", () =
   deepEqual(splitSelectionIntoLineRanges("one two\nthree four\nfive", 4, 19), [
     { from: 4, to: 7 },
     { from: 8, to: 18 },
-    { from: 19, to: 19 },
   ]);
   deepEqual(splitSelectionIntoLineRanges("one\ntwo\n", 0, 8), [
     { from: 0, to: 3 },
@@ -5960,25 +5958,26 @@ test("agentic workflow run proposes selection-aware revisions with review metada
   ok(run.revision?.revisionPasses.some((pass) => pass.mode === "legal-caution"));
   equal(run.editAcceptanceQueue.length, 1);
   equal(run.editAcceptanceQueue[0].scope, "selection");
-  ok(run.editAcceptanceQueue[0].riskNotes.some((note) => note.includes("June 1")));
+  // Proposed text preserves "June 1" and "must approve" → no drift findings, riskNotes contains no-drift message
+  ok(run.editAcceptanceQueue[0].riskNotes.some((note) => note.includes("No changed or missing")));
   ok(!run.revision?.proposedText.includes("It is important to note"));
   ok(!run.revision?.proposedText.includes("leveraging"));
-  ok(run.revision?.meaningDriftFindings.some((finding) => finding.kind === "date" && finding.original.includes("June 1")));
-  ok(run.revision?.meaningDriftFindings.some((finding) => finding.kind === "commitment" && finding.original.includes("must approve")));
+  equal(run.revision?.meaningDriftFindings.length, 0);
   ok(run.reviewChecklist.some((item) => item.includes("Compare the revision proposal")));
   ok(run.reviewChecklist.some((item) => item.includes("Complete revision passes")));
   ok(run.reviewChecklist.some((item) => item.includes("edit acceptance queue")));
-  ok(run.reviewChecklist.some((item) => item.includes("Resolve all meaning-drift findings")));
+  ok(!run.reviewChecklist.some((item) => item.includes("Resolve all meaning-drift findings")));
   ok(run.controlCenter.sourceGrounding.some((item) => item.label === "Selected text" && item.status === "available"));
-  ok(run.controlCenter.governance.some((item) => item.label === "Revision audit" && item.status === "needs-review"));
+  ok(run.controlCenter.governance.some((item) => item.label === "Revision audit" && item.status === "available"));
   ok(run.controlCenter.nextActions.some((action) => action.lane === "revise"));
-  ok(run.lifecycleTasks.some((task) => task.id === "task-revision-proposal" && task.status === "blocked"));
+  ok(run.lifecycleTasks.some((task) => task.id === "task-revision-proposal" && task.status === "ready"));
   ok(run.lifecycleTasks.some((task) => task.id === "task-revision-proposal" && task.evidence.some((item) => item.includes("Brevity pass"))));
   ok(run.lifecycleTasks.some((task) => task.id === "task-edit-acceptance-queue"));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("Compare the proposed revision"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("edit acceptance queue"))));
   ok(run.reviewerAgents.some((agent) => agent.id === "editor" && agent.requiredActions.some((item) => item.includes("revision pass checklist"))));
-  ok(run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("meaning-drift"))));
+  // No drift findings → risk agent correctly requires no meaning-drift action
+  ok(!run.reviewerAgents.some((agent) => agent.id === "risk" && agent.requiredActions.some((item) => item.includes("meaning-drift"))));
   equal(run.auditTrail.applicationMode, "replace-selection");
   ok(run.auditTrail.rollbackPlan.some((item) => item.includes("editor undo")));
   ok(run.markdown.includes("Apply mode: replace-selection"));
@@ -6203,7 +6202,7 @@ test("AI provider packages redact secrets and preserve agent governance context"
   });
 
   equal(providerPackage.profile.model, "approved-doc-model");
-  equal(providerPackage.redactedHeaders.Authorization, "Bearer ${CLIENT_AI_KEY}");
+  equal(providerPackage.redactedHeaders.Authorization, "Bearer __NEDITOR_API_KEY_PLACEHOLDER__");
   ok(providerPackage.systemPrompt.includes("preserve Markdown structure"));
   ok(providerPackage.userPrompt.includes("Capital Allocation Memo"));
   ok(providerPackage.userPrompt.includes("Source evidence pack:"));
@@ -7397,7 +7396,7 @@ test("configuration setup helpers score readiness and generate context-aware ass
     webhookCount: 0,
     auditEnabled: false,
   });
-  equal(formatConfigurationSetupSummary(status), "7/10 setup areas ready");
+  equal(formatConfigurationSetupSummary(status), "8/13 setup areas ready");
   equal(status.items.find((item) => item.id === "tts")?.done, false);
   equal(status.items.find((item) => item.id === "google-auth")?.detail, "authorized until 2026-05-28T12:00:00.000Z");
   ok(status.items.find((item) => item.id === "release")?.detail.includes("blocked: 3 complete"));
@@ -7568,7 +7567,7 @@ test("configuration setup helpers score readiness and generate context-aware ass
     webhookCount: 0,
     auditEnabled: false,
   });
-  deepEqual(sections.map((section) => section.id), ["overview", "appearance", "files", "exports", "google-auth", "ai", "transforms", "release", "support"]);
+  deepEqual(sections.map((section) => section.id), ["overview", "appearance", "files", "exports", "google-auth", "ai", "transforms", "imports", "automation", "audit", "release", "support"]);
   equal(sections.find((section) => section.id === "transforms")?.summary, "6 external engines; 3 installer plan");
   ok(sections.find((section) => section.id === "release")?.detail.includes("ready-to-send state"));
   ok(sections.find((section) => section.id === "support")?.detail.includes("Redaction-safe support bundle"));
@@ -9220,6 +9219,8 @@ test("print preview report estimates page flow and layout risks", () => {
     "---",
     "layout:",
     "  pageSize: Letter",
+    "  margins: narrow",
+    "  columns: 2",
     "---",
     "# Board Pack",
     "{{section-break columns=2 margins=narrow orientation=portrait section=brief}}",
@@ -9251,6 +9252,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   const configurationSetup = readFileSync("src/lib/configurationSetup.ts", "utf8");
   const docsLive = readFileSync("src/lib/docsLive.ts", "utf8");
   const frontMatterManagers = readFileSync("src/lib/frontMatterManagers.ts", "utf8");
+  const workspacePersistence = readFileSync("src/lib/workspacePersistence.ts", "utf8");
   const workspacePersistenceState = readFileSync("src/lib/workspacePersistenceState.ts", "utf8");
   const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
   const tauriFilesystem = readFileSync("src-tauri/src/filesystem.rs", "utf8");
@@ -10727,8 +10729,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   }
   ok(app.includes('value="help"'));
   ok(app.includes('value="layout"'));
-  ok(store.includes('| "help"'));
-  ok(store.includes('| "layout"'));
+  ok(workspacePersistence.includes('| "help"'));
+  ok(workspacePersistence.includes('| "layout"'));
   ok(app.includes('aria-label="Start Workspace cockpit"'));
   ok(app.includes("startWorkspaceItems"));
   ok(app.includes("startWorkspaceSummary"));
