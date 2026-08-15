@@ -20,7 +20,7 @@ Fix status (as of 2026-08-14)
 | G4  | HIGH     | Closed  | 4f9c2cf |
 | G5  | HIGH     | Closed  | 4f9c2cf |
 | G6  | MEDIUM   | Closed  | 8f36a54 |
-| G7  | LOW      | Deferred — `local_source_content_preview` already has a 2 MiB read cap at line 703; no additional change needed |
+| G7  | LOW      | Confirmed clean — `citation_discovery.rs:710`: `if metadata.len() > 2 * 1024 * 1024 { return None; }` cap verified |
 | G8  | MEDIUM   | Closed  | 8f36a54 |
 | G9  | MEDIUM   | Closed  | 8f36a54 |
 | G10 | LOW      | Closed  | 8f36a54 |
@@ -29,8 +29,8 @@ Fix status (as of 2026-08-14)
 | G13 | LOW      | Closed  | 492a6ac |
 | G14 | INFO     | Closed  | 492a6ac |
 | G15 | MEDIUM   | Closed  | 8f36a54 |
-| G16 | LOW      | Deferred — commit message is passed as `-m <msg>` argv, safe from injection; trailers are cosmetic only |
-| G17 | LOW      | Deferred — `validate_git_refish` already rejects `-`, `..`, `@{`, control chars; OK-with-notes |
+| G16 | LOW      | Confirmed clean — `git.rs:95`: `&["commit", "-m", &request.message, "--", file_name]` is pure argv, no shell interpolation |
+| G17 | LOW      | Confirmed clean — `git.rs:114`: `validate_git_revision(revision)?` → `validate_git_refish` rejects `-`, `@`, `//`, control chars before argv use |
 | G18 | INFO     | Closed  | 05aaff4 |
 | G19 | LOW      | Closed  | 05aaff4 |
 | G20 | INFO     | Closed  | 05aaff4 |
