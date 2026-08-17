@@ -431,6 +431,7 @@ export interface PersistedWorkspace {
   uiMode?: 'writer' | 'pilot';
   zenMode?: boolean;
   checkUpdatesOnStartup?: boolean;
+  keepInMenuBar?: boolean;
   lastUpdateCheckedAt?: string;
   pilotActivityPanel?: string;
   autosave?: boolean;
@@ -1328,7 +1329,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (splitSourcePanes !== undefined) migrated.splitSourcePanes = splitSourcePanes;
   const editorKeymapMode = enumValue(raw.editorKeymapMode, ["default", "emacs", "vim"] as const);
   if (editorKeymapMode) migrated.editorKeymapMode = editorKeymapMode;
-  for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot", "zenMode", "checkUpdatesOnStartup"] as const) {
+  for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot", "zenMode", "checkUpdatesOnStartup", "keepInMenuBar"] as const) {
     const value = booleanValue(raw[key]);
     if (value !== undefined) migrated[key] = value;
   }

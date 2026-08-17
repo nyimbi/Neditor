@@ -505,6 +505,9 @@ export const useDocumentsStore = defineStore("documents", {
     zenMode: false,
     // Updater preferences
     checkUpdatesOnStartup: false,
+    // Menu-bar helper: keep app alive in system tray when window is closed.
+    // Default: true on macOS where LSUIElement toggling makes sense; false elsewhere.
+    keepInMenuBar: typeof navigator !== "undefined" && navigator.platform.startsWith("Mac"),
     lastUpdateCheckedAt: null as string | null,
     // Minimap
     showMinimap: false,

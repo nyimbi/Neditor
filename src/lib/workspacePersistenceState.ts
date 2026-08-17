@@ -125,6 +125,7 @@ export interface WorkspacePersistenceStateInput {
   dismissedNudges?: string[];
   focusMode?: "off" | "paragraph" | "sentence";
   showMinimap?: boolean;
+  keepInMenuBar?: boolean;
   pinnedFiles?: string[];
   styleGuideEnabled?: boolean;
   styleGuideRules?: Array<{ id: string; category: string; description: string; patterns: string[]; severity: "error" | "warn" | "info"; suggestion: string }>;
@@ -218,6 +219,7 @@ export function applyPersistedWorkspacePreferenceState(
     mailMergeRequireWorkspaceRoot: typeof persisted.mailMergeRequireWorkspaceRoot === "boolean" ? persisted.mailMergeRequireWorkspaceRoot : current.mailMergeRequireWorkspaceRoot,
     mailMergeMaxRecords: typeof persisted.mailMergeMaxRecords === "number" ? persisted.mailMergeMaxRecords : current.mailMergeMaxRecords,
     mailMergeDefaultDelimiter: (persisted.mailMergeDefaultDelimiter === "," || persisted.mailMergeDefaultDelimiter === "\t") ? persisted.mailMergeDefaultDelimiter : current.mailMergeDefaultDelimiter,
+    keepInMenuBar: typeof persisted.keepInMenuBar === "boolean" ? persisted.keepInMenuBar : current.keepInMenuBar,
   };
   const restoreRequest = persisted.openFiles?.length
     ? {
@@ -327,5 +329,6 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     mailMergeRequireWorkspaceRoot: state.mailMergeRequireWorkspaceRoot,
     mailMergeMaxRecords: state.mailMergeMaxRecords,
     mailMergeDefaultDelimiter: state.mailMergeDefaultDelimiter,
+    keepInMenuBar: state.keepInMenuBar,
   });
 }

@@ -3843,6 +3843,7 @@
           </label>
           <label><input v-model="store.highContrast" type="checkbox" /> High contrast</label>
           <label><input v-model="store.reducedMotion" type="checkbox" /> Reduced motion</label>
+          <label><input v-model="store.keepInMenuBar" type="checkbox" @change="void store.persistWorkspace()" /> Keep in menu bar (hide window instead of quitting when closed — macOS only)</label>
           <section class="accessibility-qa-panel" :data-status="accessibilityQaReport.status" aria-label="Screen-reader and accessibility QA">
             <header>
               <div>

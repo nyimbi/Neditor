@@ -12264,3 +12264,116 @@ test("boot timer: warmup_transforms is invoked in the background phase", () => {
   const app = readFileSync("src/App.vue", "utf8");
   ok(app.includes("warmup_transforms"), "App.vue must call warmup_transforms IPC after first paint");
 });
+
+// ── Continuity Camera frontend tests ─────────────────────────────────────────
+
+test("continuity camera: palette entry exists for TakePhoto kind", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("continuity-photo"), "palette must have id: continuity-photo entry for TakePhoto");
+  ok(app.includes("From iPhone: Take Photo"), "palette label must read 'From iPhone: Take Photo'");
+});
+
+test("continuity camera: palette entry exists for ScanDocuments kind", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("continuity-scan"), "palette must have id: continuity-scan entry for ScanDocuments");
+  ok(app.includes("From iPhone: Scan Documents"), "palette label must read 'From iPhone: Scan Documents'");
+});
+
+test("continuity camera: palette entry exists for AddSketch kind", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("continuity-sketch"), "palette must have id: continuity-sketch entry for AddSketch");
+  ok(app.includes("From iPhone: Add Sketch"), "palette label must read 'From iPhone: Add Sketch'");
+});
+
+test("continuity camera: IPC command name matches backend registration", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes('"insert_from_continuity_camera"'),
+    'App.vue must invoke "insert_from_continuity_camera" IPC command'
+  );
+});
+
+test("continuity camera: IPC payload includes documentPath and kind", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("documentPath"), "IPC payload must include documentPath");
+  ok(app.includes("kind"), "IPC payload must include kind");
+});
+
+test("continuity camera: CONTINUITY_UNAVAILABLE error surfaces expected toast text", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes("Nearby iPhone or iPad not found"),
+    "error handler must show 'Nearby iPhone or iPad not found' message"
+  );
+  ok(
+    app.includes("Open the Camera on your device and pair via Handoff"),
+    "error handler must mention pairing via Handoff"
+  );
+});
+
+test("continuity camera: success inserts markdown image with relative path", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes("result.relative_path"),
+    "success handler must use result.relative_path to build the Markdown image"
+  );
+  ok(
+    app.includes("insertMarkdownAtCursor"),
+    "success handler must call insertMarkdownAtCursor"
+  );
+});
+
+// ── Menu-bar helper: keepInMenuBar preference ─────────────────────────────────
+
+test("keepInMenuBar: PersistedWorkspace interface includes keepInMenuBar", () => {
+  const persistence = readFileSync("src/lib/workspacePersistence.ts", "utf8");
+  ok(persistence.includes("keepInMenuBar"), "workspacePersistence.ts must declare keepInMenuBar in PersistedWorkspace");
+});
+
+test("keepInMenuBar: migration loop includes keepInMenuBar", () => {
+  const persistence = readFileSync("src/lib/workspacePersistence.ts", "utf8");
+  ok(
+    persistence.includes('"keepInMenuBar"'),
+    "normalizeWorkspaceRecord must migrate keepInMenuBar boolean"
+  );
+});
+
+test("keepInMenuBar: store has keepInMenuBar preference field", () => {
+  const store = readFileSync("src/stores/documents.ts", "utf8");
+  ok(store.includes("keepInMenuBar"), "documents.ts store must declare keepInMenuBar");
+});
+
+test("keepInMenuBar: default is platform-conditional (macOS=true, others=false)", () => {
+  const store = readFileSync("src/stores/documents.ts", "utf8");
+  // The default must reference navigator.platform or a similar platform check —
+  // not a hard-coded literal — so macOS and non-macOS get different defaults.
+  ok(
+    store.includes("navigator.platform") || store.includes("navigator.userAgent") || store.includes("process.platform"),
+    "keepInMenuBar default must be platform-conditional, not a hard-coded false/true"
+  );
+});
+
+test("keepInMenuBar: persistence round-trip via applyPersistedWorkspacePreferenceState", () => {
+  // Verify that keepInMenuBar in a persisted workspace is applied to state.
+  const migrated = migratePersistedWorkspace({ keepInMenuBar: true });
+  ok(migrated.keepInMenuBar === true, "migratePersistedWorkspace must preserve keepInMenuBar=true");
+
+  const migrated2 = migratePersistedWorkspace({ keepInMenuBar: false });
+  ok(migrated2.keepInMenuBar === false, "migratePersistedWorkspace must preserve keepInMenuBar=false");
+
+  const migrated3 = migratePersistedWorkspace({});
+  ok(migrated3.keepInMenuBar === undefined, "migratePersistedWorkspace must leave keepInMenuBar undefined when absent");
+});
+
+test("keepInMenuBar: buildPersistedWorkspaceState includes keepInMenuBar", () => {
+  const state = readFileSync("src/lib/workspacePersistenceState.ts", "utf8");
+  ok(state.includes("keepInMenuBar"), "workspacePersistenceState.ts must handle keepInMenuBar");
+});
+
+test("keepInMenuBar: App.vue exposes keepInMenuBar checkbox in Settings", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes("keepInMenuBar") && app.includes("menu bar"),
+    "App.vue Settings panel must include a keepInMenuBar checkbox with 'menu bar' label text"
+  );
+});

@@ -48,6 +48,7 @@ mod link_validation;
 mod local_agents;
 mod macos_services;
 mod mail_merge;
+mod menubar_helper;
 mod manifest;
 mod markdown_tables;
 mod net_guard;
@@ -215,6 +216,7 @@ pub fn run() {
         .manage(GoogleAuthState::default())
         .manage(NativeTtsState::default())
         .manage(PreviewThemeWatcherState::default())
+        .manage(menubar_helper::MenubarHelperState::new())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -228,6 +230,9 @@ pub fn run() {
             deep_link::setup_deep_link_handler(&app.handle().clone());
             macos_services::setup_services(&app.handle().clone());
             applescript::setup_applescript_handlers(&app.handle().clone());
+            menubar_helper::setup_tray(&app.handle().clone())?;
+            menubar_helper::setup_window_close_interceptor(&app.handle().clone());
+            menubar_helper::spawn_warm_webview(&app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -340,7 +345,9 @@ pub fn run() {
             watch_preview_theme,
             unwatch_preview_theme,
             warmup_transforms,
-            insert_from_continuity_camera
+            insert_from_continuity_camera,
+            menubar_helper::set_keep_in_menu_bar,
+            menubar_helper::update_menubar_recent_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");
