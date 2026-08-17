@@ -6543,80 +6543,17 @@
       </div>
     </section>
 
-    <section
+    <CommandPalette
       v-if="commandPaletteOpen"
-      ref="commandPaletteDialog"
-      class="modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Command palette"
-      tabindex="-1"
-      @keydown="handleModalKeydown('command-palette', $event)"
-    >
-      <div class="modal command-modal">
-        <header>
-          <h2>Command Palette</h2>
-          <button type="button" aria-label="Close command palette" @click="closeCommandPalette">x</button>
-        </header>
-        <input
-          v-model="commandQuery"
-          autofocus
-          data-initial-focus
-          aria-label="Search commands, headings, citations, glossary, index terms, or enter an AI instruction"
-          placeholder="Search commands, headings, citations, glossary, index terms"
-          @keydown.enter.prevent="runCommandPaletteAgentInstruction"
-        />
-        <button
-          v-for="command in filteredCommands"
-          :key="command.name"
-          class="command-row"
-          type="button"
-          :aria-label="`${command.name} ${command.group}`"
-          @click="runCommand(command.run)"
-        >
-          <span class="command-row-main">
-            <strong>{{ command.name }}</strong>
-            <small v-if="command.description">{{ command.description }}</small>
-          </span>
-          <span>{{ command.group }}</span>
-        </button>
-        <section v-if="commandAgentInstructionAvailable" class="command-agent-route" aria-label="AI command route">
-          <div>
-            <strong>Generate with AI agent</strong>
-            <span>Plan the workflow, create a governed packet, and keep it ready for review or distribution.</span>
-            <dl v-if="commandAgentPlanPreview" class="command-agent-preview" aria-label="AI command plan preview">
-              <div>
-                <dt>Lanes</dt>
-                <dd>{{ commandAgentPlanPreview.lanes.join(", ") }}</dd>
-              </div>
-              <div>
-                <dt>Targets</dt>
-                <dd>{{ commandAgentPlanPreview.distributionTargets.length ? commandAgentPlanPreview.distributionTargets.join(", ") : "Review packet" }}</dd>
-              </div>
-              <div>
-                <dt>Missing</dt>
-                <dd>{{ commandAgentPlanPreview.missingInputs.length ? commandAgentPlanPreview.missingInputs.slice(0, 4).join(", ") : "Ready to draft" }}</dd>
-              </div>
-            </dl>
-            <div v-if="commandAgentRouteSuggestions.length" class="command-agent-routes" role="region" aria-label="AI command route suggestions">
-              <button
-                v-for="route in commandAgentRouteSuggestions"
-                :key="route.id"
-                type="button"
-                :title="route.detail"
-                @click="runCommandPaletteAgentRoute(route.id)"
-              >
-                {{ route.label }}
-              </button>
-            </div>
-          </div>
-          <div class="command-agent-actions">
-            <button type="button" @click="openCommandPaletteAgentPlan">Plan first</button>
-            <button type="button" @click="runCommandPaletteAgentInstruction">Generate Packet</button>
-          </div>
-        </section>
-      </div>
-    </section>
+      v-model="commandQuery"
+      :commands="commands"
+      :selected-text="currentEditorSelectionText()"
+      @close="closeCommandPalette"
+      @run-command="runCommand"
+      @agent-instruction="runCommandPaletteAgentInstruction"
+      @agent-plan="openCommandPaletteAgentPlan"
+      @agent-route="runCommandPaletteAgentRoute"
+    />
 
     <!-- Transform picker palette -->
     <div
@@ -7119,6 +7056,7 @@ import ThemePicker from "./components/ThemePicker.vue";
 import KeyboardShortcutsPanel from "./components/KeyboardShortcutsPanel.vue";
 import SettingsPanel from "./components/SettingsPanel.vue";
 import TabsBar from "./components/TabsBar.vue";
+import CommandPalette from "./components/CommandPalette.vue";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { invoke } from "@tauri-apps/api/core";
@@ -7985,7 +7923,6 @@ const equationEditorDialog = ref<HTMLElement | null>(null);
 const agentWorkspaceDialog = ref<HTMLElement | null>(null);
 const guidedDemoDialog = ref<HTMLElement | null>(null);
 const configurationSetupDialog = ref<HTMLElement | null>(null);
-const commandPaletteDialog = ref<HTMLElement | null>(null);
 const conflictDialog = ref<HTMLElement | null>(null);
 const tableEditorGrid = ref<HTMLElement | null>(null);
 const tableSourceEditor = ref<HTMLTextAreaElement | null>(null);
@@ -16595,80 +16532,6 @@ const commands = computed<CommandPaletteCommand[]>(() => [
     },
   }))),
 ]);
-const filteredCommands = computed(() => {
-  const query = commandQuery.value.trim().toLowerCase();
-  if (!query) return commands.value;
-  return commands.value.filter((command) => commandSearchText(command).includes(query));
-});
-const commandAgentInstructionAvailable = computed(() => {
-  const query = commandQuery.value.trim();
-  if (query.length < 8) return false;
-  return /\b(ai|agent|create|draft|write|revise|edit|review|summari[sz]e|publish|export|prepare|make|turn|improve|humanize|outline|compose|research|report|source|citation)\b/i
-    .test(query);
-});
-const commandAgentPlanPreview = computed(() => {
-  const instruction = commandQuery.value.trim();
-  if (!commandAgentInstructionAvailable.value) return null;
-  return buildAgenticWorkflowPlan({
-    instruction,
-    documentTitle: active.value.compile?.semantic.title || active.value.title,
-    documentText: active.value.text,
-    selectedText: currentEditorSelectionText(),
-  });
-});
-const commandAgentRouteSuggestions = computed<CommandAgentRouteSuggestion[]>(() => {
-  const instruction = commandQuery.value.trim().toLowerCase();
-  if (!commandAgentInstructionAvailable.value) return [];
-  const candidates: Array<CommandAgentRouteSuggestion & { rank: number }> = [
-    {
-      id: "docs-live",
-      label: "Docs Live",
-      detail: "Open voice/context drafting with the current instruction as the starting brief.",
-      rank: /\b(create|draft|write|compose|section|voice|dictate|first draft)\b/.test(instruction) ? 0 : 3,
-    },
-    {
-      id: "ai-paste",
-      label: "AI Paste cleanup",
-      detail: "Open cleanup for pasted chat output, provenance, citations, and insertion mode.",
-      rank: /\b(paste|cleanup|clean up|chat output|clipboard|ai text)\b/.test(instruction) ? 0 : 5,
-    },
-    {
-      id: "deep-research",
-      label: "Deep Research",
-      detail: "Open source search and iterative report generation with a selected page target.",
-      rank: /\b(deep research|research report|source search|citation search|local source library|duckduckgo|searxng|tavily|200 pages?)\b/.test(instruction) ? 0 : 3,
-    },
-    {
-      id: "review",
-      label: "Review governance",
-      detail: "Open review, provenance, comments, AI markers, and readiness blockers.",
-      rank: /\b(review|qa|quality|citation|claim|humanize|governance|approve|risk)\b/.test(instruction) ? 0 : 4,
-    },
-    {
-      id: "export",
-      label: "Export readiness",
-      detail: "Open target-aware export readiness, manifests, publishing packages, and distribution evidence.",
-      rank: /\b(export|publish|distribut|blog|substack|google docs|latex|epub|ebook|html|pdf|docx|pptx)\b/.test(instruction) ? 0 : 4,
-    },
-    {
-      id: "outline",
-      label: "Outline mode",
-      detail: "Open outline-first planning for chapters, sections, subsections, and drafting queues.",
-      rank: /\b(outline|structure|plan|chapter|section|toc)\b/.test(instruction) ? 0 : 4,
-    },
-    {
-      id: "provider",
-      label: "Provider handoff",
-      detail: "Open the Agent Workspace, generate a governed packet, and build a redacted provider request.",
-      rank: /\b(provider|model|openai|anthropic|gemini|antigravity|ollama|local gateway|handoff|run ai)\b/.test(instruction) ? 0 : 4,
-    },
-  ];
-  return candidates
-    .sort((left, right) => left.rank - right.rank || left.label.localeCompare(right.label))
-    .slice(0, 4)
-    .map(({ rank: _rank, ...route }) => route);
-});
-
 async function bindNativeMenuCommands() {
   try {
     unlistenNativeMenuCommand = await listen<string>("neditor-menu-command", (event) => {
@@ -17080,7 +16943,6 @@ watch(businessProfileOpen, (open) => handleModalStateChange(open, businessProfil
 watch(configurationSetupOpen, (open) => handleModalStateChange(open, configurationSetupDialog));
 watch(equationEditorOpen, (open) => handleModalStateChange(open, equationEditorDialog));
 watch(guidedDemoOpen, (open) => handleModalStateChange(open, guidedDemoDialog));
-watch(commandPaletteOpen, (open) => handleModalStateChange(open, commandPaletteDialog));
 watch(conflictOpen, (open) => handleModalStateChange(open, conflictDialog));
 watch(() => store.aiProviderDefaults, applyStoredAiProviderDefaults, { deep: true });
 watch(() => store.googleIntegration, syncGoogleIntegrationFields, { deep: true });

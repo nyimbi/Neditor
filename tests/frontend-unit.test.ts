@@ -9269,7 +9269,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
     + readFileSync("src/components/ThemePicker.vue", "utf8")
     + readFileSync("src/components/KeyboardShortcutsPanel.vue", "utf8")
     + readFileSync("src/components/SettingsPanel.vue", "utf8")
-    + readFileSync("src/components/TabsBar.vue", "utf8");
+    + readFileSync("src/components/TabsBar.vue", "utf8")
+    + readFileSync("src/components/CommandPalette.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
   const aiProviderPackages = readFileSync("src/lib/aiProviderPackages.ts", "utf8");
