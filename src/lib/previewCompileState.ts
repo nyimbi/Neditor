@@ -6,6 +6,8 @@ export interface PreviewCompileSuccessInput {
   compiledAt?: string;
 }
 
+export type CompileErrorKind = "compile-failed" | "backend-unavailable" | "transform-error" | "";
+
 export function beginPreviewCompileState() {
   return {
     compileBusy: true,
@@ -35,6 +37,10 @@ export function applyPreviewCompileSuccessState(input: PreviewCompileSuccessInpu
     lastPreviewCompiledAt: input.compiledAt || new Date().toISOString(),
     statusMessage: `${Math.max(0, Math.trunc(input.diagnosticCount))} diagnostics`,
     lastError: "",
+    previewFailed: false,
+    consecutiveCompileFailures: 0,
+    lastCompileErrorKind: "" as CompileErrorKind,
+    lastCompileErrorMessage: "",
   };
 }
 
@@ -43,11 +49,25 @@ export function applyPreviewCompileFailureState(error: unknown, backendUnavailab
     return {
       lastError: "",
       statusMessage: "Editing locally; preview backend unavailable in browser",
+      previewFailed: true,
+      lastCompileErrorKind: "backend-unavailable" as CompileErrorKind,
+      lastCompileErrorMessage: "Preview backend not available in this environment",
     };
   }
+  const message = previewCompileErrorText(error);
+  const kind: CompileErrorKind = detectCompileErrorKind(error);
   return {
-    lastError: previewCompileErrorText(error),
+    lastError: message,
+    previewFailed: true,
+    lastCompileErrorKind: kind,
+    lastCompileErrorMessage: message,
   };
+}
+
+function detectCompileErrorKind(error: unknown): CompileErrorKind {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes("transform") || msg.includes("engine")) return "transform-error";
+  return "compile-failed";
 }
 
 function previewCompileErrorText(error: unknown) {
