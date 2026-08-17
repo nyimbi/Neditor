@@ -94,7 +94,8 @@ export interface WorkspacePersistenceStateInput {
   customDocumentOutlineTemplates: RequiredPersistedValue<"customDocumentOutlineTemplates">;
   customVersionedClauses: RequiredPersistedValue<"customVersionedClauses">;
   documentMemoryText: string;
-  uiMode?: 'writer' | 'pilot';
+  uiMode?: 'writer' | 'pilot' | 'workbench';
+  hasSeenEmptyState?: boolean;
   pilotActivityPanel?: string;
   presentationTheme?: string;
   presentationTransition?: string;
@@ -181,7 +182,8 @@ export function applyPersistedWorkspacePreferenceState(
     agentRunHistory: normalizeAgentRunHistory(persisted.agentRunHistory),
     docsLiveDraftHistory: normalizeDocsLiveDraftHistory(persisted.docsLiveDraftHistory),
     guidedDemoCompletedStepIds: persisted.guidedDemoCompletedStepIds || [],
-    uiMode: (persisted.uiMode === 'writer' || persisted.uiMode === 'pilot') ? persisted.uiMode : undefined,
+    uiMode: (persisted.uiMode === 'writer' || persisted.uiMode === 'pilot' || persisted.uiMode === 'workbench') ? persisted.uiMode : (current.uiMode ?? 'workbench'),
+    hasSeenEmptyState: typeof persisted.hasSeenEmptyState === 'boolean' ? persisted.hasSeenEmptyState : (current.hasSeenEmptyState ?? false),
     pilotActivityPanel: typeof persisted.pilotActivityPanel === 'string' ? persisted.pilotActivityPanel : undefined,
     presentationTheme: typeof persisted.presentationTheme === "string" ? persisted.presentationTheme : current.presentationTheme,
     presentationTransition: typeof persisted.presentationTransition === "string" ? persisted.presentationTransition : current.presentationTransition,
@@ -282,6 +284,7 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     workspaceRoot: state.workspaceRoot,
     mode: state.mode,
     uiMode: state.uiMode,
+    hasSeenEmptyState: state.hasSeenEmptyState,
     pilotActivityPanel: state.pilotActivityPanel,
     presentationTheme: state.presentationTheme,
     presentationTransition: state.presentationTransition,

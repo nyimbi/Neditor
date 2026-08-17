@@ -158,6 +158,8 @@ export interface AiProviderDefaults {
   endpoint: string;
   model: string;
   keyEnv: string;
+  /** Provider request timeout in seconds. Persisted per workspace. Default: 60. Range: 10–600. */
+  aiTimeoutSeconds: number;
 }
 
 export type { GoogleIntegrationPreferences };
@@ -428,7 +430,8 @@ export interface PersistedWorkspace {
   codeFolding?: boolean;
   highContrast?: boolean;
   reducedMotion?: boolean;
-  uiMode?: 'writer' | 'pilot';
+  uiMode?: 'writer' | 'pilot' | 'workbench';
+  hasSeenEmptyState?: boolean;
   zenMode?: boolean;
   checkUpdatesOnStartup?: boolean;
   keepInMenuBar?: boolean;
@@ -814,11 +817,14 @@ export function normalizeGitIntegrationPreferences(defaults: Partial<GitIntegrat
 export function normalizeAiProviderDefaults(defaults: unknown): AiProviderDefaults {
   const record = isRecord(defaults) ? defaults : {};
   const profileId = enumValue(record.profileId, AI_PROVIDER_PROFILE_IDS) || "manual-review";
+  const rawTimeout = numberValue(record.aiTimeoutSeconds);
+  const aiTimeoutSeconds = rawTimeout !== undefined ? clampNumber(rawTimeout, 10, 600) : 60;
   return {
     profileId,
     endpoint: normalizedString(record.endpoint, 300),
     model: normalizedString(record.model, 160) || "human-approved-provider",
     keyEnv: normalizeEnvName(record.keyEnv) || "NEDITOR_AI_API_KEY",
+    aiTimeoutSeconds,
   };
 }
 
@@ -1329,6 +1335,11 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (splitSourcePanes !== undefined) migrated.splitSourcePanes = splitSourcePanes;
   const editorKeymapMode = enumValue(raw.editorKeymapMode, ["default", "emacs", "vim"] as const);
   if (editorKeymapMode) migrated.editorKeymapMode = editorKeymapMode;
+  // Preserve existing writer/pilot choice; workbench is accepted; no value = fresh install gets store default.
+  const uiMode = enumValue(raw.uiMode, ["writer", "pilot", "workbench"] as const);
+  if (uiMode) migrated.uiMode = uiMode;
+  const hasSeenEmptyState = booleanValue(raw.hasSeenEmptyState);
+  if (hasSeenEmptyState !== undefined) migrated.hasSeenEmptyState = hasSeenEmptyState;
   for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot", "zenMode", "checkUpdatesOnStartup", "keepInMenuBar"] as const) {
     const value = booleanValue(raw[key]);
     if (value !== undefined) migrated[key] = value;
