@@ -23,7 +23,11 @@ where
     let mut lines = text.lines().enumerate().peekable();
     while let Some((line_index, line)) = lines.next() {
         if let Some(marker) = fenced_code_marker(line) {
-            let info = line.trim_start().strip_prefix(marker.as_str()).unwrap_or("").trim();
+            let info = line
+                .trim_start()
+                .strip_prefix(marker.as_str())
+                .unwrap_or("")
+                .trim();
             let name = info.split_whitespace().next().unwrap_or("");
             if is_supported(name) {
                 let source_line = line_index + 1;

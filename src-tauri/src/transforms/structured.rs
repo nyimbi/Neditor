@@ -10,7 +10,11 @@ pub(crate) fn render_decision_table_html(
     let mut headers: Vec<String> = Vec::new();
     let mut rows: Vec<Vec<String>> = Vec::new();
     for line in body.lines().map(str::trim).filter(|l| !l.is_empty()) {
-        let cols: Vec<&str> = line.split('|').map(str::trim).filter(|c| !c.is_empty()).collect();
+        let cols: Vec<&str> = line
+            .split('|')
+            .map(str::trim)
+            .filter(|c| !c.is_empty())
+            .collect();
         if headers.is_empty() {
             headers = cols.iter().map(|c| escape_html(c)).collect();
         } else {
@@ -20,14 +24,31 @@ pub(crate) fn render_decision_table_html(
     if headers.is_empty() {
         return "<section class=\"transform transform-decision-table\"><p>No decision table data.</p></section>".to_string();
     }
-    let thead = format!("<tr>{}</tr>", headers.iter().map(|h| format!("<th>{h}</th>")).collect::<String>());
-    let tbody = rows.iter().map(|row| {
-        let cells = row.iter().enumerate().map(|(i, cell)| {
-            let class = if i == 0 { " class=\"decision-condition\"" } else { " class=\"decision-action\"" };
-            format!("<td{class}>{cell}</td>")
-        }).collect::<String>();
-        format!("<tr>{cells}</tr>")
-    }).collect::<String>();
+    let thead = format!(
+        "<tr>{}</tr>",
+        headers
+            .iter()
+            .map(|h| format!("<th>{h}</th>"))
+            .collect::<String>()
+    );
+    let tbody = rows
+        .iter()
+        .map(|row| {
+            let cells = row
+                .iter()
+                .enumerate()
+                .map(|(i, cell)| {
+                    let class = if i == 0 {
+                        " class=\"decision-condition\""
+                    } else {
+                        " class=\"decision-action\""
+                    };
+                    format!("<td{class}>{cell}</td>")
+                })
+                .collect::<String>();
+            format!("<tr>{cells}</tr>")
+        })
+        .collect::<String>();
     format!("<section class=\"transform transform-decision-table\"><h3>Decision Table</h3><table><thead>{thead}</thead><tbody>{tbody}</tbody></table></section>")
 }
 
