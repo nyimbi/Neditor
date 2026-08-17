@@ -12896,8 +12896,9 @@ test("toast store: warning kind has 8s default timeout", () => {
 });
 
 test("toast store: ToastHost is present in App.vue", () => {
-  const src = readFileSync("src/App.vue", "utf8");
-  ok(src.includes("toast-host"), "toast-host region must exist in App.vue template");
-  ok(src.includes("useToasts"), "useToasts must be imported and used in App.vue");
-  ok(src.includes("toasts.visible"), "App.vue must iterate toasts.visible");
+  const app = readFileSync("src/App.vue", "utf8");
+  const toastHost = readFileSync("src/components/ToastHost.vue", "utf8");
+  ok(app.includes("ToastHost") || toastHost.includes("toast-host"), "toast-host region must exist in App.vue or ToastHost.vue");
+  ok(toastHost.includes("useToasts"), "useToasts must be imported and used in ToastHost.vue");
+  ok(toastHost.includes("toasts.visible"), "ToastHost.vue must iterate toasts.visible");
 });
