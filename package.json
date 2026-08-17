@@ -51,6 +51,7 @@
     "collect:security-review": "node scripts/collect-security-review-evidence.mjs",
     "collect:tables:manual": "node scripts/collect-table-editor-manual-signoff.mjs",
     "ingest:evidence": "node scripts/ingest-release-evidence.mjs",
+    "ship": "node scripts/ship-release.mjs",
     "release:local": "node scripts/create-release-candidate.mjs",
     "release:homebrew": "node scripts/create-homebrew-cask.mjs",
     "check:release-candidate": "node scripts/check-release-candidate.mjs",

@@ -106,3 +106,64 @@ The `homebrew` job is skipped on pre-releases and dry runs.
 - **macOS keychain import**: if Tauri's internal certificate import suffices,
   remove the `Import Apple signing certificate into keychain` and
   `Delete temporary keychain` steps to reduce attack surface.
+
+## `pnpm ship` — local single-command release
+
+`scripts/ship-release.mjs` automates the full local release path in one command:
+
+```sh
+# Dry-run first (fast — no builds, no pushes)
+pnpm ship -- --dry-run --skip-preflight
+
+# Full release from main with signing
+APPLE_ID=you@example.com \
+APPLE_PASSWORD=app-specific-pw \
+APPLE_TEAM_ID=XXXXXXXXXX \
+pnpm ship -- --sign
+
+# With Homebrew tap update
+pnpm ship -- --sign --homebrew
+```
+
+### Steps performed
+
+| # | Step | Notes |
+|---|------|-------|
+| 1 | Preflight | Tree clean, branch=main, versions match, `check:release-readiness` |
+| 2 | Compile | macOS: cross-compile `ned` for arm64+x86_64, `lipo` universal, `pnpm tauri build --bundles dmg --target universal-apple-darwin` |
+| 3 | Sign/notarize | macOS only; pass `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` env vars — Tauri picks them up automatically.  Skipped with a warning when `APPLE_ID` is unset; fails hard with `--sign`. |
+| 4 | Verify | Mount DMG, `lipo -info`, PlistBuddy version check, codesign probe, SHA256SUMS |
+| 5 | Tag | `git tag vX.Y.Z && git push origin vX.Y.Z`; skips if tag already at correct commit |
+| 6 | Release | `gh release create vX.Y.Z` with notes from `docs/release-notes/vX.Y.Z.md`; placeholder auto-generated if missing |
+| 7 | Homebrew | Clone/create `nyimbi/homebrew-neditor`, run `pnpm release:homebrew`, push cask.  **Off by default; requires `--homebrew` flag.** |
+
+### CLI flags
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Print every command without executing; skip tag/release/homebrew pushes |
+| `--sign` | Hard-fail if `APPLE_ID` unset |
+| `--homebrew` | Enable step 7 |
+| `--skip-preflight` | Skip step 1 (for testing) |
+
+### Windows / Linux
+
+Run `pnpm ship` on a Windows or Linux host — the script detects `process.platform` and
+invokes the appropriate Tauri bundle targets (`msi,nsis` / `deb,appimage`).
+These targets are skipped automatically when run on an incompatible host.
+
+### Open TODOs (operator action required)
+
+- **Apple certs**: set `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`, and optionally
+  `APPLE_SIGNING_IDENTITY` before running `--sign`.  Import the Developer ID Application
+  p12 into your keychain first (`security import DeveloperIDApplication.p12`).
+- **Windows host**: MSI/NSIS bundles must be built on a Windows machine or a
+  `windows-latest` CI runner — `cross` cannot cross-compile the Tauri Windows bundler.
+- **Linux host**: deb/AppImage must be built on an Ubuntu-compatible host.
+- **GPG signing** (Linux): not automated in this script; sign `.deb`/`.AppImage`
+  manually with `gpg --detach-sign` and upload the `.sig` files to the release.
+- **`src-tauri/entitlements.plist`**: add if your app needs hardened-runtime
+  entitlements (`com.apple.security.network.client`, etc.); Tauri will pass it
+  to `codesign` automatically via `tauri.conf.json`.
+- **`HOMEBREW_TAP_TOKEN`**: set to a GitHub PAT with `repo` scope on
+  `nyimbi/homebrew-neditor` if the current `gh` auth doesn't cover the tap.
