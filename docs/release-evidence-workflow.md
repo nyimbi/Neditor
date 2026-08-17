@@ -3,6 +3,13 @@
 Workflow file: `.github/workflows/neditor-release-evidence.yml`
 Trigger: manual (`workflow_dispatch`).
 
+> **Two-workflow release model**: this workflow is the **pre-release gate** —
+> it collects cross-platform evidence that the build is correct and the native
+> workflows pass.  The **ship step** is the separate publish workflow
+> (`.github/workflows/neditor-release-publish.yml`, documented at
+> `docs/release-publish-workflow.md`).  Run evidence first; push the tag to
+> trigger publish once evidence is accepted.
+
 ## Required secrets
 
 Configure all secrets at **Settings → Secrets and variables → Actions** in the
