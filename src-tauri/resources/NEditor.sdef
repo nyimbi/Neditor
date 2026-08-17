@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+
+<!--
+  NEditor AppleScript Scripting Definition
+  Referenced from Info.plist via OSAScriptingDefinition = NEditor.sdef
+
+  Status:
+    open document  — wired (queues path via cli_ipc::queue_paths_for_open)
+    All other verbs — stub (return "not yet implemented" error)
+-->
+
+<dictionary title="NEditor Scripting">
+
+  <!-- ── Standard Suite ── -->
+  <suite name="Standard Suite" code="????" description="Common scripting commands.">
+
+    <command name="open" code="aevtodoc" description="Open a document.">
+      <direct-parameter description="The file(s) to open." type="file"/>
+      <result description="The opened document." type="document"/>
+    </command>
+
+    <command name="quit" code="aevtquit" description="Quit NEditor.">
+      <parameter name="saving" code="savo" type="save options"
+                 description="Whether to save documents before quitting."
+                 optional="yes"/>
+    </command>
+
+  </suite>
+
+  <!-- ── NEditor Suite ── -->
+  <suite name="NEditor Suite" code="NEdT" description="Commands specific to NEditor.">
+
+    <!-- Objects -->
+    <class name="document" code="docu" description="A Markdown document open in NEditor."
+           plural="documents" inherits="item">
+      <property name="name" code="pnam" type="text"
+                description="The file name of the document." access="r"/>
+      <property name="path" code="ppth" type="file"
+                description="The absolute file path on disk." access="r"/>
+      <property name="text" code="ctxt" type="text"
+                description="The full Markdown text of the document." access="rw"/>
+      <property name="modified" code="imod" type="boolean"
+                description="Whether the document has unsaved changes." access="r"/>
+    </class>
+
+    <!-- open document -->
+    <command name="open document" code="NEdTopen"
+             description="Open a Markdown document in NEditor.">
+      <direct-parameter description="Path of the .md file to open." type="file"/>
+      <result description="The document that was opened." type="document"/>
+    </command>
+
+    <!-- save document -->
+    <command name="save document" code="NEdTsave"
+             description="Save the frontmost document to disk.">
+      <direct-parameter description="The document to save." type="document"/>
+    </command>
+
+    <!-- export document -->
+    <command name="export document" code="NEdTxprt"
+             description="Export a document to one of the supported formats.">
+      <direct-parameter description="The document to export." type="document"/>
+      <parameter name="as" code="EFmt" type="export format"
+                 description="Target format." optional="yes"/>
+      <parameter name="to" code="EOut" type="file"
+                 description="Output file path." optional="yes"/>
+    </command>
+
+    <!-- insert text -->
+    <command name="insert text" code="NEdTinst"
+             description="Insert text at the current cursor position.">
+      <direct-parameter description="The text to insert." type="text"/>
+      <parameter name="in" code="IdIn" type="document"
+                 description="Target document. Defaults to front document."
+                 optional="yes"/>
+    </command>
+
+    <!-- Export format enumeration -->
+    <enumeration name="export format" code="EFmt">
+      <enumerator name="html"            code="EFHTML" description="HTML"/>
+      <enumerator name="pdf"             code="EFPDF"  description="PDF"/>
+      <enumerator name="docx"            code="EFDOX"  description="Microsoft Word DOCX"/>
+      <enumerator name="pptx"            code="EFPPT"  description="Microsoft PowerPoint PPTX"/>
+      <enumerator name="markdown bundle" code="EFBND"  description="Markdown bundle (.zip)"/>
+    </enumeration>
+
+    <!-- Save options -->
+    <enumeration name="save options" code="savo">
+      <enumerator name="yes"   code="yes " description="Save before closing."/>
+      <enumerator name="no"    code="no  " description="Don't save."/>
+      <enumerator name="ask"   code="ask " description="Ask the user."/>
+    </enumeration>
+
+  </suite>
+
+</dictionary>

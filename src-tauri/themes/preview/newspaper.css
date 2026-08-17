@@ -1,0 +1,107 @@
+/* Newspaper theme for NEditor preview — multi-column broadsheet layout with
+   classic press typography. Copy and rename to customise.
+   Selector root: .preview-pane .preview-document */
+
+.preview-pane[data-preview-theme="newspaper"],
+.preview-pane.preview-theme-newspaper {
+    background: #f5f0e8;
+    color: #1a1a1a;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document,
+.preview-pane.preview-theme-newspaper .preview-document {
+    font-family: "Georgia", "Times New Roman", Times, serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #1a1a1a;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    columns: 2;
+    column-gap: 2rem;
+    column-rule: 1px solid #c0b090;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document h1 {
+    column-span: all;
+    font-size: 2.4em;
+    font-weight: bold;
+    text-align: center;
+    border-top: 3px solid #1a1a1a;
+    border-bottom: 1px solid #1a1a1a;
+    padding: 0.3em 0;
+    margin-bottom: 1em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-family: "Georgia", serif;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document h2 {
+    column-span: all;
+    font-size: 1.4em;
+    font-weight: bold;
+    border-bottom: 2px solid #1a1a1a;
+    padding-bottom: 0.2em;
+    margin-top: 1.2em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document h3 {
+    font-size: 1em;
+    font-weight: bold;
+    font-style: italic;
+    margin-top: 1em;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document p {
+    text-align: justify;
+    hyphens: auto;
+    margin: 0 0 0.8em;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document a {
+    color: #1a1a1a;
+    text-decoration: underline;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document code {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 85%;
+    background: #e8e0d0;
+    padding: 0.1em 0.3em;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document pre {
+    column-span: all;
+    background: #e8e0d0;
+    border: 1px solid #c0b090;
+    padding: 0.8em;
+    overflow-x: auto;
+    font-size: 13px;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document blockquote {
+    font-size: 1.15em;
+    font-style: italic;
+    text-align: center;
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    color: #3a3a3a;
+    border-top: 1px solid #aaa;
+    border-bottom: 1px solid #aaa;
+}
+
+.preview-pane[data-preview-theme="newspaper"] .preview-document hr {
+    column-span: all;
+    border: none;
+    border-top: 2px solid #1a1a1a;
+    margin: 1.5em 0;
+}
+
+/* Single-column on narrow viewports */
+@media (max-width: 600px) {
+    .preview-pane[data-preview-theme="newspaper"] .preview-document {
+        columns: 1;
+    }
+}

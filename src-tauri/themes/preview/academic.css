@@ -1,0 +1,143 @@
+/* Academic theme for NEditor preview — LaTeX-inspired double-column layout with
+   Computer Modern-style serif typography. Copy and rename to customise.
+   Selector root: .preview-pane .preview-document */
+
+.preview-pane[data-preview-theme="academic"],
+.preview-pane.preview-theme-academic {
+    background: #ffffff;
+    color: #111111;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document,
+.preview-pane.preview-theme-academic .preview-document {
+    font-family: "Palatino Linotype", "Palatino", "Book Antiqua", "Georgia", serif;
+    font-size: 15px;
+    line-height: 1.55;
+    color: #111111;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem;
+    columns: 2;
+    column-gap: 2.5rem;
+}
+
+/* Title / abstract area spans full width */
+.preview-pane[data-preview-theme="academic"] .preview-document h1 {
+    column-span: all;
+    font-size: 1.6em;
+    text-align: center;
+    font-variant: small-caps;
+    letter-spacing: 0.03em;
+    border: none;
+    margin-bottom: 0.2em;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document h2 {
+    font-size: 1em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 1.4em;
+    border: none;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document h3 {
+    font-size: 1em;
+    font-style: italic;
+    font-weight: normal;
+    margin-top: 1.2em;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document p {
+    text-align: justify;
+    hyphens: auto;
+    margin: 0 0 0.6em;
+    text-indent: 1.2em;
+}
+
+/* No indent after headings or first paragraph */
+.preview-pane[data-preview-theme="academic"] .preview-document h2 + p,
+.preview-pane[data-preview-theme="academic"] .preview-document h3 + p,
+.preview-pane[data-preview-theme="academic"] .preview-document blockquote + p {
+    text-indent: 0;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document a {
+    color: #111111;
+    text-decoration: none;
+    border-bottom: 1px solid #888;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document code {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 85%;
+    background: #f4f4f4;
+    padding: 0.1em 0.3em;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document pre {
+    column-span: all;
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    padding: 0.8em 1em;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document blockquote {
+    font-size: 0.95em;
+    margin: 1em 1.5em;
+    padding: 0;
+    color: #444;
+    font-style: italic;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document hr {
+    column-span: all;
+    border: none;
+    border-top: 1px solid #bbb;
+    margin: 1.5em auto;
+    width: 60%;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9em;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document th {
+    border-top: 2px solid #111;
+    border-bottom: 1px solid #111;
+    padding: 4px 8px;
+    font-variant: small-caps;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document td {
+    padding: 3px 8px;
+    border-bottom: none;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document tr:last-child td {
+    border-bottom: 2px solid #111;
+}
+
+/* Figures */
+.preview-pane[data-preview-theme="academic"] .preview-document figure {
+    text-align: center;
+    margin: 1em 0;
+}
+
+.preview-pane[data-preview-theme="academic"] .preview-document figcaption {
+    font-size: 0.85em;
+    font-style: italic;
+    color: #555;
+    margin-top: 0.3em;
+}
+
+@media (max-width: 600px) {
+    .preview-pane[data-preview-theme="academic"] .preview-document {
+        columns: 1;
+    }
+}

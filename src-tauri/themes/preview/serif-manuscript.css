@@ -1,0 +1,92 @@
+/* Serif Manuscript theme for NEditor preview — warm off-white paper feel,
+   classic serif typography for long-form writing. Copy and rename to customise.
+   Selector root: .preview-pane .preview-document */
+
+.preview-pane[data-preview-theme="serif-manuscript"],
+.preview-pane.preview-theme-serif-manuscript {
+    background: #faf8f3;
+    color: #2c2c2c;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document,
+.preview-pane.preview-theme-serif-manuscript .preview-document {
+    font-family: "Georgia", "Times New Roman", Times, serif;
+    font-size: 18px;
+    line-height: 1.8;
+    color: #2c2c2c;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document h1 {
+    font-size: 2em;
+    font-weight: normal;
+    text-align: center;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25em;
+    border: none;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document h2 {
+    font-size: 1.4em;
+    font-weight: bold;
+    margin-top: 2em;
+    border-bottom: 1px solid #c8c0b0;
+    padding-bottom: 0.2em;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document h3,
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document h4 {
+    font-size: 1.1em;
+    font-style: italic;
+    font-weight: normal;
+    margin-top: 1.5em;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document p {
+    text-align: justify;
+    hyphens: auto;
+    margin: 0 0 1em;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document a {
+    color: #8b4513;
+    text-decoration: underline;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document code {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 85%;
+    background: #ede8df;
+    padding: 0.15em 0.35em;
+    border-radius: 2px;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document pre {
+    background: #ede8df;
+    border: 1px solid #c8c0b0;
+    border-radius: 4px;
+    padding: 1em;
+    overflow-x: auto;
+    font-size: 14px;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document blockquote {
+    border-left: 3px solid #c8a87a;
+    margin: 1.5em 0;
+    padding: 0.5em 1.5em;
+    font-style: italic;
+    color: #5a4a3a;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document hr {
+    border: none;
+    text-align: center;
+    margin: 2em 0;
+}
+
+.preview-pane[data-preview-theme="serif-manuscript"] .preview-document hr::after {
+    content: "✦ ✦ ✦";
+    color: #c8a87a;
+}
