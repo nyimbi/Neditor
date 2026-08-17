@@ -5553,96 +5553,16 @@
         @click="toggleUiMode"
       >⊞ Pilot</button>
     </div>
-    <footer v-show="!writingSpaceMaximized && store.uiMode !== 'writer'" id="document-status" class="status-bar" :class="{ 'zen-mode-status': store.zenMode }" aria-label="Document status and progress" tabindex="-1">
-      <span
-        class="status-message"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        :aria-label="`Status message: ${store.statusMessage || 'No status message'}`"
-      >
-        {{ store.statusMessage }}
-      </span>
-      <span v-if="store.externalConflict" class="conflict-actions">
-        <button type="button" @click="conflictOpen = true">Compare</button>
-        <button type="button" @click="store.acceptExternalChanges">Accept external</button>
-        <button type="button" @click="store.keepLocalChanges">Keep local</button>
-        <button type="button" @click="saveConflictCopy">Save copy</button>
-      </span>
-      <span class="word-stats" :aria-label="`Document statistics: ${wordStats}`" @click="openWordGoalDialog" style="cursor:pointer" title="Click to set word count goal">{{ wordStats }}</span>
-      <span v-if="wordGoalProgress" class="word-goal-progress" :title="`Word goal: ${wordGoalProgress.current} / ${wordGoalProgress.target}`">
-        <span class="word-goal-bar" :style="{ width: wordGoalProgress.pct + '%' }" :class="{ done: wordGoalProgress.done }"></span>
-        <small>{{ wordGoalProgress.pct }}%</small>
-      </span>
-      <span v-if="activeNudge" class="feature-nudge" role="status" aria-live="polite">
-        {{ activeNudge }}
-        <button type="button" @click="dismissNudge" aria-label="Dismiss tip">✕</button>
-      </span>
-      <span class="keymap-status" :aria-label="`Editor keybinding mode: ${editorKeymapStatus}`">{{ editorKeymapStatus }}</span>
-      <span
-        v-if="previewTimingStatus"
-        class="preview-timing"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        :aria-label="`Preview timing: ${previewTimingStatus}`"
-      >
-        {{ previewTimingStatus }}
-      </span>
-      <span
-        v-if="watchStatus"
-        class="watch-status"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        :aria-label="`File watch status: ${watchStatus}`"
-      >
-        {{ watchStatus }}
-      </span>
-      <span
-        v-if="store.compileProgress"
-        class="compile-actions"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        :aria-label="`Compile progress: ${store.compileProgress}`"
-      >
-        {{ store.compileProgress }}
-        <button type="button" @click="store.cancelActiveCompile">Cancel compile</button>
-      </span>
-      <span
-        v-if="store.exportProgress"
-        class="export-progress"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        :aria-label="`Export progress: ${store.exportProgress}`"
-      >
-        {{ store.exportProgress }}
-      </span>
-      <span
-        v-if="store.aiRun"
-        class="ai-run-pill"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        :aria-label="`AI run: ${store.aiRun.label}, ${aiElapsedSeconds}s elapsed`"
-      >
-        <span class="ai-run-label">{{ store.aiRun.label }}</span>
-        <span class="ai-run-timer">{{ aiElapsedSeconds }}s</span>
-        <button type="button" class="ai-run-cancel" @click="store.cancelAiRun()">Cancel</button>
-      </span>
-      <span
-        v-if="store.lastError"
-        class="error"
-        role="alert"
-        aria-live="assertive"
-        aria-atomic="true"
-        :aria-label="`Error: ${store.lastError}`"
-      >
-        {{ store.lastError }}
-      </span>
-    </footer>
+    <StatusBar
+      :writing-space-maximized="writingSpaceMaximized"
+      :active-nudge="activeNudge"
+      :ai-elapsed-seconds="aiElapsedSeconds"
+      :editor-keymap-status="editorKeymapStatus"
+      @open-word-goal-dialog="openWordGoalDialog"
+      @open-conflict="conflictOpen = true"
+      @save-conflict-copy="saveConflictCopy"
+      @dismiss-nudge="dismissNudge"
+    />
 
     <!-- AI provider error toast: right-anchored, appears when the last AI run surfaces a structured error -->
     <aside
@@ -8568,6 +8488,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
+import StatusBar from "./components/StatusBar.vue";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { invoke } from "@tauri-apps/api/core";

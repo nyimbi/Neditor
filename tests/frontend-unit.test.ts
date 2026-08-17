@@ -12682,9 +12682,11 @@ test("providerFetch 429 is retriable with rate-limit hint", async () => {
 
 test("App.vue: cancelAiRun handler is wired in the AI progress pill Cancel button", () => {
   const app = readFileSync("src/App.vue", "utf8");
-  ok(app.includes("store.cancelAiRun()"), "App.vue must call store.cancelAiRun()");
-  ok(app.includes("ai-run-pill"), "App.vue must include an AI progress pill element");
-  ok(app.includes("ai-run-cancel"), "App.vue must include a cancel button in the AI pill");
+  const statusBar = readFileSync("src/components/StatusBar.vue", "utf8");
+  const src = app + statusBar;
+  ok(src.includes("store.cancelAiRun()"), "App.vue must call store.cancelAiRun()");
+  ok(src.includes("ai-run-pill"), "src must include an AI progress pill element");
+  ok(src.includes("ai-run-cancel"), "src must include a cancel button in the AI pill");
 });
 
 test("App.vue: AI error toast renders kind badge, message, hint, and Dismiss button", () => {
