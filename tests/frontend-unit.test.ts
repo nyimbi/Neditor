@@ -9267,7 +9267,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
     + readFileSync("src/components/StatusBar.vue", "utf8")
     + readFileSync("src/components/ToastHost.vue", "utf8")
     + readFileSync("src/components/ThemePicker.vue", "utf8")
-    + readFileSync("src/components/KeyboardShortcutsPanel.vue", "utf8");
+    + readFileSync("src/components/KeyboardShortcutsPanel.vue", "utf8")
+    + readFileSync("src/components/SettingsPanel.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
   const aiProviderPackages = readFileSync("src/lib/aiProviderPackages.ts", "utf8");
@@ -12396,7 +12397,8 @@ test("keepInMenuBar: buildPersistedWorkspaceState includes keepInMenuBar", () =>
 });
 
 test("keepInMenuBar: App.vue exposes keepInMenuBar checkbox in Settings", () => {
-  const app = readFileSync("src/App.vue", "utf8");
+  const app = readFileSync("src/App.vue", "utf8")
+    + readFileSync("src/components/SettingsPanel.vue", "utf8");
   ok(
     app.includes("keepInMenuBar") && app.includes("menu bar"),
     "App.vue Settings panel must include a keepInMenuBar checkbox with 'menu bar' label text"
@@ -12719,7 +12721,8 @@ test("App.vue: Esc key shortcut cancels active AI run", () => {
 });
 
 test("App.vue: AI timeout settings row is present in the AI configuration section", () => {
-  const app = readFileSync("src/App.vue", "utf8");
+  const app = readFileSync("src/App.vue", "utf8")
+    + readFileSync("src/components/SettingsPanel.vue", "utf8");
   ok(app.includes("aiTimeoutSeconds"), "App.vue must reference aiTimeoutSeconds");
   ok(app.includes("ai-timeout-row"), "App.vue must include the ai-timeout-row label");
 });
