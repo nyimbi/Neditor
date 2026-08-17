@@ -83,6 +83,7 @@ import {
   beginPreviewCompileState,
   cancelPreviewCompileState,
   finishPreviewCompileState,
+  type CompileErrorKind,
 } from "../lib/previewCompileState";
 import { appendChangeNoteMarker, appendReviewCommentMarker, resolveReviewCommentAtLine } from "../lib/reviewMarkers";
 import {
@@ -358,7 +359,8 @@ export const useDocumentsStore = defineStore("documents", {
     ] as OpenDocument[],
     activeId: "",
     mode: "split" as WorkbenchMode,
-    uiMode: "writer" as "writer" | "pilot",
+    uiMode: "workbench" as "writer" | "pilot" | "workbench",
+    hasSeenEmptyState: false,
     presentationTheme: "corporate" as string,
     presentationTransition: "fade" as string,
     pilotActivityPanel: "outline" as string,
@@ -422,6 +424,14 @@ export const useDocumentsStore = defineStore("documents", {
     gitStatus: null as GitStatus | null,
     statusMessage: "Ready",
     lastError: "",
+    /**
+     * Active AI provider HTTP run. Single-run at a time; starting a second run
+     * aborts the first. In-memory only — never persisted.
+     * TODO: If the app ever supports queued/parallel AI runs, replace with a Map<id, run>.
+     */
+    aiRun: null as { id: string; label: string; startedAt: number; controller: AbortController } | null,
+    /** Structured error from the most recent AI run. Cleared on next startAiRun. */
+    aiLastError: null as import("../lib/providerRuntime").ProviderError | null,
     externalHash: "",
     externalConflict: null as ExternalConflictState | null,
     ignoredConflictHashes: {} as Record<string, string>,
@@ -450,6 +460,10 @@ export const useDocumentsStore = defineStore("documents", {
     compileTaskGate: { sequence: 0 },
     compileBusy: false,
     compileProgress: "",
+    previewFailed: false,
+    consecutiveCompileFailures: 0,
+    lastCompileErrorKind: "" as CompileErrorKind,
+    lastCompileErrorMessage: "",
     lastPreviewCompileDurationMs: null as number | null,
     lastPreviewCompiledCharacters: 0,
     lastPreviewCompiledAt: "",
@@ -644,6 +658,31 @@ export const useDocumentsStore = defineStore("documents", {
       if (!next.changed) return;
       this.aiProviderDefaults = next.value;
       void this.persistWorkspace();
+    },
+    /**
+     * Begin an AI provider run. Returns the AbortController for the run so
+     * callers can pass its signal to providerFetch / executeAiProvider*.
+     * Aborts any previous in-flight run before starting the new one.
+     */
+    startAiRun(label: string): AbortController {
+      if (this.aiRun) {
+        this.aiRun.controller.abort();
+      }
+      this.aiLastError = null;
+      const controller = new AbortController();
+      this.aiRun = { id: crypto.randomUUID(), label, startedAt: Date.now(), controller };
+      return controller;
+    },
+    /** Clear the active AI run (call in finally after success or expected errors). */
+    finishAiRun() {
+      this.aiRun = null;
+    },
+    /** Cancel the active AI run and abort its in-flight HTTP request. */
+    cancelAiRun() {
+      if (this.aiRun) {
+        this.aiRun.controller.abort();
+        this.aiRun = null;
+      }
     },
     saveGoogleIntegrationPreferences(defaults: Partial<GoogleIntegrationPreferences>) {
       const next = saveGoogleIntegrationPreferencesState(this.googleIntegration, defaults);
@@ -979,7 +1018,9 @@ export const useDocumentsStore = defineStore("documents", {
         await this.syncFileWatcher();
       } catch (error) {
         if (isLatestDocumentTaskCurrent(this.compileTaskGate, snapshot, this.activeDocument)) {
-          Object.assign(this, applyPreviewCompileFailureState(error, isMissingTauriBackendError(error)));
+          const failState = applyPreviewCompileFailureState(error, isMissingTauriBackendError(error));
+          this.consecutiveCompileFailures += 1;
+          Object.assign(this, failState);
         }
       } finally {
         if (isLatestDocumentTaskCurrent(this.compileTaskGate, snapshot, this.activeDocument)) {
