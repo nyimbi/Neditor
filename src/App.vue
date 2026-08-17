@@ -359,31 +359,13 @@
           >{{ activityBadges[group.id] > 9 ? '9+' : activityBadges[group.id] }}</span>
         </button>
       </nav>
-      <aside
-        v-show="store.mode !== 'outline' && !writingSpaceMaximized && !store.zenMode"
-        id="document-sidebar"
-        :key="store.sidebar"
-        :data-sidebar="store.sidebar"
-        class="sidebar"
-        aria-label="Document workspace"
-        tabindex="-1"
+      <Sidebar
+        :writing-space-maximized="writingSpaceMaximized"
+        :sidebar-collapsed="sidebarCollapsed"
+        :sidebar-width="sidebarWidth"
+        @toggle-sidebar-collapsed="toggleSidebarCollapsed"
+        @update:sidebar-width="sidebarWidth = $event"
       >
-        <div
-          v-if="store.uiMode === 'pilot'"
-          class="sidebar-resize-handle"
-          title="Drag to resize"
-          @mousedown.prevent="onSidebarResizeStart"
-        ></div>
-        <button
-          type="button"
-          class="sidebar-collapse-btn"
-          :title="sidebarCollapsed ? 'Expand sidebar (⌘B)' : 'Collapse sidebar (⌘B)'"
-          :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-          @click="toggleSidebarCollapsed()"
-        >{{ sidebarCollapsed ? '▶' : '◀' }}</button>
-        <header v-if="store.uiMode === 'pilot'" class="sidebar-panel-header" aria-label="Current panel">
-          <span class="sidebar-panel-name">{{ currentPanelLabel }}</span>
-        </header>
         <template v-if="store.sidebar === 'files'">
           <h2>Workspace</h2>
           <!-- Pinned files -->
@@ -3453,7 +3435,118 @@
           </article>
         </template>
 
-        <template v-else-if="store.sidebar === 'help'">
+        <!-- ── Backlinks panel ──────────────────────────────────────────────── -->
+        <template v-else-if="store.sidebar === 'backlinks'">
+          <h2>Backlinks</h2>
+          <div class="sidebar-toolbar">
+            <button type="button" @click="refreshBacklinks" :disabled="backlinksLoading" title="Refresh backlinks">↻ Refresh</button>
+          </div>
+          <section class="backlinks-panel" aria-label="Documents linking to this document">
+            <div v-if="backlinksLoading" class="sidebar-loading">Scanning workspace…</div>
+            <template v-else>
+              <div class="backlinks-group" v-if="backlinksData.length">
+                <h3>Linked ({{ backlinksData.length }})</h3>
+                <button
+                  v-for="bl in backlinksData"
+                  :key="bl.source_path + ':' + bl.line"
+                  type="button"
+                  class="backlink-item"
+                  :title="bl.excerpt"
+                  @click="store.openPath(bl.source_path)"
+                >
+                  <span class="backlink-file">{{ bl.source_path.split('/').pop() }}</span>
+                  <small class="backlink-line">line {{ bl.line }}</small>
+                  <span class="backlink-excerpt">{{ bl.excerpt }}</span>
+                </button>
+              </div>
+              <p v-else class="sidebar-hint">No documents in this workspace link to <em>{{ active?.title }}</em>.</p>
+              <div class="backlinks-group" v-if="unlinkedMentionsData.length" style="margin-top:12px">
+                <h3>Unlinked mentions ({{ unlinkedMentionsData.length }})</h3>
+                <button
+                  v-for="bl in unlinkedMentionsData"
+                  :key="bl.source_path + ':' + bl.line + ':unlinked'"
+                  type="button"
+                  class="backlink-item"
+                  :title="bl.excerpt"
+                  @click="store.openPath(bl.source_path)"
+                >
+                  <span class="backlink-file">{{ bl.source_path.split('/').pop() }}</span>
+                  <small class="backlink-line">line {{ bl.line }}</small>
+                  <span class="backlink-excerpt">{{ bl.excerpt }}</span>
+                </button>
+              </div>
+            </template>
+          </section>
+        </template>
+
+        <!-- ── Tasks panel ──────────────────────────────────────────────────── -->
+        <template v-else-if="store.sidebar === 'tasks'">
+          <h2>Tasks</h2>
+          <div class="sidebar-toolbar tasks-toolbar">
+            <button type="button" @click="refreshWorkspaceTasks" :disabled="tasksLoading" title="Refresh tasks">↻</button>
+            <button type="button" :class="{ active: tasksFilterStatus === 'all' }" @click="tasksFilterStatus = 'all'">All</button>
+            <button type="button" :class="{ active: tasksFilterStatus === 'todo' }" @click="tasksFilterStatus = 'todo'">Todo</button>
+            <button type="button" :class="{ active: tasksFilterStatus === 'done' }" @click="tasksFilterStatus = 'done'">Done</button>
+          </div>
+          <div class="tasks-tag-filter" v-if="allTaskTags.length">
+            <select v-model="tasksFilterTag" aria-label="Filter by tag">
+              <option value="">All tags</option>
+              <option v-for="tag in allTaskTags" :key="tag" :value="tag">#{{ tag }}</option>
+            </select>
+          </div>
+          <section class="tasks-panel" aria-label="Workspace tasks">
+            <div v-if="tasksLoading" class="sidebar-loading">Scanning workspace…</div>
+            <template v-else>
+              <p v-if="!filteredTasks.length" class="sidebar-hint">
+                {{ workspaceTasks.length ? 'No tasks match the current filter.' : 'No checkboxes found in workspace. Use - [ ] to create tasks.' }}
+              </p>
+              <div class="task-group" v-for="(groupTasks, groupKey) in filteredTasks.reduce((acc: Record<string, typeof filteredTasks>, t) => { (acc[t.file_path] = acc[t.file_path] || []).push(t); return acc; }, {})" :key="String(groupKey)">
+                <h4 class="task-group-header">{{ String(groupKey).split('/').pop() }}</h4>
+                <label
+                  v-for="task in groupTasks as typeof filteredTasks"
+                  :key="task.file_path + ':' + task.line"
+                  class="task-item"
+                  :class="{ done: task.done }"
+                >
+                  <input type="checkbox" :checked="task.done" disabled />
+                  <span class="task-text">{{ task.text }}</span>
+                  <span v-if="task.due_date" class="task-due">{{ task.due_date }}</span>
+                  <button type="button" class="task-goto" @click="store.openPath(task.file_path)" title="Open file">→</button>
+                </label>
+              </div>
+            </template>
+          </section>
+        </template>
+
+        <!-- ── Daily Notes panel ────────────────────────────────────────────── -->
+        <template v-else-if="store.sidebar === 'daily-notes'">
+          <h2>Daily Notes</h2>
+          <div class="sidebar-toolbar">
+            <button type="button" @click="openTodayNote" class="primary" title="Open today's note (⌘⇧D)">Today</button>
+          </div>
+          <section class="daily-notes-panel" aria-label="Daily notes calendar">
+            <div class="daily-notes-calendar-nav">
+              <button type="button" @click="if (dailyNotesCalendarMonth === 1) { dailyNotesCalendarYear--; dailyNotesCalendarMonth = 12; } else dailyNotesCalendarMonth--">‹</button>
+              <span>{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dailyNotesCalendarMonth - 1] }} {{ dailyNotesCalendarYear }}</span>
+              <button type="button" @click="if (dailyNotesCalendarMonth === 12) { dailyNotesCalendarYear++; dailyNotesCalendarMonth = 1; } else dailyNotesCalendarMonth++">›</button>
+            </div>
+            <div class="daily-notes-calendar-grid" role="grid" aria-label="Daily notes calendar">
+              <div class="cal-dow" v-for="d in ['Su','Mo','Tu','We','Th','Fr','Sa']" :key="d">{{ d }}</div>
+              <button
+                v-for="cell in dailyNotesCalendarGrid"
+                :key="cell.date || 'empty-' + cell.day"
+                type="button"
+                :class="['cal-day', { 'cal-empty': cell.empty, 'cal-has-note': cell.hasNote, 'cal-today': cell.isToday }]"
+                :disabled="cell.empty"
+                :aria-label="cell.date ? `Open note for ${cell.date}` : undefined"
+                @click="cell.date && openDailyNoteForDate(cell.date)"
+              >{{ cell.day || '' }}</button>
+            </div>
+            <p class="sidebar-hint" v-if="!store.workspaceRoot">Open a workspace folder to enable daily notes.</p>
+          </section>
+        </template>
+
+        <template #help-panel>
           <KeyboardShortcutsPanel
             :help-query="helpQuery"
             :help-category="helpCategory"
@@ -3473,7 +3566,7 @@
           />
         </template>
 
-        <template v-else-if="store.sidebar === 'settings'">
+        <template #settings-panel>
           <SettingsPanel
             v-model:agent-provider-id="agentProviderId"
             v-model:agent-provider-model="agentProviderModel"
@@ -3614,119 +3707,7 @@
             :probe-import-tools="probeImportTools"
           />
         </template>
-
-        <!-- ── Backlinks panel ──────────────────────────────────────────────── -->
-        <template v-else-if="store.sidebar === 'backlinks'">
-          <h2>Backlinks</h2>
-          <div class="sidebar-toolbar">
-            <button type="button" @click="refreshBacklinks" :disabled="backlinksLoading" title="Refresh backlinks">↻ Refresh</button>
-          </div>
-          <section class="backlinks-panel" aria-label="Documents linking to this document">
-            <div v-if="backlinksLoading" class="sidebar-loading">Scanning workspace…</div>
-            <template v-else>
-              <div class="backlinks-group" v-if="backlinksData.length">
-                <h3>Linked ({{ backlinksData.length }})</h3>
-                <button
-                  v-for="bl in backlinksData"
-                  :key="bl.source_path + ':' + bl.line"
-                  type="button"
-                  class="backlink-item"
-                  :title="bl.excerpt"
-                  @click="store.openPath(bl.source_path)"
-                >
-                  <span class="backlink-file">{{ bl.source_path.split('/').pop() }}</span>
-                  <small class="backlink-line">line {{ bl.line }}</small>
-                  <span class="backlink-excerpt">{{ bl.excerpt }}</span>
-                </button>
-              </div>
-              <p v-else class="sidebar-hint">No documents in this workspace link to <em>{{ active?.title }}</em>.</p>
-              <div class="backlinks-group" v-if="unlinkedMentionsData.length" style="margin-top:12px">
-                <h3>Unlinked mentions ({{ unlinkedMentionsData.length }})</h3>
-                <button
-                  v-for="bl in unlinkedMentionsData"
-                  :key="bl.source_path + ':' + bl.line + ':unlinked'"
-                  type="button"
-                  class="backlink-item"
-                  :title="bl.excerpt"
-                  @click="store.openPath(bl.source_path)"
-                >
-                  <span class="backlink-file">{{ bl.source_path.split('/').pop() }}</span>
-                  <small class="backlink-line">line {{ bl.line }}</small>
-                  <span class="backlink-excerpt">{{ bl.excerpt }}</span>
-                </button>
-              </div>
-            </template>
-          </section>
-        </template>
-
-        <!-- ── Tasks panel ──────────────────────────────────────────────────── -->
-        <template v-else-if="store.sidebar === 'tasks'">
-          <h2>Tasks</h2>
-          <div class="sidebar-toolbar tasks-toolbar">
-            <button type="button" @click="refreshWorkspaceTasks" :disabled="tasksLoading" title="Refresh tasks">↻</button>
-            <button type="button" :class="{ active: tasksFilterStatus === 'all' }" @click="tasksFilterStatus = 'all'">All</button>
-            <button type="button" :class="{ active: tasksFilterStatus === 'todo' }" @click="tasksFilterStatus = 'todo'">Todo</button>
-            <button type="button" :class="{ active: tasksFilterStatus === 'done' }" @click="tasksFilterStatus = 'done'">Done</button>
-          </div>
-          <div class="tasks-tag-filter" v-if="allTaskTags.length">
-            <select v-model="tasksFilterTag" aria-label="Filter by tag">
-              <option value="">All tags</option>
-              <option v-for="tag in allTaskTags" :key="tag" :value="tag">#{{ tag }}</option>
-            </select>
-          </div>
-          <section class="tasks-panel" aria-label="Workspace tasks">
-            <div v-if="tasksLoading" class="sidebar-loading">Scanning workspace…</div>
-            <template v-else>
-              <p v-if="!filteredTasks.length" class="sidebar-hint">
-                {{ workspaceTasks.length ? 'No tasks match the current filter.' : 'No checkboxes found in workspace. Use - [ ] to create tasks.' }}
-              </p>
-              <div class="task-group" v-for="(groupTasks, groupKey) in filteredTasks.reduce((acc: Record<string, typeof filteredTasks>, t) => { (acc[t.file_path] = acc[t.file_path] || []).push(t); return acc; }, {})" :key="String(groupKey)">
-                <h4 class="task-group-header">{{ String(groupKey).split('/').pop() }}</h4>
-                <label
-                  v-for="task in groupTasks as typeof filteredTasks"
-                  :key="task.file_path + ':' + task.line"
-                  class="task-item"
-                  :class="{ done: task.done }"
-                >
-                  <input type="checkbox" :checked="task.done" disabled />
-                  <span class="task-text">{{ task.text }}</span>
-                  <span v-if="task.due_date" class="task-due">{{ task.due_date }}</span>
-                  <button type="button" class="task-goto" @click="store.openPath(task.file_path)" title="Open file">→</button>
-                </label>
-              </div>
-            </template>
-          </section>
-        </template>
-
-        <!-- ── Daily Notes panel ────────────────────────────────────────────── -->
-        <template v-else-if="store.sidebar === 'daily-notes'">
-          <h2>Daily Notes</h2>
-          <div class="sidebar-toolbar">
-            <button type="button" @click="openTodayNote" class="primary" title="Open today's note (⌘⇧D)">Today</button>
-          </div>
-          <section class="daily-notes-panel" aria-label="Daily notes calendar">
-            <div class="daily-notes-calendar-nav">
-              <button type="button" @click="if (dailyNotesCalendarMonth === 1) { dailyNotesCalendarYear--; dailyNotesCalendarMonth = 12; } else dailyNotesCalendarMonth--">‹</button>
-              <span>{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dailyNotesCalendarMonth - 1] }} {{ dailyNotesCalendarYear }}</span>
-              <button type="button" @click="if (dailyNotesCalendarMonth === 12) { dailyNotesCalendarYear++; dailyNotesCalendarMonth = 1; } else dailyNotesCalendarMonth++">›</button>
-            </div>
-            <div class="daily-notes-calendar-grid" role="grid" aria-label="Daily notes calendar">
-              <div class="cal-dow" v-for="d in ['Su','Mo','Tu','We','Th','Fr','Sa']" :key="d">{{ d }}</div>
-              <button
-                v-for="cell in dailyNotesCalendarGrid"
-                :key="cell.date || 'empty-' + cell.day"
-                type="button"
-                :class="['cal-day', { 'cal-empty': cell.empty, 'cal-has-note': cell.hasNote, 'cal-today': cell.isToday }]"
-                :disabled="cell.empty"
-                :aria-label="cell.date ? `Open note for ${cell.date}` : undefined"
-                @click="cell.date && openDailyNoteForDate(cell.date)"
-              >{{ cell.day || '' }}</button>
-            </div>
-            <p class="sidebar-hint" v-if="!store.workspaceRoot">Open a workspace folder to enable daily notes.</p>
-          </section>
-        </template>
-
-      </aside>
+      </Sidebar>
 
       <!-- ── Knowledge graph view ─────────────────────────────────────────── -->
       <section v-if="store.mode === 'graph'" class="graph-view" aria-label="Knowledge graph">
@@ -6930,6 +6911,7 @@ import SettingsPanel from "./components/SettingsPanel.vue";
 import TabsBar from "./components/TabsBar.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import Toolbar from "./components/Toolbar.vue";
+import Sidebar from "./components/Sidebar.vue";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { invoke } from "@tauri-apps/api/core";
@@ -26461,19 +26443,6 @@ function toggleWriterFlyover(panel: 'diagnostics' | 'export'): void {
   writerFlyover.value = writerFlyover.value === panel ? null : panel;
 }
 
-function onSidebarResizeStart(event: MouseEvent): void {
-  const startX = event.clientX;
-  const startW = sidebarWidth.value;
-  const onMove = (e: MouseEvent) => {
-    sidebarWidth.value = Math.max(160, Math.min(480, startW + (e.clientX - startX)));
-  };
-  const onUp = () => {
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
-  };
-  window.addEventListener('mousemove', onMove);
-  window.addEventListener('mouseup', onUp);
-}
 
 function onInspectorResizeStart(event: MouseEvent): void {
   const startX = event.clientX;
@@ -26502,12 +26471,6 @@ const sessionWordsAdded = computed(() => {
   return Math.max(0, activeWordCount.value - sessionStartWords.value);
 });
 
-const PANEL_LABELS: Record<string, string> = {
-  files: 'Files', outline: 'Outline', diagnostics: 'Diagnostics', layout: 'Layout',
-  tables: 'Tables', templates: 'Templates', references: 'References',
-  exports: 'Export', versioning: 'Versioning', review: 'Review', help: 'Help', settings: 'Settings',
-};
-const currentPanelLabel = computed(() => PANEL_LABELS[store.sidebar as string] || String(store.sidebar));
 
 const activityBadges = computed(() => {
   const diags = active.value?.compile?.diagnostics || [];

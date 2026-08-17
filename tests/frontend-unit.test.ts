@@ -12068,7 +12068,9 @@ test("zen mode hides command toolbar rows", () => {
 
 test("zen mode hides sidebar and activity bar", () => {
   const app = readFileSync("src/App.vue", "utf8");
-  ok(app.includes("!store.zenMode") && app.includes('id="document-sidebar"'), "sidebar must be hidden in zen mode");
+  const sidebar = readFileSync("src/components/Sidebar.vue", "utf8");
+  const sidebarId = app.includes('id="document-sidebar"') || sidebar.includes('id="document-sidebar"');
+  ok(app.includes("!store.zenMode") && sidebarId, "sidebar must be hidden in zen mode");
   ok(app.includes("!store.zenMode") && app.includes('class="activity-bar"'), "activity bar must be hidden in zen mode");
 });
 
