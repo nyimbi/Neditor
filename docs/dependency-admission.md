@@ -50,6 +50,8 @@ dependency.
 | `typescript` | `~5.6.2` | Apache-2.0 | Type checking | Dev-only | Not appropriate | Build-time only |
 | `vite` | `^6.0.3` | MIT | Frontend build server/bundler | Dev-only | Required by scaffold | Build-time only |
 | `vue-tsc` | `^2.1.10` | MIT | Vue type checking | Dev-only | Not appropriate | Build-time only |
+| `@vue/test-utils` | `^2.4.11` | MIT | Vue component mounting for DOM snapshot tests | Dev-only | node:test lacks component mount primitives | Test-only; no runtime distribution |
+| `happy-dom` | `^20.11.2` | MIT | Lightweight DOM environment for node --test (faster than jsdom) | Dev-only | jsdom is heavier; headless Playwright overkill for unit tests | Test-only; no runtime distribution |
 
 ## Rust Dependencies
 

@@ -10903,7 +10903,7 @@ test("local verification scripts expose local baseline checks", () => {
   equal(scripts["test:desktop-smoke"], "node scripts/check-desktop-smoke.mjs");
   equal(scripts["test:tauri-webdriver"], "node scripts/run-tauri-webdriver.mjs");
   equal(scripts["test:rendered-exports"], "node scripts/check-rendered-export-audit.mjs");
-  equal(scripts["test:unit"], "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js");
+  equal(scripts["test:unit"], "vite build --config vite.snapshot.config.ts && node scripts/tsc-large-stack.mjs -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js .tmp-tests/tests/frontend-snapshots.test.js");
   equal(scripts["test:e2e"], "node scripts/run-e2e.mjs");
   ok(verification.includes('command("Browser workflow environment", "node", ["scripts/check-e2e-environment.mjs"])'));
   ok(verification.includes('command("Browser workflow suite", "node", ["scripts/run-e2e.mjs"])'));

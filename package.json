@@ -63,7 +63,7 @@
     "test:performance-audit": "node scripts/check-performance-audit.mjs",
     "test:tauri-webdriver": "node scripts/run-tauri-webdriver.mjs",
     "test:rendered-exports": "node scripts/check-rendered-export-audit.mjs",
-    "test:unit": "tsc -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js",
+    "test:unit": "vite build --config vite.snapshot.config.ts && node scripts/tsc-large-stack.mjs -p tsconfig.test.json && node --test .tmp-tests/tests/frontend-unit.test.js .tmp-tests/tests/frontend-snapshots.test.js",
     "test:e2e": "node scripts/run-e2e.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
@@ -103,6 +103,8 @@
     "@playwright/test": "^1.60.0",
     "@tauri-apps/cli": "^2",
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.11",
+    "happy-dom": "^20.11.2",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
     "vue-tsc": "^2.1.10"

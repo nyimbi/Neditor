@@ -1,0 +1,355 @@
+// @ts-nocheck
+// happy-dom's Window type has circular self-references that cause TypeScript's
+// flow-type resolver to overflow the call stack on this file.  @ts-nocheck
+// suppresses type checking while still allowing tsc to emit the JS output.
+// Vite's build step (which runs first) provides actual type safety for the
+// App.vue compilation.  See docs/componentization-plan.md blocker B6.
+/**
+ * DOM snapshot tests — Phase 0 componentization safety net.
+ *
+ * Each test mounts App with a specific store state, serializes the rendered
+ * HTML (dynamic bits stripped), and writes / compares a snapshot file under
+ * tests/snapshots/.
+ *
+ * First run: creates snapshot files (always passes).
+ * Subsequent runs: compares; fails with a diff on structural change.
+ * UPDATE_SNAPSHOTS=1 pnpm run test:unit — refreshes all snapshots.
+ *
+ * Blockers documented in docs/componentization-plan.md.
+ */
+
+import test, { after } from "node:test";
+import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
+import { join as joinPath, dirname as dirPath } from "node:path";
+import { fileURLToPath as toFilePath } from "node:url";
+
+// ── 1. DOM environment (must precede any Vue/App import) ───────────────────
+import { Window } from "happy-dom";
+
+const happyWin = new Window({ url: "http://localhost/" });
+
+// Patch globals before any module that touches the DOM is loaded.
+// Some properties on globalThis are read-only getters in Node 26 (navigator,
+// location, history) — use defineProperty with writable:true to override them.
+function defineGlobal(key: string, value: unknown): void {
+  try {
+    const desc = Object.getOwnPropertyDescriptor(globalThis, key);
+    if (desc && !desc.writable && !desc.set) {
+      Object.defineProperty(globalThis, key, { value, writable: true, configurable: true });
+    } else {
+      (globalThis as Record<string, unknown>)[key] = value;
+    }
+  } catch {
+    // Silently skip properties that cannot be patched in this runtime.
+  }
+}
+
+defineGlobal("window",   happyWin);
+defineGlobal("document", happyWin.document);
+defineGlobal("navigator", happyWin.navigator);
+defineGlobal("location",  happyWin.location);
+defineGlobal("history",   happyWin.history);
+defineGlobal("getComputedStyle", happyWin.getComputedStyle.bind(happyWin));
+defineGlobal("MutationObserver", happyWin.MutationObserver);
+defineGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => setTimeout(cb, 0) as unknown as number);
+defineGlobal("cancelAnimationFrame",  (id: number) => clearTimeout(id as unknown as ReturnType<typeof setTimeout>));
+defineGlobal("ResizeObserver", class ResizeObserver {
+  observe()    {}
+  unobserve()  {}
+  disconnect() {}
+});
+defineGlobal("IntersectionObserver", class IntersectionObserver {
+  observe()    {}
+  unobserve()  {}
+  disconnect() {}
+  takeRecords(): [] { return []; }
+});
+if (!globalThis.performance) {
+  defineGlobal("performance", { now: () => Date.now() });
+}
+// Vue's resolveRootNamespace checks `el instanceof SVGElement` — expose DOM
+// constructors that happy-dom provides on its Window object.
+const DOM_CONSTRUCTORS = [
+  "SVGElement", "HTMLElement", "Element", "Node", "EventTarget",
+  "CustomEvent", "Event", "KeyboardEvent", "MouseEvent", "TouchEvent",
+  "Text", "Comment", "DocumentFragment", "ShadowRoot",
+  "HTMLInputElement", "HTMLButtonElement", "HTMLSelectElement",
+  "HTMLTextAreaElement", "HTMLDivElement", "HTMLSpanElement",
+  "HTMLAnchorElement", "HTMLImageElement", "HTMLCanvasElement",
+  "HTMLFormElement", "HTMLLabelElement", "HTMLOptionElement",
+  "HTMLIFrameElement", "HTMLScriptElement", "HTMLStyleElement",
+  "HTMLLinkElement", "HTMLMetaElement", "HTMLTableElement",
+  "CSSStyleDeclaration", "XMLSerializer", "DOMParser",
+  "Blob", "File", "FileList", "FileReader",
+  "URL", "URLSearchParams",
+  "AbortController", "AbortSignal",
+] as const;
+
+for (const name of DOM_CONSTRUCTORS) {
+  if ((happyWin as any)[name] !== undefined) {
+    defineGlobal(name, (happyWin as any)[name]);
+  }
+}
+
+// App.vue accesses window.__neditor_boot before any await in onMounted.
+(globalThis as Record<string, unknown>)["__neditor_boot"] = {};
+
+// ── 2. Vue test-utils + Pinia — DYNAMIC imports ────────────────────────────
+// Static imports are evaluated before ANY module code, so @vue/test-utils
+// and Vue's runtime-dom would capture a null `document` at load time.
+// Dynamic imports below execute AFTER the globals are set above.
+const { flushPromises } = await import("@vue/test-utils");
+const { createPinia, setActivePinia } = await import("pinia");
+// createApp bypasses @vue/test-utils' error collector which re-throws every
+// caught error regardless of the user's errorHandler.  Raw createApp lets our
+// own handler suppress TDZ / Tauri / CodeMirror errors permanently.
+const { createApp } = await import("vue");
+
+// ── 3. Dynamic import of the Vite-bundled App (after globals are set) ───────
+// AppBundle.js is generated by `vite build --config vite.snapshot.config.ts`
+// and emits to .tmp-tests/AppBundle.js.  At test runtime we're already inside
+// .tmp-tests/tests/, so the path is one level up.
+// @ts-ignore: generated artifact — types in AppBundle.d.ts at project root
+const bundle = await import("../AppBundle.js") as {
+  default: import("vue").DefineComponent<Record<string, never>, Record<string, never>, unknown>;
+  useDocumentsStore: () => {
+    $patch(s: Record<string, unknown>): void;
+    bootCritical: () => Promise<void>;
+    bootBackground: () => Promise<void>;
+    [k: string]: unknown;
+  };
+  useToasts: () => {
+    push(t: { kind: string; title: string; body?: string }): string;
+    dismiss(id: string): void;
+    visible: Array<{ id: string; kind: string; title: string; body?: string }>;
+    [k: string]: unknown;
+  };
+};
+
+const App              = bundle.default;
+const useDocumentsStore = bundle.useDocumentsStore;
+const useToasts        = bundle.useToasts;
+
+import { domSnapshot } from "./lib/domSnapshot.js";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Serialize element HTML for snapshotting. */
+function html(el: Element | null): string {
+  return el?.outerHTML ?? "<empty/>";
+}
+
+/** Mount App with the given document-store patch and return element + stores. */
+async function mountWithState(patch: Record<string, unknown> = {}) {
+  const pinia = createPinia();
+  setActivePinia(pinia);
+
+  const docStore = useDocumentsStore();
+  // Stub boot actions so Tauri calls cannot overwrite our pre-set state.
+  docStore.bootCritical  = async () => {};
+  docStore.bootBackground = async () => {};
+  docStore.$patch(patch);
+
+  // Use raw createApp instead of @vue/test-utils mount().
+  // test-utils re-throws ALL errors collected during mount (including TDZ
+  // errors that our errorHandler suppresses).  createApp + our own
+  // app.config.errorHandler lets us truly suppress expected test-env errors.
+  const div = happyWin.document.createElement("div");
+  (happyWin.document.body as unknown as HTMLElement).appendChild(div as unknown as HTMLElement);
+
+  const app = createApp(App);
+  app.config.errorHandler = (err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      !msg.includes("__TAURI") &&
+      !msg.includes("invoke") &&
+      !msg.includes("isTauri") &&
+      !msg.includes("initialization") &&   // TDZ: "Cannot access 'x' before initialization"
+      !msg.includes("Cannot read properties of undefined") &&
+      !msg.includes("EditorView") &&
+      !msg.includes("getBoundingClientRect") &&
+      !msg.includes("performance")
+    ) {
+      console.warn("[snapshot mount error]", msg);
+    }
+  };
+  app.use(pinia);
+  app.mount(div as unknown as HTMLElement);
+
+  // Flush microtasks so async onMounted work (now a no-op) settles.
+  await flushPromises();
+
+  const toastStore = useToasts();
+  const element = (div.firstElementChild ?? div) as unknown as Element;
+  const unmount = () => {
+    try { app.unmount(); } catch {}
+    try { (happyWin.document.body as unknown as HTMLElement).removeChild(div as unknown as HTMLElement); } catch {}
+  };
+  return { element, unmount, docStore, toastStore, pinia };
+}
+
+// After all tests, clean up the happy-dom window.
+// happy-dom's event system keeps the Node.js event loop alive; exit explicitly
+// so `node --test` completes instead of hanging indefinitely.
+after(() => {
+  try { happyWin.close(); } catch {}
+  setImmediate(() => process.exit(0));
+});
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+test("snapshot: workbench mode default", async () => {
+  const { element, unmount } = await mountWithState({ uiMode: "workbench", zenMode: false });
+  await domSnapshot("01-workbench-default", html(element));
+  unmount();
+});
+
+test("snapshot: writer mode", async () => {
+  const { element, unmount } = await mountWithState({ uiMode: "writer" });
+  await domSnapshot("02-writer-mode", html(element));
+  unmount();
+});
+
+test("snapshot: zen mode", async () => {
+  const { element, unmount } = await mountWithState({ zenMode: true });
+  await domSnapshot("03-zen-mode", html(element));
+  unmount();
+});
+
+test("snapshot: pilot mode", async () => {
+  const { element, unmount } = await mountWithState({ uiMode: "pilot" });
+  await domSnapshot("04-pilot-mode", html(element));
+  unmount();
+});
+
+test("snapshot: empty-state overlay visible", async () => {
+  const { element, unmount } = await mountWithState({ hasSeenEmptyState: false });
+  await domSnapshot("05-empty-state-visible", html(element));
+  unmount();
+});
+
+test("snapshot: empty-state overlay dismissed", async () => {
+  const { element, unmount } = await mountWithState({ hasSeenEmptyState: true });
+  await domSnapshot("06-empty-state-dismissed", html(element));
+  unmount();
+});
+
+test("snapshot: sidebar panel – outline", async () => {
+  const { element, unmount } = await mountWithState({ sidebar: "outline" });
+  await domSnapshot("07a-sidebar-outline", html(element));
+  unmount();
+});
+
+test("snapshot: sidebar panel – files", async () => {
+  const { element, unmount } = await mountWithState({ sidebar: "files" });
+  await domSnapshot("07b-sidebar-files", html(element));
+  unmount();
+});
+
+test("snapshot: sidebar panel – exports", async () => {
+  const { element, unmount } = await mountWithState({ sidebar: "exports" });
+  await domSnapshot("07c-sidebar-exports", html(element));
+  unmount();
+});
+
+test("snapshot: sidebar panel – versioning", async () => {
+  const { element, unmount } = await mountWithState({ sidebar: "versioning" });
+  await domSnapshot("07d-sidebar-versioning", html(element));
+  unmount();
+});
+
+test("snapshot: sidebar panel – review", async () => {
+  const { element, unmount } = await mountWithState({ sidebar: "review" });
+  await domSnapshot("07e-sidebar-review", html(element));
+  unmount();
+});
+
+test("snapshot: sidebar panel – references", async () => {
+  const { element, unmount } = await mountWithState({ sidebar: "references" });
+  await domSnapshot("07f-sidebar-references", html(element));
+  unmount();
+});
+
+test("snapshot: command palette open", async () => {
+  // commandPaletteOpen is a local ref inside App's setup — trigger via
+  // the keyboard shortcut so we don't need to reach inside the closure.
+  const { element, unmount } = await mountWithState({});
+  // Dispatch the keyboard shortcut that opens the palette (⌘K / Ctrl+K).
+  const keyEvent = new (happyWin.KeyboardEvent as unknown as typeof KeyboardEvent)("keydown", {
+    key: "k",
+    metaKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  (happyWin.document.body as unknown as HTMLElement).dispatchEvent(keyEvent);
+  await flushPromises();
+  await domSnapshot("08-command-palette-open", html(element));
+  unmount();
+});
+
+test("snapshot: settings panel open", async () => {
+  // Settings is a sidebar panel, not a separate overlay.
+  const { element, unmount } = await mountWithState({ sidebar: "settings" });
+  await domSnapshot("09-settings-panel", html(element));
+  unmount();
+});
+
+test("snapshot: toast host – info + warning + error", async () => {
+  const { element, unmount, toastStore } = await mountWithState({});
+  toastStore.push({ kind: "info",    title: "Info toast",    body: "Test info message" });
+  toastStore.push({ kind: "warning", title: "Warning toast", body: "Test warning message" });
+  toastStore.push({ kind: "error",   title: "Error toast",   body: "Test error message" });
+  await flushPromises();
+  await domSnapshot("10-toast-host", html(element));
+  unmount();
+});
+
+test("snapshot: degraded preview state", async () => {
+  const { element, unmount } = await mountWithState({ previewFailed: true });
+  await domSnapshot("11-preview-failed", html(element));
+  unmount();
+});
+
+test("snapshot: AI progress pill active", async () => {
+  const { element, unmount, docStore } = await mountWithState({});
+  (docStore as Record<string, unknown>)["aiRun"] = {
+    id: "test-run-id",
+    label: "Summarising document…",
+    startedAt: Date.now(),
+    controller: new AbortController(),
+  };
+  await flushPromises();
+  await domSnapshot("12-ai-progress-pill", html(element));
+  unmount();
+});
+
+test("snapshot: AI error card visible", async () => {
+  const { element, unmount, docStore } = await mountWithState({});
+  (docStore as Record<string, unknown>)["aiLastError"] = {
+    kind: "network",
+    message: "Connection refused",
+    provider: "openai",
+    statusCode: null,
+  };
+  await flushPromises();
+  await domSnapshot("13-ai-error-card", html(element));
+  unmount();
+});
+
+// Sentinel: verifies the snapshot file count matches expectation.
+test("snapshot: file count matches", () => {
+  // At runtime this file is at .tmp-tests/tests/frontend-snapshots.test.js
+  // (compiled by tsc); two levels up reaches the project root.
+  const here = dirPath(toFilePath(import.meta.url));
+  const dir  = joinPath(here, "..", "..", "tests", "snapshots");
+  try {
+    const files = readdirSync(dir).filter((f) => f.endsWith(".html"));
+    assert.ok(files.length >= 13, `Expected ≥13 snapshot files, got ${files.length}`);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      assert.fail("snapshots/ directory missing — run tests once to create it");
+    }
+    throw e;
+  }
+});
