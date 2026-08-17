@@ -104,101 +104,19 @@
           </section>
         </div>
       </nav>
-      <section v-show="!store.zenMode" class="document-tabs" aria-label="Open documents">
-        <section
-          v-for="group in groupedDocuments"
-          :key="group.key"
-          class="tab-group"
-          :aria-label="`${group.label} tabs`"
-          @dragover.prevent
-          @drop="dropTabOnGroup(group, $event)"
-        >
-          <header class="tab-group-header" :title="group.title">
-            <span class="tab-group-title">
-              <span>{{ group.label }}</span>
-              <small>{{ group.documents.length }}</small>
-            </span>
-            <button class="tab-icon-button" type="button" aria-label="Close tab group" title="Close tab group" @click="closeTabGroup(group)">
-              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                <path v-for="path in toolbarIconPaths('close')" :key="path" :d="path"></path>
-              </svg>
-            </button>
-          </header>
-          <div
-            v-for="(document, tabIndex) in group.documents"
-            :key="document.id"
-            class="tab"
-            :class="{ active: document.id === store.activeId }"
-            :title="document.path || document.title"
-            :data-document-path="document.path || ''"
-            draggable="true"
-            @pointerdown="draggedTabId = document.id"
-            @dragstart="startTabDrag(document.id, $event)"
-            @dragover.prevent
-            @drop="dropTabOnDocument(document, $event)"
-            @dragend="draggedTabId = ''"
-          >
-            <span
-              class="tab-drag-handle"
-              draggable="true"
-              title="Drag tab"
-              aria-hidden="true"
-              @dragstart="startTabDrag(document.id, $event)"
-            >::</span>
-            <button
-              class="tab-main"
-              type="button"
-              :aria-label="documentTabAriaLabel(document)"
-              @click="activate(document.id)"
-            >
-              <span v-if="document.dirty" class="tab-dirty" aria-hidden="true"></span>
-              <span class="tab-title">{{ document.title }}</span>
-              <small v-if="documentTabFileName(document)" class="tab-file-name">{{ documentTabFileName(document) }}</small>
-            </button>
-            <button
-              class="tab-icon-button"
-              type="button"
-              aria-label="Move tab left"
-              :title="`Move ${document.title} tab left`"
-              :disabled="tabIndex === 0"
-              @click="moveTabWithinGroup(group, document.id, -1)"
-            >
-              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                <path v-for="path in toolbarIconPaths('previous')" :key="path" :d="path"></path>
-              </svg>
-            </button>
-            <button
-              class="tab-icon-button"
-              type="button"
-              aria-label="Move tab right"
-              :title="`Move ${document.title} tab right`"
-              :disabled="tabIndex === group.documents.length - 1"
-              @click="moveTabWithinGroup(group, document.id, 1)"
-            >
-              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                <path v-for="path in toolbarIconPaths('next')" :key="path" :d="path"></path>
-              </svg>
-            </button>
-            <button
-              class="tab-icon-button"
-              :class="{ active: document.pinned }"
-              type="button"
-              :aria-label="document.pinned ? 'Unpin document' : 'Pin document'"
-              :title="document.pinned ? 'Unpin document' : 'Pin document'"
-              @click="store.togglePin(document.id)"
-            >
-              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                <path v-for="path in toolbarIconPaths('pin')" :key="path" :d="path"></path>
-              </svg>
-            </button>
-            <button class="tab-icon-button" type="button" aria-label="Close document" title="Close document" @click="closeDocument(document.id)">
-              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                <path v-for="path in toolbarIconPaths('close')" :key="path" :d="path"></path>
-              </svg>
-            </button>
-          </div>
-        </section>
-      </section>
+      <TabsBar
+        :grouped-documents="groupedDocuments"
+        :dragged-tab-id="draggedTabId"
+        :toolbar-icon-paths="toolbarIconPaths"
+        @update:dragged-tab-id="draggedTabId = $event"
+        @activate="activate"
+        @close-document="closeDocument"
+        @close-tab-group="closeTabGroup"
+        @drop-on-group="dropTabOnGroup"
+        @drop-on-document="dropTabOnDocument"
+        @move-within-group="moveTabWithinGroup"
+        @toggle-pin="store.togglePin"
+      />
 
       <section class="window-meta" aria-label="Document status">
         <button
@@ -7200,6 +7118,7 @@ import ToastHost from "./components/ToastHost.vue";
 import ThemePicker from "./components/ThemePicker.vue";
 import KeyboardShortcutsPanel from "./components/KeyboardShortcutsPanel.vue";
 import SettingsPanel from "./components/SettingsPanel.vue";
+import TabsBar from "./components/TabsBar.vue";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { invoke } from "@tauri-apps/api/core";

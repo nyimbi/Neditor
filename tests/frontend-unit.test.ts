@@ -9268,7 +9268,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
     + readFileSync("src/components/ToastHost.vue", "utf8")
     + readFileSync("src/components/ThemePicker.vue", "utf8")
     + readFileSync("src/components/KeyboardShortcutsPanel.vue", "utf8")
-    + readFileSync("src/components/SettingsPanel.vue", "utf8");
+    + readFileSync("src/components/SettingsPanel.vue", "utf8")
+    + readFileSync("src/components/TabsBar.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
   const aiProviderPackages = readFileSync("src/lib/aiProviderPackages.ts", "utf8");
@@ -11795,7 +11796,8 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
   ok(script.includes("outlineModeTitles"));
   ok(script.includes("native workflow exported html from native menu command"));
   ok(script.includes("native workflow restored workspace tabs with active pinned and scroll state"));
-  const app = readFileSync("src/App.vue", "utf8");
+  const app = readFileSync("src/App.vue", "utf8")
+    + readFileSync("src/components/TabsBar.vue", "utf8");
   ok(app.includes("__NEDITOR_DESKTOP_WORKFLOW__"));
   ok(app.includes("desktop_workflow_smoke_enabled"));
   ok(app.includes(":data-document-path=\"document.path || ''\""));
@@ -12062,11 +12064,16 @@ test("zen mode hides sidebar and activity bar", () => {
 
 test("zen mode hides document tabs", () => {
   const app = readFileSync("src/App.vue", "utf8");
+  const tabsBar = readFileSync("src/components/TabsBar.vue", "utf8");
   ok(
-    app.includes('v-show="!store.zenMode"') || app.includes("v-show=\"!store.zenMode\""),
+    app.includes('v-show="!store.zenMode"') || app.includes("v-show=\"!store.zenMode\"") ||
+    tabsBar.includes('v-show="!store.zenMode"') || tabsBar.includes("v-show=\"!store.zenMode\""),
     "document-tabs section must be conditionally hidden in zen mode",
   );
-  ok(app.includes('class="document-tabs"'), "document-tabs section must still exist in App.vue");
+  ok(
+    app.includes('class="document-tabs"') || tabsBar.includes('class="document-tabs"'),
+    "document-tabs section must still exist in App.vue or TabsBar.vue",
+  );
 });
 
 test("zen mode keyboard shortcut Cmd+Ctrl+F is registered in handleShortcut", () => {
