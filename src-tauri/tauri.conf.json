@@ -63,34 +63,7 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "info": {
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLName": "NEditor URL Scheme",
-            "CFBundleURLSchemes": ["neditor"]
-          }
-        ],
-        "NSServices": [
-          {
-            "NSMenuItem": {
-              "default": "Open in NEditor"
-            },
-            "NSMessage": "openInNEditor",
-            "NSSendTypes": ["NSStringPboardType", "NSFilenamesPboardType"],
-            "NSRequiredContext": {}
-          },
-          {
-            "NSMenuItem": {
-              "default": "New NEditor Document from Selection"
-            },
-            "NSMessage": "newNEditorDocumentFromSelection",
-            "NSSendTypes": ["NSStringPboardType"],
-            "NSRequiredContext": {}
-          }
-        ],
-        "OSAScriptingDefinition": "NEditor.sdef",
-        "NSAppleScriptEnabled": true
-      }
+      "infoPlist": "Info.plist"
     }
   },
   "plugins": {

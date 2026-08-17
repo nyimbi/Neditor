@@ -171,7 +171,7 @@ pub(crate) fn handle_deep_link(action: DeepLinkAction, app: &AppHandle) {
 pub(crate) fn setup_deep_link_handler(app: &AppHandle) {
     use tauri_plugin_deep_link::DeepLinkExt;
     let handle = app.clone();
-    if let Err(e) = app.deep_link().on_open_url(move |event| {
+    let _ = app.deep_link().on_open_url(move |event| {
         for url in event.urls() {
             let url_str = url.as_str();
             match parse_deep_link(url_str) {
@@ -181,9 +181,7 @@ pub(crate) fn setup_deep_link_handler(app: &AppHandle) {
                 }
             }
         }
-    }) {
-        eprintln!("[neditor deep-link] failed to register handler: {e}");
-    }
+    });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
