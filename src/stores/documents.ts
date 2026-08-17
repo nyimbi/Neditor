@@ -501,6 +501,11 @@ export const useDocumentsStore = defineStore("documents", {
     dismissedNudges: [] as string[],
     // Focus mode
     focusMode: "off" as "off" | "paragraph" | "sentence",
+    // Zen mode (full distraction-free writing)
+    zenMode: false,
+    // Updater preferences
+    checkUpdatesOnStartup: false,
+    lastUpdateCheckedAt: null as string | null,
     // Minimap
     showMinimap: false,
     // Pinned files

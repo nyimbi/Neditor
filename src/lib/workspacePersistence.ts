@@ -55,7 +55,7 @@ export type LatexTemplatePreset =
   | "textbook"
   | "book"
   | string;
-export type PreviewTheme = "match" | "light" | "dark";
+export type PreviewTheme = "match" | "light" | "dark" | (string & {});
 export type SnapshotStorage = "app-data" | "project-local";
 export type ExportTarget =
   | "html"
@@ -429,6 +429,9 @@ export interface PersistedWorkspace {
   highContrast?: boolean;
   reducedMotion?: boolean;
   uiMode?: 'writer' | 'pilot';
+  zenMode?: boolean;
+  checkUpdatesOnStartup?: boolean;
+  lastUpdateCheckedAt?: string;
   pilotActivityPanel?: string;
   autosave?: boolean;
   autosaveDelayMs?: number;
@@ -1325,7 +1328,7 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   if (splitSourcePanes !== undefined) migrated.splitSourcePanes = splitSourcePanes;
   const editorKeymapMode = enumValue(raw.editorKeymapMode, ["default", "emacs", "vim"] as const);
   if (editorKeymapMode) migrated.editorKeymapMode = editorKeymapMode;
-  for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot"] as const) {
+  for (const key of ["wordWrap", "lineNumbers", "codeFolding", "highContrast", "reducedMotion", "autosave", "autoSnapshot", "zenMode", "checkUpdatesOnStartup"] as const) {
     const value = booleanValue(raw[key]);
     if (value !== undefined) migrated[key] = value;
   }
@@ -1339,6 +1342,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
     const value = stringValue(raw[key]);
     if (value !== undefined) migrated[key] = value;
   }
+  const lastUpdateCheckedAt = stringValue(raw.lastUpdateCheckedAt);
+  if (lastUpdateCheckedAt !== undefined) migrated.lastUpdateCheckedAt = lastUpdateCheckedAt;
   const editorFontSize = numberValue(raw.editorFontSize);
   if (editorFontSize !== undefined) migrated.editorFontSize = clampFontSize(editorFontSize);
   const previewFontSize = numberValue(raw.previewFontSize);
