@@ -27,7 +27,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "copyright": "Copyright (c) 2026 NEditor Contributors",
+    "copyright": "Copyright (c) 2026 Nyimbi Odero and contributors",
     "license": "MIT",
     "licenseFile": "../LICENSE",
     "category": "Productivity",
