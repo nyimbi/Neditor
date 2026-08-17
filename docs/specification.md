@@ -1701,6 +1701,15 @@ Productization and setup commands:
 - `configure_default_markdown_reader`
 - `create_support_bundle`
 
+Continuity Camera commands:
+
+- `insert_from_continuity_camera`
+
+Menu-bar helper commands:
+
+- `menubar_helper::set_keep_in_menu_bar`
+- `menubar_helper::update_menubar_recent_files`
+
 ## 26. Data Storage
 
 Application data:

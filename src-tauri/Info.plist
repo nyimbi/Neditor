@@ -56,5 +56,11 @@
     <string>NEditor.sdef</string>
     <key>NSAppleScriptEnabled</key>
     <true/>
+
+    <!-- Continuity Camera: photo/scan/sketch from nearby iPhone or iPad -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>NEditor uses your camera to insert photos taken on a nearby iPhone or iPad into your document.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>NEditor accesses the camera when you insert a photo from a nearby iPhone or iPad.</string>
 </dict>
 </plist>

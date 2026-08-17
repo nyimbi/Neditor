@@ -121,3 +121,6 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `watch_preview_theme` | `src-tauri/src/preview_themes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `unwatch_preview_theme` | `src-tauri/src/preview_themes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `warmup_transforms` | `src-tauri/src/lib.rs` | Frontend calls this post-paint to trigger lazy trust-store init; covered by `boot timer: warmup_transforms is invoked in the background phase` unit test |
+| `insert_from_continuity_camera` | `src-tauri/src/continuity_camera.rs` | `continuity_camera_tests::continuity_kind_serde_round_trip_take_photo`; `continuity_camera_tests::write_asset_confines_output_to_workspace_assets_dir` |
+| `menubar_helper::set_keep_in_menu_bar` | `src-tauri/src/menubar_helper.rs` | `menubar_helper::tests::set_enabled_updates_flag`; `menubar_helper::tests::lsuielement_toggle_round_trip_via_mock` |
+| `menubar_helper::update_menubar_recent_files` | `src-tauri/src/menubar_helper.rs` | `menubar_helper::tests::recent_files_bounded_to_five` |

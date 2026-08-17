@@ -165,6 +165,7 @@ fn zip_entry_texts_with_prefix(bytes: &[u8], prefix: &str) -> Vec<String> {
 mod export_command_tests;
 
 mod ai_cleanup_tests;
+mod continuity_camera_tests;
 mod file_command_tests;
 mod filesystem_watch_tests;
 mod ipc_command_tests;
