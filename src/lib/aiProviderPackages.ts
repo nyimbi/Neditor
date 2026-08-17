@@ -1,4 +1,7 @@
 import type { AgenticWorkflowRun } from "./agenticWorkflows.js";
+import { providerFetch, ProviderFetchError, type ProviderFetchOpts } from "./providerRuntime.js";
+export type { ProviderError, ProviderFetchResult } from "./providerRuntime.js";
+export { ProviderFetchError };
 
 export type AiProviderProfileId =
   | "manual-review"
@@ -281,42 +284,63 @@ export function buildAiProviderRequestPackage(
   };
 }
 
+/** Runtime options for cancellation, timeout, and progress. Ignored when a custom fetcher is supplied. */
+export interface AiProviderRuntimeOpts {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  label?: string;
+}
+
 export async function executeAiProviderRequestPackage(
   requestPackage: AiProviderRequestPackage,
   apiKey = "",
-  fetcher: AiProviderFetch = globalThis.fetch.bind(globalThis) as AiProviderFetch,
+  /** Supply a mock fetcher in tests; omit or pass null to use providerFetch (recommended for production). */
+  fetcher?: AiProviderFetch | null,
+  runtimeOpts?: AiProviderRuntimeOpts,
 ): Promise<AiProviderExecutionResult> {
   if (!requestPackage.profile.endpoint) {
     throw new Error("This provider profile is a manual handoff and does not define an endpoint.");
   }
   const headers = concreteHeaders(requestPackage.redactedHeaders, apiKey);
   const endpoint = requestPackage.profile.endpoint.replace("{model}", encodeURIComponent(requestPackage.profile.model));
-  const response = await fetcher(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(requestPackage.requestBody),
-  });
-  const rawText = await response.text();
-  const markdown = extractProviderMarkdown(rawText, requestPackage.profile.bodyStyle);
-  if (!response.ok) {
-    throw new Error(`Provider request failed: ${response.status} ${response.statusText}${rawText ? ` - ${rawText.slice(0, 240)}` : ""}`);
+  const body = JSON.stringify(requestPackage.requestBody);
+
+  if (fetcher) {
+    // Legacy / test path: use caller-supplied fetcher with no timeout/abort plumbing.
+    const response = await fetcher(endpoint, { method: "POST", headers, body });
+    const rawText = await response.text();
+    const markdown = extractProviderMarkdown(rawText, requestPackage.profile.bodyStyle);
+    if (!response.ok) {
+      throw new Error(`Provider request failed: ${response.status} ${response.statusText}${rawText ? ` - ${rawText.slice(0, 240)}` : ""}`);
+    }
+    if (!markdown.trim()) {
+      throw new Error("Provider response did not contain usable Markdown text.");
+    }
+    return { ok: response.ok, status: response.status, statusText: response.statusText, markdown, rawText };
   }
+
+  // Production path: providerFetch with timeout, abort, and progress.
+  const opts: ProviderFetchOpts = {
+    label: runtimeOpts?.label ?? "Agent Workspace",
+    timeoutMs: runtimeOpts?.timeoutMs,
+    signal: runtimeOpts?.signal,
+  };
+  const result = await providerFetch<string>(endpoint, { method: "POST", headers, body }, opts);
+  if (!result.ok) throw new ProviderFetchError(result.error);
+  const rawText = result.data;
+  const markdown = extractProviderMarkdown(rawText, requestPackage.profile.bodyStyle);
   if (!markdown.trim()) {
     throw new Error("Provider response did not contain usable Markdown text.");
   }
-  return {
-    ok: response.ok,
-    status: response.status,
-    statusText: response.statusText,
-    markdown,
-    rawText,
-  };
+  return { ok: true, status: 200, statusText: "OK", markdown, rawText };
 }
 
 export async function executeDirectAiProviderPrompt(
   options: DirectAiProviderPromptOptions,
   apiKey = "",
-  fetcher: AiProviderFetch = globalThis.fetch.bind(globalThis) as AiProviderFetch,
+  /** Supply a mock fetcher in tests; omit or pass null to use providerFetch (recommended for production). */
+  fetcher?: AiProviderFetch | null,
+  runtimeOpts?: AiProviderRuntimeOpts,
 ): Promise<AiProviderExecutionResult> {
   const baseProfile = providerProfileById(options.profileId);
   const profile: AiProviderProfile = {
@@ -331,26 +355,36 @@ export async function executeDirectAiProviderPrompt(
   const headers = concreteHeaders(buildHeaders(profile, keyEnv), apiKey);
   const requestBody = buildRequestBody(profile, options.systemPrompt, options.userPrompt);
   const endpoint = profile.endpoint.replace("{model}", encodeURIComponent(profile.model));
-  const response = await fetcher(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(requestBody),
-  });
-  const rawText = await response.text();
-  const markdown = extractProviderMarkdown(rawText, profile.bodyStyle);
-  if (!response.ok) {
-    throw new Error(`Provider request failed: ${response.status} ${response.statusText}${rawText ? ` - ${rawText.slice(0, 240)}` : ""}`);
+  const body = JSON.stringify(requestBody);
+
+  if (fetcher) {
+    // Legacy / test path: use caller-supplied fetcher with no timeout/abort plumbing.
+    const response = await fetcher(endpoint, { method: "POST", headers, body });
+    const rawText = await response.text();
+    const markdown = extractProviderMarkdown(rawText, profile.bodyStyle);
+    if (!response.ok) {
+      throw new Error(`Provider request failed: ${response.status} ${response.statusText}${rawText ? ` - ${rawText.slice(0, 240)}` : ""}`);
+    }
+    if (!markdown.trim()) {
+      throw new Error("Provider response did not contain usable Markdown text.");
+    }
+    return { ok: response.ok, status: response.status, statusText: response.statusText, markdown, rawText };
   }
+
+  // Production path: providerFetch with timeout, abort, and progress.
+  const opts: ProviderFetchOpts = {
+    label: runtimeOpts?.label ?? "AI request",
+    timeoutMs: runtimeOpts?.timeoutMs,
+    signal: runtimeOpts?.signal,
+  };
+  const result = await providerFetch<string>(endpoint, { method: "POST", headers, body }, opts);
+  if (!result.ok) throw new ProviderFetchError(result.error);
+  const rawText = result.data;
+  const markdown = extractProviderMarkdown(rawText, profile.bodyStyle);
   if (!markdown.trim()) {
     throw new Error("Provider response did not contain usable Markdown text.");
   }
-  return {
-    ok: response.ok,
-    status: response.status,
-    statusText: response.statusText,
-    markdown,
-    rawText,
-  };
+  return { ok: true, status: 200, statusText: "OK", markdown, rawText };
 }
 
 /**
@@ -361,7 +395,8 @@ export async function executeDirectAiProviderPrompt(
 export async function executeOllamaWithStreaming(
   options: DirectAiProviderPromptOptions & { numCtx?: number; onToken?: (chunk: string, total: string) => void },
   apiKey = "",
-  fetcher: AiProviderFetch = globalThis.fetch.bind(globalThis) as AiProviderFetch,
+  fetcher?: AiProviderFetch | null,
+  runtimeOpts?: AiProviderRuntimeOpts,
 ): Promise<AiProviderExecutionResult> {
   const baseProfile = providerProfileById(options.profileId);
   const profile: AiProviderProfile = {
@@ -373,7 +408,7 @@ export async function executeOllamaWithStreaming(
     throw new Error("This provider profile is a manual handoff and does not define an endpoint.");
   }
   if (profile.bodyStyle !== "ollama-chat" || !options.onToken) {
-    return executeDirectAiProviderPrompt(options, apiKey, fetcher);
+    return executeDirectAiProviderPrompt(options, apiKey, fetcher ?? null, runtimeOpts);
   }
   const { executeStreamingOllamaPrompt } = await import("./ollamaModels.js");
   try {
