@@ -8396,37 +8396,13 @@
       </div>
     </section>
 
-    <section v-if="previewThemeGalleryOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Preview theme gallery" @keydown="handleModalKeydown('preview-theme-gallery', $event)">
-      <div class="modal">
-        <header class="modal-header">
-          <h2>Preview Themes</h2>
-          <button type="button" class="modal-close" aria-label="Close theme gallery" @click="previewThemeGalleryOpen = false">×</button>
-        </header>
-        <div class="modal-body preview-theme-gallery-body">
-          <div v-if="!previewThemeList.length" class="preview-theme-empty">
-            <p>No themes found. Add .css files to your user themes folder.</p>
-            <button type="button" @click="openUserThemesDir">Open user themes folder</button>
-          </div>
-          <ul v-else class="preview-theme-list">
-            <li
-              v-for="theme in previewThemeList"
-              :key="theme.id"
-              class="preview-theme-item"
-              :class="{ active: store.previewTheme === theme.id }"
-              @click="selectPreviewTheme(theme.id); previewThemeGalleryOpen = false"
-            >
-              <div class="preview-theme-swatch" :data-theme-source="theme.source"></div>
-              <span class="preview-theme-name">{{ theme.name }}</span>
-              <small class="preview-theme-source">{{ theme.source }}</small>
-            </li>
-          </ul>
-          <footer class="preview-theme-gallery-footer">
-            <button type="button" @click="openUserThemesDir">Open user themes folder</button>
-            <button type="button" @click="previewThemeGalleryOpen = false">Close</button>
-          </footer>
-        </div>
-      </div>
-    </section>
+    <ThemePicker
+      v-model:open="previewThemeGalleryOpen"
+      :theme-list="previewThemeList"
+      @keydown="handleModalKeydown('preview-theme-gallery', $event)"
+      @select-theme="selectPreviewTheme"
+      @open-themes-dir="openUserThemesDir"
+    />
 
     <section v-if="updaterModalOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Software update" @keydown="handleModalKeydown('updater', $event)">
       <div class="modal">
@@ -8455,6 +8431,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
 import StatusBar from "./components/StatusBar.vue";
 import ToastHost from "./components/ToastHost.vue";
+import ThemePicker from "./components/ThemePicker.vue";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { invoke } from "@tauri-apps/api/core";

@@ -12104,10 +12104,12 @@ test("preview theme gallery opens via openPreviewThemeGallery function", () => {
 
 test("preview theme gallery renders theme list items", () => {
   const app = readFileSync("src/App.vue", "utf8");
-  ok(app.includes("preview-theme-list"), "App.vue must render .preview-theme-list element");
-  ok(app.includes("preview-theme-item"), "App.vue must render .preview-theme-item elements");
-  ok(app.includes("theme.name"), "App.vue must display theme.name in gallery");
-  ok(app.includes("theme.source"), "App.vue must display theme.source in gallery");
+  const themePicker = readFileSync("src/components/ThemePicker.vue", "utf8");
+  const src = app + themePicker;
+  ok(src.includes("preview-theme-list"), "src must render .preview-theme-list element");
+  ok(src.includes("preview-theme-item"), "src must render .preview-theme-item elements");
+  ok(src.includes("theme.name"), "src must display theme.name in gallery");
+  ok(src.includes("theme.source"), "src must display theme.source in gallery");
 });
 
 test("selecting a preview theme injects CSS into #preview-theme-active style element", () => {
