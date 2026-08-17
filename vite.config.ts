@@ -34,9 +34,15 @@ export default defineConfig(async () => ({
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
-          if (id.includes("/@codemirror/")) return "codemirror";
+          // CodeMirror — large but only needed once editor mounts.
+          if (id.includes("/@codemirror/") || id.includes("/lezer/") || id.includes("/@lezer/")) return "vendor-cm";
+          // KaTeX — math rendering, deferred after editor.
+          if (id.includes("/katex/")) return "vendor-katex";
+          // Tauri plugin bindings — small but isolated.
           if (id.includes("/@tauri-apps/")) return "tauri";
+          // Vue + Pinia — tiny, needed immediately for app shell.
           if (id.includes("/vue/") || id.includes("/pinia/")) return "vue-vendor";
+          // Everything else (markdown-it, yaml, etc.).
           return "vendor";
         },
       },

@@ -35,8 +35,13 @@ struct TrustStoreFile {
 /// Registered with Tauri `.manage()` so every invocation of
 /// `run_external_transform` consults it instead of trusting the
 /// frontend-supplied `trusted` boolean.
+///
+/// The inner map is loaded lazily on first IPC use so startup is not
+/// blocked by a disk read.
 pub(crate) struct TransformTrustStore {
-    inner: Mutex<HashMap<PathBuf, TrustEntry>>,
+    /// `None` until the first operation that needs the map; loaded from
+    /// `store_path` on demand.
+    inner: Mutex<Option<HashMap<PathBuf, TrustEntry>>>,
     store_path: PathBuf,
 }
 
@@ -53,12 +58,19 @@ pub(crate) struct TrustedEngineInfo {
 }
 
 impl TransformTrustStore {
-    /// Load from the platform data-local directory, or start empty.
+    /// Return an instance whose inner map is loaded lazily on first use.
+    ///
+    /// This replaces the old eager file-read so the Tauri `.manage()` call
+    /// no longer blocks startup on disk I/O.
     pub(crate) fn load_or_default() -> Self {
-        Self::load_from(data_store_path())
+        Self {
+            inner: Mutex::new(None),
+            store_path: data_store_path(),
+        }
     }
 
     /// Ephemeral instance backed by a unique temp file — for tests only.
+    /// The inner map starts pre-populated (empty) so tests bypass lazy loading.
     #[cfg(test)]
     pub(crate) fn ephemeral() -> Self {
         let store_path = std::env::temp_dir().join(format!(
@@ -69,33 +81,17 @@ impl TransformTrustStore {
                 .as_nanos()
         ));
         Self {
-            inner: Mutex::new(HashMap::new()),
+            inner: Mutex::new(Some(HashMap::new())),
             store_path,
         }
     }
 
     /// Load from an arbitrary path — useful for tests that need isolated stores.
+    /// Unlike `load_or_default` this eagerly reads the file (tests require it).
     pub(crate) fn load_from(store_path: PathBuf) -> Self {
-        let inner = if store_path.is_file() {
-            fs::read_to_string(&store_path)
-                .ok()
-                .and_then(|json| serde_json::from_str::<TrustStoreFile>(&json).ok())
-                .map(|file| {
-                    file.entries
-                        .into_iter()
-                        .filter_map(|(k, v)| {
-                            // Re-canonicalize on load; skip stale entries for
-                            // paths that no longer exist.
-                            PathBuf::from(&k).canonicalize().ok().map(|p| (p, v))
-                        })
-                        .collect::<HashMap<_, _>>()
-                })
-                .unwrap_or_default()
-        } else {
-            HashMap::new()
-        };
+        let loaded = read_trust_file(&store_path);
         Self {
-            inner: Mutex::new(inner),
+            inner: Mutex::new(Some(loaded)),
             store_path,
         }
     }
@@ -111,7 +107,9 @@ impl TransformTrustStore {
 
         // Check under lock, but release before potential persist call.
         let (trusted, should_evict) = {
-            let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            ensure_loaded(&mut guard, &self.store_path);
+            let inner = guard.as_ref().unwrap();
             match inner.get(&canonical) {
                 None => (false, false),
                 Some(entry) => {
@@ -122,9 +120,11 @@ impl TransformTrustStore {
         };
 
         if should_evict {
-            let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            ensure_loaded(&mut guard, &self.store_path);
+            let inner = guard.as_mut().unwrap();
             inner.remove(&canonical);
-            let _ = self.persist_locked(&*inner);
+            let _ = self.persist_locked(inner);
         }
 
         trusted
@@ -152,9 +152,11 @@ impl TransformTrustStore {
             engine_size,
             engine_mtime,
         };
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        ensure_loaded(&mut guard, &self.store_path);
+        let inner = guard.as_mut().unwrap();
         inner.insert(canonical, entry);
-        self.persist_locked(&*inner)
+        self.persist_locked(inner)
     }
 
     /// Remove the trust entry for `engine_path`.
@@ -163,14 +165,18 @@ impl TransformTrustStore {
         let canonical = engine_path
             .canonicalize()
             .unwrap_or_else(|_| engine_path.to_path_buf());
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        ensure_loaded(&mut guard, &self.store_path);
+        let inner = guard.as_mut().unwrap();
         inner.remove(&canonical);
-        self.persist_locked(&*inner)
+        self.persist_locked(inner)
     }
 
     /// List all stored trust entries with current validity.
     pub(crate) fn list(&self) -> Vec<TrustedEngineInfo> {
-        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        ensure_loaded(&mut guard, &self.store_path);
+        let inner = guard.as_ref().unwrap();
         inner
             .iter()
             .map(|(path, entry)| TrustedEngineInfo {
@@ -211,6 +217,32 @@ impl TransformTrustStore {
         }
 
         Ok(())
+    }
+}
+
+/// Read and canonicalize trust entries from `store_path`.
+/// Shared by `load_from` (eager, for tests) and `ensure_loaded` (lazy, prod).
+fn read_trust_file(store_path: &PathBuf) -> HashMap<PathBuf, TrustEntry> {
+    if !store_path.is_file() {
+        return HashMap::new();
+    }
+    fs::read_to_string(store_path)
+        .ok()
+        .and_then(|json| serde_json::from_str::<TrustStoreFile>(&json).ok())
+        .map(|file| {
+            file.entries
+                .into_iter()
+                .filter_map(|(k, v)| PathBuf::from(&k).canonicalize().ok().map(|p| (p, v)))
+                .collect::<HashMap<_, _>>()
+        })
+        .unwrap_or_default()
+}
+
+/// If `slot` is `None`, load from `store_path` and populate it.
+/// Must be called while the mutex guard is held.
+fn ensure_loaded(slot: &mut Option<HashMap<PathBuf, TrustEntry>>, store_path: &PathBuf) {
+    if slot.is_none() {
+        *slot = Some(read_trust_file(store_path));
     }
 }
 

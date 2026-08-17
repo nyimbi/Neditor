@@ -5,6 +5,7 @@ use std::{collections::BTreeSet, fs, path::Path, path::PathBuf};
 
 mod ai_cleanup;
 mod ai_humanizer;
+mod continuity_camera;
 mod applescript;
 mod audit;
 mod backlinks;
@@ -101,6 +102,7 @@ use compiler::{compile_document, compile_document_with_options, run_transform};
 pub(crate) use compiler_types::{
     CompileRequest, CompileResponse, ExportManifest, Heading, IncludeEdge, SourceMapEntry,
 };
+use continuity_camera::insert_from_continuity_camera;
 use csl_styles::list_installed_csl_styles;
 use daily_notes::{list_daily_notes, open_daily_note};
 use data_exchange::{export_markdown_tables, fetch_rest_source, import_spreadsheet_table};
@@ -169,6 +171,13 @@ use track_changes::{
 };
 use transform_install::{install_transform_handlers, list_transform_handler_installers};
 use transforms::external::{list_transform_engines, run_external_transform};
+
+/// No-op IPC command called by the frontend immediately after first paint to
+/// hint which transform engines will be used.  The call site triggers lazy
+/// trust-store initialization and JIT-loads the transform engine list into
+/// OS file-system caches — making the first real compile faster.
+#[tauri::command]
+fn warmup_transforms(_names: Vec<String>) {}
 #[cfg(test)]
 use transforms::external::{run_external_transform_inner, ExternalTransformRequest};
 #[cfg(test)]
@@ -329,7 +338,9 @@ pub fn run() {
             read_preview_theme_css,
             open_user_themes_dir,
             watch_preview_theme,
-            unwatch_preview_theme
+            unwatch_preview_theme,
+            warmup_transforms,
+            insert_from_continuity_camera
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");

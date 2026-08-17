@@ -536,10 +536,16 @@ export const useDocumentsStore = defineStore("documents", {
     },
   },
   actions: {
-    async boot() {
+    /** Critical boot phase: load persisted preferences so the editor can
+     *  paint the correct document immediately.  Call this before buildEditor(). */
+    async bootCritical() {
       this.activeId = ensureActiveWorkspaceDocumentState(this.documents, this.activeId).activeId;
       await this.loadPreferences();
       this.activeId = ensureActiveWorkspaceDocumentState(this.documents, this.activeId).activeId;
+    },
+    /** Background boot phase: compile, workspace scan, git, snapshots,
+     *  transform engine list.  Fire-and-forget after first paint. */
+    async bootBackground() {
       await this.compileActive();
       await this.refreshWorkspace();
       await this.loadWorkspaceDocumentOutlineTemplates();
@@ -550,6 +556,11 @@ export const useDocumentsStore = defineStore("documents", {
       } catch {
         this.transformEngines = [];
       }
+    },
+    /** Full sequential boot — kept for compatibility (e.g. tests). */
+    async boot() {
+      await this.bootCritical();
+      await this.bootBackground();
     },
     setActiveDocument(id: string) {
       const active = applyActiveWorkspaceDocumentState(this.documents, this.activeId, id);

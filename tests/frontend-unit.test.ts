@@ -12220,3 +12220,47 @@ test("extended language mapping: markdown() in App.vue uses codeLanguages option
   ok(app.includes("buildCodeLanguages"), "App.vue must call buildCodeLanguages for codeLanguages option");
   ok(app.includes("codeLanguages:"), "markdown() call must pass codeLanguages option");
 });
+
+// ── Boot timer ────────────────────────────────────────────────────────────────
+
+test("boot timer: main.ts initialises window.__neditor_boot before mount", () => {
+  const main = readFileSync("src/main.ts", "utf8");
+  ok(main.includes("window.__neditor_boot"), "main.ts must set window.__neditor_boot");
+  ok(main.includes("bootStart: performance.now()"), "main.ts must record bootStart using performance.now()");
+  // The assignment must appear before createApp() so the timer fires at the
+  // very first JS execution opportunity, not after Vue initialises.
+  const bootIdx = main.indexOf("window.__neditor_boot");
+  const mountIdx = main.indexOf("createApp(");
+  ok(bootIdx < mountIdx, "window.__neditor_boot must be assigned before createApp() in main.ts");
+});
+
+test("boot timer: App.vue records editorReady after buildEditor()", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("window.__neditor_boot.editorReady"), "App.vue must set editorReady timestamp");
+  ok(app.includes("window.__neditor_boot.pluginsReady"), "App.vue must set pluginsReady timestamp");
+  // editorReady must appear after buildEditor() in source order.
+  const editorIdx = app.indexOf("buildEditor()");
+  const editorReadyIdx = app.indexOf("window.__neditor_boot.editorReady");
+  ok(editorIdx < editorReadyIdx, "editorReady must be set after buildEditor() call");
+});
+
+test("boot timer: App.vue calls bootCritical() before buildEditor()", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("store.bootCritical()"), "App.vue onMounted must await store.bootCritical()");
+  const critIdx = app.indexOf("store.bootCritical()");
+  const buildIdx = app.indexOf("buildEditor()");
+  ok(critIdx < buildIdx, "bootCritical() must precede buildEditor() in onMounted");
+});
+
+test("boot timer: App.vue defers bootBackground() after buildEditor()", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("store.bootBackground()"), "App.vue must call store.bootBackground()");
+  const buildIdx = app.indexOf("buildEditor()");
+  const bgIdx = app.indexOf("store.bootBackground()");
+  ok(buildIdx < bgIdx, "bootBackground() must come after buildEditor() — deferred phase");
+});
+
+test("boot timer: warmup_transforms is invoked in the background phase", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("warmup_transforms"), "App.vue must call warmup_transforms IPC after first paint");
+});

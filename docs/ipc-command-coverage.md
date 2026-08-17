@@ -120,3 +120,4 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `open_user_themes_dir` | `src-tauri/src/preview_themes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `watch_preview_theme` | `src-tauri/src/preview_themes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `unwatch_preview_theme` | `src-tauri/src/preview_themes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `warmup_transforms` | `src-tauri/src/lib.rs` | Frontend calls this post-paint to trigger lazy trust-store init; covered by `boot timer: warmup_transforms is invoked in the background phase` unit test |

@@ -14296,6 +14296,9 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "profile-sql-transform", label: "SQL From Database Profile", help: "Insert a SQL transform scaffold from the selected safe database profile.", disabled: !activeDatabaseProfile.value, run: () => insertActiveDatabaseProfileSqlTransform() },
           { id: "install-transform-handlers", label: "Install Transform Handlers", help: "Open the configurator workflow that downloads and installs Graphviz, D2, PlantUML, Pikchr, and SQLite handlers.", run: () => openTransformInstaller() },
           { id: "include-document", label: "Include Document", help: "Open the References sidebar builder for inserting another Markdown document into this one.", run: () => openIncludeBuilder() },
+          { id: "continuity-photo", label: "From iPhone: Take Photo", help: "Capture a photo on a nearby iPhone or iPad and insert it into the document.", run: () => insertFromContinuityCamera("TakePhoto") },
+          { id: "continuity-scan", label: "From iPhone: Scan Documents", help: "Scan a document with a nearby iPhone or iPad and insert it into the document.", run: () => insertFromContinuityCamera("ScanDocuments") },
+          { id: "continuity-sketch", label: "From iPhone: Add Sketch", help: "Draw a sketch on a nearby iPhone or iPad and insert it into the document.", run: () => insertFromContinuityCamera("AddSketch") },
         ],
       },
       {
@@ -18333,31 +18336,20 @@ async function drainCliQueue(): Promise<void> {
 }
 
 onMounted(async () => {
-  await store.boot();
-  // Register this instance so `ned file.md` can detect us and queue paths
-  void invoke("register_instance").catch(() => {});
-  // Drain any paths queued while we were starting
-  await drainCliQueue();
-  // Re-drain whenever the window comes back into focus
-  window.addEventListener("focus", () => void drainCliQueue());
-  syncGoogleIntegrationFields();
-  await openPendingCliPaths();
-  await loadTransformHandlerInstallers();
-  await loadCliDeployPlan();
-  await loadDefaultMarkdownReaderPlan();
-  await hydrateTtsModelStorageLocation();
-  await bindNativeMenuCommands();
-  applyAiPasteDefaults();
+  // ── Phase 1: critical path ─────────────────────────────────────────────────
+  // Load preferences (the only thing buildEditor needs to know which document
+  // to show), then paint the editor immediately.  Every await that was here
+  // before was adding latency to first paint; they all moved to Phase 2.
+  window.__neditor_boot.mountStart = performance.now();
+  await store.bootCritical();
   buildEditor();
+  window.__neditor_boot.editorReady = performance.now();
   scheduleAutosave();
   scheduleAutoSnapshot();
   setWindowTitle(store.windowTitle);
   installE2eAppHooks();
-  void nextTick().then(async () => {
-    await reportDesktopUiSmoke();
-    await runDesktopWorkflowSmokeIfEnabled();
-  });
   void installDesktopWorkflowTestHooks();
+  // Register cheap DOM event listeners synchronously — no I/O cost.
   window.addEventListener("keydown", handleShortcut);
   window.addEventListener("mouseover", handleButtonHelpEnter);
   window.addEventListener("mousemove", handleButtonHelpPointerMove, true);
@@ -18366,6 +18358,36 @@ onMounted(async () => {
   window.addEventListener("focusout", handleButtonHelpLeave);
   window.addEventListener("scroll", hideButtonHelp, true);
   window.addEventListener("click", handleAppMenuDocumentClick);
+
+  // ── Phase 2: background work ───────────────────────────────────────────────
+  // Fire-and-forget; runs concurrently with the first rendered frame so it
+  // does not block user interaction or time-to-first-paint.
+  void (async () => {
+    await store.bootBackground();
+    // Warm the trust store and transform engine list on the Rust side now that
+    // the editor is visible — first compile will be ready by the time the user
+    // types anything.
+    void invoke("warmup_transforms", { names: [] }).catch(() => {});
+    // Register this instance so `ned file.md` can detect us and queue paths
+    void invoke("register_instance").catch(() => {});
+    // Drain any paths queued while we were starting
+    await drainCliQueue();
+    // Re-drain whenever the window comes back into focus
+    window.addEventListener("focus", () => void drainCliQueue());
+    syncGoogleIntegrationFields();
+    await openPendingCliPaths();
+    await loadTransformHandlerInstallers();
+    await loadCliDeployPlan();
+    await loadDefaultMarkdownReaderPlan();
+    await hydrateTtsModelStorageLocation();
+    await bindNativeMenuCommands();
+    applyAiPasteDefaults();
+    window.__neditor_boot.pluginsReady = performance.now();
+    void nextTick().then(async () => {
+      await reportDesktopUiSmoke();
+      await runDesktopWorkflowSmokeIfEnabled();
+    });
+  })();
 });
 
 onBeforeUnmount(() => {
@@ -26724,6 +26746,36 @@ function applyCoverBuilderPackage() {
 
 function insertFigureSnippet(position: FigureCropPosition = "center") {
   insertBlock(formatFigureSnippet(position));
+}
+
+// ── Continuity Camera ─────────────────────────────────────────────────────────
+
+type ContinuityKind = "TakePhoto" | "ScanDocuments" | "AddSketch";
+
+async function insertFromContinuityCamera(kind: ContinuityKind): Promise<void> {
+  const documentPath: string | undefined = active.value?.path ?? undefined;
+  try {
+    const result = await invoke<{ relative_path: string; kind: ContinuityKind }>(
+      "insert_from_continuity_camera",
+      { documentPath, kind }
+    );
+    const kindLabel: Record<ContinuityKind, string> = {
+      TakePhoto: "Photo",
+      ScanDocuments: "Scan",
+      AddSketch: "Sketch",
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    insertMarkdownAtCursor(`\n![${kindLabel[kind]} ${today}](${result.relative_path})\n`);
+    store.statusMessage = `Inserted ${kindLabel[kind].toLowerCase()} from iPhone`;
+  } catch (e: unknown) {
+    const msg = String(e);
+    if (msg.includes("CONTINUITY_UNAVAILABLE")) {
+      store.statusMessage =
+        "Nearby iPhone or iPad not found. Open the Camera on your device and pair via Handoff.";
+    } else {
+      store.statusMessage = `Continuity Camera error: ${msg}`;
+    }
+  }
 }
 
 function insertIndexMarkerForTerm(term: string) {
