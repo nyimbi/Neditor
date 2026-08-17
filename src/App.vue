@@ -7,6 +7,7 @@
       'writing-space-maximized': writingSpaceMaximized,
       [`ui-mode-${store.uiMode}`]: true,
       'sidebar-is-collapsed': sidebarCollapsed,
+      'zen-mode': store.zenMode,
     }"
     :data-theme="store.theme"
     :data-toolbar-display="store.toolbarDisplay"
@@ -103,7 +104,7 @@
           </section>
         </div>
       </nav>
-      <section class="document-tabs" aria-label="Open documents">
+      <section v-show="!store.zenMode" class="document-tabs" aria-label="Open documents">
         <section
           v-for="group in groupedDocuments"
           :key="group.key"
@@ -283,7 +284,7 @@
       </section>
     </header>
 
-    <nav id="main-commands" class="command-bar" aria-label="Main commands" tabindex="-1">
+    <nav v-show="!store.zenMode" id="main-commands" class="command-bar" aria-label="Main commands" tabindex="-1">
       <section
         v-for="row in commandToolbarRows"
         v-show="!isToolbarCollapsed(row.id)"
@@ -543,7 +544,7 @@
       </section>
 
       <nav
-        v-if="store.uiMode === 'pilot' && store.mode !== 'outline' && !writingSpaceMaximized"
+        v-if="store.uiMode === 'pilot' && store.mode !== 'outline' && !writingSpaceMaximized && !store.zenMode"
         class="activity-bar"
         aria-label="Panel navigation"
       >
@@ -568,7 +569,7 @@
         </button>
       </nav>
       <aside
-        v-show="store.mode !== 'outline' && !writingSpaceMaximized"
+        v-show="store.mode !== 'outline' && !writingSpaceMaximized && !store.zenMode"
         id="document-sidebar"
         :key="store.sidebar"
         :data-sidebar="store.sidebar"
@@ -3809,11 +3810,11 @@
           </label>
           <label>
             Preview theme
-            <select v-model="store.previewTheme">
-              <option value="match">Match app</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
+            <div class="preview-theme-picker">
+              <button type="button" @click="openPreviewThemeGallery()" :title="`Current theme: ${store.previewTheme}`">
+                {{ store.previewTheme }} ▾
+              </button>
+            </div>
           </label>
           <label>
             Toolbar buttons
@@ -5491,7 +5492,7 @@
         @click="toggleUiMode"
       >⊞ Pilot</button>
     </div>
-    <footer v-show="!writingSpaceMaximized && store.uiMode !== 'writer'" id="document-status" class="status-bar" aria-label="Document status and progress" tabindex="-1">
+    <footer v-show="!writingSpaceMaximized && store.uiMode !== 'writer'" id="document-status" class="status-bar" :class="{ 'zen-mode-status': store.zenMode }" aria-label="Document status and progress" tabindex="-1">
       <span
         class="status-message"
         role="status"
@@ -8382,6 +8383,57 @@
         </footer>
       </div>
     </section>
+
+    <section v-if="previewThemeGalleryOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Preview theme gallery" @keydown="handleModalKeydown('preview-theme-gallery', $event)">
+      <div class="modal">
+        <header class="modal-header">
+          <h2>Preview Themes</h2>
+          <button type="button" class="modal-close" aria-label="Close theme gallery" @click="previewThemeGalleryOpen = false">×</button>
+        </header>
+        <div class="modal-body preview-theme-gallery-body">
+          <div v-if="!previewThemeList.length" class="preview-theme-empty">
+            <p>No themes found. Add .css files to your user themes folder.</p>
+            <button type="button" @click="openUserThemesDir">Open user themes folder</button>
+          </div>
+          <ul v-else class="preview-theme-list">
+            <li
+              v-for="theme in previewThemeList"
+              :key="theme.id"
+              class="preview-theme-item"
+              :class="{ active: store.previewTheme === theme.id }"
+              @click="selectPreviewTheme(theme.id); previewThemeGalleryOpen = false"
+            >
+              <div class="preview-theme-swatch" :data-theme-source="theme.source"></div>
+              <span class="preview-theme-name">{{ theme.name }}</span>
+              <small class="preview-theme-source">{{ theme.source }}</small>
+            </li>
+          </ul>
+          <footer class="preview-theme-gallery-footer">
+            <button type="button" @click="openUserThemesDir">Open user themes folder</button>
+            <button type="button" @click="previewThemeGalleryOpen = false">Close</button>
+          </footer>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="updaterModalOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Software update" @keydown="handleModalKeydown('updater', $event)">
+      <div class="modal">
+        <header class="modal-header">
+          <h2>Update Available</h2>
+          <button type="button" class="modal-close" aria-label="Close update dialog" @click="updaterModalOpen = false">×</button>
+        </header>
+        <div class="modal-body">
+          <p v-if="updaterAvailable">Version <strong>{{ updaterAvailable.version }}</strong> is available.</p>
+          <pre v-if="updaterAvailable?.body" class="updater-release-notes">{{ updaterAvailable.body }}</pre>
+          <div class="modal-actions">
+            <button type="button" class="primary" :disabled="updaterDownloadBusy" @click="downloadAndRestart">
+              {{ updaterDownloadBusy ? 'Downloading…' : 'Download & Restart' }}
+            </button>
+            <button type="button" @click="updaterModalOpen = false">Later</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -8409,6 +8461,7 @@ import {
 } from "@codemirror/commands";
 import { codeFolding, foldAll, foldGutter, foldKeymap, unfoldAll } from "@codemirror/language";
 import { markdown } from "@codemirror/lang-markdown";
+import { buildCodeLanguages } from "./lib/languageMapping";
 import { findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, searchKeymap, selectNextOccurrence } from "@codemirror/search";
 import { closeBrackets, closeBracketsKeymap, insertBracket } from "@codemirror/autocomplete";
 import { forceLinting, linter, lintGutter, type Diagnostic as CodeMirrorDiagnostic } from "@codemirror/lint";
@@ -10368,6 +10421,113 @@ const sessionStartWords = ref<number | null>(null);
 const openAppMenuId = ref<string | null>(null);
 const toolbarVisibilityMenuOpen = ref(false);
 const writingSpaceMaximized = ref(false);
+
+// Preview theme gallery
+const previewThemeGalleryOpen = ref(false);
+const previewThemeList = ref<Array<{ id: string; name: string; source: "bundled" | "user" }>>([]);
+let unlistenPreviewThemeChange: (() => void) | null = null;
+
+async function openPreviewThemeGallery() {
+  try {
+    previewThemeList.value = await invoke<Array<{ id: string; name: string; source: "bundled" | "user" }>>("list_preview_themes");
+  } catch {
+    previewThemeList.value = [];
+  }
+  previewThemeGalleryOpen.value = true;
+}
+
+async function selectPreviewTheme(id: string) {
+  // Stop watching previous theme
+  unlistenPreviewThemeChange?.();
+  unlistenPreviewThemeChange = null;
+  try {
+    await invoke("unwatch_preview_theme");
+  } catch { /* noop */ }
+
+  store.previewTheme = id;
+  void store.persistWorkspace();
+
+  try {
+    const css = await invoke<string>("read_preview_theme_css", { id });
+    injectPreviewThemeCss(css);
+  } catch { /* noop */ }
+
+  const selectedTheme = previewThemeList.value.find(t => t.id === id);
+  if (selectedTheme?.source === "user") {
+    try {
+      await invoke("watch_preview_theme", { id });
+      unlistenPreviewThemeChange = await listen("preview-theme-changed", async (event: { payload: { id: string; css: string } }) => {
+        if (event.payload.id === store.previewTheme) {
+          injectPreviewThemeCss(event.payload.css);
+        }
+      });
+    } catch { /* noop */ }
+  }
+}
+
+function injectPreviewThemeCss(css: string) {
+  let style = document.getElementById("preview-theme-active") as HTMLStyleElement | null;
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "preview-theme-active";
+    document.head.appendChild(style);
+  }
+  style.textContent = css;
+}
+
+async function openUserThemesDir() {
+  try {
+    await invoke("open_user_themes_dir");
+  } catch (e) {
+    store.statusMessage = `Could not open themes folder: ${e}`;
+  }
+}
+
+// Auto-updater
+const updaterModalOpen = ref(false);
+const updaterCheckBusy = ref(false);
+const updaterAvailable = ref<{ version: string; body: string | null } | null>(null);
+const updaterDownloadBusy = ref(false);
+
+async function checkForUpdates() {
+  if (updaterCheckBusy.value) return;
+  updaterCheckBusy.value = true;
+  store.statusMessage = "Checking for updates…";
+  store.lastUpdateCheckedAt = new Date().toISOString();
+  void store.persistWorkspace();
+  try {
+    const { check } = await import("@tauri-apps/plugin-updater");
+    const update = await check();
+    if (update?.available) {
+      updaterAvailable.value = { version: update.version, body: update.body ?? null };
+      updaterModalOpen.value = true;
+      store.statusMessage = `Update available: ${update.version}`;
+    } else {
+      store.statusMessage = "NEditor is up to date";
+    }
+  } catch (e) {
+    store.statusMessage = `Update check failed: ${e}`;
+  } finally {
+    updaterCheckBusy.value = false;
+  }
+}
+
+async function downloadAndRestart() {
+  if (updaterDownloadBusy.value) return;
+  updaterDownloadBusy.value = true;
+  store.statusMessage = "Downloading update…";
+  try {
+    const { check } = await import("@tauri-apps/plugin-updater");
+    const update = await check();
+    if (update?.available) {
+      await update.downloadAndInstall();
+    }
+  } catch (e) {
+    store.statusMessage = `Update failed: ${e}`;
+    updaterDownloadBusy.value = false;
+  }
+}
+
 const writingSpaceRestoreLayout = ref<WritingSpaceLayoutSnapshot | null>(null);
 const printPreviewEnabled = ref(false);
 const conflictOpen = ref(false);
@@ -13760,6 +13920,8 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "save-as", label: "Save As", title: "Save document as", icon: "saveAs", run: () => saveDocumentAs() },
       { id: "export-html", label: "HTML Export", title: "Export standalone HTML", icon: "html", run: () => exportDocumentAs("html") },
       { id: "export-epub", label: "EPUB Export", title: "Export EPUB ebook package", icon: "epub", run: () => exportDocumentAs("epub") },
+      { id: "copy-as-html", label: "Copy HTML", title: "Copy document as standalone HTML to clipboard (⌘⇧C)", icon: "html", run: () => void copyExportAsHtml() },
+      { id: "copy-as-rtf", label: "Copy RTF", title: "Copy document as rich text to clipboard (⌘⌥⇧C)", icon: "export", run: () => void copyExportAsRichText() },
       { id: "print-preview", label: "Print Preview", title: "Show approximate pagination, margins, columns, page breaks, and print-flow warnings", icon: "printer", run: () => togglePrintPreview(true) },
       { id: "visual-qa", label: "Visual QA", title: "Open target-by-target export visual QA evidence and next actions", icon: "snapshot", primary: true, run: () => openExportVisualQaDashboard() },
       { id: "publish", label: "Publish", title: "Open blog, Substack, or CMS publishing handoff", icon: "send", primary: true, run: () => openPublishingHandoff() },
@@ -13927,6 +14089,8 @@ const commandBarGroups = computed<CommandBarGroup[]>(() => [
       { id: "focus-mode-sentence", label: "Focus: Sentence", title: "Dim all text except the sentence at the cursor", icon: "wand", run: () => { store.focusMode = 'sentence'; } },
       { id: "focus-mode-off", label: "Focus: Off", title: "Turn off sentence/paragraph focus mode", icon: "wand", run: () => { store.focusMode = 'off'; } },
       { id: "style-guide-toggle", label: "Style Guide", title: "Toggle style guide enforcement in the review sidebar", icon: "comment", run: () => { store.styleGuideEnabled = !store.styleGuideEnabled; store.sidebar = 'review' as typeof store.sidebar; } },
+      { id: "zen-mode-enter", label: "Zen: Enter", title: "Enter distraction-free writing mode — hides toolbars, sidebars, and status chips (⌘⌃F)", icon: "expand", run: () => { store.zenMode = true; } },
+      { id: "zen-mode-exit", label: "Zen: Exit", title: "Exit zen mode and restore full interface (⌘⌃F or Escape)", icon: "collapse", run: () => { store.zenMode = false; } },
     ],
   },
 ]);
@@ -14280,6 +14444,7 @@ const appMenus = computed<AppMenu[]>(() => [
           { id: "export-help", label: "Export and Publishing", help: "Learn export targets and handoffs.", run: () => openHelp("export-publishing") },
           { id: "brand-help", label: "Brand and Page Design", help: "Learn brand kits, page design presets, and export profiles.", run: () => openHelp("brand-page-design") },
           { id: "shortcuts", label: "Keyboard Shortcuts", help: "Review shortcut and toolbar controls.", run: () => openHelp("keyboard-shortcuts") },
+          { id: "check-updates", label: "Check for Updates…", help: "Check for a new version of NEditor.", disabled: updaterCheckBusy.value, run: () => void checkForUpdates() },
         ],
       },
     ],
@@ -17195,6 +17360,10 @@ const commands = computed<CommandPaletteCommand[]>(() => [
   { name: "Export HTML", group: "Export", run: () => void exportDocumentAs("html") },
   { name: "Export EPUB", group: "Export", run: () => void exportDocumentAs("epub") },
   { name: "Export document", group: "Export", run: () => void exportDocument() },
+  { name: "Copy as HTML", group: "Export", keywords: ["copy", "html", "clipboard", "copy as html"], run: () => void copyExportAsHtml() },
+  { name: "Copy as Rich Text", group: "Export", keywords: ["copy", "rtf", "rich text", "clipboard", "rtf"], run: () => void copyExportAsRichText() },
+  { name: "Zen: Enter", group: "Workflow", keywords: ["zen", "focus", "distraction-free", "minimalist", "full screen", "writing mode"], run: () => { store.zenMode = true; } },
+  { name: "Zen: Exit", group: "Workflow", keywords: ["zen", "exit", "restore", "interface", "distraction-free"], run: () => { store.zenMode = false; } },
   { name: "Create snapshot", group: "Versioning", run: () => void snapshotActive() },
   { name: "Refresh Git diff", group: "Versioning", run: () => void store.refreshGitDiff() },
   { name: "Commit document", group: "Versioning", run: () => void store.commitActive() },
@@ -21537,7 +21706,7 @@ function editorExtensions(label = "Markdown editor", syncPreviewScroll = true) {
     lintGutter(),
     history(),
     EditorState.allowMultipleSelections.of(true),
-    markdown(),
+    markdown({ codeLanguages: buildCodeLanguages() }),
     linter(editorDiagnostics, { delay: 150 }),
     semanticEditorDecorations,
     closeBrackets(),
@@ -22475,7 +22644,7 @@ function restoreModalFocus() {
   }
 }
 
-function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "configuration-setup" | "equation-editor" | "guided-demo" | "command-palette" | "conflict", event: KeyboardEvent) {
+function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "configuration-setup" | "equation-editor" | "guided-demo" | "command-palette" | "conflict" | "preview-theme-gallery" | "updater", event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.preventDefault();
     closeModal(kind);
@@ -22501,7 +22670,7 @@ function handleModalKeydown(kind: "ai-paste" | "agent-workspace" | "docs-live" |
   }
 }
 
-function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "configuration-setup" | "equation-editor" | "guided-demo" | "command-palette" | "conflict") {
+function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "business-profile" | "configuration-setup" | "equation-editor" | "guided-demo" | "command-palette" | "conflict" | "preview-theme-gallery" | "updater") {
   if (kind === "ai-paste") {
     closeAiPaste();
   } else if (kind === "agent-workspace") {
@@ -22518,6 +22687,10 @@ function closeModal(kind: "ai-paste" | "agent-workspace" | "docs-live" | "busine
     closeGuidedDemo();
   } else if (kind === "command-palette") {
     closeCommandPalette();
+  } else if (kind === "preview-theme-gallery") {
+    previewThemeGalleryOpen.value = false;
+  } else if (kind === "updater") {
+    updaterModalOpen.value = false;
   } else {
     closeConflictDialog();
   }
@@ -25170,6 +25343,26 @@ async function exportDocumentAs(target: typeof store.exportTarget) {
   store.sidebar = "exports";
   await nextTick();
   await exportDocument();
+}
+
+async function copyExportAsHtml() {
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  try {
+    await invoke("copy_export_as_html", { documentSource: editorView?.state.doc.toString() || active.value.text, documentPath: active.value.path || "" });
+    store.statusMessage = "Copied to clipboard as HTML";
+  } catch (e) {
+    store.statusMessage = `Copy as HTML failed: ${e}`;
+  }
+}
+
+async function copyExportAsRichText() {
+  store.updateText(editorView?.state.doc.toString() || active.value.text);
+  try {
+    await invoke("copy_export_as_rich_text", { documentSource: editorView?.state.doc.toString() || active.value.text, documentPath: active.value.path || "" });
+    store.statusMessage = "Copied to clipboard as Rich Text";
+  } catch (e) {
+    store.statusMessage = `Copy as Rich Text failed: ${e}`;
+  }
 }
 
 function selectExportProfile(id: string) {
@@ -28367,6 +28560,7 @@ async function checkDocLocked(): Promise<void> {
 watch(() => active.value?.path, checkDocLocked, { immediate: true });
 
 function handleShortcut(event: KeyboardEvent) {
+  if (event.key === 'Escape' && store.zenMode) { store.zenMode = false; return; }
   if (event.metaKey || event.ctrlKey) {
     const k = event.key;
     if (k === '\\' ) { event.preventDefault(); toggleUiMode(); return; }
@@ -28376,6 +28570,7 @@ function handleShortcut(event: KeyboardEvent) {
     if (k === 'u' && event.shiftKey) { event.preventDefault(); openHumanizer(); return; }
     if (k === 'b' && !event.shiftKey && !event.altKey) { event.preventDefault(); toggleSidebarCollapsed(); return; }
     if (k === 'f' && event.altKey) { event.preventDefault(); store.focusMode = store.focusMode === 'off' ? 'paragraph' : store.focusMode === 'paragraph' ? 'sentence' : 'off'; return; }
+    if (k === 'f' && event.ctrlKey && !event.altKey) { event.preventDefault(); store.zenMode = !store.zenMode; return; }
     if (k === 'a' && event.altKey) { event.preventDefault(); void generateInlineVariations(); return; }
     // ⌘1–7: switch activity group in Pilot mode (before editable-target guard)
     if (store.uiMode === 'pilot' && !event.shiftKey && !event.altKey) {
@@ -28422,6 +28617,12 @@ function handleShortcut(event: KeyboardEvent) {
     } else {
       void exportDocument();
     }
+  } else if (key === "c" && event.shiftKey && !event.altKey) {
+    event.preventDefault();
+    void copyExportAsHtml();
+  } else if (key === "c" && event.shiftKey && event.altKey) {
+    event.preventDefault();
+    void copyExportAsRichText();
   } else if (key === "b") {
     event.preventDefault();
     wrapSelection("**");
@@ -38494,6 +38695,18 @@ del.tracked-del { background: #fee2e2; color: #b91c1c; text-decoration: line-thr
 .status-bar .status-message, .status-bar span, .status-bar small { color: var(--c-text2) !important; font-size: 10px !important; }
 .status-bar button { color: var(--c-text2) !important; font-size: 10px !important; height: 100% !important; min-height: 0 !important; padding: 0 8px !important; cursor: pointer; }
 .status-bar button:hover { background: var(--c-fill-hover) !important; color: var(--c-text) !important; }
+.zen-mode-status .status-message,
+.zen-mode-status .conflict-actions,
+.zen-mode-status .word-goal-progress,
+.zen-mode-status .feature-nudge,
+.zen-mode-status .keymap-status,
+.zen-mode-status .preview-timing,
+.zen-mode-status .watch-status,
+.zen-mode-status .compile-actions,
+.zen-mode-status .export-progress,
+.zen-mode-status .error {
+  display: none;
+}
 
 /* Panes */
 .editor-pane, .preview-pane { background: var(--c-surface) !important; }

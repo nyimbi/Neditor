@@ -21,6 +21,7 @@ dependency.
 | `@tauri-apps/plugin-store` | `^2.4.3` | MIT/Apache-2.0 | Preferences and UI state persistence | Bundled frontend/Rust plugin | JSON sidecar store possible but less integrated | Local app data only |
 | `@tauri-apps/plugin-window-state` | `^2.4.1` | MIT/Apache-2.0 | Native window state persistence | Bundled frontend/Rust plugin | Custom Rust state service possible | Local app data only |
 | `@tauri-apps/plugin-opener` | `^2` | MIT/Apache-2.0 | Open/reveal generated artifacts | Bundled frontend/Rust plugin | Platform-specific shell calls | User-triggered only |
+| `@tauri-apps/plugin-updater` | `^2` | MIT/Apache-2.0 | In-app software update check and install | Bundled frontend/Rust plugin | Manual update instructions possible | Fetches version manifest from configured update server; no credentials stored |
 | `@codemirror/state` | `^6.6.0` | MIT | Editor state engine | Bundled frontend | Building an editor is out of scope | Local document text only |
 | `@codemirror/view` | `^6.43.0` | MIT | Editor rendering | Bundled frontend | Building an editor is out of scope | Local document text only |
 | `@codemirror/commands` | `^6.10.3` | MIT | Editing commands/history | Bundled frontend | In-house command engine would add risk | Local document text only |
@@ -29,6 +30,15 @@ dependency.
 | `@codemirror/search` | `^6.7.0` | MIT | Find/search keymaps | Bundled frontend | In-house search possible but lower quality | Local document text only |
 | `@codemirror/autocomplete` | `^6.20.2` | MIT | Future snippets/completions | Bundled frontend | Could defer; useful for commands/snippets | Local document text only |
 | `@codemirror/lint` | `^6.9.6` | MIT | Future diagnostics gutter integration | Bundled frontend | Could render diagnostics manually | Local document text only |
+| `@codemirror/lang-python` | `^6` | MIT | Python syntax highlighting in code fences | Bundled frontend | Language server or regex highlight not practical | Local document text only |
+| `@codemirror/lang-rust` | `^6` | MIT | Rust syntax highlighting in code fences | Bundled frontend | Language server or regex highlight not practical | Local document text only |
+| `@codemirror/lang-cpp` | `^6` | MIT | C/C++ syntax highlighting in code fences | Bundled frontend | Legacy mode covers C but typed package is cleaner | Local document text only |
+| `@codemirror/lang-java` | `^6` | MIT | Java syntax highlighting in code fences | Bundled frontend | Legacy mode alternative; typed package preferred | Local document text only |
+| `@codemirror/lang-sql` | `^6` | MIT | SQL syntax highlighting in code fences | Bundled frontend | Legacy mode alternative; typed package preferred | Local document text only |
+| `@codemirror/lang-xml` | `^6` | MIT | XML/HTML syntax highlighting in code fences | Bundled frontend | Legacy mode alternative; typed package preferred | Local document text only |
+| `@codemirror/lang-yaml` | `^6` | MIT | YAML syntax highlighting in code fences | Bundled frontend | Legacy mode alternative; typed package preferred | Local document text only |
+| `@codemirror/lang-php` | `^6` | MIT | PHP syntax highlighting in code fences | Bundled frontend | Legacy mode alternative; typed package preferred | Local document text only |
+| `@codemirror/legacy-modes` | `^6` | MIT | Legacy StreamLanguage modes for 20+ additional languages (go, ruby, swift, shell, etc.) | Bundled frontend | Per-language typed packages not available for all targets | Local document text only |
 
 ## JavaScript Development Dependencies
 

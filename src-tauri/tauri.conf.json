@@ -34,7 +34,9 @@
     "shortDescription": "Local-first AI-assisted Markdown workbench",
     "longDescription": "NEditor is a local-first AI-assisted Markdown workbench for planning, drafting, reviewing, exporting, and publishing business documents.",
     "resources": {
-      "../examples/showcase": "examples/showcase"
+      "../examples/showcase": "examples/showcase",
+      "themes/preview": "themes/preview",
+      "resources/NEditor.sdef": "resources/NEditor.sdef"
     },
     "externalBin": [
       "binaries/ned"
@@ -59,6 +61,51 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "info": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "NEditor URL Scheme",
+            "CFBundleURLSchemes": ["neditor"]
+          }
+        ],
+        "NSServices": [
+          {
+            "NSMenuItem": {
+              "default": "Open in NEditor"
+            },
+            "NSMessage": "openInNEditor",
+            "NSSendTypes": ["NSStringPboardType", "NSFilenamesPboardType"],
+            "NSRequiredContext": {}
+          },
+          {
+            "NSMenuItem": {
+              "default": "New NEditor Document from Selection"
+            },
+            "NSMessage": "newNEditorDocumentFromSelection",
+            "NSSendTypes": ["NSStringPboardType"],
+            "NSRequiredContext": {}
+          }
+        ],
+        "OSAScriptingDefinition": "NEditor.sdef",
+        "NSAppleScriptEnabled": true
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "TODO: generate with `tauri signer generate` and set here. Also set TAURI_SIGNING_PRIVATE_KEY in CI.",
+      "endpoints": [
+        "https://releases.neditor.app/{{target}}/{{current_version}}"
+      ],
+      "dialog": false
+    },
+    "deep-link": {
+      "mobile": [],
+      "desktop": {
+        "schemes": ["neditor"]
+      }
+    }
   }
 }

@@ -11957,3 +11957,266 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(smoke.includes("native UI report did not include rendered preview identity or content"));
   ok(smoke.includes("status = \"limited\""));
 });
+
+// ── Copy-as-HTML / Copy-as-RTF ────────────────────────────────────────────────
+
+test("copy-as-HTML command invokes the correct IPC name with expected arguments", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  // IPC command name
+  ok(app.includes('"copy_export_as_html"'), "IPC command name copy_export_as_html must appear in App.vue");
+  // Both documentSource and documentPath args passed
+  ok(app.includes("documentSource:"), "copy_export_as_html call must pass documentSource argument");
+  ok(app.includes("documentPath:"), "copy_export_as_html call must pass documentPath argument");
+  // Status toast
+  ok(app.includes("Copied to clipboard as HTML"), "success toast for copy-as-HTML must be set in statusMessage");
+  // Keyboard shortcut binding
+  ok(app.includes("copyExportAsHtml"), "copyExportAsHtml function must be defined or referenced");
+});
+
+test("copy-as-RTF command invokes the correct IPC name with expected arguments", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes('"copy_export_as_rich_text"'), "IPC command name copy_export_as_rich_text must appear in App.vue");
+  ok(app.includes("Copied to clipboard as Rich Text"), "success toast for copy-as-RTF must be set in statusMessage");
+  ok(app.includes("copyExportAsRichText"), "copyExportAsRichText function must be defined or referenced");
+});
+
+test("copy-as-HTML command appears in the command palette export group", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("Copy as HTML"), "Copy as HTML entry must appear in the command palette");
+  ok(app.includes("Copy as Rich Text"), "Copy as Rich Text entry must appear in the command palette");
+});
+
+test("copy-as-HTML keyboard shortcut is wired to Cmd+Shift+C", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  // The handler must check shiftKey for 'c' key and call copyExportAsHtml
+  ok(
+    app.includes('key === "c" && event.shiftKey') || app.includes("key === 'c' && event.shiftKey"),
+    "handleShortcut must handle Shift+C for copy-as-HTML",
+  );
+});
+
+test("copy-as-RTF keyboard shortcut is wired to Cmd+Alt+Shift+C", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes("event.altKey") && app.includes("copyExportAsRichText"),
+    "handleShortcut must distinguish altKey for copy-as-RTF vs copy-as-HTML",
+  );
+});
+
+// ── Zen mode ──────────────────────────────────────────────────────────────────
+
+test("zen mode state is defined in the documents store", () => {
+  const store = readFileSync("src/stores/documents.ts", "utf8");
+  ok(store.includes("zenMode: false"), "store must initialise zenMode as false");
+});
+
+test("zen mode is persisted in workspace persistence schema", () => {
+  const persistence = readFileSync("src/lib/workspacePersistence.ts", "utf8");
+  ok(persistence.includes("zenMode?:"), "PersistedWorkspace must declare zenMode field");
+  ok(persistence.includes('"zenMode"'), "normalizeWorkspaceRecord must migrate zenMode boolean");
+});
+
+test("zen mode toggle hides command bar chrome via class binding", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("'zen-mode': store.zenMode"), "app-shell :class must include zen-mode when store.zenMode is true");
+  ok(app.includes("v-show=\"!store.zenMode\"") || app.includes('v-show="!store.zenMode"'), "at least one element must be hidden with v-show when zen mode is active");
+});
+
+test("zen mode hides command toolbar rows", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes('v-show="!store.zenMode"') && app.includes('id="main-commands"'),
+    "command bar nav must carry v-show not tied to zen mode — both strings must appear in App.vue",
+  );
+});
+
+test("zen mode hides sidebar and activity bar", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("!store.zenMode") && app.includes('id="document-sidebar"'), "sidebar must be hidden in zen mode");
+  ok(app.includes("!store.zenMode") && app.includes('class="activity-bar"'), "activity bar must be hidden in zen mode");
+});
+
+test("zen mode hides document tabs", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes('v-show="!store.zenMode"') || app.includes("v-show=\"!store.zenMode\""),
+    "document-tabs section must be conditionally hidden in zen mode",
+  );
+  ok(app.includes('class="document-tabs"'), "document-tabs section must still exist in App.vue");
+});
+
+test("zen mode keyboard shortcut Cmd+Ctrl+F is registered in handleShortcut", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("store.zenMode = !store.zenMode"), "handleShortcut must toggle store.zenMode");
+  ok(app.includes("event.ctrlKey") && app.includes("store.zenMode"), "handleShortcut must check ctrlKey for zen mode shortcut");
+});
+
+test("Escape key exits zen mode", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes("store.zenMode = false") && app.includes("Escape"),
+    "handleShortcut must set zenMode to false on Escape",
+  );
+});
+
+test("zen mode command palette entries Zen Enter and Zen Exit are registered", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("Zen: Enter"), "command palette must include Zen: Enter entry");
+  ok(app.includes("Zen: Exit"), "command palette must include Zen: Exit entry");
+});
+
+// ── Preview theme gallery ─────────────────────────────────────────────────────
+
+test("preview theme gallery IPC commands are wired", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes('"list_preview_themes"'), "App.vue must invoke list_preview_themes");
+  ok(app.includes('"read_preview_theme_css"'), "App.vue must invoke read_preview_theme_css");
+  ok(app.includes('"open_user_themes_dir"'), "App.vue must invoke open_user_themes_dir");
+  ok(app.includes('"watch_preview_theme"'), "App.vue must invoke watch_preview_theme");
+  ok(app.includes('"unwatch_preview_theme"'), "App.vue must invoke unwatch_preview_theme");
+});
+
+test("preview theme gallery opens via openPreviewThemeGallery function", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("openPreviewThemeGallery"), "App.vue must define openPreviewThemeGallery");
+  ok(app.includes("previewThemeGalleryOpen"), "App.vue must have previewThemeGalleryOpen reactive state");
+  ok(app.includes("previewThemeList"), "App.vue must have previewThemeList reactive state");
+});
+
+test("preview theme gallery renders theme list items", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("preview-theme-list"), "App.vue must render .preview-theme-list element");
+  ok(app.includes("preview-theme-item"), "App.vue must render .preview-theme-item elements");
+  ok(app.includes("theme.name"), "App.vue must display theme.name in gallery");
+  ok(app.includes("theme.source"), "App.vue must display theme.source in gallery");
+});
+
+test("selecting a preview theme injects CSS into #preview-theme-active style element", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("preview-theme-active"), "App.vue must inject CSS into element with id preview-theme-active");
+  ok(app.includes("injectPreviewThemeCss"), "App.vue must define injectPreviewThemeCss helper");
+  ok(app.includes("style.textContent = css") || app.includes("style.textContent=css"), "injectPreviewThemeCss must assign css to style.textContent");
+});
+
+test("preview theme listens for preview-theme-changed event for user themes hot reload", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes('"preview-theme-changed"'), "App.vue must listen for preview-theme-changed event");
+});
+
+test("preview theme gallery has Open user themes folder button", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("Open user themes folder") || app.includes("openUserThemesDir"), "App.vue must expose openUserThemesDir and/or label it");
+});
+
+test("PreviewTheme type allows arbitrary string IDs beyond match/light/dark", () => {
+  const persistence = readFileSync("src/lib/workspacePersistence.ts", "utf8");
+  ok(
+    persistence.includes("string & {}") || persistence.includes("(string & {})"),
+    "PreviewTheme must be widened with (string & {}) to allow arbitrary theme IDs",
+  );
+});
+
+// ── Auto-updater UI ───────────────────────────────────────────────────────────
+
+test("auto-updater check for updates function is defined", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("checkForUpdates"), "App.vue must define checkForUpdates function");
+  ok(app.includes("@tauri-apps/plugin-updater"), "App.vue must import from @tauri-apps/plugin-updater");
+  ok(app.includes("Check for Updates"), "Help menu must include Check for Updates item");
+});
+
+test("auto-updater shows version and release notes in modal", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("updaterModalOpen"), "App.vue must have updaterModalOpen reactive state");
+  ok(app.includes("updaterAvailable"), "App.vue must have updaterAvailable reactive state");
+  ok(app.includes("Download & Restart") || app.includes("downloadAndRestart"), "App.vue must have Download & Restart action");
+});
+
+test("auto-updater preferences are persisted in store and workspace", () => {
+  const store = readFileSync("src/stores/documents.ts", "utf8");
+  const persistence = readFileSync("src/lib/workspacePersistence.ts", "utf8");
+  ok(store.includes("checkUpdatesOnStartup"), "store must have checkUpdatesOnStartup preference");
+  ok(store.includes("lastUpdateCheckedAt"), "store must have lastUpdateCheckedAt timestamp");
+  ok(persistence.includes("checkUpdatesOnStartup"), "workspacePersistence must persist checkUpdatesOnStartup");
+  ok(persistence.includes("lastUpdateCheckedAt"), "workspacePersistence must persist lastUpdateCheckedAt");
+});
+
+// ── Extended language mapping ─────────────────────────────────────────────────
+
+import { buildCodeLanguages, resolveLanguage } from "../src/lib/languageMapping.js";
+
+test("extended language mapping: resolveLanguage returns a LanguageDescription for python", () => {
+  const result = resolveLanguage("python");
+  ok(result !== undefined, "resolveLanguage('python') must return a LanguageDescription");
+  ok(result!.name === "Python", "resolveLanguage('python') name must be Python");
+});
+
+test("extended language mapping: py alias resolves to python", () => {
+  const result = resolveLanguage("py");
+  ok(result !== undefined, "resolveLanguage('py') must resolve to Python");
+  ok(result!.name === "Python", "py alias must map to Python LanguageDescription");
+});
+
+test("extended language mapping: rust resolves correctly", () => {
+  const result = resolveLanguage("rust");
+  ok(result !== undefined, "resolveLanguage('rust') must return a LanguageDescription");
+  ok(result!.name === "Rust", "rust must map to Rust LanguageDescription");
+});
+
+test("extended language mapping: bash/sh aliases resolve to Shell", () => {
+  for (const alias of ["sh", "bash", "shell"]) {
+    const result = resolveLanguage(alias);
+    ok(result !== undefined, `resolveLanguage('${alias}') must return a LanguageDescription`);
+    ok(result!.name === "Shell", `${alias} must map to Shell LanguageDescription`);
+  }
+});
+
+test("extended language mapping: sql resolves to SQL", () => {
+  const result = resolveLanguage("sql");
+  ok(result !== undefined, "resolveLanguage('sql') must return a LanguageDescription");
+  ok(result!.name === "SQL", "sql must map to SQL LanguageDescription");
+});
+
+test("extended language mapping: go alias resolves to Go", () => {
+  const result = resolveLanguage("go");
+  ok(result !== undefined, "resolveLanguage('go') must return a LanguageDescription");
+  ok(result!.name === "Go", "go must map to Go LanguageDescription");
+});
+
+test("extended language mapping: yaml and yml both resolve to YAML", () => {
+  for (const alias of ["yaml", "yml"]) {
+    const result = resolveLanguage(alias);
+    ok(result !== undefined, `resolveLanguage('${alias}') must return a LanguageDescription`);
+    ok(result!.name === "YAML", `${alias} must map to YAML LanguageDescription`);
+  }
+});
+
+test("extended language mapping: unknown language returns undefined", () => {
+  const result = resolveLanguage("notareallangage");
+  equal(result, undefined, "resolveLanguage must return undefined for unknown fence info strings");
+});
+
+test("extended language mapping: case-insensitive resolution", () => {
+  const result = resolveLanguage("PYTHON");
+  ok(result !== undefined, "resolveLanguage must resolve case-insensitively");
+  ok(result!.name === "Python", "PYTHON must resolve to Python LanguageDescription");
+});
+
+test("extended language mapping: buildCodeLanguages covers at least 20 languages", () => {
+  const languages = buildCodeLanguages();
+  ok(languages.length >= 20, `buildCodeLanguages must return at least 20 entries, got ${languages.length}`);
+});
+
+test("extended language mapping: cpp alias resolves to C++", () => {
+  for (const alias of ["cpp", "c++"]) {
+    const result = resolveLanguage(alias);
+    ok(result !== undefined, `resolveLanguage('${alias}') must return a LanguageDescription`);
+    ok(result!.name === "C++", `${alias} must map to C++ LanguageDescription`);
+  }
+});
+
+test("extended language mapping: markdown() in App.vue uses codeLanguages option", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("buildCodeLanguages"), "App.vue must call buildCodeLanguages for codeLanguages option");
+  ok(app.includes("codeLanguages:"), "markdown() call must pass codeLanguages option");
+});

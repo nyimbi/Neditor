@@ -113,3 +113,10 @@ rows below so new native commands cannot quietly bypass the coverage ledger.
 | `run_mail_merge` | `src-tauri/src/mail_merge.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `search_workspace` | `src-tauri/src/search.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
 | `show_ollama_model_info` | `src-tauri/src/ollama_models.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `copy_export_as_html` | `src-tauri/src/clipboard_export.rs` | `clipboard_export::tests::html_pipeline_produces_non_empty_output`; `clipboard_export::tests::html_to_plain_text_strips_tags` |
+| `copy_export_as_rich_text` | `src-tauri/src/clipboard_export.rs` | `clipboard_export::tests::rtf_contains_heading_markup`; `clipboard_export::tests::rtf_covers_bold_italic_code`; `clipboard_export::tests::rtf_covers_lists`; `clipboard_export::tests::rtf_covers_hr_and_blockquote` |
+| `list_preview_themes` | `src-tauri/src/preview_themes.rs` | `preview_themes::tests::load_themes_from_dir_returns_sorted_themes`; `preview_themes::tests::user_theme_overrides_bundled_same_id` |
+| `read_preview_theme_css` | `src-tauri/src/preview_themes.rs` | `preview_themes::tests::path_is_safe_rejects_traversal` |
+| `open_user_themes_dir` | `src-tauri/src/preview_themes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `watch_preview_theme` | `src-tauri/src/preview_themes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |
+| `unwatch_preview_theme` | `src-tauri/src/preview_themes.rs` | `ipc_command_tests::spec_25_4_ipc_commands_are_registered_and_documented` |

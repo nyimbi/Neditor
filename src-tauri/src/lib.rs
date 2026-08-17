@@ -5,6 +5,7 @@ use std::{collections::BTreeSet, fs, path::Path, path::PathBuf};
 
 mod ai_cleanup;
 mod ai_humanizer;
+mod applescript;
 mod audit;
 mod backlinks;
 mod bibliography;
@@ -13,6 +14,7 @@ mod calculations;
 mod citation_discovery;
 pub mod cli;
 mod cli_ipc;
+mod clipboard_export;
 mod compile_options;
 mod compiler;
 mod compiler_support;
@@ -20,6 +22,7 @@ mod compiler_types;
 mod csl_styles;
 mod daily_notes;
 mod data_exchange;
+mod deep_link;
 mod diagnostics;
 mod diagnostics_types;
 mod document_ast;
@@ -42,6 +45,7 @@ mod layout;
 mod link_graph;
 mod link_validation;
 mod local_agents;
+mod macos_services;
 mod mail_merge;
 mod manifest;
 mod markdown_tables;
@@ -49,6 +53,7 @@ mod net_guard;
 mod ollama_models;
 mod paged_document;
 mod pandoc_import;
+mod preview_themes;
 mod provenance;
 mod readability;
 mod references;
@@ -88,6 +93,7 @@ use cli::{
     default_markdown_reader_plan, deploy_cli, pending_cli_open_paths,
 };
 use cli_ipc::{cli_queue_file_path, drain_cli_open_queue, register_instance};
+use clipboard_export::{copy_export_as_html, copy_export_as_rich_text};
 #[cfg(test)]
 use compiler::compile;
 pub(crate) use compiler::compile_with_options;
@@ -144,6 +150,10 @@ use ollama_models::{
     show_ollama_model_info,
 };
 use pandoc_import::import_document;
+use preview_themes::{
+    list_preview_themes, open_user_themes_dir, read_preview_theme_css, unwatch_preview_theme,
+    watch_preview_theme, PreviewThemeWatcherState,
+};
 use readability::analyze_readability;
 use rfp_import::import_rfp_source;
 use search::search_workspace;
@@ -195,14 +205,20 @@ pub fn run() {
         .manage(FileWatcherState::default())
         .manage(GoogleAuthState::default())
         .manage(NativeTtsState::default())
+        .manage(PreviewThemeWatcherState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_updater::Builder::default().build())
         .setup(|app| {
             write_desktop_smoke_report(app);
+            deep_link::setup_deep_link_handler(&app.handle().clone());
+            macos_services::setup_services(&app.handle().clone());
+            applescript::setup_applescript_handlers(&app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -306,7 +322,14 @@ pub fn run() {
             reject_suggestion,
             accept_all_suggestions,
             reject_all_suggestions,
-            list_suggestions
+            list_suggestions,
+            copy_export_as_html,
+            copy_export_as_rich_text,
+            list_preview_themes,
+            read_preview_theme_css,
+            open_user_themes_dir,
+            watch_preview_theme,
+            unwatch_preview_theme
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEditor");
