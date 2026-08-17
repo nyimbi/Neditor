@@ -203,14 +203,20 @@ use workspace_files::WorkspaceFileRequest;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    // On macOS the native menu bar is the primary UI; on Windows/Linux the
+    // in-app menu bar (rendered in Vue) is used instead.
+    #[cfg(target_os = "macos")]
+    let builder = tauri::Builder::default()
         .menu(build_neditor_menu)
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
             if id.starts_with("neditor-") {
                 let _ = app.emit("neditor-menu-command", id);
             }
-        })
+        });
+    #[cfg(not(target_os = "macos"))]
+    let builder = tauri::Builder::default();
+    builder
         .manage(TransformTrustStore::load_or_default())
         .manage(FileWatcherState::default())
         .manage(GoogleAuthState::default())
@@ -560,8 +566,6 @@ fn build_neditor_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> 
         .build()?;
 
     let writing_tools_menu = SubmenuBuilder::new(app, "Writing Tools")
-        .item(&menu_item(app, "neditor-open-search", "Find and Replace")?)
-        .separator()
         .item(&menu_item(app, "neditor-insert-table", "Insert Table")?)
         .item(&menu_item(
             app,

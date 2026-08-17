@@ -25,7 +25,7 @@
     </nav>
 
     <header class="titlebar">
-      <nav class="app-menu-bar" aria-label="Application menus" @keydown="handleAppMenuKeydown">
+      <nav v-if="!isMacOS" class="app-menu-bar" aria-label="Application menus" @keydown="handleAppMenuKeydown">
         <div v-for="menu in appMenus" :key="menu.id" class="app-menu">
           <button
             type="button"
@@ -8484,6 +8484,7 @@ import {
   type LocalAgentCliProfile,
 } from "./lib/aiProviderPackages";
 import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
+import { isAppMenuHidden } from "./lib/platformDetection";
 import { accessibilityQaMarkdown, buildAccessibilityQaReport } from "./lib/accessibilityQa";
 import { bibliographyEntryStub, bibliographyStubsForMissingKeys, citationReferenceSnippet } from "./lib/bibliographyManager";
 import {
@@ -10419,6 +10420,7 @@ function toggleSidebarCollapsed(): void {
 }
 const writerFocusMode = ref(false);
 const sessionStartWords = ref<number | null>(null);
+const isMacOS = isAppMenuHidden(navigator.platform);
 const openAppMenuId = ref<string | null>(null);
 const toolbarVisibilityMenuOpen = ref(false);
 const writingSpaceMaximized = ref(false);

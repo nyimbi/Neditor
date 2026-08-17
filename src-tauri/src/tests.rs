@@ -169,4 +169,5 @@ mod continuity_camera_tests;
 mod file_command_tests;
 mod filesystem_watch_tests;
 mod ipc_command_tests;
+mod native_menu_tests;
 mod tts_tests;

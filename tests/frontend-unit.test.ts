@@ -12377,3 +12377,36 @@ test("keepInMenuBar: App.vue exposes keepInMenuBar checkbox in Settings", () => 
     "App.vue Settings panel must include a keepInMenuBar checkbox with 'menu bar' label text"
   );
 });
+
+import { isAppMenuHidden } from "../src/lib/platformDetection.js";
+
+test("isAppMenuHidden: returns true for macOS platform strings", () => {
+  ok(isAppMenuHidden("MacIntel"), "MacIntel should hide in-app menu");
+  ok(isAppMenuHidden("MacM1"), "MacM1 should hide in-app menu");
+  ok(isAppMenuHidden("Mac"), "Mac should hide in-app menu");
+});
+
+test("isAppMenuHidden: returns false for non-macOS platform strings", () => {
+  equal(isAppMenuHidden("Win32"), false, "Win32 should show in-app menu");
+  equal(isAppMenuHidden("Linux x86_64"), false, "Linux should show in-app menu");
+  equal(isAppMenuHidden(""), false, "empty string should show in-app menu");
+});
+
+test("in-app menu bar is hidden on macOS in App.vue template", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes('v-if="!isMacOS"') && app.includes("app-menu-bar"),
+    "App.vue must guard the .app-menu-bar nav with v-if=\"!isMacOS\""
+  );
+});
+
+test("native menu is macOS-only in lib.rs", () => {
+  const libRs = readFileSync("src-tauri/src/lib.rs", "utf8");
+  ok(
+    libRs.includes('#[cfg(target_os = "macos")]'),
+    "lib.rs must have a #[cfg(target_os = \"macos\")] guard"
+  );
+  const guardIdx = libRs.indexOf('#[cfg(target_os = "macos")]');
+  const menuIdx = libRs.indexOf(".menu(build_neditor_menu)");
+  ok(guardIdx < menuIdx, "#[cfg(target_os = \"macos\")] guard must precede .menu(build_neditor_menu)");
+});
