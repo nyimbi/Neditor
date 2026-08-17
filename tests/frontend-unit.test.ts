@@ -9270,7 +9270,8 @@ test("workbench command bar exposes icon display controls and workflow groups", 
     + readFileSync("src/components/KeyboardShortcutsPanel.vue", "utf8")
     + readFileSync("src/components/SettingsPanel.vue", "utf8")
     + readFileSync("src/components/TabsBar.vue", "utf8")
-    + readFileSync("src/components/CommandPalette.vue", "utf8");
+    + readFileSync("src/components/CommandPalette.vue", "utf8")
+    + readFileSync("src/components/Toolbar.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
   const aiProviderPackages = readFileSync("src/lib/aiProviderPackages.ts", "utf8");
@@ -12045,15 +12046,23 @@ test("zen mode is persisted in workspace persistence schema", () => {
 
 test("zen mode toggle hides command bar chrome via class binding", () => {
   const app = readFileSync("src/App.vue", "utf8");
+  const toolbar = readFileSync("src/components/Toolbar.vue", "utf8");
+  const tabsBar = readFileSync("src/components/TabsBar.vue", "utf8");
   ok(app.includes("'zen-mode': store.zenMode"), "app-shell :class must include zen-mode when store.zenMode is true");
-  ok(app.includes("v-show=\"!store.zenMode\"") || app.includes('v-show="!store.zenMode"'), "at least one element must be hidden with v-show when zen mode is active");
+  ok(
+    app.includes("v-show=\"!store.zenMode\"") || app.includes('v-show="!store.zenMode"') ||
+    toolbar.includes('v-show="!store.zenMode"') || tabsBar.includes('v-show="!store.zenMode"'),
+    "at least one element must be hidden with v-show when zen mode is active",
+  );
 });
 
 test("zen mode hides command toolbar rows", () => {
   const app = readFileSync("src/App.vue", "utf8");
+  const toolbar = readFileSync("src/components/Toolbar.vue", "utf8");
   ok(
-    app.includes('v-show="!store.zenMode"') && app.includes('id="main-commands"'),
-    "command bar nav must carry v-show not tied to zen mode — both strings must appear in App.vue",
+    (app.includes('v-show="!store.zenMode"') || toolbar.includes('v-show="!store.zenMode"')) &&
+    (app.includes('id="main-commands"') || toolbar.includes('id="main-commands"')),
+    "command bar nav must carry v-show not tied to zen mode — both strings must appear in App.vue or Toolbar.vue",
   );
 });
 
