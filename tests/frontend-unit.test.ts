@@ -9263,7 +9263,11 @@ test("print preview report estimates page flow and layout risks", () => {
 });
 
 test("workbench command bar exposes icon display controls and workflow groups", () => {
-  const app = readFileSync("src/App.vue", "utf8");
+  const app = readFileSync("src/App.vue", "utf8")
+    + readFileSync("src/components/StatusBar.vue", "utf8")
+    + readFileSync("src/components/ToastHost.vue", "utf8")
+    + readFileSync("src/components/ThemePicker.vue", "utf8")
+    + readFileSync("src/components/KeyboardShortcutsPanel.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
   const aiProviderPackages = readFileSync("src/lib/aiProviderPackages.ts", "utf8");

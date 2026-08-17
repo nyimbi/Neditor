@@ -3664,93 +3664,23 @@
         </template>
 
         <template v-else-if="store.sidebar === 'help'">
-          <h2>Help Center</h2>
-          <section class="help-center" aria-label="Help center">
-            <div class="help-controls">
-              <label>
-                Search help
-                <input v-model="helpQuery" type="search" placeholder="export, outline, voice, shortcut" />
-              </label>
-              <label>
-                Area
-                <select v-model="helpCategory">
-                  <option value="all">All areas</option>
-                  <option v-for="category in helpCategoryOptions" :key="category.id" :value="category.id">{{ category.label }}</option>
-                </select>
-              </label>
-            </div>
-            <div class="help-quick-actions" aria-label="Popular help actions">
-              <button type="button" @click="openStartWorkspace()">Start Workspace</button>
-              <button type="button" @click="openHelp('docs-live')">Docs Live</button>
-              <button type="button" @click="openHelp('agent-lifecycle-governance')">AI Governance</button>
-              <button type="button" @click="openGuidedDemo()">Guided demo</button>
-              <button type="button" @click="openHelp('export-publishing')">Export</button>
-              <button type="button" @click="openHelp('keyboard-shortcuts')">Shortcuts</button>
-            </div>
-            <section class="start-workspace-cockpit" aria-label="Start Workspace cockpit">
-              <header>
-                <div>
-                  <strong>Start Workspace</strong>
-                  <span>{{ startWorkspaceSummary }}</span>
-                </div>
-                <button
-                  type="button"
-                  title="Insert the current onboarding checklist into the active document for review, delegation, or handoff"
-                  @click="insertStartWorkspaceChecklist"
-                >
-                  Insert checklist
-                </button>
-              </header>
-              <ol class="start-workspace-steps" aria-label="Workspace setup and creation steps">
-                <li v-for="item in startWorkspaceItems" :key="item.id" :class="{ complete: item.done }">
-                  <div>
-                    <strong>{{ item.label }}</strong>
-                    <span>{{ item.status }}</span>
-                    <small>{{ item.detail }}</small>
-                  </div>
-                  <button type="button" :disabled="item.disabled" :title="item.title" @click="runStartWorkspaceAction(item)">
-                    {{ item.actionLabel }}
-                  </button>
-                </li>
-              </ol>
-            </section>
-            <section class="help-topic-list" role="list" aria-label="Help topics">
-              <div v-for="topic in filteredHelpTopics" :key="topic.id" role="listitem">
-                <button
-                  class="help-topic-button"
-                  :class="{ active: topic.id === selectedHelpTopic?.id }"
-                  type="button"
-                  @click="selectHelpTopic(topic.id)"
-                >
-                  <strong>{{ topic.title }}</strong>
-                  <small>{{ topic.summary }}</small>
-                </button>
-              </div>
-            </section>
-            <p v-if="!filteredHelpTopics.length" class="sidebar-hint">No help topics matched that search.</p>
-            <article v-if="selectedHelpTopic" class="help-topic-detail" aria-label="Selected help topic">
-              <div class="help-topic-header">
-                <small>{{ helpCategoryLabel(selectedHelpTopic.category) }}</small>
-                <h3>{{ selectedHelpTopic.title }}</h3>
-                <p>{{ selectedHelpTopic.summary }}</p>
-              </div>
-              <p class="help-when">{{ selectedHelpTopic.when }}</p>
-              <ol class="help-steps">
-                <li v-for="step in selectedHelpTopic.steps" :key="step">{{ step }}</li>
-              </ol>
-              <ul class="help-tips">
-                <li v-for="tip in selectedHelpTopic.tips" :key="tip">{{ tip }}</li>
-              </ul>
-              <div class="help-action-row">
-                <button v-for="action in selectedHelpTopic.actions" :key="action.label" type="button" @click="runHelpAction(action)">
-                  {{ action.label }}
-                </button>
-              </div>
-              <div class="help-keywords" aria-label="Topic keywords">
-                <span v-for="keyword in selectedHelpTopic.keywords" :key="keyword">{{ keyword }}</span>
-              </div>
-            </article>
-          </section>
+          <KeyboardShortcutsPanel
+            :help-query="helpQuery"
+            :help-category="helpCategory"
+            :start-workspace-summary="startWorkspaceSummary"
+            :start-workspace-items="startWorkspaceItems"
+            :filtered-help-topics="filteredHelpTopics"
+            :selected-help-topic="selectedHelpTopic"
+            @update:help-query="helpQuery = $event"
+            @update:help-category="helpCategory = $event as typeof helpCategory"
+            @open-start-workspace="openStartWorkspace"
+            @open-help="openHelp"
+            @open-guided-demo="openGuidedDemo"
+            @insert-start-workspace-checklist="insertStartWorkspaceChecklist"
+            @run-start-workspace-action="runStartWorkspaceAction"
+            @select-help-topic="selectHelpTopic"
+            @run-help-action="runHelpAction"
+          />
         </template>
 
         <template v-else-if="store.sidebar === 'settings'">
@@ -8432,6 +8362,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSPro
 import StatusBar from "./components/StatusBar.vue";
 import ToastHost from "./components/ToastHost.vue";
 import ThemePicker from "./components/ThemePicker.vue";
+import KeyboardShortcutsPanel from "./components/KeyboardShortcutsPanel.vue";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { invoke } from "@tauri-apps/api/core";
