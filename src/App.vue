@@ -211,9 +211,9 @@
         <button
           type="button"
           class="ui-mode-btn"
-          :title="store.uiMode === 'writer' ? 'Switch to Pilot mode (⌘\\)' : 'Switch to Writer mode (⌘\\)'"
+          :title="store.uiMode === 'writer' ? 'Switch to Pilot mode (⌘\\)' : store.uiMode === 'pilot' ? 'Switch to Workbench mode (⌘\\)' : 'Switch to Writer mode (⌘\\)'"
           @click="toggleUiMode"
-        >{{ store.uiMode === 'writer' ? '⊞ Pilot' : '✍ Writer' }}</button>
+        >{{ store.uiMode === 'writer' ? '⊞ Pilot' : store.uiMode === 'pilot' ? '⊟ Workbench' : '✍ Writer' }}</button>
         <section
           v-if="collapsedToolbarRows.length"
           class="collapsed-toolbar-tray titlebar-toolbar-tray"
@@ -290,6 +290,7 @@
         v-show="!isToolbarCollapsed(row.id)"
         :key="row.id"
         class="command-toolbar-row"
+        :data-row-id="row.id"
         :aria-label="`${row.label} toolbar`"
       >
         <button
@@ -4184,6 +4185,19 @@
                 <code>{{ profile.command }}</code>
               </span>
             </div>
+            <label class="ai-timeout-row">
+              Request timeout (seconds)
+              <input
+                type="number"
+                min="10"
+                max="600"
+                step="5"
+                :value="store.aiProviderDefaults.aiTimeoutSeconds"
+                @change="store.saveAiProviderDefaults({ ...store.aiProviderDefaults, aiTimeoutSeconds: Math.min(600, Math.max(10, Number(($event.target as HTMLInputElement).value) || 60)) })"
+                aria-label="AI provider request timeout in seconds (10–600)"
+              />
+              <small>10–600 s · default 60. Applies to all AI provider HTTP requests.</small>
+            </label>
           </section>
           <!-- Ollama status + model catalog -->
           <template v-if="isOllamaProfile">
@@ -5302,6 +5316,32 @@
         <div v-if="docLocked" class="doc-locked-banner" aria-live="polite">
           🔒 This document is approved/locked. Editing is disabled. Change status in front matter to unlock.
         </div>
+        <!-- Item B: first-run empty-state overlay -->
+        <div
+          v-if="emptyStateOverlayVisible"
+          class="empty-state-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Welcome to NEditor"
+          @keydown.escape.stop="dismissEmptyState(false)"
+        >
+          <div class="empty-state-card" @keydown.tab.stop>
+            <div class="empty-state-cursor" aria-hidden="true">|</div>
+            <h2 class="empty-state-heading">Start typing</h2>
+            <p class="empty-state-hint">NEditor saves your work as a normal Markdown file on your Mac. Nothing leaves your device unless you export it.</p>
+            <div class="empty-state-actions">
+              <button type="button" class="primary" @click="store.newDocument(); dismissEmptyState(true)">New document</button>
+              <button type="button" @click="openDocument(); dismissEmptyState(true)">Open file</button>
+              <button type="button" @click="openFolder(); dismissEmptyState(true)">Open folder</button>
+            </div>
+            <label class="empty-state-dismiss-label">
+              <input type="checkbox" @change="(e) => { if ((e.target as HTMLInputElement).checked) dismissEmptyState(true); }" />
+              Do not show again
+            </label>
+            <button type="button" class="empty-state-close" aria-label="Close welcome overlay" @click="dismissEmptyState(false)">x</button>
+          </div>
+        </div>
+
         <div class="editor-split-grid" :data-split-source="store.splitSourcePanes ? 'true' : 'false'" :class="{ 'has-minimap': store.showMinimap }">
           <div ref="editorHost" class="editor-host editor-host-primary" :class="{ 'editor-locked': docLocked }" aria-label="Primary Markdown source pane"></div>
           <div v-if="store.splitSourcePanes" ref="secondaryEditorHost" class="editor-host editor-host-secondary" aria-label="Secondary Markdown source pane"></div>
@@ -5351,6 +5391,26 @@
         @scroll="syncEditorScrollFromPreview"
         @click="(e: MouseEvent) => { const a = (e.target as HTMLElement).closest('a[data-wiki-target]') as HTMLAnchorElement | null; if (a) { const target = a.getAttribute('data-wiki-target') || ''; const hashIdx = target.indexOf('#'); if (hashIdx !== -1) { e.preventDefault(); void navigateToBlockRef(target.slice(0, hashIdx), target.slice(hashIdx + 1)); } } }"
       >
+        <!-- Item C: degraded preview state -->
+        <div v-if="store.previewFailed" class="preview-degraded-banner" role="status" aria-live="polite">
+          <div class="preview-degraded-icon" aria-hidden="true">&#9888;</div>
+          <div class="preview-degraded-body">
+            <strong class="preview-degraded-heading">Preview unavailable</strong>
+            <span class="preview-degraded-kind">{{ ({ 'compile-failed': 'Compile failed', 'backend-unavailable': 'Backend not responding', 'transform-error': 'Transform engine missing' } as Record<string, string>)[store.lastCompileErrorKind] ?? 'Compile failed' }}</span>
+            <span v-if="store.lastCompileErrorMessage" class="preview-degraded-msg">{{ store.lastCompileErrorMessage }}</span>
+          </div>
+          <div class="preview-degraded-actions">
+            <button type="button" class="preview-degraded-retry" @click="store.compileActive()">Retry</button>
+            <button
+              v-if="store.consecutiveCompileFailures >= 3"
+              type="button"
+              class="preview-degraded-report"
+              @click="copyPreviewErrorForSupport()"
+            >Copy error for support</button>
+          </div>
+        </div>
+        <div v-if="store.previewFailed && active?.compile?.html" class="preview-stale-ribbon" aria-label="Stale preview shown below">Stale</div>
+
         <section v-if="store.mode === 'export'" class="export-preview-summary" aria-label="Export preview summary">
           <div>
             <strong>{{ exportPreviewSummary.targetLabel }}</strong>
@@ -5395,7 +5455,7 @@
         </section>
         <article
           class="preview-document"
-          :class="{ 'print-preview-document': printPreviewEnabled }"
+          :class="{ 'print-preview-document': printPreviewEnabled, 'preview-document-stale': store.previewFailed }"
           role="document"
           :aria-label="previewDocumentLabel"
           tabindex="0"
@@ -5561,6 +5621,18 @@
         {{ store.exportProgress }}
       </span>
       <span
+        v-if="store.aiRun"
+        class="ai-run-pill"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        :aria-label="`AI run: ${store.aiRun.label}, ${aiElapsedSeconds}s elapsed`"
+      >
+        <span class="ai-run-label">{{ store.aiRun.label }}</span>
+        <span class="ai-run-timer">{{ aiElapsedSeconds }}s</span>
+        <button type="button" class="ai-run-cancel" @click="store.cancelAiRun()">Cancel</button>
+      </span>
+      <span
         v-if="store.lastError"
         class="error"
         role="alert"
@@ -5571,6 +5643,25 @@
         {{ store.lastError }}
       </span>
     </footer>
+
+    <!-- AI provider error toast: right-anchored, appears when the last AI run surfaces a structured error -->
+    <aside
+      v-if="store.aiLastError"
+      class="ai-error-toast"
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
+      aria-label="AI provider error"
+    >
+      <span class="ai-error-kind-badge" :data-kind="store.aiLastError.kind">{{ aiErrorKindLabel(store.aiLastError.kind) }}</span>
+      <p class="ai-error-message">{{ store.aiLastError.message }}</p>
+      <p v-if="store.aiLastError.hint" class="ai-error-hint">{{ store.aiLastError.hint }}</p>
+      <div class="ai-error-actions">
+        <button type="button" @click="copyAiErrorDetails">Copy details</button>
+        <button v-if="store.aiLastError.retriable && lastAiRunFn" type="button" @click="retryLastAiRun">Retry</button>
+        <button type="button" @click="store.aiLastError = null">Dismiss</button>
+      </div>
+    </aside>
 
     <div v-if="buttonHelp.visible" id="button-help-tooltip" class="button-help-tooltip" role="tooltip" :style="buttonHelpStyle">
       {{ buttonHelp.text }}
@@ -8435,6 +8526,43 @@
         </div>
       </div>
     </section>
+
+    <!-- Item D: Toast notification host -->
+    <aside
+      v-if="toasts.visible.length || toasts.overflowCount > 0"
+      class="toast-host"
+      aria-label="Notifications"
+      aria-live="polite"
+      aria-atomic="false"
+    >
+      <p v-if="toasts.overflowCount > 0" class="toast-overflow">+{{ toasts.overflowCount }} more</p>
+      <article
+        v-for="toast in toasts.visible"
+        :key="toast.id"
+        class="toast-item"
+        :class="`toast-${toast.kind}`"
+        role="alert"
+      >
+        <div class="toast-content">
+          <strong class="toast-title">{{ toast.title }}</strong>
+          <span v-if="toast.body" class="toast-body">{{ toast.body }}</span>
+        </div>
+        <div class="toast-actions">
+          <button
+            v-if="toast.actionLabel && toast.onAction"
+            type="button"
+            class="toast-action-btn"
+            @click="() => { toast.onAction?.(); toasts.dismiss(toast.id); }"
+          >{{ toast.actionLabel }}</button>
+          <button
+            type="button"
+            class="toast-dismiss-btn"
+            :aria-label="`Dismiss: ${toast.title}`"
+            @click="toasts.dismiss(toast.id)"
+          >x</button>
+        </div>
+      </article>
+    </aside>
   </div>
 </template>
 
@@ -8477,12 +8605,14 @@ import {
   localAgentCliProfileById,
   localAgentCliProfiles,
   providerProfileById,
+  ProviderFetchError,
   type AiProviderExecutionResult,
   type AiProviderProfileId,
   type AiProviderRequestPackage,
   type AiProviderSourcePack,
   type LocalAgentCliProfile,
 } from "./lib/aiProviderPackages";
+import type { ProviderError } from "./lib/providerRuntime";
 import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
 import { isAppMenuHidden } from "./lib/platformDetection";
 import { accessibilityQaMarkdown, buildAccessibilityQaReport } from "./lib/accessibilityQa";
@@ -8905,6 +9035,7 @@ import {
   type VimRegister,
 } from "./lib/vimKeybindings";
 import { useDocumentsStore } from "./stores/documents";
+import { useToasts } from "./lib/toasts";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
 
 type CitationSourceLibraryItem = CitationSourceAuditItem;
@@ -8940,6 +9071,7 @@ type CopyDataSourceFileResponse = {
 };
 
 const store = useDocumentsStore();
+const toasts = useToasts();
 type ExportTarget = typeof store.exportTarget;
 interface AppMenuItem {
   id: string;
@@ -9583,6 +9715,50 @@ const humanizeInput = ref('');
 const humanizeBusy = ref(false);
 const humanizeResult = ref('');
 const humanizeChanges = ref<string[]>([]);
+
+// ── AI run progress pill ───────────────────────────────────────────────────
+/** Elapsed seconds counter for the active AI run status pill. */
+const aiElapsedSeconds = ref(0);
+let aiElapsedTimer: ReturnType<typeof setInterval> | undefined;
+watch(() => store.aiRun, (run) => {
+  clearInterval(aiElapsedTimer);
+  aiElapsedTimer = undefined;
+  if (run) {
+    aiElapsedSeconds.value = 0;
+    aiElapsedTimer = setInterval(() => {
+      aiElapsedSeconds.value = Math.floor((Date.now() - run.startedAt) / 1000);
+    }, 1000);
+  }
+});
+/** Last AI function invoked; used by the Retry button. */
+const lastAiRunFn = ref<(() => void) | null>(null);
+
+function aiErrorKindLabel(kind: ProviderError["kind"]): string {
+  return { timeout: "Timeout", aborted: "Cancelled", network: "Network", http: "Provider", parse: "Parse" }[kind] ?? kind;
+}
+async function copyAiErrorDetails() {
+  if (!store.aiLastError) return;
+  const text = [
+    `Kind: ${store.aiLastError.kind}`,
+    `Message: ${store.aiLastError.message}`,
+    store.aiLastError.hint ? `Hint: ${store.aiLastError.hint}` : "",
+    store.aiLastError.status ? `Status: ${store.aiLastError.status}` : "",
+  ].filter(Boolean).join("\n");
+  try { await navigator.clipboard?.writeText(text); } catch { /* clipboard unavailable */ }
+}
+function retryLastAiRun() {
+  store.aiLastError = null;
+  lastAiRunFn.value?.();
+}
+function copyPreviewErrorForSupport(): void {
+  const info = JSON.stringify({
+    errorKind: store.lastCompileErrorKind,
+    errorMessage: store.lastCompileErrorMessage,
+    documentTitle: active.value?.title,
+    consecutiveFailures: store.consecutiveCompileFailures,
+  }, null, 2);
+  navigator.clipboard.writeText(info).catch(() => null);
+}
 const compareOpen = ref(false);
 const comparePathA = ref('');
 const comparePathB = ref('');
@@ -11303,6 +11479,21 @@ let nativeMenuCommandLast = {
 const nativeMenuSmokeSuppressedCommands = new Map<string, number>();
 
 const active = computed(() => store.activeDocument);
+
+// Item B: first-run empty-state overlay
+const emptyStateOverlayVisible = computed(
+  () =>
+    !store.hasSeenEmptyState &&
+    active.value.title === "Untitled" &&
+    !active.value.text.trim() &&
+    store.uiMode !== 'writer',
+);
+function dismissEmptyState(permanent: boolean): void {
+  if (permanent) {
+    store.hasSeenEmptyState = true;
+    void store.persistWorkspace();
+  }
+}
 const activeExportProfile = computed(() => store.exportProfiles.find((profile) => profile.id === store.activeExportProfileId) || null);
 const availableLatexTemplateProfiles = computed(() => latexTemplateProfilesForPicker(store.customLatexTemplates));
 const activeLatexTemplateProfile = computed(() =>
@@ -15711,6 +15902,10 @@ async function runDeepResearchDocumentCreation() {
     store.statusMessage = "Enter a deep research topic";
     return;
   }
+  lastAiRunFn.value = () => void runDeepResearchDocumentCreation();
+  const controller = store.startAiRun("Deep Research");
+  const timeoutMs = store.aiProviderDefaults.aiTimeoutSeconds * 1000;
+  const runtimeOpts = { signal: controller.signal, timeoutMs, label: "Deep Research" };
   deepResearchBusy.value = true;
   deepResearchDraft.value = "";
   deepResearchIterations.value = [];
@@ -15730,9 +15925,12 @@ async function runDeepResearchDocumentCreation() {
             userPrompt: deepResearchQueryPrompt(settings, deepResearchIterations.value),
           },
           agentProviderApiKey.value,
+          undefined,
+          runtimeOpts,
         );
         query = queryResult.markdown.replace(/^["'`]+|["'`]+$/g, "").split("\n")[0].trim() || query;
-      } catch {
+      } catch (innerErr) {
+        if (innerErr instanceof ProviderFetchError && (innerErr.providerError.kind === "aborted" || innerErr.providerError.kind === "timeout")) throw innerErr;
         query = fallbackDeepResearchQuery(settings, deepResearchIterations.value);
       }
       deepResearchStatus.value = `Searching ${settings.searchProvider}: ${query}`;
@@ -15752,11 +15950,14 @@ async function runDeepResearchDocumentCreation() {
             userPrompt: deepResearchReflectionPrompt(settings, query, results, deepResearchIterations.value),
           },
           agentProviderApiKey.value,
+          undefined,
+          runtimeOpts,
         );
         const parsed = parseReflection(reflection.markdown);
         summary = parsed.summary || summary;
         gaps = parsed.gaps.length ? parsed.gaps : gaps;
-      } catch {
+      } catch (innerErr) {
+        if (innerErr instanceof ProviderFetchError && (innerErr.providerError.kind === "aborted" || innerErr.providerError.kind === "timeout")) throw innerErr;
         summary = summary || "No usable search results were returned.";
       }
       deepResearchIterations.value = [
@@ -15776,9 +15977,12 @@ async function runDeepResearchDocumentCreation() {
           userPrompt: deepResearchDraftPrompt(settings, deepResearchIterations.value, citationSourceLibrary.value),
         },
         agentProviderApiKey.value,
+        undefined,
+        runtimeOpts,
       );
       deepResearchDraft.value = draft.markdown;
-    } catch {
+    } catch (innerErr) {
+      if (innerErr instanceof ProviderFetchError && (innerErr.providerError.kind === "aborted" || innerErr.providerError.kind === "timeout")) throw innerErr;
       deepResearchDraft.value = fallbackResearchDraft(settings, deepResearchIterations.value, citationSourceLibrary.value);
     }
     const maxExpansionPasses = expansionPassBudget(settings);
@@ -15807,6 +16011,8 @@ async function runDeepResearchDocumentCreation() {
             ),
           },
           agentProviderApiKey.value,
+          undefined,
+          runtimeOpts,
         );
         const nextDraft = expanded.markdown.trim();
         if (!nextDraft) break;
@@ -15817,7 +16023,8 @@ async function runDeepResearchDocumentCreation() {
           deepResearchStatus.value = `Expansion paused at about ${nextPages}/${settings.targetPages} pages because the provider stopped increasing length.`;
           break;
         }
-      } catch {
+      } catch (innerErr) {
+        if (innerErr instanceof ProviderFetchError && (innerErr.providerError.kind === "aborted" || innerErr.providerError.kind === "timeout")) throw innerErr;
         break;
       }
     }
@@ -15840,6 +16047,8 @@ async function runDeepResearchDocumentCreation() {
           ),
         },
         agentProviderApiKey.value,
+        undefined,
+        runtimeOpts,
       );
       const reviewedMarkdown = reviewed.markdown.trim();
       const reviewedPages = estimateMarkdownPages(reviewedMarkdown);
@@ -15848,7 +16057,8 @@ async function runDeepResearchDocumentCreation() {
       } else {
         deepResearchDraft.value = ensureDeepResearchQualityAudit(settings, deepResearchDraft.value, deepResearchIterations.value);
       }
-    } catch {
+    } catch (innerErr) {
+      if (innerErr instanceof ProviderFetchError && (innerErr.providerError.kind === "aborted" || innerErr.providerError.kind === "timeout")) throw innerErr;
       deepResearchDraft.value = ensureDeepResearchQualityAudit(settings, deepResearchDraft.value, deepResearchIterations.value);
     }
     const finalPages = estimateMarkdownPages(deepResearchDraft.value);
@@ -15861,10 +16071,12 @@ async function runDeepResearchDocumentCreation() {
     store.statusMessage = `${readyMessage}${savedSourceSuffix}`;
     deepResearchStatus.value = `${readyMessage}${savedSourceSuffix}`;
   } catch (error) {
+    if (error instanceof ProviderFetchError) store.aiLastError = error.providerError;
     store.lastError = appErrorText(error);
     deepResearchStatus.value = "Deep research failed";
   } finally {
     deepResearchBusy.value = false;
+    store.finishAiRun();
   }
 }
 
@@ -16529,16 +16741,25 @@ async function importLocalAgentResponse() {
 }
 async function runAgentProviderRequest() {
   if (!agentProviderPackage.value || agentProviderBusy.value) return;
+  lastAiRunFn.value = () => void runAgentProviderRequest();
+  const controller = store.startAiRun("Agent Workspace");
   agentProviderBusy.value = true;
   agentProviderResult.value = null;
   try {
-    agentProviderResult.value = await executeAiProviderRequestPackage(agentProviderPackage.value, agentProviderApiKey.value);
+    agentProviderResult.value = await executeAiProviderRequestPackage(
+      agentProviderPackage.value,
+      agentProviderApiKey.value,
+      undefined,
+      { signal: controller.signal, timeoutMs: store.aiProviderDefaults.aiTimeoutSeconds * 1000, label: "Agent Workspace" },
+    );
     store.statusMessage = `Provider returned ${agentProviderResult.value.markdown.length} Markdown characters for review`;
   } catch (error) {
+    if (error instanceof ProviderFetchError) store.aiLastError = error.providerError;
     store.lastError = error instanceof Error ? error.message : String(error);
     store.statusMessage = "Provider request failed";
   } finally {
     agentProviderBusy.value = false;
+    store.finishAiRun();
   }
 }
 function applyAgentProviderResponse() {
@@ -25233,6 +25454,9 @@ async function saveDocument() {
   }
   flushEditorTextToStore();
   await store.saveActive();
+  if (active.value.path) {
+    toasts.push({ kind: "success", title: "Saved", body: active.value.path });
+  }
 }
 
 async function saveDocumentAs() {
@@ -25245,6 +25469,7 @@ async function saveDocumentAs() {
   if (path) {
     flushEditorTextToStore();
     await store.saveActive(path);
+    toasts.push({ kind: "success", title: "Saved", body: path });
   }
 }
 
@@ -25360,7 +25585,19 @@ async function exportDocument() {
       filters: [{ name: store.exportTarget.toUpperCase(), extensions: [extension] }],
       defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")}.${extension}`,
     }));
-  if (path) await store.exportActive(path);
+  if (path) {
+    await store.exportActive(path);
+    if (store.lastExportOutputPath) {
+      const exportPath = store.lastExportOutputPath;
+      toasts.push({
+        kind: "success",
+        title: "Export complete",
+        body: exportPath,
+        actionLabel: "Reveal in Finder",
+        onAction: () => void invoke("show_in_folder", { path: exportPath }).catch(() => null),
+      });
+    }
+  }
 }
 
 async function exportDocumentAs(target: typeof store.exportTarget) {
@@ -28508,6 +28745,37 @@ function resetWriterIdle(): void {
 watch([() => active.value?.text, editorCursorLine], resetWriterIdle);
 watch(() => store.uiMode, (m) => { if (m !== 'writer') { if (writerIdleHandle !== null) clearTimeout(writerIdleHandle); writerStripIdle.value = false; } });
 
+// Item C: compile failure toast (warn after first failure, "Report this" hint after 3)
+watch(() => store.consecutiveCompileFailures, (count, prev) => {
+  if (count === 0 || count <= (prev ?? 0)) return;
+  const kindLabels: Record<string, string> = {
+    'compile-failed': 'Compile failed',
+    'backend-unavailable': 'Backend not responding',
+    'transform-error': 'Transform engine error',
+  };
+  const kindLabel = kindLabels[store.lastCompileErrorKind] ?? 'Compile failed';
+  if (count === 1) {
+    toasts.push({ kind: "warning", title: "Preview unavailable", body: kindLabel });
+  } else if (count === 3) {
+    toasts.push({
+      kind: "warning",
+      title: "Preview unavailable (3rd failure)",
+      body: `${kindLabel} -- repeated failures detected`,
+      actionLabel: "Copy error for support",
+      onAction: () => copyPreviewErrorForSupport(),
+    });
+  }
+});
+
+// Item D: snapshot restored toast
+const _lastSnapshotCount = ref(0);
+watch(() => store.snapshots.length, (n) => { _lastSnapshotCount.value = n; });
+watch(() => store.statusMessage, (msg) => {
+  if (msg.startsWith('Restored snapshot')) {
+    toasts.push({ kind: "info", title: "Snapshot restored", body: msg.replace('Restored snapshot ', '') });
+  }
+});
+
 // Writer status strip
 const writerDiagSummary = computed(() => {
   const diags = active.value?.compile?.diagnostics || [];
@@ -28525,7 +28793,9 @@ const writerExportSummary = computed(() => {
 });
 
 function toggleUiMode(): void {
-  store.uiMode = store.uiMode === 'writer' ? 'pilot' : 'writer';
+  if (store.uiMode === 'writer') store.uiMode = 'pilot';
+  else if (store.uiMode === 'pilot') store.uiMode = 'workbench';
+  else store.uiMode = 'writer';
   void store.persistWorkspace();
 }
 
@@ -28616,6 +28886,7 @@ watch(() => active.value?.path, checkDocLocked, { immediate: true });
 
 function handleShortcut(event: KeyboardEvent) {
   if (event.key === 'Escape' && store.zenMode) { store.zenMode = false; return; }
+  if (event.key === 'Escape' && store.aiRun) { store.cancelAiRun(); return; }
   if (event.metaKey || event.ctrlKey) {
     const k = event.key;
     if (k === '\\' ) { event.preventDefault(); toggleUiMode(); return; }
@@ -37378,6 +37649,21 @@ select:hover {
   }
 }
 
+/* ── Workbench mode (default) ─────────────────────────────────────────────── */
+
+/* Workbench: full chrome visible, split pane, sidebar, command bar (file+writing rows only) */
+.app-shell.ui-mode-workbench {
+  grid-template-rows: 30px auto minmax(0, 1fr) 16px;
+}
+
+/* Hide review-navigation row in workbench — keep file and writing rows only */
+.app-shell.ui-mode-workbench .command-toolbar-row[data-row-id="review-navigation"] { display: none; }
+/* Hide the view toolbar row in workbench — use mode selector in status bar instead */
+.app-shell.ui-mode-workbench .command-toolbar-row-view { display: none; }
+
+/* Keep inspector collapsed-but-visible in workbench */
+.app-shell.ui-mode-workbench .inspector-pane { display: flex; }
+
 /* ── Writer / Pilot mode ──────────────────────────────────────────────────── */
 
 .app-shell.ui-mode-writer {
@@ -39252,4 +39538,110 @@ button.ws-seg:hover { background: var(--c-fill-hover) !important; color: var(--c
 .pinned-file-name { flex:1; text-align:left; background:none; border:none; cursor:pointer; color:var(--c-accent); font-size:12px; padding:3px 4px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pinned-file-name:hover { background:var(--c-fill-hover); }
 .pin-remove { background:none; border:none; cursor:pointer; color:var(--c-text2); font-size:12px; padding:2px 4px; }
+
+/* ── Item B: Empty-state overlay ─────────────────────────────────────────── */
+.empty-state-overlay {
+  position: absolute; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.18); backdrop-filter: blur(2px);
+}
+.empty-state-card {
+  position: relative;
+  background: var(--c-chrome, #fff);
+  border: 1px solid var(--c-border, #d0d9e4);
+  border-radius: 12px;
+  padding: 32px 36px 24px;
+  max-width: 440px; width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.empty-state-cursor { font-size: 40px; color: var(--c-accent, #3b82f6); line-height: 1; animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.empty-state-heading { margin: 0; font-size: 22px; font-weight: 700; }
+.empty-state-hint { margin: 0; font-size: 13px; color: var(--c-text2, #64748b); line-height: 1.5; }
+.empty-state-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.empty-state-dismiss-label { font-size: 12px; color: var(--c-text2, #64748b); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.empty-state-close {
+  position: absolute; top: 10px; right: 12px;
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: var(--c-text2, #64748b); line-height: 1;
+}
+.empty-state-close:hover { color: var(--c-text, #1e293b); }
+@media (prefers-color-scheme: dark) {
+  .empty-state-overlay { background: rgba(0,0,0,0.4); }
+  .empty-state-card { background: var(--c-chrome, #1e293b); border-color: var(--c-border, #334155); }
+}
+
+/* ── Item C: Degraded preview ────────────────────────────────────────────── */
+.preview-degraded-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 16px; margin: 8px 8px 0;
+  background: #fff8e1; border: 1px solid #f59e0b; border-radius: 8px;
+  font-size: 13px;
+}
+@media (prefers-color-scheme: dark) {
+  .preview-degraded-banner { background: #291d00; border-color: #92400e; }
+}
+.preview-degraded-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.preview-degraded-body { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.preview-degraded-heading { font-weight: 700; }
+.preview-degraded-kind { color: var(--c-text2, #64748b); font-size: 12px; }
+.preview-degraded-msg { color: var(--c-text2, #64748b); font-size: 11px; font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 60px; overflow: auto; }
+.preview-degraded-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.preview-degraded-retry, .preview-degraded-report {
+  font-size: 12px; padding: 4px 10px;
+  border: 1px solid var(--c-border, #d0d9e4); border-radius: 5px;
+  background: var(--c-chrome, #fff); cursor: pointer; white-space: nowrap;
+}
+.preview-degraded-retry:hover, .preview-degraded-report:hover { background: var(--c-fill-hover, #f1f5f9); }
+.preview-stale-ribbon {
+  display: inline-block; margin: 4px 8px 0;
+  background: #f59e0b; color: #fff; font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.preview-document-stale { opacity: 0.5; pointer-events: none; }
+
+/* ── Item D: Toast host ───────────────────────────────────────────────────── */
+.toast-host {
+  position: fixed; top: 16px; right: 16px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: 340px; width: calc(100vw - 32px);
+  pointer-events: none;
+}
+.toast-overflow {
+  text-align: center; font-size: 11px; color: var(--c-text2, #64748b);
+  margin: 0; pointer-events: auto;
+}
+.toast-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; border-radius: 8px;
+  font-size: 13px; line-height: 1.4;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.16);
+  pointer-events: auto;
+  border: 1px solid transparent;
+}
+.toast-info    { background: #f0f9ff; border-color: #7dd3fc; color: #0c4a6e; }
+.toast-success { background: #f0fdf4; border-color: #86efac; color: #14532d; }
+.toast-warning { background: #fffbeb; border-color: #fcd34d; color: #78350f; }
+.toast-error   { background: #fef2f2; border-color: #fca5a5; color: #7f1d1d; }
+@media (prefers-color-scheme: dark) {
+  .toast-info    { background: #0c2a3d; border-color: #0284c7; color: #bae6fd; }
+  .toast-success { background: #052e16; border-color: #16a34a; color: #bbf7d0; }
+  .toast-warning { background: #1c1000; border-color: #d97706; color: #fde68a; }
+  .toast-error   { background: #1f0000; border-color: #dc2626; color: #fecaca; }
+}
+.toast-content { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.toast-title { font-weight: 700; }
+.toast-body { font-size: 12px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toast-actions { display: flex; align-items: flex-start; gap: 6px; flex-shrink: 0; }
+.toast-action-btn {
+  font-size: 11px; padding: 3px 8px; border-radius: 4px;
+  background: rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.1); cursor: pointer;
+}
+.toast-action-btn:hover { background: rgba(0,0,0,0.14); }
+.toast-dismiss-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; line-height: 1; opacity: 0.5; padding: 0 2px;
+}
+.toast-dismiss-btn:hover { opacity: 1; }
 </style>

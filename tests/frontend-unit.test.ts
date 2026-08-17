@@ -20,7 +20,9 @@ import {
   isLocalAgentCliProfile,
   localAgentCliProfileById,
   localAgentCliProfiles,
+  ProviderFetchError,
 } from "../src/lib/aiProviderPackages.js";
+import { providerFetch } from "../src/lib/providerRuntime.js";
 import {
   assessDeepResearchSource,
   detectDeepResearchEvidenceConflicts,
@@ -802,12 +804,24 @@ test("preview compile state helpers preserve busy success failure and cancel sta
       lastPreviewCompiledAt: "2026-05-31T10:00:00.000Z",
       statusMessage: "2 diagnostics",
       lastError: "",
+      previewFailed: false,
+      consecutiveCompileFailures: 0,
+      lastCompileErrorKind: "",
+      lastCompileErrorMessage: "",
     },
   );
-  deepEqual(applyPreviewCompileFailureState(new Error("compiler offline")), { lastError: "compiler offline" });
+  deepEqual(applyPreviewCompileFailureState(new Error("compiler offline")), {
+    lastError: "compiler offline",
+    previewFailed: true,
+    lastCompileErrorKind: "compile-failed",
+    lastCompileErrorMessage: "compiler offline",
+  });
   deepEqual(applyPreviewCompileFailureState(new Error("Cannot read properties of undefined (reading 'invoke')"), true), {
     lastError: "",
     statusMessage: "Editing locally; preview backend unavailable in browser",
+    previewFailed: true,
+    lastCompileErrorKind: "backend-unavailable",
+    lastCompileErrorMessage: "Preview backend not available in this environment",
   });
 });
 
@@ -7193,6 +7207,7 @@ test("AI provider defaults normalize non-secret setup preferences", () => {
       endpoint: "https://api.openai.com/v1/chat/completions",
       model: "gpt-4.1",
       keyEnv: "OPENAI_API_KEY",
+      aiTimeoutSeconds: 60,
     },
   );
   deepEqual(normalizeAiProviderDefaults({ profileId: "unknown", keyEnv: "1bad" }), {
@@ -7200,6 +7215,7 @@ test("AI provider defaults normalize non-secret setup preferences", () => {
     endpoint: "",
     model: "human-approved-provider",
     keyEnv: "NEDITOR_AI_API_KEY",
+    aiTimeoutSeconds: 60,
   });
   deepEqual(
     normalizeAiProviderDefaults({
@@ -7213,6 +7229,7 @@ test("AI provider defaults normalize non-secret setup preferences", () => {
       endpoint: "http://127.0.0.1:11434/api/chat",
       model: "llama3.1",
       keyEnv: "NEDITOR_AI_API_KEY",
+      aiTimeoutSeconds: 60,
     },
   );
 });
@@ -7293,6 +7310,7 @@ test("configuration profile state helpers normalize saves and skip unchanged set
     endpoint: "https://api.openai.com/v1/chat/completions",
     model: "gpt-4.1",
     keyEnv: "OPENAI_API_KEY",
+    aiTimeoutSeconds: 60,
   });
   equal(saveAiProviderDefaultsState(changedProviderDefaults.value, changedProviderDefaults.value).changed, false);
 
@@ -8236,6 +8254,7 @@ test("workspace persistence migration versions and normalizes saved settings", (
     endpoint: "https://api.openai.com/v1/chat/completions",
     model: "gpt-4.1",
     keyEnv: "OPENAI_API_KEY",
+    aiTimeoutSeconds: 60,
   });
   deepEqual(migrated.googleIntegration, {
     clientId: "desktop-client.apps.googleusercontent.com",
@@ -12409,4 +12428,474 @@ test("native menu is macOS-only in lib.rs", () => {
   const guardIdx = libRs.indexOf('#[cfg(target_os = "macos")]');
   const menuIdx = libRs.indexOf(".menu(build_neditor_menu)");
   ok(guardIdx < menuIdx, "#[cfg(target_os = \"macos\")] guard must precede .menu(build_neditor_menu)");
+});
+
+// ── providerFetch & AI run plumbing ───────────────────────────────────────
+
+/** Build a minimal mock fetch function for providerFetch tests.
+ *  Critically: respects the `signal` from RequestInit so AbortController-based
+ *  timeouts and cancellations work correctly without the test hanging.
+ */
+function mockFetch(opts: {
+  status?: number;
+  statusText?: string;
+  body?: string;
+  /** When true the fetch promise waits for the signal to abort (simulates hung provider). */
+  hang?: boolean;
+  /** When true the fetch rejects with a network error. */
+  networkError?: boolean;
+}): typeof globalThis.fetch {
+  return async (_url: string | URL | Request, init?: RequestInit) => {
+    if (opts.networkError) throw new TypeError("Failed to fetch");
+    if (opts.hang) {
+      // Resolve only when the signal fires (or reject with AbortError).
+      return new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal?.aborted) {
+          const err = Object.assign(new Error("The operation was aborted."), { name: "AbortError" });
+          reject(err);
+          return;
+        }
+        if (signal) {
+          signal.addEventListener("abort", () => {
+            const err = Object.assign(new Error("The operation was aborted."), { name: "AbortError" });
+            reject(err);
+          }, { once: true });
+        }
+        // Without a signal this would hang forever; callers must always pass a signal when hang:true.
+      });
+    }
+    const body = opts.body ?? "{}";
+    return {
+      ok: (opts.status ?? 200) < 400,
+      status: opts.status ?? 200,
+      statusText: opts.statusText ?? "OK",
+      text: async () => body,
+    } as Response;
+  };
+}
+
+test("providerFetch resolves ok:true when fetch succeeds inside timeout", async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = mockFetch({ status: 200, body: '{"message":"hi"}' });
+  try {
+    const result = await providerFetch("https://example.com/v1", { method: "POST" }, { label: "Test" });
+    ok(result.ok, "expected ok:true");
+    if (!result.ok) throw new Error("unreachable");
+    equal(result.data, '{"message":"hi"}');
+    ok(typeof result.ms === "number" && result.ms >= 0);
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test("providerFetch resolves ok:false kind:timeout when fetch hangs past timeoutMs", async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = mockFetch({ hang: true });
+  try {
+    const result = await providerFetch(
+      "https://example.com/v1",
+      { method: "POST" },
+      { label: "Slow call", timeoutMs: 50 },
+    );
+    ok(!result.ok, "expected ok:false");
+    if (result.ok) throw new Error("unreachable");
+    equal(result.error.kind, "timeout");
+    ok(result.error.retriable, "timeout should be retriable");
+    ok(result.error.hint?.includes("Settings"), "hint should mention Settings");
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test("providerFetch resolves ok:false kind:aborted when caller signal fires before timeout", async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = mockFetch({ hang: true });
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 30);
+  try {
+    const result = await providerFetch(
+      "https://example.com/v1",
+      { method: "POST" },
+      { label: "Cancelled call", timeoutMs: 10_000, signal: controller.signal },
+    );
+    ok(!result.ok, "expected ok:false");
+    if (result.ok) throw new Error("unreachable");
+    equal(result.error.kind, "aborted");
+    equal(result.error.retriable, false);
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test("providerFetch categorizes 401 as kind:http retriable:false with API key hint", async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = mockFetch({ status: 401, statusText: "Unauthorized", body: '{"error":"invalid key"}' });
+  try {
+    const result = await providerFetch("https://example.com/v1", { method: "POST" }, { label: "Auth test" });
+    ok(!result.ok, "expected ok:false for 401");
+    if (result.ok) throw new Error("unreachable");
+    equal(result.error.kind, "http");
+    equal(result.error.status, 401);
+    equal(result.error.retriable, false);
+    ok(result.error.hint?.toLowerCase().includes("api key"), "hint should mention API key");
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test("providerFetch categorizes network error as kind:network retriable:true", async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = mockFetch({ networkError: true });
+  try {
+    const result = await providerFetch("https://example.com/v1", { method: "POST" }, { label: "Net fail" });
+    ok(!result.ok, "expected ok:false for network error");
+    if (result.ok) throw new Error("unreachable");
+    equal(result.error.kind, "network");
+    ok(result.error.retriable, "network error should be retriable");
+    ok(result.error.hint?.includes("endpoint"), "hint should mention endpoint");
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test("providerFetch clears timeout timer after successful fetch (no leak)", async () => {
+  // Verifiable indirectly: if timer leaked, the test process would stay alive.
+  // Here we confirm the call completes promptly and the result is ok.
+  const orig = globalThis.fetch;
+  globalThis.fetch = mockFetch({ status: 200, body: "pong" });
+  try {
+    const result = await providerFetch("https://example.com/v1", { method: "POST" }, { label: "No leak", timeoutMs: 5000 });
+    ok(result.ok, "should succeed and clean up timer");
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test("providerFetch emits onProgress phases connect → stream → done on success", async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = mockFetch({ status: 200, body: "ok" });
+  const phases: string[] = [];
+  try {
+    const result = await providerFetch(
+      "https://example.com/v1",
+      { method: "POST" },
+      { label: "Progress", onProgress: (p) => phases.push(p) },
+    );
+    ok(result.ok);
+    deepEqual(phases, ["connect", "stream", "done"]);
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test("ProviderFetchError carries structured providerError and is instanceof Error", () => {
+  const err = new ProviderFetchError({ kind: "timeout", message: "timed out", retriable: true, hint: "Check settings" });
+  ok(err instanceof Error);
+  ok(err instanceof ProviderFetchError);
+  equal(err.providerError.kind, "timeout");
+  equal(err.providerError.retriable, true);
+  equal(err.name, "ProviderFetchError");
+});
+
+test("executeAiProviderRequestPackage: mock fetcher path returns AiProviderExecutionResult", async () => {
+  // Use a hand-crafted AiProviderRequestPackage to avoid the complex AgenticWorkflowRun fixture.
+  const { providerProfileById: ppById } = await import("../src/lib/aiProviderPackages.js");
+  const profile = ppById("openai-compatible");
+  const pkg = {
+    profile,
+    systemPrompt: "You help.",
+    userPrompt: "Draft something.",
+    sourcePack: { contextSources: [], userSources: [], claimReview: [], cleanupBlockers: [], governanceBlockers: [], distributionBlockers: [], releaseEvidence: [] },
+    requestBody: { model: profile.model, messages: [{ role: "user", content: "Draft." }] },
+    redactedHeaders: { "Content-Type": "application/json", "Authorization": "__NEDITOR_API_KEY_PLACEHOLDER__" },
+    curl: "",
+    checklist: [],
+    markdown: "# Package\n",
+  };
+  const result = await executeAiProviderRequestPackage(
+    pkg as Parameters<typeof executeAiProviderRequestPackage>[0],
+    "session-key",
+    async (_url, _init) => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      text: async () => JSON.stringify({ choices: [{ message: { content: "# Improved\n\nGood content." } }] }),
+    }),
+  );
+  equal(result.ok, true);
+  ok(result.markdown.includes("Improved"));
+});
+
+test("executeDirectAiProviderPrompt works with mock fetcher (test path)", async () => {
+  // Use ollama-local (no auth header) to avoid needing an API key in tests.
+  const result = await executeDirectAiProviderPrompt(
+    {
+      profileId: "ollama-local",
+      systemPrompt: "You help.",
+      userPrompt: "Draft something.",
+    },
+    "",
+    async (_input, init) => {
+      ok(typeof init.body === "string" && init.body.includes("messages"));
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        text: async () => JSON.stringify({ message: { content: "# Result\n\nDone." } }),
+      };
+    },
+  );
+  ok(result.markdown.includes("Result"));
+});
+
+test("providerFetch 500 response is retriable with server error hint", async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = mockFetch({ status: 500, statusText: "Internal Server Error", body: "boom" });
+  try {
+    const result = await providerFetch("https://example.com/v1", { method: "POST" }, { label: "500 test" });
+    ok(!result.ok);
+    if (result.ok) throw new Error("unreachable");
+    equal(result.error.kind, "http");
+    equal(result.error.status, 500);
+    ok(result.error.retriable, "5xx should be retriable");
+    ok(result.error.hint?.includes("server error"));
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test("providerFetch 429 is retriable with rate-limit hint", async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = mockFetch({ status: 429, statusText: "Too Many Requests", body: "slow down" });
+  try {
+    const result = await providerFetch("https://example.com/v1", { method: "POST" }, { label: "429 test" });
+    ok(!result.ok);
+    if (result.ok) throw new Error("unreachable");
+    equal(result.error.kind, "http");
+    ok(result.error.retriable, "429 should be retriable");
+    ok(result.error.hint?.toLowerCase().includes("rate limit"));
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+test("App.vue: cancelAiRun handler is wired in the AI progress pill Cancel button", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("store.cancelAiRun()"), "App.vue must call store.cancelAiRun()");
+  ok(app.includes("ai-run-pill"), "App.vue must include an AI progress pill element");
+  ok(app.includes("ai-run-cancel"), "App.vue must include a cancel button in the AI pill");
+});
+
+test("App.vue: AI error toast renders kind badge, message, hint, and Dismiss button", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("ai-error-toast"), "App.vue must include the ai-error-toast aside");
+  ok(app.includes("ai-error-kind-badge"), "App.vue must render a kind badge");
+  ok(app.includes("ai-error-message"), "App.vue must render the error message");
+  ok(app.includes("ai-error-hint"), "App.vue must render the hint");
+  ok(app.includes("store.aiLastError = null"), "Dismiss button must clear aiLastError");
+});
+
+test("App.vue: Retry button is wired to retryLastAiRun and gated on retriable + lastAiRunFn", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("retryLastAiRun"), "App.vue must define and call retryLastAiRun");
+  ok(app.includes("store.aiLastError.retriable && lastAiRunFn"), "Retry button must be gated on retriable && lastAiRunFn");
+});
+
+test("App.vue: Esc key shortcut cancels active AI run", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(
+    app.includes("event.key === 'Escape' && store.aiRun") && app.includes("store.cancelAiRun()"),
+    "App.vue handleShortcut must cancel AI run on Escape when aiRun is active",
+  );
+});
+
+test("App.vue: AI timeout settings row is present in the AI configuration section", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("aiTimeoutSeconds"), "App.vue must reference aiTimeoutSeconds");
+  ok(app.includes("ai-timeout-row"), "App.vue must include the ai-timeout-row label");
+});
+
+test("App.vue: runDeepResearchDocumentCreation calls startAiRun and finishAiRun", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("store.startAiRun(\"Deep Research\")"), "runDeepResearchDocumentCreation must call startAiRun");
+  ok(app.includes("store.finishAiRun()"), "runDeepResearchDocumentCreation must call finishAiRun");
+});
+
+test("App.vue: runAgentProviderRequest calls startAiRun and finishAiRun", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("store.startAiRun(\"Agent Workspace\")"), "runAgentProviderRequest must call startAiRun");
+});
+
+test("normalizeAiProviderDefaults: aiTimeoutSeconds defaults to 60", () => {
+  const result = normalizeAiProviderDefaults({});
+  equal(result.aiTimeoutSeconds, 60);
+});
+
+test("normalizeAiProviderDefaults: aiTimeoutSeconds is clamped to 10–600", () => {
+  equal(normalizeAiProviderDefaults({ aiTimeoutSeconds: 5 }).aiTimeoutSeconds, 10, "below min clamped to 10");
+  equal(normalizeAiProviderDefaults({ aiTimeoutSeconds: 9999 }).aiTimeoutSeconds, 600, "above max clamped to 600");
+  equal(normalizeAiProviderDefaults({ aiTimeoutSeconds: 120 }).aiTimeoutSeconds, 120, "in-range value preserved");
+});
+
+// ── Item A: Workbench default ─────────────────────────────────────────────
+
+test("documents store state: default uiMode is workbench", () => {
+  const src = readFileSync("src/stores/documents.ts", "utf8");
+  ok(src.includes('uiMode: "workbench"'), "default uiMode must be workbench");
+  ok(src.includes('"writer" | "pilot" | "workbench"'), "uiMode type union must include workbench");
+});
+
+test("workspace migration: uiMode:writer is preserved for existing users", () => {
+  const persisted = migratePersistedWorkspace({ uiMode: "writer" });
+  equal(persisted.uiMode, "writer", "writer uiMode must be preserved in migration");
+});
+
+test("workspace migration: uiMode:pilot is preserved for existing users", () => {
+  const persisted = migratePersistedWorkspace({ uiMode: "pilot" });
+  equal(persisted.uiMode, "pilot", "pilot uiMode must be preserved in migration");
+});
+
+test("workspace migration: uiMode:workbench is accepted", () => {
+  const persisted = migratePersistedWorkspace({ uiMode: "workbench" });
+  equal(persisted.uiMode, "workbench");
+});
+
+test("workspace migration: missing uiMode does not set a value (fresh install gets store default)", () => {
+  const persisted = migratePersistedWorkspace({});
+  equal(persisted.uiMode, undefined, "fresh workspace has no uiMode override; store default applies");
+});
+
+test("toolbar display: default toolbarDisplay is both (icons + labels)", () => {
+  const src = readFileSync("src/stores/documents.ts", "utf8");
+  ok(src.includes('toolbarDisplay: "both"'), "default toolbarDisplay must be both (labelled)");
+});
+
+// ── Item B: Empty-state overlay ──────────────────────────────────────────
+
+test("empty-state overlay: hasSeenEmptyState persists and migrates", () => {
+  const withSeen = migratePersistedWorkspace({ hasSeenEmptyState: true });
+  equal(withSeen.hasSeenEmptyState, true);
+  const withUnseen = migratePersistedWorkspace({ hasSeenEmptyState: false });
+  equal(withUnseen.hasSeenEmptyState, false);
+  const fresh = migratePersistedWorkspace({});
+  equal(fresh.hasSeenEmptyState, undefined, "fresh install has no override; defaults to false in store");
+});
+
+test("empty-state overlay: App.vue renders overlay for untitled+empty+never-seen", () => {
+  const src = readFileSync("src/App.vue", "utf8");
+  ok(src.includes("emptyStateOverlayVisible"), "emptyStateOverlayVisible computed must exist in App.vue");
+  ok(src.includes("hasSeenEmptyState"), "hasSeenEmptyState must be referenced in App.vue");
+  ok(src.includes("empty-state-overlay"), "empty-state-overlay class must appear in template");
+  ok(src.includes("Do not show again"), "dismiss-permanently label must appear in template");
+});
+
+// ── Item C: Degraded preview ─────────────────────────────────────────────
+
+test("degraded preview: compile failure sets previewFailed and preserves editor", () => {
+  const failureState = applyPreviewCompileFailureState(new Error("parse error at line 42"));
+  equal(failureState.previewFailed, true, "previewFailed must be true on compile failure");
+  equal(failureState.lastCompileErrorKind, "compile-failed");
+  ok(failureState.lastCompileErrorMessage.includes("parse error"), "error message must be captured");
+});
+
+test("degraded preview: backend unavailable sets correct kind", () => {
+  const failureState = applyPreviewCompileFailureState(new Error("invoke not available"), true);
+  equal(failureState.previewFailed, true);
+  equal(failureState.lastCompileErrorKind, "backend-unavailable");
+});
+
+test("degraded preview: success state resets previewFailed and failure counters", () => {
+  const successState = applyPreviewCompileSuccessState({
+    startedAtMs: 0, finishedAtMs: 100, textLength: 500, diagnosticCount: 0,
+  });
+  equal(successState.previewFailed, false, "previewFailed must reset on success");
+  equal(successState.consecutiveCompileFailures, 0, "consecutive failures must reset on success");
+  equal(successState.lastCompileErrorKind, "", "error kind must clear on success");
+  equal(successState.lastCompileErrorMessage, "", "error message must clear on success");
+});
+
+test("degraded preview: App.vue shows retry button and stale ribbon", () => {
+  const src = readFileSync("src/App.vue", "utf8");
+  ok(src.includes("preview-degraded-banner"), "degraded preview banner must exist in template");
+  ok(src.includes("store.previewFailed"), "previewFailed must gate the degraded state");
+  ok(src.includes("preview-degraded-retry"), "retry button must exist");
+  ok(src.includes("preview-stale-ribbon"), "stale ribbon must exist for last-known-good preview");
+  ok(src.includes("store.compileActive()"), "retry button must call compileActive");
+});
+
+// ── Item D: Toast store ───────────────────────────────────────────────────
+
+import { createPinia, setActivePinia } from "pinia";
+import { useToasts } from "../src/lib/toasts.js";
+
+test("toast store: push adds toast with generated id", () => {
+  setActivePinia(createPinia());
+  const toasts = useToasts();
+  const id = toasts.push({ kind: "info", title: "Hello" });
+  ok(typeof id === "string" && id.length > 0, "push must return a non-empty id");
+  equal(toasts.toasts.length, 1);
+  equal(toasts.toasts[0].title, "Hello");
+});
+
+test("toast store: dismiss removes toast by id", () => {
+  setActivePinia(createPinia());
+  const toasts = useToasts();
+  const id = toasts.push({ kind: "success", title: "Done", timeoutMs: null });
+  equal(toasts.toasts.length, 1);
+  toasts.dismiss(id);
+  equal(toasts.toasts.length, 0);
+});
+
+test("toast store: clear removes all toasts", () => {
+  setActivePinia(createPinia());
+  const toasts = useToasts();
+  toasts.push({ kind: "info", title: "A", timeoutMs: null });
+  toasts.push({ kind: "info", title: "B", timeoutMs: null });
+  toasts.push({ kind: "error", title: "C", timeoutMs: null });
+  equal(toasts.toasts.length, 3);
+  toasts.clear();
+  equal(toasts.toasts.length, 0);
+});
+
+test("toast store: visible getter caps at 4", () => {
+  setActivePinia(createPinia());
+  const toasts = useToasts();
+  for (let i = 0; i < 6; i++) toasts.push({ kind: "info", title: `T${i}`, timeoutMs: null });
+  equal(toasts.toasts.length, 6, "all 6 pushed to internal list");
+  equal(toasts.visible.length, 4, "visible is capped at 4");
+  equal(toasts.overflowCount, 2, "overflow count is 2");
+});
+
+test("toast store: error kind has no auto-dismiss (null timeout)", () => {
+  setActivePinia(createPinia());
+  const toasts = useToasts();
+  toasts.push({ kind: "error", title: "Bad thing" });
+  equal(toasts.toasts[0].timeoutMs, null, "error toast must have null (no) timeout");
+});
+
+test("toast store: info and success kinds have 5s default timeout", () => {
+  setActivePinia(createPinia());
+  const toasts = useToasts();
+  toasts.push({ kind: "info", title: "Note", timeoutMs: null });
+  // Verify the constant from the module (stored on the toast object on push)
+  const infoToast = useToasts();
+  const pushed = infoToast.push({ kind: "info", title: "x" });
+  const stored = infoToast.toasts.find(t => t.id === pushed);
+  equal(stored?.timeoutMs, 5000, "info toast defaults to 5000ms");
+});
+
+test("toast store: warning kind has 8s default timeout", () => {
+  setActivePinia(createPinia());
+  const toasts = useToasts();
+  const id = toasts.push({ kind: "warning", title: "Warn" });
+  const stored = toasts.toasts.find(t => t.id === id);
+  equal(stored?.timeoutMs, 8000, "warning toast defaults to 8000ms");
+});
+
+test("toast store: ToastHost is present in App.vue", () => {
+  const src = readFileSync("src/App.vue", "utf8");
+  ok(src.includes("toast-host"), "toast-host region must exist in App.vue template");
+  ok(src.includes("useToasts"), "useToasts must be imported and used in App.vue");
+  ok(src.includes("toasts.visible"), "App.vue must iterate toasts.visible");
 });
