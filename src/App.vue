@@ -655,74 +655,7 @@
         </div>
       </section>
 
-      <section id="markdown-source" v-show="store.mode !== 'preview' && store.mode !== 'export' && store.mode !== 'presentation' && store.mode !== 'outline'" class="editor-pane" :class="{ 'focus-mode': writerFocusMode && store.uiMode === 'writer' }" aria-label="Markdown source" tabindex="-1" @pointerup="handleEditorPointerUp" @keydown.escape="selectionToolbarVisible = false" style="position:relative">
-        <!-- ── Breadcrumb navigation ── -->
-        <nav
-          v-if="store.uiMode === 'pilot' && documentBreadcrumbs.length"
-          class="editor-breadcrumbs"
-          aria-label="Document section breadcrumbs"
-        >
-          <span class="breadcrumb-doc">{{ active?.title || 'Document' }}</span>
-          <template v-for="crumb in documentBreadcrumbs" :key="crumb.line">
-            <span class="breadcrumb-sep">›</span>
-            <button type="button" class="breadcrumb-item" @click="scrollEditorToLine(crumb.line)">{{ crumb.text }}</button>
-          </template>
-        </nav>
-        <div v-if="store.uiMode === 'writer'" class="writer-doc-title" aria-hidden="true">
-          {{ active?.compile?.semantic.title || active?.title || '' }}
-        </div>
-        <div v-if="docLocked" class="doc-locked-banner" aria-live="polite">
-          🔒 This document is approved/locked. Editing is disabled. Change status in front matter to unlock.
-        </div>
-        <!-- Item B: first-run empty-state overlay -->
-        <div
-          v-if="emptyStateOverlayVisible"
-          class="empty-state-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Welcome to NEditor"
-          @keydown.escape.stop="dismissEmptyState(false)"
-        >
-          <div class="empty-state-card" @keydown.tab.stop>
-            <div class="empty-state-cursor" aria-hidden="true">|</div>
-            <h2 class="empty-state-heading">Start typing</h2>
-            <p class="empty-state-hint">NEditor saves your work as a normal Markdown file on your Mac. Nothing leaves your device unless you export it.</p>
-            <div class="empty-state-actions">
-              <button type="button" class="primary" @click="store.newDocument(); dismissEmptyState(true)">New document</button>
-              <button type="button" @click="openDocument(); dismissEmptyState(true)">Open file</button>
-              <button type="button" @click="openFolder(); dismissEmptyState(true)">Open folder</button>
-            </div>
-            <label class="empty-state-dismiss-label">
-              <input type="checkbox" @change="(e) => { if ((e.target as HTMLInputElement).checked) dismissEmptyState(true); }" />
-              Do not show again
-            </label>
-            <button type="button" class="empty-state-close" aria-label="Close welcome overlay" @click="dismissEmptyState(false)">x</button>
-          </div>
-        </div>
-
-        <div class="editor-split-grid" :data-split-source="store.splitSourcePanes ? 'true' : 'false'" :class="{ 'has-minimap': store.showMinimap }">
-          <div ref="editorHost" class="editor-host editor-host-primary" :class="{ 'editor-locked': docLocked }" aria-label="Primary Markdown source pane"></div>
-          <div v-if="store.splitSourcePanes" ref="secondaryEditorHost" class="editor-host editor-host-secondary" aria-label="Secondary Markdown source pane"></div>
-          <!-- Minimap: document structure navigator -->
-          <nav v-if="store.showMinimap" class="editor-minimap" aria-label="Document minimap">
-            <div class="minimap-header">
-              <span>Map</span>
-              <button type="button" @click="store.showMinimap = false" aria-label="Close minimap">×</button>
-            </div>
-            <div class="minimap-headings">
-              <button
-                v-for="heading in (active?.compile?.document_ast?.blocks?.filter((b: any) => b.kind === 'heading') || [])"
-                :key="(heading as any).line"
-                type="button"
-                class="minimap-heading"
-                :class="`minimap-h${(heading as any).level}`"
-                :title="(heading as any).text"
-                @click="scrollEditorToLine((heading as any).line)"
-              >{{ (heading as any).text }}</button>
-            </div>
-          </nav>
-        </div>
-      </section>
+      <EditorPane ref="editorPaneRef" @change="(t: string) => store.updateText(t)" @cursor="editorCursorLine = $event" />
 
       <button
         v-show="paneSplitterVisible"
@@ -738,91 +671,7 @@
         @keydown="handlePaneSplitterKeydown"
       ></button>
 
-      <section
-        ref="previewPane"
-        id="live-preview"
-        v-show="store.mode !== 'source' && store.mode !== 'focus' && store.mode !== 'outline'"
-        class="preview-pane"
-        :data-preview-theme="store.previewTheme"
-        aria-label="Live preview"
-        tabindex="-1"
-        @scroll="syncEditorScrollFromPreview"
-        @click="(e: MouseEvent) => { const a = (e.target as HTMLElement).closest('a[data-wiki-target]') as HTMLAnchorElement | null; if (a) { const target = a.getAttribute('data-wiki-target') || ''; const hashIdx = target.indexOf('#'); if (hashIdx !== -1) { e.preventDefault(); void navigateToBlockRef(target.slice(0, hashIdx), target.slice(hashIdx + 1)); } } }"
-      >
-        <!-- Item C: degraded preview state -->
-        <div v-if="store.previewFailed" class="preview-degraded-banner" role="status" aria-live="polite">
-          <div class="preview-degraded-icon" aria-hidden="true">&#9888;</div>
-          <div class="preview-degraded-body">
-            <strong class="preview-degraded-heading">Preview unavailable</strong>
-            <span class="preview-degraded-kind">{{ ({ 'compile-failed': 'Compile failed', 'backend-unavailable': 'Backend not responding', 'transform-error': 'Transform engine missing' } as Record<string, string>)[store.lastCompileErrorKind] ?? 'Compile failed' }}</span>
-            <span v-if="store.lastCompileErrorMessage" class="preview-degraded-msg">{{ store.lastCompileErrorMessage }}</span>
-          </div>
-          <div class="preview-degraded-actions">
-            <button type="button" class="preview-degraded-retry" @click="store.compileActive()">Retry</button>
-            <button
-              v-if="store.consecutiveCompileFailures >= 3"
-              type="button"
-              class="preview-degraded-report"
-              @click="copyPreviewErrorForSupport()"
-            >Copy error for support</button>
-          </div>
-        </div>
-        <div v-if="store.previewFailed && active?.compile?.html" class="preview-stale-ribbon" aria-label="Stale preview shown below">Stale</div>
-
-        <section v-if="store.mode === 'export'" class="export-preview-summary" aria-label="Export preview summary">
-          <div>
-            <strong>{{ exportPreviewSummary.targetLabel }}</strong>
-            <span>{{ exportPreviewSummary.readinessLabel }}</span>
-          </div>
-          <p>{{ exportPreviewSummary.manifestLabel }}</p>
-          <p v-if="exportPreviewSummary.releaseLabel">{{ exportPreviewSummary.releaseLabel }}</p>
-          <ul aria-label="Export preview options">
-            <li v-for="option in exportPreviewSummary.options" :key="option">{{ option }}</li>
-          </ul>
-        </section>
-        <section v-if="transformPreviewItems.length" class="transform-preview-summary" aria-label="Transform artifact preview">
-          <h2>Transform Artifacts</h2>
-          <article v-for="artifact in transformPreviewItems" :key="artifact.id">
-            <strong>{{ artifact.name }}</strong>
-            <p>{{ artifact.outputLabel }}</p>
-            <small>{{ artifact.cacheLabel }}</small>
-            <small v-if="artifact.locationLabel">{{ artifact.locationLabel }}</small>
-            <button v-if="artifact.sourceLine" type="button" @click="goToTransformArtifact(artifact)">Go to source</button>
-            <ul v-if="artifact.diagnostics.length" class="diagnostic-related">
-              <li v-for="diagnostic in artifact.diagnostics" :key="diagnostic.message">{{ diagnostic.message }}</li>
-            </ul>
-          </article>
-        </section>
-        <section v-if="printPreviewEnabled" class="print-preview-summary" aria-label="Print preview summary">
-          <header>
-            <div>
-              <strong>Print preview</strong>
-              <span>{{ printPreviewReport.summary }}</span>
-            </div>
-            <button type="button" title="Leave print preview mode" @click="printPreviewEnabled = false">Exit</button>
-          </header>
-          <div class="print-preview-metrics" aria-label="Print preview metrics">
-            <span><strong>{{ printPreviewReport.estimatedPages }}</strong> pages</span>
-            <span><strong>{{ printPreviewReport.wordCount }}</strong> words</span>
-            <span><strong>{{ printPreviewReport.pageBreaks }}</strong> page breaks</span>
-            <span><strong>{{ printPreviewReport.sectionBreaks.length }}</strong> section breaks</span>
-          </div>
-          <ul v-if="printPreviewReport.warnings.length" aria-label="Print preview warnings">
-            <li v-for="warning in printPreviewReport.warnings" :key="warning">{{ warning }}</li>
-          </ul>
-        </section>
-        <article
-          class="preview-document"
-          :class="{ 'print-preview-document': printPreviewEnabled, 'preview-document-stale': store.previewFailed }"
-          role="document"
-          :aria-label="previewDocumentLabel"
-          tabindex="0"
-          :style="previewDocumentStyle"
-          @click="handlePreviewClick"
-          @keydown="handlePreviewKeydown"
-          v-html="previewHtmlWithDiagnostics"
-        ></article>
-      </section>
+      <PreviewPane ref="previewPaneRef" @scroll="onPreviewScroll" />
       <aside
         v-if="store.uiMode === 'pilot' && store.mode !== 'outline' && !writingSpaceMaximized"
         class="inspector-pane"
@@ -3733,6 +3582,8 @@ import TabsBar from "./components/TabsBar.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import Toolbar from "./components/Toolbar.vue";
 import Sidebar from "./components/Sidebar.vue";
+import EditorPane from "./components/EditorPane.vue";
+import PreviewPane from "./components/PreviewPane.vue";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { invoke } from "@tauri-apps/api/core";
@@ -4588,8 +4439,8 @@ const agentControlActions: AgenticWorkflowAction[] = [
   "prepare-export",
   "open-exports",
 ];
-const editorHost = ref<HTMLElement | null>(null);
-const secondaryEditorHost = ref<HTMLElement | null>(null);
+const editorPaneRef = ref<InstanceType<typeof EditorPane> | null>(null);
+const previewPaneRef = ref<InstanceType<typeof PreviewPane> | null>(null);
 const workspacePane = ref<HTMLElement | null>(null);
 const previewPane = ref<HTMLElement | null>(null);
 const aiPasteDialog = ref<HTMLElement | null>(null);
@@ -5170,23 +5021,6 @@ function saveWordGoal(): void {
   store.wordCountTarget = n > 0 ? n : null;
   wordGoalDialogOpen.value = false;
 }
-
-// ── Breadcrumbs ───────────────────────────────────────────────────────────────
-const documentBreadcrumbs = computed(() => {
-  const doc = active.value;
-  if (!doc?.compile) return [];
-  const line = editorCursorLine.value;
-  const headings = doc.compile.document_ast?.blocks?.filter((b: any) => b.kind === 'heading') || [];
-  const active_headings: Array<{ level: number; text: string; line: number }> = [];
-  for (const h of headings as Array<{ kind: string; level: number; text: string; line: number; end_line: number }>) {
-    if (h.line > line) break;
-    while (active_headings.length && active_headings[active_headings.length - 1].level >= h.level) {
-      active_headings.pop();
-    }
-    active_headings.push({ level: h.level, text: h.text, line: h.line });
-  }
-  return active_headings;
-});
 
 function scrollEditorToLine(line: number): void {
   if (!editorView) return;
@@ -6523,20 +6357,6 @@ const nativeMenuSmokeSuppressedCommands = new Map<string, number>();
 
 const active = computed(() => store.activeDocument);
 
-// Item B: first-run empty-state overlay
-const emptyStateOverlayVisible = computed(
-  () =>
-    !store.hasSeenEmptyState &&
-    active.value.title === "Untitled" &&
-    !active.value.text.trim() &&
-    store.uiMode !== 'writer',
-);
-function dismissEmptyState(permanent: boolean): void {
-  if (permanent) {
-    store.hasSeenEmptyState = true;
-    void store.persistWorkspace();
-  }
-}
 const activeExportProfile = computed(() => store.exportProfiles.find((profile) => profile.id === store.activeExportProfileId) || null);
 const availableLatexTemplateProfiles = computed(() => latexTemplateProfilesForPicker(store.customLatexTemplates));
 const activeLatexTemplateProfile = computed(() =>
@@ -17524,12 +17344,16 @@ function createEditorView(parent: HTMLElement, label: string, syncPreviewScroll:
   });
 }
 
+function onPreviewScroll(_payload: { ratio: number; scrollTop: number }): void {
+  // scroll sync already handled inside PreviewPane via ctx.syncEditorScrollFromPreview
+}
+
 function buildEditor() {
   editorView?.destroy();
   secondaryEditorView?.destroy();
-  editorView = editorHost.value ? createEditorView(editorHost.value, "Primary Markdown editor", true) : null;
-  secondaryEditorView = store.splitSourcePanes && secondaryEditorHost.value
-    ? createEditorView(secondaryEditorHost.value, "Secondary Markdown editor", false)
+  editorView = editorPaneRef.value?.editorHostEl ? createEditorView(editorPaneRef.value.editorHostEl, "Primary Markdown editor", true) : null;
+  secondaryEditorView = store.splitSourcePanes && editorPaneRef.value?.secondaryEditorHostEl
+    ? createEditorView(editorPaneRef.value.secondaryEditorHostEl, "Secondary Markdown editor", false)
     : null;
   refreshTableCursorCellPreview();
   void nextTick(() => restoreActiveScrollPosition());
@@ -23927,6 +23751,36 @@ function handleShortcut(event: KeyboardEvent) {
     commandPaletteOpen.value = true;
   }
 }
+
+provide('registerPreviewPaneEl', (el: HTMLElement | null) => { previewPane.value = el; });
+
+provide('editorPaneCtx', {
+  writerFocusMode,
+  handleEditorPointerUp,
+  selectionToolbarVisible,
+  openDocument,
+  openFolder,
+  editorCursorLine,
+  scrollEditorToLine,
+  docLocked,
+});
+
+provide('previewPaneCtx', {
+  previewHtmlWithDiagnostics,
+  previewDocumentLabel,
+  previewDocumentStyle,
+  handlePreviewClick,
+  handlePreviewKeydown,
+  syncEditorScrollFromPreview,
+  navigateToBlockRef,
+  copyPreviewErrorForSupport,
+  exportPreviewSummary,
+  transformPreviewItems,
+  goToTransformArtifact,
+  printPreviewEnabled,
+  printPreviewReport,
+  active,
+});
 
 provide('sidebarCtx', {
   PRESENTATION_THEMES,

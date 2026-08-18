@@ -11815,6 +11815,7 @@ test("desktop WebDriver harness covers native settings and export workflows", ()
 
 test("desktop launch smoke records native UI workbench surfaces", () => {
   const app = readFileSync("src/App.vue", "utf8");
+  const previewPaneSrc = readFileSync("src/components/PreviewPane.vue", "utf8");
   const vimKeybindings = readFileSync("src/lib/vimKeybindings.ts", "utf8");
   const rust = readFileSync("src-tauri/src/lib.rs", "utf8");
   const smoke = readFileSync("scripts/check-desktop-smoke.mjs", "utf8");
@@ -11919,7 +11920,7 @@ test("desktop launch smoke records native UI workbench surfaces", () => {
   ok(app.includes("native workflow rendered diagnostic range in editor"));
   ok(app.includes("native workflow jumped preview diagnostic to source range"));
   ok(app.includes("collectNativePreviewSourceMapEvidence"));
-  ok(app.includes("@keydown=\"handlePreviewKeydown\""));
+  ok(app.includes("@keydown=\"handlePreviewKeydown\"") || previewPaneSrc.includes("@keydown=\"handlePreviewKeydown\""));
   ok(app.includes("markPreviewSourceTarget"));
   ok(app.includes("data-preview-source-target"));
   ok(app.includes("Press Enter or Space to go to Markdown source"));
@@ -12815,10 +12816,11 @@ test("empty-state overlay: hasSeenEmptyState persists and migrates", () => {
 
 test("empty-state overlay: App.vue renders overlay for untitled+empty+never-seen", () => {
   const src = readFileSync("src/App.vue", "utf8");
-  ok(src.includes("emptyStateOverlayVisible"), "emptyStateOverlayVisible computed must exist in App.vue");
-  ok(src.includes("hasSeenEmptyState"), "hasSeenEmptyState must be referenced in App.vue");
-  ok(src.includes("empty-state-overlay"), "empty-state-overlay class must appear in template");
-  ok(src.includes("Do not show again"), "dismiss-permanently label must appear in template");
+  const editorPaneSrc = readFileSync("src/components/EditorPane.vue", "utf8");
+  ok(src.includes("emptyStateOverlayVisible") || editorPaneSrc.includes("emptyStateOverlayVisible"), "emptyStateOverlayVisible computed must exist in App.vue or EditorPane");
+  ok(src.includes("hasSeenEmptyState") || editorPaneSrc.includes("hasSeenEmptyState"), "hasSeenEmptyState must be referenced in App.vue or EditorPane");
+  ok(src.includes("empty-state-overlay") || editorPaneSrc.includes("empty-state-overlay"), "empty-state-overlay class must appear in template");
+  ok(src.includes("Do not show again") || editorPaneSrc.includes("Do not show again"), "dismiss-permanently label must appear in template");
 });
 
 // ── Item C: Degraded preview ─────────────────────────────────────────────
@@ -12848,11 +12850,12 @@ test("degraded preview: success state resets previewFailed and failure counters"
 
 test("degraded preview: App.vue shows retry button and stale ribbon", () => {
   const src = readFileSync("src/App.vue", "utf8");
-  ok(src.includes("preview-degraded-banner"), "degraded preview banner must exist in template");
-  ok(src.includes("store.previewFailed"), "previewFailed must gate the degraded state");
-  ok(src.includes("preview-degraded-retry"), "retry button must exist");
-  ok(src.includes("preview-stale-ribbon"), "stale ribbon must exist for last-known-good preview");
-  ok(src.includes("store.compileActive()"), "retry button must call compileActive");
+  const previewPaneSrc = readFileSync("src/components/PreviewPane.vue", "utf8");
+  ok(src.includes("preview-degraded-banner") || previewPaneSrc.includes("preview-degraded-banner"), "degraded preview banner must exist in template");
+  ok(src.includes("store.previewFailed") || previewPaneSrc.includes("store.previewFailed"), "previewFailed must gate the degraded state");
+  ok(src.includes("preview-degraded-retry") || previewPaneSrc.includes("preview-degraded-retry"), "retry button must exist");
+  ok(src.includes("preview-stale-ribbon") || previewPaneSrc.includes("preview-stale-ribbon"), "stale ribbon must exist for last-known-good preview");
+  ok(src.includes("store.compileActive()") || previewPaneSrc.includes("store.compileActive()"), "retry button must call compileActive");
 });
 
 // ── Item D: Toast store ───────────────────────────────────────────────────
@@ -12930,4 +12933,84 @@ test("toast store: ToastHost is present in App.vue", () => {
   ok(app.includes("ToastHost") || toastHost.includes("toast-host"), "toast-host region must exist in App.vue or ToastHost.vue");
   ok(toastHost.includes("useToasts"), "useToasts must be imported and used in ToastHost.vue");
   ok(toastHost.includes("toasts.visible"), "ToastHost.vue must iterate toasts.visible");
+});
+
+// ── useEditor composable ──────────────────────────────────────────────────────
+
+test("useEditor: createEditor function exists and is exported", () => {
+  const src = readFileSync("src/composables/useEditor.ts", "utf8");
+  ok(src.includes("export function createEditor"), "createEditor must be exported");
+  ok(src.includes("EditorView"), "must use EditorView from @codemirror/view");
+  ok(src.includes("EditorState"), "must use EditorState from @codemirror/state");
+});
+
+test("useEditor: EditorApi interface has setDoc, destroy, focus, getSelection, insertAt, subscribeToChanges", () => {
+  const src = readFileSync("src/composables/useEditor.ts", "utf8");
+  ok(src.includes("setDoc"), "setDoc must be present");
+  ok(src.includes("destroy"), "destroy must be present");
+  ok(src.includes("focus"), "focus must be present");
+  ok(src.includes("getSelection"), "getSelection must be present");
+  ok(src.includes("insertAt"), "insertAt must be present");
+  ok(src.includes("subscribeToChanges"), "subscribeToChanges must be present");
+});
+
+test("useEditor: wrapEditorApi returns EditorApi-shaped object", () => {
+  const src = readFileSync("src/composables/useEditor.ts", "utf8");
+  ok(src.includes("export function wrapEditorApi"), "wrapEditorApi must be exported");
+  ok(src.includes("setDoc"), "wrapEditorApi must return setDoc");
+});
+
+// ── EditorPane component ──────────────────────────────────────────────────────
+
+test("EditorPane: has change and cursor emits", () => {
+  const src = readFileSync("src/components/EditorPane.vue", "utf8");
+  ok(src.includes("change"), "EditorPane must declare change emit");
+  ok(src.includes("cursor"), "EditorPane must declare cursor emit");
+});
+
+test("EditorPane: preserves editor-pane section with correct id and class", () => {
+  const src = readFileSync("src/components/EditorPane.vue", "utf8");
+  ok(src.includes('id="markdown-source"'), "editor section id must be preserved");
+  ok(src.includes('class="editor-pane"'), "editor-pane class must be preserved");
+  ok(src.includes("empty-state-overlay"), "empty-state overlay must be in EditorPane");
+  ok(src.includes("editor-split-grid"), "editor split grid must be present");
+});
+
+test("EditorPane: uses inject for cross-cutting context", () => {
+  const src = readFileSync("src/components/EditorPane.vue", "utf8");
+  ok(src.includes("inject"), "EditorPane must use inject for context");
+  ok(src.includes("editorPaneCtx"), "EditorPane must inject editorPaneCtx");
+});
+
+// ── PreviewPane component ─────────────────────────────────────────────────────
+
+test("PreviewPane: degraded state elements are present", () => {
+  const src = readFileSync("src/components/PreviewPane.vue", "utf8");
+  ok(src.includes("previewFailed") || src.includes("store.previewFailed"), "previewFailed condition must exist");
+  ok(src.includes("preview-degraded-banner"), "degraded banner must be present");
+  ok(src.includes("Preview unavailable"), "degraded heading text must be preserved");
+  ok(src.includes("preview-stale-ribbon"), "stale ribbon must be present");
+});
+
+test("PreviewPane: preserves live-preview section with correct id and class", () => {
+  const src = readFileSync("src/components/PreviewPane.vue", "utf8");
+  ok(src.includes('id="live-preview"'), "preview section id must be preserved");
+  ok(src.includes('class="preview-pane"'), "preview-pane class must be preserved");
+  ok(src.includes("preview-document"), "preview-document article must be present");
+});
+
+test("PreviewPane: scroll emit exists", () => {
+  const src = readFileSync("src/components/PreviewPane.vue", "utf8");
+  ok(src.includes("scroll"), "PreviewPane must have scroll emit or handler");
+  ok(src.includes("emit"), "PreviewPane must use emit");
+});
+
+// ── App.vue wiring ────────────────────────────────────────────────────────────
+
+test("EditorPane and PreviewPane are used in App.vue", () => {
+  const app = readFileSync("src/App.vue", "utf8");
+  ok(app.includes("EditorPane"), "App.vue must use EditorPane component");
+  ok(app.includes("PreviewPane"), "App.vue must use PreviewPane component");
+  ok(app.includes("editorPaneCtx"), "App.vue must provide editorPaneCtx");
+  ok(app.includes("previewPaneCtx"), "App.vue must provide previewPaneCtx");
 });
