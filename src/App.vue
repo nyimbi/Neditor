@@ -212,19 +212,7 @@
       @toggle-writing-space-maximized="toggleWritingSpaceMaximized"
     />
 
-    <section v-if="externalTransformTrustPrompts.length" class="trust-prompt" aria-label="External transform trust prompts">
-      <article v-for="prompt in externalTransformTrustPrompts" :key="prompt.name" class="trust-prompt-item">
-        <div>
-          <strong>{{ prompt.name }} transform</strong>
-          <span>{{ prompt.path }}</span>
-          <small>{{ prompt.inputMode }} | {{ prompt.securitySummary }}</small>
-        </div>
-        <div class="trust-prompt-actions">
-          <button type="button" @click="trustTransformEngine(prompt.name)">Trust</button>
-          <button type="button" @click="reviewTransformEngineSettings(prompt.name)">Settings</button>
-        </div>
-      </article>
-    </section>
+    <TrustPromptModal />
 
     <section v-if="store.missingWorkspaceFiles.length" class="restore-warning" aria-label="Missing restored documents">
       <strong>Missing restored documents</strong>
@@ -1833,6 +1821,7 @@ import PreviewPane from "./components/PreviewPane.vue";
 import DocsLiveWizard from "./panels/DocsLiveWizard.vue";
 import AgentWorkspace from './panels/AgentWorkspace.vue';
 import AiCleanupModal from './panels/AiCleanupModal.vue';
+import TrustPromptModal from './panels/TrustPromptModal.vue';
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { invoke } from "@tauri-apps/api/core";
@@ -22893,6 +22882,12 @@ provide('aiCleanupCtx', {
   loadAiPasteFromClipboard,
   closeAiPaste,
   handleModalKeydown,
+});
+
+provide('trustPromptCtx', {
+  externalTransformTrustPrompts,
+  trustTransformEngine,
+  reviewTransformEngineSettings,
 });
 </script>
 
