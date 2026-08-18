@@ -9264,6 +9264,7 @@ test("print preview report estimates page flow and layout risks", () => {
 
 test("workbench command bar exposes icon display controls and workflow groups", () => {
   const app = readFileSync("src/App.vue", "utf8")
+    + readFileSync("src/panels/DocsLiveWizard.vue", "utf8")
     + readFileSync("src/components/StatusBar.vue", "utf8")
     + readFileSync("src/components/ToastHost.vue", "utf8")
     + readFileSync("src/components/ThemePicker.vue", "utf8")
