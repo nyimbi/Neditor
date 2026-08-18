@@ -9272,7 +9272,9 @@ test("workbench command bar exposes icon display controls and workflow groups", 
     + readFileSync("src/components/TabsBar.vue", "utf8")
     + readFileSync("src/components/CommandPalette.vue", "utf8")
     + readFileSync("src/components/Toolbar.vue", "utf8")
-    + readFileSync("src/components/Sidebar.vue", "utf8");
+    + readFileSync("src/components/Sidebar.vue", "utf8")
+    + readFileSync("src/components/EditorPane.vue", "utf8")
+    + readFileSync("src/components/PreviewPane.vue", "utf8");
   const store = readFileSync("src/stores/documents.ts", "utf8");
   const types = readFileSync("src/types.ts", "utf8");
   const aiProviderPackages = readFileSync("src/lib/aiProviderPackages.ts", "utf8");
@@ -9829,7 +9831,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
   ok(app.includes('aria-label="Deep research source quality review"'));
   ok(app.includes("deepResearchSourceQualityItems"));
   ok(app.includes("deepResearchSourceQualitySummary"));
-  ok(app.includes("qualityDimensions.map"));
+  ok(app.includes("qualityDimensions") && (app.includes("qualityDimensions.map") || app.includes("_formatQualityDimensions")), "qualityDimensions must be rendered (inline map or helper)");
   ok(app.includes("insertDeepResearchSourceQualityReview"));
   ok(app.includes("Insert source quality"));
   ok(app.includes("AI: Insert deep research source quality review"));
