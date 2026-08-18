@@ -97,7 +97,7 @@ import { useDocumentsStore } from "../stores/documents";
 
 const store = useDocumentsStore();
 
-const props = defineProps<{
+defineProps<{
   writingSpaceMaximized: boolean;
   activeNudge: string | null;
   aiElapsedSeconds: number;

@@ -1826,7 +1826,7 @@
         <section v-if="deepResearchIterations.length" class="snapshot-row" aria-label="Deep research source quality review">
           <p>{{ deepResearchSourceQualitySummary }}</p>
           <small v-for="item in deepResearchSourceQualityItems.slice(0, 6)" :key="`${item.iteration}-${item.url}`">
-            {{ item.fitLabel }} | {{ item.fitScore }}/100 | {{ item.title }} | {{ item.qualityDimensions.map((dimension) => `${dimension.name} ${dimension.score}`).join(" / ") }} | {{ item.reviewAction }}
+            {{ item.fitLabel }} | {{ item.fitScore }}/100 | {{ item.title }} | {{ _formatQualityDimensions(item.qualityDimensions) }} | {{ item.reviewAction }}
           </small>
         </section>
         <section v-if="deepResearchIterations.length" class="snapshot-row" aria-label="Deep research evidence conflict review">
@@ -3158,7 +3158,7 @@
           <p v-if="!filteredTasks.length" class="sidebar-hint">
             {{ workspaceTasks.length ? 'No tasks match the current filter.' : 'No checkboxes found in workspace. Use - [ ] to create tasks.' }}
           </p>
-          <div class="task-group" v-for="(groupTasks, groupKey) in filteredTasks.reduce((acc: Record<string, typeof filteredTasks>, t) => { (acc[t.file_path] = acc[t.file_path] || []).push(t); return acc; }, {})" :key="String(groupKey)">
+          <div class="task-group" v-for="(groupTasks, groupKey) in _groupTasksByFile(filteredTasks)" :key="String(groupKey)">
             <h4 class="task-group-header">{{ String(groupKey).split('/').pop() }}</h4>
             <label
               v-for="task in groupTasks as typeof filteredTasks"
@@ -3320,7 +3320,6 @@ const {
   clearActiveDocumentSet,
   clearTableCellSpan,
   compilerOutputInventory,
-  confirm,
   copyActiveDocumentSetManifest,
   copyCitationSourceLibraryAudit,
   copyCitationSourcePath,
@@ -3471,7 +3470,6 @@ const {
   goToTableTextCellSource,
   handleButtonHelpHitboxEnter,
   hideButtonHelp,
-  history,
   importDataSourceAsEditableTable,
   importLatexTemplateLibraryJson,
   importRfpSourceFile,
@@ -3572,7 +3570,6 @@ const {
   loadTableTextCellAtCursor,
   manifestPreview,
   markTableSourceEditDirty,
-  markdown,
   markdownTables,
   mergedMetadataVariableRows,
   missingCitationKeys,
@@ -3583,7 +3580,6 @@ const {
   onFigureCropPointerDown,
   onFigureCropPointerMove,
   onFigureCropPositionChange,
-  open,
   openAgentWorkspace,
   openAgentWorkspaceForBusinessTemplate,
   openAgentWorkspaceForRfpAnalysis,
@@ -3637,7 +3633,6 @@ const {
   qualityStepAssistance,
   readinessLayoutSummary,
   redownloadCitationSource,
-  ref,
   referenceLabelManagerSummary,
   referenceLabelRows,
   refreshBacklinks,
@@ -3837,5 +3832,17 @@ function onSidebarResizeStart(event: MouseEvent): void {
 
 function toggleSidebarCollapsed(): void {
   emit('toggle-sidebar-collapsed');
+}
+
+type _WorkspaceTask = { file_path: string; line: number; text: string; done: boolean; tags: string[]; due_date: string | null; heading_context: string };
+function _groupTasksByFile(tasks: _WorkspaceTask[]): Record<string, _WorkspaceTask[]> {
+  return tasks.reduce((acc: Record<string, _WorkspaceTask[]>, t) => {
+    (acc[t.file_path] = acc[t.file_path] || []).push(t);
+    return acc;
+  }, {});
+}
+
+function _formatQualityDimensions(dims: { name: string; score: number }[]): string {
+  return dims.map(d => `${d.name} ${d.score}`).join(' / ');
 }
 </script>

@@ -107,7 +107,7 @@ interface DocumentTabGroup {
   documents: OpenDocument[];
 }
 
-const props = defineProps<{
+defineProps<{
   groupedDocuments: DocumentTabGroup[];
   draggedTabId: string;
   toolbarIconPaths: (icon: string) => string[];
