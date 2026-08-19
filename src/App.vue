@@ -2254,6 +2254,7 @@ import {
 import { useDocumentsStore } from "./stores/documents";
 import { useToasts } from "./lib/toasts";
 import { useAi } from "./composables/useAi";
+import { useCompile } from "./composables/useCompile";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
 
 type CitationSourceLibraryItem = CitationSourceAuditItem;
@@ -2291,6 +2292,7 @@ type CopyDataSourceFileResponse = {
 const store = useDocumentsStore();
 const toasts = useToasts();
 const { aiElapsedSeconds, lastAiRunFn, aiErrorKindLabel, copyAiErrorDetails, retryLastAiRun } = useAi();
+const { copyPreviewErrorForSupport } = useCompile();
 type ExportTarget = typeof store.exportTarget;
 interface AppMenuItem {
   id: string;
@@ -2935,15 +2937,7 @@ const humanizeResult = ref('');
 const humanizeChanges = ref<string[]>([]);
 
 // ── AI run progress pill: state and helpers live in useAi() ──────────────
-function copyPreviewErrorForSupport(): void {
-  const info = JSON.stringify({
-    errorKind: store.lastCompileErrorKind,
-    errorMessage: store.lastCompileErrorMessage,
-    documentTitle: active.value?.title,
-    consecutiveFailures: store.consecutiveCompileFailures,
-  }, null, 2);
-  navigator.clipboard.writeText(info).catch(() => null);
-}
+// ── Compile error toast + copyPreviewErrorForSupport live in useCompile() ─
 const compareOpen = ref(false);
 const comparePathA = ref('');
 const comparePathB = ref('');
@@ -21690,27 +21684,7 @@ function resetWriterIdle(): void {
 watch([() => active.value?.text, editorCursorLine], resetWriterIdle);
 watch(() => store.uiMode, (m) => { if (m !== 'writer') { if (writerIdleHandle !== null) clearTimeout(writerIdleHandle); writerStripIdle.value = false; } });
 
-// Item C: compile failure toast (warn after first failure, "Report this" hint after 3)
-watch(() => store.consecutiveCompileFailures, (count, prev) => {
-  if (count === 0 || count <= (prev ?? 0)) return;
-  const kindLabels: Record<string, string> = {
-    'compile-failed': 'Compile failed',
-    'backend-unavailable': 'Backend not responding',
-    'transform-error': 'Transform engine error',
-  };
-  const kindLabel = kindLabels[store.lastCompileErrorKind] ?? 'Compile failed';
-  if (count === 1) {
-    toasts.push({ kind: "warning", title: "Preview unavailable", body: kindLabel });
-  } else if (count === 3) {
-    toasts.push({
-      kind: "warning",
-      title: "Preview unavailable (3rd failure)",
-      body: `${kindLabel} -- repeated failures detected`,
-      actionLabel: "Copy error for support",
-      onAction: () => copyPreviewErrorForSupport(),
-    });
-  }
-});
+// Item C: compile failure toasts — registered in useCompile()
 
 // Item D: snapshot restored toast
 const _lastSnapshotCount = ref(0);
