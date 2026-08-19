@@ -1832,7 +1832,6 @@ import {
   type AiProviderSourcePack,
   type LocalAgentCliProfile,
 } from "./lib/aiProviderPackages";
-import type { ProviderError } from "./lib/providerRuntime";
 import { inspectAiRuntimeReadiness, type AiRuntimeReadinessReport } from "./lib/aiRuntimeReadiness";
 import { isAppMenuHidden } from "./lib/platformDetection";
 import { accessibilityQaMarkdown, buildAccessibilityQaReport } from "./lib/accessibilityQa";
@@ -2254,6 +2253,7 @@ import {
 } from "./lib/vimKeybindings";
 import { useDocumentsStore } from "./stores/documents";
 import { useToasts } from "./lib/toasts";
+import { useAi } from "./composables/useAi";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
 
 type CitationSourceLibraryItem = CitationSourceAuditItem;
@@ -2290,6 +2290,7 @@ type CopyDataSourceFileResponse = {
 
 const store = useDocumentsStore();
 const toasts = useToasts();
+const { aiElapsedSeconds, lastAiRunFn, aiErrorKindLabel, copyAiErrorDetails, retryLastAiRun } = useAi();
 type ExportTarget = typeof store.exportTarget;
 interface AppMenuItem {
   id: string;
@@ -2933,40 +2934,7 @@ const humanizeBusy = ref(false);
 const humanizeResult = ref('');
 const humanizeChanges = ref<string[]>([]);
 
-// ── AI run progress pill ───────────────────────────────────────────────────
-/** Elapsed seconds counter for the active AI run status pill. */
-const aiElapsedSeconds = ref(0);
-let aiElapsedTimer: ReturnType<typeof setInterval> | undefined;
-watch(() => store.aiRun, (run) => {
-  clearInterval(aiElapsedTimer);
-  aiElapsedTimer = undefined;
-  if (run) {
-    aiElapsedSeconds.value = 0;
-    aiElapsedTimer = setInterval(() => {
-      aiElapsedSeconds.value = Math.floor((Date.now() - run.startedAt) / 1000);
-    }, 1000);
-  }
-});
-/** Last AI function invoked; used by the Retry button. */
-const lastAiRunFn = ref<(() => void) | null>(null);
-
-function aiErrorKindLabel(kind: ProviderError["kind"]): string {
-  return { timeout: "Timeout", aborted: "Cancelled", network: "Network", http: "Provider", parse: "Parse" }[kind] ?? kind;
-}
-async function copyAiErrorDetails() {
-  if (!store.aiLastError) return;
-  const text = [
-    `Kind: ${store.aiLastError.kind}`,
-    `Message: ${store.aiLastError.message}`,
-    store.aiLastError.hint ? `Hint: ${store.aiLastError.hint}` : "",
-    store.aiLastError.status ? `Status: ${store.aiLastError.status}` : "",
-  ].filter(Boolean).join("\n");
-  try { await navigator.clipboard?.writeText(text); } catch { /* clipboard unavailable */ }
-}
-function retryLastAiRun() {
-  store.aiLastError = null;
-  lastAiRunFn.value?.();
-}
+// ── AI run progress pill: state and helpers live in useAi() ──────────────
 function copyPreviewErrorForSupport(): void {
   const info = JSON.stringify({
     errorKind: store.lastCompileErrorKind,
