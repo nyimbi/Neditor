@@ -2256,6 +2256,7 @@ import { useToasts } from "./lib/toasts";
 import { useAi } from "./composables/useAi";
 import { useCompile } from "./composables/useCompile";
 import { useKeybindings } from "./composables/useKeybindings";
+import { useFileOps } from "./composables/useFileOps";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
 
 type CitationSourceLibraryItem = CitationSourceAuditItem;
@@ -2295,6 +2296,8 @@ const toasts = useToasts();
 const { aiElapsedSeconds, lastAiRunFn, aiErrorKindLabel, copyAiErrorDetails, retryLastAiRun } = useAi();
 const { copyPreviewErrorForSupport } = useCompile();
 const { install: installKeybindings, uninstall: uninstallKeybindings } = useKeybindings();
+// flushEditorTextToStore, desktopWorkflowSmokeMarkdownPath, desktopWorkflowSmokeNamedMarkdownPath are hoisted function declarations defined later in this file
+const { openDocument, openFolder, saveDocument, saveAs: saveDocumentAs, rename: renameDocument, duplicate: duplicateDocument } = useFileOps(flushEditorTextToStore, desktopWorkflowSmokeMarkdownPath, desktopWorkflowSmokeNamedMarkdownPath);
 type ExportTarget = typeof store.exportTarget;
 interface AppMenuItem {
   id: string;
@@ -17442,26 +17445,7 @@ function resolveIncludePath(parentPath: string, target: string) {
   return `/${stack.join("/")}`;
 }
 
-async function openDocument() {
-  const smokePath = await desktopWorkflowSmokeMarkdownPath();
-  if (smokePath) {
-    await store.openPath(smokePath);
-    return;
-  }
-  const selected = await open({
-    multiple: false,
-    filters: [{ name: "Markdown", extensions: ["md", "markdown", "mdown", "txt"] }],
-  });
-  if (typeof selected === "string") await store.openPath(selected);
-}
-
-async function openFolder() {
-  const selected = await open({
-    directory: true,
-    multiple: false,
-  });
-  if (typeof selected === "string") await store.openFolder(selected);
-}
+// openDocument, openFolder — extracted to useFileOps()
 
 async function saveWorkspace() {
   await store.persistWorkspace();
@@ -18407,58 +18391,13 @@ async function toggleTransformTrust(name: string, event: Event) {
   await store.setTransformTrust(name, true);
 }
 
-async function saveDocument() {
-  if (!active.value.path) {
-    await saveDocumentAs();
-    return;
-  }
-  flushEditorTextToStore();
-  await store.saveActive();
-  if (active.value.path) {
-    toasts.push({ kind: "success", title: "Saved", body: active.value.path });
-  }
-}
-
-async function saveDocumentAs() {
-  const path =
-    (await desktopWorkflowSmokeMarkdownPath()) ||
-    (await save({
-      filters: [{ name: "Markdown", extensions: ["md"] }],
-      defaultPath: active.value.title.endsWith(".md") ? active.value.title : `${active.value.title}.md`,
-  }));
-  if (path) {
-    flushEditorTextToStore();
-    await store.saveActive(path);
-    toasts.push({ kind: "success", title: "Saved", body: path });
-  }
-}
-
+// saveDocument, saveDocumentAs, renameDocument, duplicateDocument — extracted to useFileOps()
+// These smoke helpers are injected into useFileOps() so their names remain visible here for desktop-smoke scan.
 async function desktopWorkflowSmokeMarkdownPath() {
   return invoke<string | null>("desktop_workflow_smoke_file_path", { extension: "md" }).catch(() => null);
 }
-
 async function desktopWorkflowSmokeNamedMarkdownPath(fileStem: string) {
   return invoke<string | null>("desktop_workflow_smoke_named_path", { fileStem, extension: "md" }).catch(() => null);
-}
-
-async function renameDocument() {
-  const path =
-    (await desktopWorkflowSmokeNamedMarkdownPath("native-workflow-renamed")) ||
-    (await save({
-      filters: [{ name: "Markdown", extensions: ["md"] }],
-      defaultPath: active.value.title.endsWith(".md") ? active.value.title : `${active.value.title}.md`,
-    }));
-  if (path) await store.renameActive(path);
-}
-
-async function duplicateDocument() {
-  const path =
-    (await desktopWorkflowSmokeNamedMarkdownPath("native-workflow-duplicate")) ||
-    (await save({
-      filters: [{ name: "Markdown", extensions: ["md"] }],
-      defaultPath: `${active.value.title.replace(/\.[^.]+$/, "")} copy.md`,
-    }));
-  if (path) await store.duplicateActive(path);
 }
 
 async function saveConflictCopy() {
