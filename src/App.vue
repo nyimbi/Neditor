@@ -2255,6 +2255,7 @@ import { useDocumentsStore } from "./stores/documents";
 import { useToasts } from "./lib/toasts";
 import { useAi } from "./composables/useAi";
 import { useCompile } from "./composables/useCompile";
+import { useKeybindings } from "./composables/useKeybindings";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
 
 type CitationSourceLibraryItem = CitationSourceAuditItem;
@@ -2293,6 +2294,7 @@ const store = useDocumentsStore();
 const toasts = useToasts();
 const { aiElapsedSeconds, lastAiRunFn, aiErrorKindLabel, copyAiErrorDetails, retryLastAiRun } = useAi();
 const { copyPreviewErrorForSupport } = useCompile();
+const { install: installKeybindings, uninstall: uninstallKeybindings } = useKeybindings();
 type ExportTarget = typeof store.exportTarget;
 interface AppMenuItem {
   id: string;
@@ -11529,7 +11531,7 @@ onMounted(async () => {
   installE2eAppHooks();
   void installDesktopWorkflowTestHooks();
   // Register cheap DOM event listeners synchronously — no I/O cost.
-  window.addEventListener("keydown", handleShortcut);
+  installKeybindings(handleShortcut);
   window.addEventListener("mouseover", handleButtonHelpEnter);
   window.addEventListener("mousemove", handleButtonHelpPointerMove, true);
   window.addEventListener("focusin", handleButtonHelpEnter);
@@ -11581,7 +11583,7 @@ onBeforeUnmount(() => {
   if (nudgeTimer.value) clearTimeout(nudgeTimer.value);
   if (_styleGuideTimer) clearTimeout(_styleGuideTimer);
   onCanvasDragEnd(); // remove any stale window drag listeners
-  window.removeEventListener("keydown", handleShortcut);
+  uninstallKeybindings();
   window.removeEventListener("mouseover", handleButtonHelpEnter);
   window.removeEventListener("mousemove", handleButtonHelpPointerMove, true);
   window.removeEventListener("focusin", handleButtonHelpEnter);
