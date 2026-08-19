@@ -758,7 +758,6 @@ const store = useDocumentsStore();
 const _ctx = inject('sidebarCtx') as Record<string, any>;
 const {
   academicTemplatesByCategory,
-  active,
   allVersionedBusinessClauses,
   analyzeCurrentRfpSource,
   appendAllTransformTemplateAssistance,

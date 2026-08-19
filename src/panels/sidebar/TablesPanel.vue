@@ -409,9 +409,7 @@
 
 <script setup lang="ts">
 import { inject } from 'vue';
-import { useDocumentsStore } from '../../stores/documents';
 
-const store = useDocumentsStore();
 const _ctx = inject('sidebarCtx') as Record<string, any>;
 const {
   addTableColumn,

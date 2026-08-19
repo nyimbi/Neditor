@@ -484,7 +484,6 @@ const _ctx = inject('sidebarCtx') as Record<string, any>;
 const {
   PRESENTATION_THEMES,
   PRESENTATION_TRANSITIONS,
-  active,
   activeExportProfile,
   activeLatexTemplateProfile,
   activePublishingDestination,

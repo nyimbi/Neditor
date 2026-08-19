@@ -171,7 +171,6 @@ import { useDocumentsStore } from '../../stores/documents';
 const store = useDocumentsStore();
 const _ctx = inject('sidebarCtx') as Record<string, any>;
 const {
-  active,
   allDocumentOutlineTemplates,
   appendDocumentOutlineTemplate,
   appendOutlineToDocument,
