@@ -2257,6 +2257,7 @@ import { useAi } from "./composables/useAi";
 import { useCompile } from "./composables/useCompile";
 import { useKeybindings } from "./composables/useKeybindings";
 import { useFileOps } from "./composables/useFileOps";
+import { useWorkspaceScope } from "./composables/useWorkspaceScope";
 import type { AiCleanupResponse, DocumentBlock, DocumentDiagnostic, OpenDocument, SemanticDocument, TransformEngineMetadata } from "./types";
 
 type CitationSourceLibraryItem = CitationSourceAuditItem;
@@ -2298,6 +2299,7 @@ const { copyPreviewErrorForSupport } = useCompile();
 const { install: installKeybindings, uninstall: uninstallKeybindings } = useKeybindings();
 // flushEditorTextToStore, desktopWorkflowSmokeMarkdownPath, desktopWorkflowSmokeNamedMarkdownPath are hoisted function declarations defined later in this file
 const { openDocument, openFolder, saveDocument, saveAs: saveDocumentAs, rename: renameDocument, duplicate: duplicateDocument } = useFileOps(flushEditorTextToStore, desktopWorkflowSmokeMarkdownPath, desktopWorkflowSmokeNamedMarkdownPath);
+const { pin, unpin } = useWorkspaceScope();
 type ExportTarget = typeof store.exportTarget;
 interface AppMenuItem {
   id: string;
@@ -17063,7 +17065,7 @@ function dropTabOnGroup(group: DocumentTabGroup, event?: DragEvent) {
   if (!tabId) return;
   const document = store.documents.find((candidate) => candidate.id === tabId);
   if (group.key.startsWith("set:") && document) {
-    store.setPinned(document.id, false);
+    unpin(document.id);
     const currentDocument = store.documents.find((candidate) => candidate.id === document.id) || document;
     store.setActiveDocument(currentDocument.id);
     applyTextToDocument(currentDocument, setDocumentSetFrontMatter(currentDocument.text, group.label));
@@ -17089,10 +17091,10 @@ function dropTabOnDocument(target: OpenDocument, event: DragEvent) {
 function alignTabWithTargetGroup(document: OpenDocument, target: OpenDocument) {
   const targetGroup = tabGroupDescriptor(target);
   if (targetGroup.key === "pinned") {
-    store.setPinned(document.id, true);
+    pin(document.id);
     return;
   }
-  if (document.pinned) store.setPinned(document.id, false);
+  if (document.pinned) unpin(document.id);
   if (targetGroup.key.startsWith("set:")) {
     const currentDocument = store.documents.find((candidate) => candidate.id === document.id) || document;
     applyTextToDocument(
