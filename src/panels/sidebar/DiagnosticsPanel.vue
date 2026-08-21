@@ -89,10 +89,8 @@
 
 <script setup lang="ts">
 import { computed, inject } from 'vue';
-import { useDocumentsStore } from '../../stores/documents';
 import CollapsibleAdvanced from '../../components/CollapsibleAdvanced.vue';
 
-const store = useDocumentsStore();
 const _ctx = inject('sidebarCtx') as Record<string, any>;
 const {
   active,
