@@ -8691,6 +8691,7 @@ test("workspace persistence state helper builds normalized store snapshots", () 
     mailMergeRequireWorkspaceRoot: false,
     mailMergeMaxRecords: 1000,
     mailMergeDefaultDelimiter: ",",
+    sidebarAdvancedExpanded: {},
   });
 
   equal(workspace.schemaVersion, WORKSPACE_SCHEMA_VERSION);
@@ -8798,6 +8799,7 @@ test("workspace persistence state helper applies persisted preferences and resto
     mailMergeRequireWorkspaceRoot: false,
     mailMergeMaxRecords: 1000,
     mailMergeDefaultDelimiter: ",",
+    sidebarAdvancedExpanded: {},
   } satisfies Parameters<typeof applyPersistedWorkspacePreferenceState>[0];
 
   const result = applyPersistedWorkspacePreferenceState(
@@ -13100,4 +13102,79 @@ test("App.vue: migration toast fires for activity-bar users via dismissedNudges 
   ok(src.includes("sidebar-tabs-onboarding"), "App.vue must use sidebar-tabs-onboarding as the one-time nudge key");
   ok(src.includes("Try the new sidebar tabs layout"), "Migration toast title must appear in App.vue");
   ok(src.includes("store.sidebarLayout = 'tabs'"), "Switch action must flip sidebarLayout to tabs");
+});
+
+// CollapsibleAdvanced
+test("CollapsibleAdvanced: renders collapsed by default when no state exists", () => {
+  const src = readFileSync("src/components/CollapsibleAdvanced.vue", "utf8");
+  ok(src.includes("collapsible-advanced-body"), "must have body element class");
+  ok(src.includes("collapsible-advanced-body--open"), "must have open modifier class");
+  ok(!src.includes("expanded = true"), "must not hard-code expanded=true as default");
+  ok(src.includes("sidebarAdvancedExpanded") || src.includes("getAdvancedExpanded"), "must read expansion state from store");
+});
+
+test("CollapsibleAdvanced: clicking header toggles expansion via store action", () => {
+  const src = readFileSync("src/components/CollapsibleAdvanced.vue", "utf8");
+  ok(src.includes("setAdvancedExpanded"), "must call store.setAdvancedExpanded on toggle");
+  ok(src.includes("@click") || src.includes("onClick"), "header must be click-bound");
+  ok(src.includes("!expanded"), "toggle must invert current state");
+});
+
+test("CollapsibleAdvanced: aria-expanded reflects expansion state", () => {
+  const src = readFileSync("src/components/CollapsibleAdvanced.vue", "utf8");
+  ok(src.includes("aria-expanded"), "must set aria-expanded on header button");
+  ok(src.includes("aria-controls"), "must set aria-controls linking header to body");
+});
+
+test("CollapsibleAdvanced: panelId prop is used as the persistence key", () => {
+  const src = readFileSync("src/components/CollapsibleAdvanced.vue", "utf8");
+  ok(src.includes("panelId"), "must declare panelId prop");
+  ok(src.includes("props.panelId") || src.includes("panelId)"), "must pass panelId to store action");
+});
+
+test("sidebarAdvancedExpanded: present in PersistedWorkspace type", () => {
+  const src = readFileSync("src/lib/workspacePersistence.ts", "utf8");
+  ok(src.includes("sidebarAdvancedExpanded"), "workspacePersistence.ts must declare sidebarAdvancedExpanded");
+});
+
+test("sidebarAdvancedExpanded: restored in applyPersistedWorkspacePreferenceState", () => {
+  const src = readFileSync("src/lib/workspacePersistenceState.ts", "utf8");
+  ok(src.includes("sidebarAdvancedExpanded"), "workspacePersistenceState.ts must handle sidebarAdvancedExpanded restore");
+});
+
+test("sidebarAdvancedExpanded: persists and restores via migratePersistedWorkspace passthrough", () => {
+  const withExpanded = migratePersistedWorkspace({ sidebarAdvancedExpanded: { outline: true } });
+  deepEqual(withExpanded.sidebarAdvancedExpanded, { outline: true });
+  const empty = migratePersistedWorkspace({});
+  equal(empty.sidebarAdvancedExpanded, undefined, "absent key must not produce override");
+});
+
+test("getAdvancedExpanded: returns false for unknown panelId", () => {
+  const src = readFileSync("src/stores/documents.ts", "utf8");
+  ok(src.includes("getAdvancedExpanded"), "store must have getAdvancedExpanded action");
+  ok(src.includes("?? false"), "must default to false for unknown panelId");
+});
+
+test("setAdvancedExpanded: action exists and calls persistWorkspace", () => {
+  const src = readFileSync("src/stores/documents.ts", "utf8");
+  ok(src.includes("setAdvancedExpanded"), "store must have setAdvancedExpanded action");
+  ok(src.includes("sidebarAdvancedExpanded"), "store state must include sidebarAdvancedExpanded");
+});
+
+test("OutlinePanel: wraps advanced section in CollapsibleAdvanced with panelId=outline", () => {
+  const src = readFileSync("src/panels/sidebar/OutlinePanel.vue", "utf8");
+  ok(src.includes("CollapsibleAdvanced"), "OutlinePanel must use CollapsibleAdvanced");
+  ok(src.includes('panel-id="outline"'), 'OutlinePanel must pass panel-id="outline" to CollapsibleAdvanced');
+  ok(src.includes("outline-planner"), "advanced section must include outline-planner");
+  ok(src.includes("document-map"), "advanced section must include document-map");
+  ok(src.includes("outline-library"), "advanced section must include outline-library");
+});
+
+test("OutlinePanel: heading tree (primary content) is outside CollapsibleAdvanced", () => {
+  const src = readFileSync("src/panels/sidebar/OutlinePanel.vue", "utf8");
+  // heading buttons appear before the CollapsibleAdvanced opening tag
+  const collapsibleIdx = src.indexOf("<CollapsibleAdvanced");
+  const outlineRowIdx = src.indexOf("outline-row");
+  ok(outlineRowIdx !== -1, "outline-row buttons must exist");
+  ok(outlineRowIdx < collapsibleIdx, "outline-row (primary content) must precede CollapsibleAdvanced");
 });
