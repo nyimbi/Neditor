@@ -4,26 +4,54 @@
     id="document-sidebar"
     :key="store.sidebar"
     :data-sidebar="store.sidebar"
+    :data-sidebar-layout="store.sidebarLayout"
     class="sidebar"
     aria-label="Document workspace"
     tabindex="-1"
   >
+    <!-- ── Tab strip (tabs layout) ─────────────────────────────────────────── -->
+    <nav
+      v-if="store.sidebarLayout === 'tabs'"
+      class="sidebar-tab-strip"
+      aria-label="Sidebar panels"
+    >
+      <button
+        v-for="tab in SIDEBAR_TABS"
+        :key="tab.id"
+        type="button"
+        class="sidebar-tab"
+        :class="{ 'sidebar-tab--active': effectiveTab === tab.id }"
+        :aria-current="effectiveTab === tab.id ? 'true' : undefined"
+        :aria-label="tab.label"
+        @click="selectTab(tab.id)"
+      >{{ tab.label }}</button>
+    </nav>
+
+    <!-- ── Activity-bar layout chrome ─────────────────────────────────────── -->
     <div
-      v-if="store.uiMode === 'pilot'"
+      v-if="store.uiMode === 'pilot' && store.sidebarLayout !== 'tabs'"
       class="sidebar-resize-handle"
       title="Drag to resize"
       @mousedown.prevent="onSidebarResizeStart"
     ></div>
     <button
+      v-if="store.sidebarLayout !== 'tabs'"
       type="button"
       class="sidebar-collapse-btn"
       :title="sidebarCollapsed ? 'Expand sidebar (⌘B)' : 'Collapse sidebar (⌘B)'"
       :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
       @click="toggleSidebarCollapsed()"
     >{{ sidebarCollapsed ? '▶' : '◀' }}</button>
-    <header v-if="store.uiMode === 'pilot'" class="sidebar-panel-header" aria-label="Current panel">
+    <header v-if="store.uiMode === 'pilot' && store.sidebarLayout !== 'tabs'" class="sidebar-panel-header" aria-label="Current panel">
       <span class="sidebar-panel-name">{{ currentPanelLabel }}</span>
     </header>
+
+    <!-- ── Tab-mode panel header ───────────────────────────────────────────── -->
+    <div v-if="store.sidebarLayout === 'tabs' && effectiveTab" class="sidebar-tab-content-header">
+      <span class="sidebar-tab-content-title">{{ PANEL_LABELS[effectiveTab] || effectiveTab }}</span>
+      <button type="button" class="sidebar-tab-more" aria-label="More options" title="More options">···</button>
+    </div>
+
     <FilesPanel v-if="store.sidebar === 'files'" />
 
     <OutlinePanel v-else-if="store.sidebar === 'outline'" />
@@ -162,6 +190,7 @@ import VersioningPanel from '../panels/sidebar/VersioningPanel.vue';
 import ReviewPanel from '../panels/sidebar/ReviewPanel.vue';
 import BacklinksPanel from '../panels/sidebar/BacklinksPanel.vue';
 import { useDocumentsStore } from '../stores/documents';
+import type { SidebarPanel } from '../lib/workspacePersistence';
 
 const props = defineProps<{
   writingSpaceMaximized: boolean;
@@ -203,10 +232,24 @@ const {
 const PANEL_LABELS: Record<string, string> = {
   files: 'Files', outline: 'Outline', diagnostics: 'Diagnostics', layout: 'Layout',
   tables: 'Tables', templates: 'Templates', references: 'References',
-  exports: 'Export', versioning: 'Versioning', review: 'Review', help: 'Help', settings: 'Settings',
+  exports: 'Export', versioning: 'Versioning', review: 'Review',
+  backlinks: 'Backlinks', tasks: 'Tasks', 'daily-notes': 'Daily Notes',
+  help: 'Help', settings: 'Settings',
 };
 
+const SIDEBAR_TABS = Object.entries(PANEL_LABELS).map(([id, label]) => ({ id, label }));
+
 const currentPanelLabel = computed(() => PANEL_LABELS[store.sidebar as string] || String(store.sidebar));
+
+/** In tabs mode: the active tab; falls back to store.sidebar if activeSidebarTab not yet set. */
+const effectiveTab = computed(() =>
+  store.sidebarLayout === 'tabs' ? (store.activeSidebarTab || store.sidebar) : store.sidebar
+);
+
+function selectTab(panelId: string): void {
+  store.activeSidebarTab = panelId;
+  store.sidebar = panelId as SidebarPanel;
+}
 
 function onSidebarResizeStart(event: MouseEvent): void {
   const startX = event.clientX;

@@ -323,7 +323,7 @@
       </section>
 
       <nav
-        v-if="store.uiMode === 'pilot' && store.mode !== 'outline' && !writingSpaceMaximized && !store.zenMode"
+        v-if="store.uiMode === 'pilot' && store.mode !== 'outline' && !writingSpaceMaximized && !store.zenMode && store.sidebarLayout !== 'tabs'"
         class="activity-bar"
         aria-label="Panel navigation"
       >
@@ -11528,6 +11528,19 @@ onMounted(async () => {
   // before was adding latency to first paint; they all moved to Phase 2.
   window.__neditor_boot.mountStart = performance.now();
   await store.bootCritical();
+  // One-time onboarding toast for users migrated to activity-bar layout
+  if (store.sidebarLayout === 'activity-bar' && !store.dismissedNudges.includes('sidebar-tabs-onboarding')) {
+    store.dismissedNudges = [...store.dismissedNudges, 'sidebar-tabs-onboarding'];
+    void store.persistWorkspace();
+    toasts.push({
+      kind: 'info',
+      title: 'Try the new sidebar tabs layout',
+      body: 'A vertical tab strip keeps every panel one click away.',
+      timeoutMs: null,
+      actionLabel: 'Switch',
+      onAction: () => { store.sidebarLayout = 'tabs'; void store.persistWorkspace(); },
+    });
+  }
   buildEditor();
   window.__neditor_boot.editorReady = performance.now();
   scheduleAutosave();
