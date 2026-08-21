@@ -13178,3 +13178,25 @@ test("OutlinePanel: heading tree (primary content) is outside CollapsibleAdvance
   ok(outlineRowIdx !== -1, "outline-row buttons must exist");
   ok(outlineRowIdx < collapsibleIdx, "outline-row (primary content) must precede CollapsibleAdvanced");
 });
+
+// ── Phase D: FilesPanel CollapsibleAdvanced ───────────────────────────────────
+test("FilesPanel: wraps search and document sets in CollapsibleAdvanced with panel-id='files'", () => {
+  const src = readFileSync("src/panels/sidebar/FilesPanel.vue", "utf8");
+  ok(src.includes("CollapsibleAdvanced"), "FilesPanel must use CollapsibleAdvanced");
+  ok(src.includes('panel-id="files"'), 'FilesPanel must pass panel-id="files" to CollapsibleAdvanced');
+  ok(src.includes("workspace-search-box"), "Advanced section must include workspace search box");
+  ok(src.includes("document-set-manager"), "Advanced section must include document-set-manager");
+});
+
+test("FilesPanel: primary content (file tree, pinned, open folder) is outside CollapsibleAdvanced", () => {
+  const src = readFileSync("src/panels/sidebar/FilesPanel.vue", "utf8");
+  const collapsibleIdx = src.indexOf("<CollapsibleAdvanced");
+  const fileRowIdx = src.indexOf("file-row");
+  const pinnedIdx = src.indexOf("pinned-files");
+  const openFolderIdx = src.indexOf("openFolder");
+  ok(fileRowIdx !== -1, "file-row must exist");
+  ok(pinnedIdx !== -1, "pinned-files must exist");
+  ok(fileRowIdx < collapsibleIdx, "file-row (primary content) must precede CollapsibleAdvanced");
+  ok(pinnedIdx < collapsibleIdx, "pinned-files must precede CollapsibleAdvanced");
+  ok(openFolderIdx < collapsibleIdx, "openFolder must precede CollapsibleAdvanced");
+});
