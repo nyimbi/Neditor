@@ -56,34 +56,7 @@
 
     <OutlinePanel v-else-if="store.sidebar === 'outline'" />
 
-    <template v-else-if="store.sidebar === 'diagnostics'">
-      <h2>Diagnostics</h2>
-      <section class="compiler-output-inventory" aria-label="Compiler output inventory">
-        <article v-for="item in compilerOutputInventory" :key="item.label" class="snapshot-row" :data-status="item.status">
-          <p>{{ item.label }}</p>
-          <small>{{ item.status }} | {{ item.detail }}</small>
-        </article>
-      </section>
-      <section role="list" aria-label="Compiler diagnostics">
-        <article
-          v-for="diagnostic in active.compile?.diagnostics || []"
-          :key="`${diagnostic.severity}-${diagnostic.source_file || ''}-${diagnostic.line || ''}-${diagnostic.column || ''}-${diagnostic.message}`"
-          class="diagnostic"
-          :class="diagnostic.severity"
-          role="listitem"
-          :aria-label="diagnosticAnnouncementLabel(diagnostic)"
-        >
-          <strong>{{ diagnostic.severity }}</strong>
-          <p>{{ diagnostic.message }}</p>
-          <small v-if="diagnosticLocation(diagnostic)">{{ diagnosticLocation(diagnostic) }}</small>
-          <small v-if="diagnostic.suggestion">{{ diagnostic.suggestion }}</small>
-          <ul v-if="diagnostic.related.length" class="diagnostic-related">
-            <li v-for="related in diagnostic.related" :key="related">{{ related }}</li>
-          </ul>
-          <button v-if="canNavigateDiagnostic(diagnostic)" type="button" @click="goToSourceTarget(diagnostic)">Go to source</button>
-        </article>
-      </section>
-    </template>
+    <DiagnosticsPanel v-else-if="store.sidebar === 'diagnostics'" />
 
     <LayoutPanel v-else-if="store.sidebar === 'layout'" />
 
@@ -189,6 +162,7 @@ import ExportsPanel from '../panels/sidebar/ExportsPanel.vue';
 import VersioningPanel from '../panels/sidebar/VersioningPanel.vue';
 import ReviewPanel from '../panels/sidebar/ReviewPanel.vue';
 import BacklinksPanel from '../panels/sidebar/BacklinksPanel.vue';
+import DiagnosticsPanel from '../panels/sidebar/DiagnosticsPanel.vue';
 import { useDocumentsStore } from '../stores/documents';
 import type { SidebarPanel } from '../lib/workspacePersistence';
 
@@ -209,15 +183,10 @@ const _ctx = inject('sidebarCtx') as Record<string, any>;
 const {
   active,
   allTaskTags,
-  canNavigateDiagnostic,
-  compilerOutputInventory,
   dailyNotesCalendarGrid,
   dailyNotesCalendarMonth,
   dailyNotesCalendarYear,
-  diagnosticAnnouncementLabel,
-  diagnosticLocation,
   filteredTasks,
-  goToSourceTarget,
   openDailyNoteForDate,
   openTodayNote,
   refreshWorkspaceTasks,

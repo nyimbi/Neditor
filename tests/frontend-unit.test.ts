@@ -9286,6 +9286,7 @@ test("workbench command bar exposes icon display controls and workflow groups", 
     + readFileSync("src/panels/sidebar/VersioningPanel.vue", "utf8")
     + readFileSync("src/panels/sidebar/ReviewPanel.vue", "utf8")
     + readFileSync("src/panels/sidebar/BacklinksPanel.vue", "utf8")
+    + readFileSync("src/panels/sidebar/DiagnosticsPanel.vue", "utf8")
     + readFileSync("src/components/EditorPane.vue", "utf8")
     + readFileSync("src/components/PreviewPane.vue", "utf8")
     + readFileSync("src/panels/AgentWorkspace.vue", "utf8")
@@ -13199,4 +13200,47 @@ test("FilesPanel: primary content (file tree, pinned, open folder) is outside Co
   ok(fileRowIdx < collapsibleIdx, "file-row (primary content) must precede CollapsibleAdvanced");
   ok(pinnedIdx < collapsibleIdx, "pinned-files must precede CollapsibleAdvanced");
   ok(openFolderIdx < collapsibleIdx, "openFolder must precede CollapsibleAdvanced");
+});
+
+// ── Phase D: DiagnosticsPanel ─────────────────────────────────────────────────
+test("DiagnosticsPanel: registered as a sidebar tab in Sidebar.vue PANEL_LABELS", () => {
+  const src = readFileSync("src/components/Sidebar.vue", "utf8");
+  ok(src.includes("diagnostics: 'Diagnostics'"), "diagnostics must appear in PANEL_LABELS");
+  ok(src.includes("DiagnosticsPanel"), "Sidebar.vue must import and use DiagnosticsPanel");
+  ok(src.includes("store.sidebar === 'diagnostics'"), "DiagnosticsPanel must be conditionally rendered");
+});
+
+test("DiagnosticsPanel: renders trust-required prompts when externalTransformTrustPrompts is populated", () => {
+  const src = readFileSync("src/panels/sidebar/DiagnosticsPanel.vue", "utf8");
+  ok(src.includes("externalTransformTrustPrompts"), "must consume externalTransformTrustPrompts");
+  ok(src.includes("Trust required"), "must render 'Trust required' label");
+  ok(src.includes("trustTransformEngine"), "must wire Trust button to trustTransformEngine");
+});
+
+test("DiagnosticsPanel: renders compile errors when compileDiagnostics is non-empty", () => {
+  const src = readFileSync("src/panels/sidebar/DiagnosticsPanel.vue", "utf8");
+  ok(src.includes("compileDiagnostics"), "must reference compileDiagnostics computed");
+  ok(src.includes("active.value?.compile?.diagnostics"), "must source diagnostics from active.compile.diagnostics");
+  ok(src.includes("goToSourceTarget"), "must wire go-to-source for navigable diagnostics");
+});
+
+test("DiagnosticsPanel: groups diagnostics by kind (Compile, Trust, Engine)", () => {
+  const src = readFileSync("src/panels/sidebar/DiagnosticsPanel.vue", "utf8");
+  ok(src.includes(">Compile<"), "must have Compile group heading");
+  ok(src.includes(">Trust<"), "must have Trust group heading");
+  ok(src.includes(">Engine<"), "must have Engine group heading");
+});
+
+test("DiagnosticsPanel: advanced section uses CollapsibleAdvanced with panel-id='diagnostics'", () => {
+  const src = readFileSync("src/panels/sidebar/DiagnosticsPanel.vue", "utf8");
+  ok(src.includes("CollapsibleAdvanced"), "must use CollapsibleAdvanced");
+  ok(src.includes('panel-id="diagnostics"'), 'must pass panel-id="diagnostics"');
+  ok(src.includes("compiler-output-inventory"), "advanced must include compiler output inventory");
+  ok(src.includes("copyPreviewErrorForSupport"), "advanced must include copy-error-for-support button");
+});
+
+test("Sidebar.vue: inline diagnostics template removed (content lives in DiagnosticsPanel)", () => {
+  const src = readFileSync("src/components/Sidebar.vue", "utf8");
+  ok(!src.includes("compiler-output-inventory"), "inline compiler-output-inventory must be removed from Sidebar.vue");
+  ok(!src.includes("compilerOutputInventory"), "compilerOutputInventory must not be injected in Sidebar.vue");
 });
