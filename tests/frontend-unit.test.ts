@@ -13029,3 +13029,75 @@ test("EditorPane and PreviewPane are used in App.vue", () => {
   ok(app.includes("editorPaneCtx"), "App.vue must provide editorPaneCtx");
   ok(app.includes("previewPaneCtx"), "App.vue must provide previewPaneCtx");
 });
+
+// ── Sidebar layout preference ─────────────────────────────────────────────────
+
+test("sidebarLayout: default is tabs on fresh install (no persisted record)", () => {
+  const src = readFileSync("src/stores/documents.ts", "utf8");
+  ok(src.includes('sidebarLayout: "tabs"'), 'store default sidebarLayout must be "tabs"');
+});
+
+test("sidebarLayout: persisted workspace without sidebarLayout migrates to activity-bar", () => {
+  // Existing workspace record without the field → legacy migration → "activity-bar"
+  const persisted = migratePersistedWorkspace({ sidebar: "outline" });
+  equal(persisted.sidebarLayout, "activity-bar", 'existing workspace without sidebarLayout must migrate to "activity-bar"');
+});
+
+test("sidebarLayout: persisted workspace with sidebarLayout:tabs loads unchanged", () => {
+  const persisted = migratePersistedWorkspace({ sidebarLayout: "tabs" });
+  equal(persisted.sidebarLayout, "tabs");
+});
+
+test("sidebarLayout: persisted workspace with sidebarLayout:activity-bar loads unchanged", () => {
+  const persisted = migratePersistedWorkspace({ sidebarLayout: "activity-bar" });
+  equal(persisted.sidebarLayout, "activity-bar");
+});
+
+test("sidebarLayout: fresh install (migratePersistedWorkspace(null)) sets no sidebarLayout so store default applies", () => {
+  const persisted = migratePersistedWorkspace(null);
+  equal(persisted.sidebarLayout, undefined, "null input must not produce a sidebarLayout override");
+});
+
+test("activeSidebarTab: persists and restores", () => {
+  const withTab = migratePersistedWorkspace({ activeSidebarTab: "files" });
+  equal(withTab.activeSidebarTab, "files");
+  const noTab = migratePersistedWorkspace({ sidebar: "outline" });
+  equal(noTab.activeSidebarTab, undefined, "activeSidebarTab absent from persisted record is undefined");
+});
+
+test("Sidebar.vue: renders tab strip element when sidebarLayout=tabs", () => {
+  const src = readFileSync("src/components/Sidebar.vue", "utf8");
+  ok(src.includes("sidebar-tab-strip"), 'Sidebar must contain .sidebar-tab-strip element for tabs layout');
+  ok(src.includes("sidebarLayout === 'tabs'"), "Sidebar must gate tab strip on sidebarLayout==='tabs'");
+});
+
+test("Sidebar.vue: renders legacy activity-bar chrome when sidebarLayout=activity-bar", () => {
+  const src = readFileSync("src/components/Sidebar.vue", "utf8");
+  ok(src.includes("sidebarLayout !== 'tabs'"), "Sidebar must gate legacy chrome on sidebarLayout!=='tabs'");
+  ok(src.includes("sidebar-collapse-btn"), "sidebar-collapse-btn must still exist for activity-bar mode");
+});
+
+test("Sidebar.vue: selecting a tab updates activeSidebarTab and store.sidebar", () => {
+  const src = readFileSync("src/components/Sidebar.vue", "utf8");
+  ok(src.includes("store.activeSidebarTab = panelId"), "selectTab must set store.activeSidebarTab");
+  ok(src.includes("store.sidebar = panelId"), "selectTab must set store.sidebar to keep watches firing");
+});
+
+test("SettingsPanel.vue: exposes sidebarLayout radio group", () => {
+  const src = readFileSync("src/components/SettingsPanel.vue", "utf8");
+  ok(src.includes('v-model="store.sidebarLayout"'), "SettingsPanel must bind sidebarLayout via v-model");
+  ok(src.includes('value="tabs"'), 'SettingsPanel must include tabs radio option');
+  ok(src.includes('value="activity-bar"'), 'SettingsPanel must include activity-bar radio option');
+});
+
+test("App.vue: activity-bar nav hidden when sidebarLayout=tabs", () => {
+  const src = readFileSync("src/App.vue", "utf8");
+  ok(src.includes("sidebarLayout !== 'tabs'"), "App.vue activity-bar must be hidden when sidebarLayout==='tabs'");
+});
+
+test("App.vue: migration toast fires for activity-bar users via dismissedNudges key", () => {
+  const src = readFileSync("src/App.vue", "utf8");
+  ok(src.includes("sidebar-tabs-onboarding"), "App.vue must use sidebar-tabs-onboarding as the one-time nudge key");
+  ok(src.includes("Try the new sidebar tabs layout"), "Migration toast title must appear in App.vue");
+  ok(src.includes("store.sidebarLayout = 'tabs'"), "Switch action must flip sidebarLayout to tabs");
+});
