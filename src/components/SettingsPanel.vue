@@ -75,6 +75,19 @@
   <input v-model.number="store.toolbarTextSize" type="range" min="9" max="15" step="1" />
   <output>{{ store.toolbarTextSize }}px</output>
 </label>
+<fieldset class="sidebar-layout-fieldset">
+  <legend>Sidebar layout</legend>
+  <label>
+    <input type="radio" v-model="store.sidebarLayout" value="tabs" @change="void store.persistWorkspace()" />
+    Tabs
+    <small>Vertical tab strip inside the sidebar — one panel active at a time.</small>
+  </label>
+  <label>
+    <input type="radio" v-model="store.sidebarLayout" value="activity-bar" @change="void store.persistWorkspace()" />
+    Activity bar
+    <small>Classic icon bar on the left edge selects the active panel.</small>
+  </label>
+</fieldset>
 <label><input v-model="store.wordWrap" type="checkbox" /> Word wrap</label>
 <label><input v-model="store.lineNumbers" type="checkbox" /> Line numbers</label>
 <label><input v-model="store.codeFolding" type="checkbox" /> Code folding</label>
