@@ -87,6 +87,7 @@ export type SidebarPanel =
   | "tasks"
   | "daily-notes"
   | "graph";
+export type SidebarLayout = "tabs" | "activity-bar";
 export type ThemePreference = "system" | "light" | "dark" | "paper";
 export type ToolbarDisplay = "both" | "icons" | "text";
 export type EditorKeymapMode = "default" | "emacs" | "vim";
@@ -509,6 +510,8 @@ export interface PersistedWorkspace {
   mailMergeDefaultDelimiter?: "," | "\t";
   presentationTheme?: string;
   presentationTransition?: string;
+  sidebarLayout?: SidebarLayout;
+  activeSidebarTab?: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1439,6 +1442,11 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   migrated.customDocumentOutlineTemplates = normalizeCustomDocumentOutlineTemplates(raw.customDocumentOutlineTemplates);
   migrated.customVersionedClauses = normalizeCustomVersionedClauses(raw.customVersionedClauses);
   migrated.documentMemoryText = normalizedString(raw.documentMemoryText, 20_000) || "";
+  // sidebarLayout: existing persisted workspaces without this field migrate to "activity-bar"
+  // so legacy users see no change. Only a fresh install (no persisted record) gets "tabs".
+  migrated.sidebarLayout = enumValue(raw.sidebarLayout, ["tabs", "activity-bar"] as const) || "activity-bar";
+  const activeSidebarTab = stringValue(raw.activeSidebarTab);
+  if (activeSidebarTab !== undefined) migrated.activeSidebarTab = activeSidebarTab || null;
   return migrated;
 }
 

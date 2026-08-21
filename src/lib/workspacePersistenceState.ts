@@ -26,6 +26,7 @@ import {
   normalizeTtsPreferences,
   type PersistedScrollPosition,
   type PersistedWorkspace,
+  type SidebarLayout,
 } from "./workspacePersistence.js";
 import type { OpenDocument } from "../types.js";
 
@@ -131,6 +132,8 @@ export interface WorkspacePersistenceStateInput {
   styleGuideEnabled?: boolean;
   styleGuideRules?: Array<{ id: string; category: string; description: string; patterns: string[]; severity: "error" | "warn" | "info"; suggestion: string }>;
   suggestionMode?: boolean;
+  sidebarLayout?: SidebarLayout;
+  activeSidebarTab?: string | null;
 }
 
 export type WorkspacePreferenceStateInput = Omit<WorkspacePersistenceStateInput, "documents" | "activeId">;
@@ -222,6 +225,8 @@ export function applyPersistedWorkspacePreferenceState(
     mailMergeMaxRecords: typeof persisted.mailMergeMaxRecords === "number" ? persisted.mailMergeMaxRecords : current.mailMergeMaxRecords,
     mailMergeDefaultDelimiter: (persisted.mailMergeDefaultDelimiter === "," || persisted.mailMergeDefaultDelimiter === "\t") ? persisted.mailMergeDefaultDelimiter : current.mailMergeDefaultDelimiter,
     keepInMenuBar: typeof persisted.keepInMenuBar === "boolean" ? persisted.keepInMenuBar : current.keepInMenuBar,
+    sidebarLayout: persisted.sidebarLayout ?? current.sidebarLayout,
+    activeSidebarTab: persisted.activeSidebarTab !== undefined ? persisted.activeSidebarTab : current.activeSidebarTab,
   };
   const restoreRequest = persisted.openFiles?.length
     ? {
@@ -333,5 +338,7 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     mailMergeMaxRecords: state.mailMergeMaxRecords,
     mailMergeDefaultDelimiter: state.mailMergeDefaultDelimiter,
     keepInMenuBar: state.keepInMenuBar,
+    sidebarLayout: state.sidebarLayout,
+    activeSidebarTab: state.activeSidebarTab,
   });
 }
