@@ -162,226 +162,6 @@
       <small>{{ item.suggestion }}</small>
     </article>
   </section>
-  <section class="export-assistance-panel" aria-label="AI export readiness assistance">
-    <header>
-      <div>
-        <h3>AI Export Assistance</h3>
-        <span>Suggested next answers for metadata, readiness diagnostics, and artifact evidence.</span>
-      </div>
-      <button type="button" @click="appendAllExportStepAssistance">Use all</button>
-    </header>
-    <article v-for="item in exportStepAssistance" :key="item.stepId">
-      <div>
-        <small>{{ item.stepLabel }}</small>
-        <p>{{ item.suggestedAnswer }}</p>
-        <p class="sidebar-hint">{{ item.rationale }}</p>
-        <ul>
-          <li v-for="signal in item.contextSignals" :key="signal">{{ signal }}</li>
-        </ul>
-      </div>
-      <button type="button" @click="appendExportStepAssistance(item)">{{ item.actionLabel }}</button>
-    </article>
-    <label>
-      Export readiness notes
-      <textarea v-model="exportReadinessNotes" rows="4" aria-label="Export readiness notes"></textarea>
-    </label>
-    <div class="reference-actions">
-      <button type="button" :disabled="!exportReadinessNotes.trim()" @click="insertExportReadinessNotes">Insert notes</button>
-      <button type="button" @click="prepareForExport">Run readiness</button>
-    </div>
-  </section>
-  <section v-if="publishingPanelVisible" class="publishing-handoff-panel" aria-label="Publishing handoff">
-    <header>
-      <div>
-        <h3>Publish and distribute</h3>
-        <span>{{ publishingTargetHelpText }} Uses dry-run previews and session-only endpoint tokens.</span>
-      </div>
-      <button type="button" :disabled="store.exportBusy" @click="preparePublishingHandoff">Prepare</button>
-    </header>
-    <div class="publishing-profile-row">
-      <label>
-        Saved destination
-        <select :value="store.activePublishingDestinationId" @change="selectPublishingDestination(inputValue($event))">
-          <option value="">Current destination</option>
-          <option v-for="profile in store.publishingDestinationProfiles" :key="profile.id" :value="profile.id">{{ profile.name }}</option>
-        </select>
-      </label>
-      <label>
-        Destination name
-        <input v-model="publishingDestinationName" type="text" />
-      </label>
-      <button type="button" @click="savePublishingDestinationProfile">Save destination</button>
-      <button type="button" :disabled="!activePublishingDestination" @click="deleteActivePublishingDestination">Delete</button>
-    </div>
-    <div class="publishing-grid">
-      <label>
-        Destination
-        <select v-model="publishingTargetKind">
-          <option v-for="target in publishingTargetOptions" :key="target.value" :value="target.value">{{ target.label }}</option>
-        </select>
-      </label>
-      <label>
-        Content
-        <select v-model="publishingContentFormat">
-          <option value="html">HTML</option>
-          <option value="markdown">Markdown</option>
-          <option value="text">Plain text</option>
-        </select>
-      </label>
-      <label>
-        Endpoint URL
-        <input v-model="publishingEndpointUrl" type="url" placeholder="https://cms.example.com/webhook/neditor" />
-      </label>
-      <label>
-        Auth header
-        <input v-model="publishingAuthHeaderName" type="text" placeholder="Authorization" />
-      </label>
-      <label>
-        Session token
-        <input v-model="publishingAuthToken" type="password" autocomplete="off" placeholder="Stored only in this session" />
-      </label>
-      <label class="checkbox-row"><input v-model="publishingDryRun" type="checkbox" /> Dry run until I explicitly send</label>
-    </div>
-    <article class="publishing-summary" :data-status="publishingRequestPreview.canSend ? 'ready' : 'needs-review'">
-      <strong>{{ publishingHandoff.title }}</strong>
-      <p>{{ publishingHandoff.description || "No public summary yet." }}</p>
-      <small>Slug {{ publishingHandoff.slug }} | {{ publishingHandoff.readinessLabel }} | {{ publishingHandoff.tags.length ? publishingHandoff.tags.join(", ") : "no tags" }}</small>
-    </article>
-    <div class="publishing-checklist">
-      <article v-for="item in publishingHandoff.checklist" :key="item.id" class="snapshot-row" :data-status="item.status">
-        <strong>{{ item.label }}</strong>
-        <p>{{ item.detail }}</p>
-      </article>
-    </div>
-    <section class="publishing-preflight" aria-label="Publishing preflight audit">
-      <header>
-        <div>
-          <strong>Publishing preflight</strong>
-          <span>{{ publishingPreflightReport.blockers.length }} blocker{{ publishingPreflightReport.blockers.length === 1 ? "" : "s" }} | {{ publishingPreflightReport.needsReview.length }} review item{{ publishingPreflightReport.needsReview.length === 1 ? "" : "s" }}</span>
-        </div>
-      </header>
-      <article v-for="item in publishingPreflightReport.items" :key="item.id" class="snapshot-row" :data-status="item.status">
-        <strong>{{ item.label }}</strong>
-        <p>{{ item.status }} | {{ item.detail }}</p>
-      </article>
-    </section>
-    <div class="reference-actions">
-      <button type="button" @click="copyPublishingPayload">Copy payload</button>
-      <button type="button" @click="copyPublishingContent">Copy content</button>
-      <button type="button" @click="insertPublishingPreflightAudit">Insert preflight</button>
-      <button type="button" @click="copyPublishingPreflightAudit">Copy preflight</button>
-      <button
-        type="button"
-        :disabled="publishingBusy || publishingDryRun || !publishingRequestPreview.canSend"
-        @click="sendPublishingPayload"
-      >
-        Send to endpoint
-      </button>
-    </div>
-    <p v-for="warning in publishingRequestPreview.warnings" :key="warning" class="sidebar-hint">{{ warning }}</p>
-    <textarea :value="publishingRequestPreview.bodyText" rows="7" readonly aria-label="Publishing payload preview"></textarea>
-  </section>
-  <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
-  <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Include styles</label>
-  <label><input v-model="store.exportDefaults.includeSyntaxHighlighting" type="checkbox" /> Syntax highlighting</label>
-  <label><input v-model="store.exportDefaults.coverPage" type="checkbox" /> Cover page</label>
-  <label><input v-model="store.exportDefaults.pageNumbers" type="checkbox" /> Page numbers</label>
-  <label>
-    Layout preset
-    <select v-model="store.exportDefaults.layoutPreset">
-      <option value="business">Business</option>
-      <option value="compact">Compact</option>
-      <option value="presentation">Presentation</option>
-    </select>
-  </label>
-  <section class="print-preview-card" aria-label="Print preview controls">
-    <header>
-      <div>
-        <strong>Print preview</strong>
-        <span>{{ printPreviewReport.summary }}</span>
-      </div>
-      <button type="button" :class="{ active: printPreviewEnabled }" title="Show approximate page geometry, pagination, margins, columns, and page-break warnings in the preview" @click="() => togglePrintPreview()">
-        {{ printPreviewEnabled ? "Hide" : "Show" }}
-      </button>
-    </header>
-    <div class="print-preview-metrics" aria-label="Print preview export metrics">
-      <span><strong>{{ printPreviewReport.estimatedPages }}</strong> pages</span>
-      <span><strong>{{ printPreviewReport.wordCount }}</strong> words</span>
-      <span><strong>{{ printPreviewReport.columns }}</strong> columns</span>
-      <span><strong>{{ printPreviewReport.margins }}</strong> margins</span>
-    </div>
-    <ul v-if="printPreviewReport.warnings.length" aria-label="Print preview export warnings">
-      <li v-for="warning in printPreviewReport.warnings" :key="warning">{{ warning }}</li>
-    </ul>
-    <p v-else class="sidebar-hint">No print-flow warnings from the approximate preview model.</p>
-  </section>
-  <section class="export-visual-qa-dashboard" :data-status="exportVisualQaDashboard.status" aria-label="Export visual QA dashboard">
-    <header>
-      <div>
-        <h3>Visual QA</h3>
-        <span>{{ exportVisualQaDashboard.summary }}</span>
-      </div>
-      <strong>{{ exportVisualQaDashboard.status }}</strong>
-    </header>
-    <div class="export-visual-qa-metrics" aria-label="Export visual QA status counts">
-      <span><strong>{{ exportVisualQaDashboard.counts.ready }}</strong> ready</span>
-      <span><strong>{{ exportVisualQaDashboard.counts["needs-review"] }}</strong> review</span>
-      <span><strong>{{ exportVisualQaDashboard.counts.blocked }}</strong> blocked</span>
-      <span><strong>{{ exportVisualQaDashboard.counts["not-run"] }}</strong> not run</span>
-    </div>
-    <article class="export-visual-qa-current" :data-status="exportVisualQaCurrentRow.status">
-      <strong>{{ exportVisualQaCurrentRow.label }}</strong>
-      <p>{{ exportVisualQaCurrentRow.nextAction }}</p>
-      <small>{{ exportVisualQaCurrentRow.evidence.join(" | ") || exportVisualQaCurrentRow.blockers.join(" | ") || "No current output proof yet." }}</small>
-    </article>
-    <details>
-      <summary>Target evidence</summary>
-      <article
-        v-for="row in exportVisualQaDashboard.rows"
-        :key="row.target"
-        class="export-visual-qa-row"
-        :data-status="row.status"
-      >
-        <header>
-          <strong>{{ row.label }}</strong>
-          <span>{{ row.status }}</span>
-        </header>
-        <p>{{ row.nextAction }}</p>
-        <ul v-if="row.blockers.length">
-          <li v-for="blocker in row.blockers" :key="blocker">{{ blocker }}</li>
-        </ul>
-        <small>{{ row.evidence.join(" | ") || row.checks.slice(0, 2).join(" | ") }}</small>
-      </article>
-    </details>
-    <div class="reference-actions">
-      <button type="button" :disabled="store.exportBusy" title="Run target-aware export readiness before judging the selected output target" @click="prepareForExport">Run readiness</button>
-      <button type="button" title="Insert this export visual QA dashboard into the Markdown document for reviewer handoff" @click="insertExportVisualQaReport">Insert QA report</button>
-      <button type="button" title="Show approximate page geometry, pagination, margins, columns, and print-flow warnings" @click="togglePrintPreview(true)">Show print preview</button>
-    </div>
-  </section>
-  <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Include comments</label>
-  <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
-  <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
-  <label><input v-model="store.exportDefaults.includeAgenda" type="checkbox" /> PPTX agenda</label>
-  <h3>Presentation settings</h3>
-  <div class="pres-theme-row">
-    <span class="compact-label">Theme</span>
-    <div class="pres-theme-grid">
-      <button
-        v-for="theme in PRESENTATION_THEMES" :key="theme.id"
-        type="button" class="pres-theme-btn"
-        :class="{ 'pres-theme-active': store.presentationTheme === theme.id }"
-        :title="theme.label"
-        :style="{ background: 'linear-gradient(135deg,' + theme.previewStart + ',' + theme.previewEnd + ')' }"
-        @click="store.presentationTheme = theme.id; void store.persistWorkspace()"
-      ><span class="pres-theme-lbl">{{ theme.label }}</span></button>
-    </div>
-  </div>
-  <label>Transition<select v-model="store.presentationTransition" @change="void store.persistWorkspace()"><option v-for="t in PRESENTATION_TRANSITIONS" :key="t.id" :value="t.id">{{ t.label }}</option></select></label>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-    <button type="button" @click="openPresenterView">Presenter view</button>
-    <button type="button" :disabled="store.exportBusy" @click="exportDocumentAs('html-slides')">Export HTML slides</button>
-  </div>
   <div class="export-actions">
     <button class="template-action-primary" type="button" :disabled="store.exportBusy" @click="exportDocumentAs('html')">
       <span class="button-icon" aria-hidden="true">
@@ -463,21 +243,245 @@
       </article>
     </section>
   </section>
-  <h3>Manifest</h3>
-  <pre>{{ manifestPreview }}</pre>
-  <h3>Snapshots</h3>
-  <button type="button" @click="store.listSnapshots">Refresh snapshots</button>
-  <article v-for="snapshot in store.snapshots" :key="snapshot.snapshot_path" class="snapshot-row">
-    <p>{{ snapshot.label || "snapshot" }}</p>
-    <small>{{ snapshot.created_at || snapshot.snapshot_path }}</small>
-    <small>{{ snapshot.document_version || "unversioned" }} | {{ snapshot.status || "unknown" }} | {{ snapshot.author || "unknown author" }}</small>
-    <button type="button" @click="restoreSnapshot(snapshot.snapshot_path)">Restore</button>
-  </article>
+
+  <CollapsibleAdvanced panel-id="exports" label="Advanced">
+    <section class="export-assistance-panel" aria-label="AI export readiness assistance">
+      <header>
+        <div>
+          <h3>AI Export Assistance</h3>
+          <span>Suggested next answers for metadata, readiness diagnostics, and artifact evidence.</span>
+        </div>
+        <button type="button" @click="appendAllExportStepAssistance">Use all</button>
+      </header>
+      <article v-for="item in exportStepAssistance" :key="item.stepId">
+        <div>
+          <small>{{ item.stepLabel }}</small>
+          <p>{{ item.suggestedAnswer }}</p>
+          <p class="sidebar-hint">{{ item.rationale }}</p>
+          <ul>
+            <li v-for="signal in item.contextSignals" :key="signal">{{ signal }}</li>
+          </ul>
+        </div>
+        <button type="button" @click="appendExportStepAssistance(item)">{{ item.actionLabel }}</button>
+      </article>
+      <label>
+        Export readiness notes
+        <textarea v-model="exportReadinessNotes" rows="4" aria-label="Export readiness notes"></textarea>
+      </label>
+      <div class="reference-actions">
+        <button type="button" :disabled="!exportReadinessNotes.trim()" @click="insertExportReadinessNotes">Insert notes</button>
+        <button type="button" @click="prepareForExport">Run readiness</button>
+      </div>
+    </section>
+    <section v-if="publishingPanelVisible" class="publishing-handoff-panel" aria-label="Publishing handoff">
+      <header>
+        <div>
+          <h3>Publish and distribute</h3>
+          <span>{{ publishingTargetHelpText }} Uses dry-run previews and session-only endpoint tokens.</span>
+        </div>
+        <button type="button" :disabled="store.exportBusy" @click="preparePublishingHandoff">Prepare</button>
+      </header>
+      <div class="publishing-profile-row">
+        <label>
+          Saved destination
+          <select :value="store.activePublishingDestinationId" @change="selectPublishingDestination(inputValue($event))">
+            <option value="">Current destination</option>
+            <option v-for="profile in store.publishingDestinationProfiles" :key="profile.id" :value="profile.id">{{ profile.name }}</option>
+          </select>
+        </label>
+        <label>
+          Destination name
+          <input v-model="publishingDestinationName" type="text" />
+        </label>
+        <button type="button" @click="savePublishingDestinationProfile">Save destination</button>
+        <button type="button" :disabled="!activePublishingDestination" @click="deleteActivePublishingDestination">Delete</button>
+      </div>
+      <div class="publishing-grid">
+        <label>
+          Destination
+          <select v-model="publishingTargetKind">
+            <option v-for="target in publishingTargetOptions" :key="target.value" :value="target.value">{{ target.label }}</option>
+          </select>
+        </label>
+        <label>
+          Content
+          <select v-model="publishingContentFormat">
+            <option value="html">HTML</option>
+            <option value="markdown">Markdown</option>
+            <option value="text">Plain text</option>
+          </select>
+        </label>
+        <label>
+          Endpoint URL
+          <input v-model="publishingEndpointUrl" type="url" placeholder="https://cms.example.com/webhook/neditor" />
+        </label>
+        <label>
+          Auth header
+          <input v-model="publishingAuthHeaderName" type="text" placeholder="Authorization" />
+        </label>
+        <label>
+          Session token
+          <input v-model="publishingAuthToken" type="password" autocomplete="off" placeholder="Stored only in this session" />
+        </label>
+        <label class="checkbox-row"><input v-model="publishingDryRun" type="checkbox" /> Dry run until I explicitly send</label>
+      </div>
+      <article class="publishing-summary" :data-status="publishingRequestPreview.canSend ? 'ready' : 'needs-review'">
+        <strong>{{ publishingHandoff.title }}</strong>
+        <p>{{ publishingHandoff.description || "No public summary yet." }}</p>
+        <small>Slug {{ publishingHandoff.slug }} | {{ publishingHandoff.readinessLabel }} | {{ publishingHandoff.tags.length ? publishingHandoff.tags.join(", ") : "no tags" }}</small>
+      </article>
+      <div class="publishing-checklist">
+        <article v-for="item in publishingHandoff.checklist" :key="item.id" class="snapshot-row" :data-status="item.status">
+          <strong>{{ item.label }}</strong>
+          <p>{{ item.detail }}</p>
+        </article>
+      </div>
+      <section class="publishing-preflight" aria-label="Publishing preflight audit">
+        <header>
+          <div>
+            <strong>Publishing preflight</strong>
+            <span>{{ publishingPreflightReport.blockers.length }} blocker{{ publishingPreflightReport.blockers.length === 1 ? "" : "s" }} | {{ publishingPreflightReport.needsReview.length }} review item{{ publishingPreflightReport.needsReview.length === 1 ? "" : "s" }}</span>
+          </div>
+        </header>
+        <article v-for="item in publishingPreflightReport.items" :key="item.id" class="snapshot-row" :data-status="item.status">
+          <strong>{{ item.label }}</strong>
+          <p>{{ item.status }} | {{ item.detail }}</p>
+        </article>
+      </section>
+      <div class="reference-actions">
+        <button type="button" @click="copyPublishingPayload">Copy payload</button>
+        <button type="button" @click="copyPublishingContent">Copy content</button>
+        <button type="button" @click="insertPublishingPreflightAudit">Insert preflight</button>
+        <button type="button" @click="copyPublishingPreflightAudit">Copy preflight</button>
+        <button
+          type="button"
+          :disabled="publishingBusy || publishingDryRun || !publishingRequestPreview.canSend"
+          @click="sendPublishingPayload"
+        >
+          Send to endpoint
+        </button>
+      </div>
+      <p v-for="warning in publishingRequestPreview.warnings" :key="warning" class="sidebar-hint">{{ warning }}</p>
+      <textarea :value="publishingRequestPreview.bodyText" rows="7" readonly aria-label="Publishing payload preview"></textarea>
+    </section>
+    <label><input v-model="store.exportDefaults.includeManifest" type="checkbox" /> Export manifest</label>
+    <label><input v-model="store.exportDefaults.includeStyles" type="checkbox" /> Include styles</label>
+    <label><input v-model="store.exportDefaults.includeSyntaxHighlighting" type="checkbox" /> Syntax highlighting</label>
+    <label><input v-model="store.exportDefaults.coverPage" type="checkbox" /> Cover page</label>
+    <label><input v-model="store.exportDefaults.pageNumbers" type="checkbox" /> Page numbers</label>
+    <label>
+      Layout preset
+      <select v-model="store.exportDefaults.layoutPreset">
+        <option value="business">Business</option>
+        <option value="compact">Compact</option>
+        <option value="presentation">Presentation</option>
+      </select>
+    </label>
+    <section class="print-preview-card" aria-label="Print preview controls">
+      <header>
+        <div>
+          <strong>Print preview</strong>
+          <span>{{ printPreviewReport.summary }}</span>
+        </div>
+        <button type="button" :class="{ active: printPreviewEnabled }" title="Show approximate page geometry, pagination, margins, columns, and page-break warnings in the preview" @click="() => togglePrintPreview()">
+          {{ printPreviewEnabled ? "Hide" : "Show" }}
+        </button>
+      </header>
+      <div class="print-preview-metrics" aria-label="Print preview export metrics">
+        <span><strong>{{ printPreviewReport.estimatedPages }}</strong> pages</span>
+        <span><strong>{{ printPreviewReport.wordCount }}</strong> words</span>
+        <span><strong>{{ printPreviewReport.columns }}</strong> columns</span>
+        <span><strong>{{ printPreviewReport.margins }}</strong> margins</span>
+      </div>
+      <ul v-if="printPreviewReport.warnings.length" aria-label="Print preview export warnings">
+        <li v-for="warning in printPreviewReport.warnings" :key="warning">{{ warning }}</li>
+      </ul>
+      <p v-else class="sidebar-hint">No print-flow warnings from the approximate preview model.</p>
+    </section>
+    <section class="export-visual-qa-dashboard" :data-status="exportVisualQaDashboard.status" aria-label="Export visual QA dashboard">
+      <header>
+        <div>
+          <h3>Visual QA</h3>
+          <span>{{ exportVisualQaDashboard.summary }}</span>
+        </div>
+        <strong>{{ exportVisualQaDashboard.status }}</strong>
+      </header>
+      <div class="export-visual-qa-metrics" aria-label="Export visual QA status counts">
+        <span><strong>{{ exportVisualQaDashboard.counts.ready }}</strong> ready</span>
+        <span><strong>{{ exportVisualQaDashboard.counts["needs-review"] }}</strong> review</span>
+        <span><strong>{{ exportVisualQaDashboard.counts.blocked }}</strong> blocked</span>
+        <span><strong>{{ exportVisualQaDashboard.counts["not-run"] }}</strong> not run</span>
+      </div>
+      <article class="export-visual-qa-current" :data-status="exportVisualQaCurrentRow.status">
+        <strong>{{ exportVisualQaCurrentRow.label }}</strong>
+        <p>{{ exportVisualQaCurrentRow.nextAction }}</p>
+        <small>{{ exportVisualQaCurrentRow.evidence.join(" | ") || exportVisualQaCurrentRow.blockers.join(" | ") || "No current output proof yet." }}</small>
+      </article>
+      <details>
+        <summary>Target evidence</summary>
+        <article
+          v-for="row in exportVisualQaDashboard.rows"
+          :key="row.target"
+          class="export-visual-qa-row"
+          :data-status="row.status"
+        >
+          <header>
+            <strong>{{ row.label }}</strong>
+            <span>{{ row.status }}</span>
+          </header>
+          <p>{{ row.nextAction }}</p>
+          <ul v-if="row.blockers.length">
+            <li v-for="blocker in row.blockers" :key="blocker">{{ blocker }}</li>
+          </ul>
+          <small>{{ row.evidence.join(" | ") || row.checks.slice(0, 2).join(" | ") }}</small>
+        </article>
+      </details>
+      <div class="reference-actions">
+        <button type="button" :disabled="store.exportBusy" title="Run target-aware export readiness before judging the selected output target" @click="prepareForExport">Run readiness</button>
+        <button type="button" title="Insert this export visual QA dashboard into the Markdown document for reviewer handoff" @click="insertExportVisualQaReport">Insert QA report</button>
+        <button type="button" title="Show approximate page geometry, pagination, margins, columns, and print-flow warnings" @click="togglePrintPreview(true)">Show print preview</button>
+      </div>
+    </section>
+    <label><input v-model="store.exportDefaults.includeComments" type="checkbox" /> Include comments</label>
+    <label><input v-model="store.exportDefaults.includeProvenance" type="checkbox" /> Include AI provenance</label>
+    <label><input v-model="store.exportDefaults.includeGlossary" type="checkbox" /> Include glossary</label>
+    <label><input v-model="store.exportDefaults.includeAgenda" type="checkbox" /> PPTX agenda</label>
+    <h3>Presentation settings</h3>
+    <div class="pres-theme-row">
+      <span class="compact-label">Theme</span>
+      <div class="pres-theme-grid">
+        <button
+          v-for="theme in PRESENTATION_THEMES" :key="theme.id"
+          type="button" class="pres-theme-btn"
+          :class="{ 'pres-theme-active': store.presentationTheme === theme.id }"
+          :title="theme.label"
+          :style="{ background: 'linear-gradient(135deg,' + theme.previewStart + ',' + theme.previewEnd + ')' }"
+          @click="store.presentationTheme = theme.id; void store.persistWorkspace()"
+        ><span class="pres-theme-lbl">{{ theme.label }}</span></button>
+      </div>
+    </div>
+    <label>Transition<select v-model="store.presentationTransition" @change="void store.persistWorkspace()"><option v-for="t in PRESENTATION_TRANSITIONS" :key="t.id" :value="t.id">{{ t.label }}</option></select></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button type="button" @click="openPresenterView">Presenter view</button>
+      <button type="button" :disabled="store.exportBusy" @click="exportDocumentAs('html-slides')">Export HTML slides</button>
+    </div>
+    <h3>Manifest</h3>
+    <pre>{{ manifestPreview }}</pre>
+    <h3>Snapshots</h3>
+    <button type="button" @click="store.listSnapshots">Refresh snapshots</button>
+    <article v-for="snapshot in store.snapshots" :key="snapshot.snapshot_path" class="snapshot-row">
+      <p>{{ snapshot.label || "snapshot" }}</p>
+      <small>{{ snapshot.created_at || snapshot.snapshot_path }}</small>
+      <small>{{ snapshot.document_version || "unversioned" }} | {{ snapshot.status || "unknown" }} | {{ snapshot.author || "unknown author" }}</small>
+      <button type="button" @click="restoreSnapshot(snapshot.snapshot_path)">Restore</button>
+    </article>
+  </CollapsibleAdvanced>
 </template>
 
 <script setup lang="ts">
 import { inject } from 'vue';
 import { useDocumentsStore } from '../../stores/documents';
+import CollapsibleAdvanced from '../../components/CollapsibleAdvanced.vue';
 
 const store = useDocumentsStore();
 const _ctx = inject('sidebarCtx') as Record<string, any>;

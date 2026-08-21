@@ -13244,3 +13244,26 @@ test("Sidebar.vue: inline diagnostics template removed (content lives in Diagnos
   ok(!src.includes("compiler-output-inventory"), "inline compiler-output-inventory must be removed from Sidebar.vue");
   ok(!src.includes("compilerOutputInventory"), "compilerOutputInventory must not be injected in Sidebar.vue");
 });
+
+// ── Phase D: ExportsPanel CollapsibleAdvanced ─────────────────────────────────
+test("ExportsPanel: wraps publishing handoff, AI assistance, visual QA, and snapshots in CollapsibleAdvanced with panel-id='exports'", () => {
+  const src = readFileSync("src/panels/sidebar/ExportsPanel.vue", "utf8");
+  ok(src.includes("CollapsibleAdvanced"), "ExportsPanel must use CollapsibleAdvanced");
+  ok(src.includes('panel-id="exports"'), 'ExportsPanel must pass panel-id="exports" to CollapsibleAdvanced');
+  ok(src.includes("publishing-handoff-panel"), "Advanced section must include publishing-handoff-panel");
+  ok(src.includes("export-assistance-panel"), "Advanced section must include export-assistance-panel");
+  ok(src.includes("export-visual-qa-dashboard"), "Advanced section must include export-visual-qa-dashboard");
+  ok(src.includes("snapshot-row"), "Advanced section must include snapshots");
+});
+
+test("ExportsPanel: primary targets and export actions precede CollapsibleAdvanced", () => {
+  const src = readFileSync("src/panels/sidebar/ExportsPanel.vue", "utf8");
+  const collapsibleIdx = src.indexOf("<CollapsibleAdvanced");
+  const targetSelectIdx = src.indexOf('v-model="store.exportTarget"');
+  const exportActionsIdx = src.indexOf("export-actions");
+  const readinessIdx = src.indexOf("export-result");
+  ok(collapsibleIdx !== -1, "CollapsibleAdvanced must exist");
+  ok(targetSelectIdx < collapsibleIdx, "target select must precede CollapsibleAdvanced");
+  ok(exportActionsIdx < collapsibleIdx, "export action buttons must precede CollapsibleAdvanced");
+  ok(readinessIdx < collapsibleIdx, "export result section must precede CollapsibleAdvanced");
+});
