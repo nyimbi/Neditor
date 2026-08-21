@@ -512,6 +512,7 @@ export interface PersistedWorkspace {
   presentationTransition?: string;
   sidebarLayout?: SidebarLayout;
   activeSidebarTab?: string | null;
+  sidebarAdvancedExpanded?: Record<string, boolean>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1447,6 +1448,8 @@ function normalizeWorkspaceRecord(raw: Record<string, unknown>): PersistedWorksp
   migrated.sidebarLayout = enumValue(raw.sidebarLayout, ["tabs", "activity-bar"] as const) || "activity-bar";
   const activeSidebarTab = stringValue(raw.activeSidebarTab);
   if (activeSidebarTab !== undefined) migrated.activeSidebarTab = activeSidebarTab || null;
+  const sidebarAdvancedExpanded = booleanRecord(raw.sidebarAdvancedExpanded);
+  if (sidebarAdvancedExpanded) migrated.sidebarAdvancedExpanded = sidebarAdvancedExpanded;
   return migrated;
 }
 

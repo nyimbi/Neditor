@@ -134,6 +134,7 @@ export interface WorkspacePersistenceStateInput {
   suggestionMode?: boolean;
   sidebarLayout?: SidebarLayout;
   activeSidebarTab?: string | null;
+  sidebarAdvancedExpanded: Record<string, boolean>;
 }
 
 export type WorkspacePreferenceStateInput = Omit<WorkspacePersistenceStateInput, "documents" | "activeId">;
@@ -227,6 +228,9 @@ export function applyPersistedWorkspacePreferenceState(
     keepInMenuBar: typeof persisted.keepInMenuBar === "boolean" ? persisted.keepInMenuBar : current.keepInMenuBar,
     sidebarLayout: persisted.sidebarLayout ?? current.sidebarLayout,
     activeSidebarTab: persisted.activeSidebarTab !== undefined ? persisted.activeSidebarTab : current.activeSidebarTab,
+    sidebarAdvancedExpanded: typeof persisted.sidebarAdvancedExpanded === "object" && persisted.sidebarAdvancedExpanded !== null
+      ? Object.fromEntries(Object.entries(persisted.sidebarAdvancedExpanded).filter((e): e is [string, boolean] => typeof e[1] === "boolean"))
+      : current.sidebarAdvancedExpanded,
   };
   const restoreRequest = persisted.openFiles?.length
     ? {
@@ -340,5 +344,6 @@ export function buildPersistedWorkspaceState(state: WorkspacePersistenceStateInp
     keepInMenuBar: state.keepInMenuBar,
     sidebarLayout: state.sidebarLayout,
     activeSidebarTab: state.activeSidebarTab,
+    sidebarAdvancedExpanded: state.sidebarAdvancedExpanded,
   });
 }

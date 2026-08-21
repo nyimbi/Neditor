@@ -368,6 +368,7 @@ export const useDocumentsStore = defineStore("documents", {
     sidebar: "outline" as SidebarPanel,
     sidebarLayout: "tabs" as SidebarLayout,
     activeSidebarTab: null as string | null,
+    sidebarAdvancedExpanded: {} as Record<string, boolean>,
     theme: "system" as "system" | "light" | "dark",
     previewTheme: "match" as PreviewTheme,
     toolbarDisplay: "both" as ToolbarDisplay,
@@ -1969,6 +1970,13 @@ export const useDocumentsStore = defineStore("documents", {
       if (!result) return;
       this.documents = result.documents;
       this.statusMessage = result.statusMessage;
+      void this.persistWorkspace();
+    },
+    getAdvancedExpanded(panelId: string): boolean {
+      return this.sidebarAdvancedExpanded[panelId] ?? false;
+    },
+    setAdvancedExpanded(panelId: string, expanded: boolean) {
+      this.sidebarAdvancedExpanded = { ...this.sidebarAdvancedExpanded, [panelId]: expanded };
       void this.persistWorkspace();
     },
   },
